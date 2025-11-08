@@ -1,7 +1,7 @@
-import asyncio
 import json
 import logging
 from copy import deepcopy
+from pathlib import Path
 
 import aiofiles
 
@@ -10,6 +10,7 @@ from optexity.inference.api.core.run_interaction import run_interaction_action
 from optexity.inference.api.infra.browser import Browser
 from optexity.schema.automation import ActionNode, Automation, ForLoopNode
 from optexity.schema.memory import BrowserState, Memory
+from optexity.utils.utils import save_screenshot
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +24,15 @@ logger = logging.getLogger(__name__)
 
 
 async def run_automation(automation: Automation, memory: Memory, browser: Browser):
+    save_directory = memory.save_directory / str(memory.task_id)
+    save_directory.mkdir(parents=True, exist_ok=True)
 
-    # automation = expand_for_loop_based_on_input_variables(automation, memory)
+    file_handler = logging.FileHandler(str(save_directory / "optexity.log"))
+    file_handler.setLevel(logging.DEBUG)
+
+    logging.getLogger("optexity").addHandler(file_handler)
+
+    logger.info(f"Running automation for task {memory.task_id}")
 
     memory.automation_state.step_index = -1
     memory.automation_state.try_index = 0
@@ -41,6 +49,7 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
             action_nodes = [node]
 
         for action_node in action_nodes:
+            await sleep_for_page_to_load(browser, action_node.before_sleep_time)
             await browser.handle_new_tabs(0)
             memory.automation_state.step_index += 1
             memory.automation_state.try_index = 0
@@ -48,7 +57,18 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
             action_node.replace_variables(memory.variables.input_variables)
             action_node.replace_variables(memory.variables.generated_variables)
 
-            memory.browser_states.append(BrowserState(url=browser.page.url))
+            ## TODO: optimize this by taking screenshot only if needed
+            ## TODO: get axtree only if needed
+            browser_state_summary = await browser.get_browser_state_summary()
+
+            memory.browser_states.append(
+                BrowserState(
+                    url=browser_state_summary.url,
+                    screenshot=browser_state_summary.screenshot,
+                    title=browser_state_summary.title,
+                    axtree=browser_state_summary.dom_state.llm_representation(),
+                )
+            )
             logger.debug(
                 f"--------------------------------Running node {memory.automation_state.step_index}--------------------------------"
             )
@@ -60,21 +80,22 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
                     await run_interaction_action(
                         action_node.interaction_action, memory, browser
                     )
-                # elif action_node.assertion_action:
-                #     await browser.run_assertion_action(action_node.assertion_action)
                 elif action_node.extraction_action:
-                    await sleep_for_page_to_load(browser, action_node.before_sleep_time)
                     await run_extraction_action(
                         action_node.extraction_action, memory, browser
                     )
 
-                # elif action_node.python_script_action:
-                #     await browser.run_python_script_action(action_node.python_script_action)
             except Exception as e:
                 logger.error(
                     f"Error running node {memory.automation_state.step_index}: {e}"
                 )
                 raise e
+            finally:
+                step_save_directory = (
+                    save_directory / f"step_{memory.automation_state.step_index}"
+                )
+                step_save_directory.mkdir(parents=True, exist_ok=True)
+                await save_memory_state(memory, action_node, step_save_directory)
 
             if action_node.expect_new_tab:
                 found_new_tab, total_time = await browser.handle_new_tabs(
@@ -96,11 +117,64 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
                 f"--------------------------------Finished node {memory.automation_state.step_index}--------------------------------"
             )
 
-            async with aiofiles.open("automation.json", "w") as f:
-                await f.write(json.dumps(full_automation, indent=4))
+    browser_state_summary = await browser.get_browser_state_summary()
 
-            async with aiofiles.open("memory.json", "w") as f:
-                await f.write(json.dumps(memory.model_dump(), indent=4))
+    memory.browser_states.append(
+        BrowserState(
+            url=browser_state_summary.url,
+            screenshot=browser_state_summary.screenshot,
+            title=browser_state_summary.title,
+            axtree=browser_state_summary.dom_state.llm_representation(),
+        )
+    )
+
+    step_save_directory = (
+        save_directory / f"step_{memory.automation_state.step_index+1}"
+    )
+    step_save_directory.mkdir(parents=True, exist_ok=True)
+    await save_memory_state(memory, None, step_save_directory)
+
+    logging.getLogger("optexity").removeHandler(file_handler)
+
+
+async def save_memory_state(
+    memory: Memory, node: ActionNode | None, save_directory: Path
+):
+    browser_state = memory.browser_states[-1]
+    automation_state = memory.automation_state
+    save_screenshot(browser_state.screenshot, save_directory / "screenshot.png")
+
+    state_dict = {
+        "title": browser_state.title,
+        "url": browser_state.url,
+        "step_index": automation_state.step_index,
+        "try_index": automation_state.try_index,
+    }
+
+    async with aiofiles.open(save_directory / "state.json", "w") as f:
+        await f.write(json.dumps(state_dict, indent=4))
+
+    if browser_state.axtree:
+        async with aiofiles.open(save_directory / "axtree.txt", "w") as f:
+            await f.write(browser_state.axtree)
+
+    if node:
+        async with aiofiles.open(save_directory / "action_node.json", "w") as f:
+            await f.write(json.dumps(node.model_dump(), indent=4))
+
+    async with aiofiles.open(save_directory / "input_variables.json", "w") as f:
+        await f.write(json.dumps(memory.variables.input_variables, indent=4))
+
+    async with aiofiles.open(save_directory / "generated_variables.json", "w") as f:
+        await f.write(json.dumps(memory.variables.generated_variables, indent=4))
+
+    async with aiofiles.open(save_directory / "output_data.json", "w") as f:
+        await f.write(json.dumps(memory.variables.output_data, indent=4))
+
+
+async def save_automation(automation: Automation, save_directory: Path):
+    async with aiofiles.open(save_directory / "automation.json", "w") as f:
+        await f.write(json.dumps(automation.model_dump(), indent=4))
 
 
 async def sleep_for_page_to_load(browser: Browser, sleep_time: float):

@@ -24,12 +24,14 @@ async def run_extraction_action(
 async def handle_llm_extraction(
     llm_extraction: LLMExtraction, memory: Memory, browser: Browser
 ):
+    # TODO: fix this double calling of screenshot and axtree
     if "axtree" in llm_extraction.source:
-        axtree = await browser.get_axtree()
+        axtree = memory.browser_states[-1].axtree
     else:
         axtree = None
+
     if "screenshot" in llm_extraction.source:
-        screenshot = await browser.get_screenshot()
+        screenshot = memory.browser_states[-1].screenshot
     else:
         screenshot = None
 

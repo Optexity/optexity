@@ -1,3 +1,6 @@
+import uuid
+from pathlib import Path
+
 from optexity.schema.token_usage import TokenUsage
 from pydantic import BaseModel, Field
 
@@ -25,7 +28,6 @@ class NetworkResponse(BaseModel):
 
 class AutomationState(BaseModel):
     step_index: int = Field(default_factory=lambda: -1)
-
     try_index: int = Field(default_factory=lambda: -1)
 
 
@@ -44,6 +46,8 @@ class Variables(BaseModel):
 
 
 class Memory(BaseModel):
+    task_id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    save_directory: Path = Field(default=Path("/tmp/optexity"))
     variables: Variables
     automation_state: AutomationState = Field(default_factory=AutomationState)
     browser_states: list[BrowserState] = Field(default_factory=list)

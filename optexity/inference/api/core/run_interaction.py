@@ -73,8 +73,7 @@ async def handle_click_element(
     ):
         memory.automation_state.try_index += 1
         try:
-            axtree = await browser.get_axtree()
-            memory.browser_states[-1].axtree = axtree
+            axtree = memory.browser_states[-1].axtree
             index = get_index_from_prompt(
                 click_element_action.prompt_instructions, axtree
             )
@@ -110,8 +109,7 @@ async def handle_input_text(
     if input_text_action.prompt_instructions and not input_text_action.skip_prompt:
         memory.automation_state.try_index += 1
         try:
-            axtree = await browser.get_axtree()
-            memory.browser_states[-1].axtree = axtree
+            axtree = memory.browser_states[-1].axtree
             index = get_index_from_prompt(input_text_action.prompt_instructions, axtree)
             await browser.input_text_index(index, input_text_action.input_text)
             return

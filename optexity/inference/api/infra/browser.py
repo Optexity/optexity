@@ -1,15 +1,11 @@
 import asyncio
 import logging
-import time
 from typing import Literal
-from uuid import uuid4
 
-import aiofiles
-from playwright.async_api import Locator, Page
+from playwright.async_api import Locator
 
 from browser_use import Agent, BrowserSession, ChatGoogle
-from browser_use.agent.views import AgentStepInfo
-from optexity.utils.utils import save_screenshot
+from browser_use.browser.views import BrowserStateSummary
 
 logger = logging.getLogger(__name__)
 
@@ -143,20 +139,15 @@ class Browser:
         locator: Locator = eval(f"page.{command}")
         return locator
 
-    async def get_axtree(self) -> str:
-        # step_info = AgentStepInfo(step_number=0, max_steps=100)
-        # browser_state_summary = await self.backend_agent._prepare_context(step_info)
-        browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
-            include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
-            include_recent_events=self.backend_agent.include_recent_events,
-        )
-        save_screenshot(browser_state_summary.screenshot, "screenshot.png")
+    # async def get_axtree(self) -> str:
+    #     browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
+    #         include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
+    #         include_recent_events=self.backend_agent.include_recent_events,
+    #     )
 
-        llm_representation = browser_state_summary.dom_state.llm_representation()
-        async with aiofiles.open("axtree.txt", "w") as f:
-            await f.write(llm_representation)
+    #     llm_representation = browser_state_summary.dom_state.llm_representation()
 
-        return llm_representation
+    #     return llm_representation
 
     def get_xpath_from_index(self, index: int) -> str:
         raise NotImplementedError("Not implemented")
@@ -178,3 +169,11 @@ class Browser:
         if page is None:
             return None
         await page.goto(url)
+
+    async def get_browser_state_summary(self) -> BrowserStateSummary:
+        browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
+            include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
+            include_recent_events=self.backend_agent.include_recent_events,
+        )
+
+        return browser_state_summary
