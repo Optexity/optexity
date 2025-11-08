@@ -1,7 +1,7 @@
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class Locator(BaseModel):
@@ -62,7 +62,20 @@ class CheckAction(BaseAction):
 
 class SelectOptionAction(BaseAction):
     select_values: list[str]
-    download_filename: str | None = None
+    expect_download: bool = False
+    download_filename: str = Field(default_factory=lambda: str(uuid4()))
+
+    @model_validator(mode="after")
+    def set_download_filename(cls, model: "SelectOptionAction"):
+
+        user_set = model.__pydantic_fields_set__
+
+        if "download_filename" in user_set:
+            assert (
+                model.expect_download
+            ), "download_filename is only allowed when expect_download is True"
+
+        return model
 
     def replace(self, pattern: str, replacement: str):
         super().replace(pattern, replacement)
@@ -80,18 +93,17 @@ class SelectOptionAction(BaseAction):
 class ClickElementAction(BaseAction):
     double_click: bool = False
     expect_download: bool = False
-    download_filename: str | None = None
+    download_filename: str = Field(default_factory=lambda: str(uuid4()))
 
     @model_validator(mode="after")
     def set_download_filename(cls, model: "ClickElementAction"):
-        if model.expect_download:
-            if model.download_filename is None:
-                model.download_filename = str(uuid4())[:8]
-        else:
-            if model.download_filename is not None:
-                raise ValueError(
-                    "download_filename is not allowed when expect_download is False"
-                )
+
+        user_set = model.__pydantic_fields_set__
+
+        if "download_filename" in user_set:
+            assert (
+                model.expect_download
+            ), "download_filename is only allowed when expect_download is True"
 
         return model
 
@@ -118,7 +130,7 @@ class InputTextAction(BaseAction):
 
 class DownloadUrlAsPdfAction(BaseModel):
     # Used when the current page is a PDF and we want to download it
-    download_filename: str | None = None
+    download_filename: str = Field(default_factory=lambda: str(uuid4()))
 
     def replace(self, pattern: str, replacement: str):
         if self.download_filename:

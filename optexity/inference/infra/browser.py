@@ -177,3 +177,9 @@ class Browser:
         )
 
         return browser_state_summary
+
+    async def get_current_page_url(self) -> str:
+        page = await self.get_current_page()
+        if page is None:
+            return None
+        return page.url

@@ -25,10 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 async def run_automation(automation: Automation, memory: Memory, browser: Browser):
-    save_directory = memory.save_directory / str(memory.task_id)
-    save_directory.mkdir(parents=True, exist_ok=True)
-
-    file_handler = logging.FileHandler(str(save_directory / "optexity.log"))
+    file_handler = logging.FileHandler(str(memory.log_file_path))
     file_handler.setLevel(logging.DEBUG)
 
     logging.getLogger("optexity").addHandler(file_handler)
@@ -52,14 +49,14 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
         for action_node in action_nodes:
             await sleep_for_page_to_load(browser, action_node.before_sleep_time)
             await browser.handle_new_tabs(0)
+
             memory.automation_state.step_index += 1
             memory.automation_state.try_index = 0
 
             action_node.replace_variables(memory.variables.input_variables)
             action_node.replace_variables(memory.variables.generated_variables)
 
-            ## TODO: optimize this by taking screenshot only if needed
-            ## TODO: get axtree only if needed
+            ## TODO: optimize this by taking screenshot and axtree only if needed
             browser_state_summary = await browser.get_browser_state_summary()
 
             memory.browser_states.append(
@@ -70,9 +67,7 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
                     axtree=browser_state_summary.dom_state.llm_representation(),
                 )
             )
-            logger.debug(
-                f"--------------------------------Running node {memory.automation_state.step_index}--------------------------------"
-            )
+            logger.debug(f"-----Running node {memory.automation_state.step_index}-----")
 
             full_automation.append(action_node.model_dump())
 
@@ -94,12 +89,10 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
                 )
                 raise e
             finally:
-                step_save_directory = (
-                    save_directory / f"step_{memory.automation_state.step_index}"
-                )
-                step_save_directory.mkdir(parents=True, exist_ok=True)
-                await save_memory_state(memory, action_node, step_save_directory)
 
+                await save_memory_state(
+                    memory, action_node, memory.automation_state.step_index
+                )
             if action_node.expect_new_tab:
                 found_new_tab, total_time = await browser.handle_new_tabs(
                     action_node.max_new_tab_wait_time
@@ -117,11 +110,11 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
                 await sleep_for_page_to_load(browser, action_node.end_sleep_time)
 
             logger.debug(
-                f"--------------------------------Finished node {memory.automation_state.step_index}--------------------------------"
+                f"-----Finished node {memory.automation_state.step_index}-----"
             )
 
+    memory.automation_state.step_index += 1
     browser_state_summary = await browser.get_browser_state_summary()
-
     memory.browser_states.append(
         BrowserState(
             url=browser_state_summary.url,
@@ -131,47 +124,49 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
         )
     )
 
-    step_save_directory = (
-        save_directory / f"step_{memory.automation_state.step_index+1}"
-    )
-    step_save_directory.mkdir(parents=True, exist_ok=True)
-    await save_memory_state(memory, None, step_save_directory)
+    await save_memory_state(memory, None, memory.automation_state.step_index)
 
     logging.getLogger("optexity").removeHandler(file_handler)
 
 
-async def save_memory_state(
-    memory: Memory, node: ActionNode | None, save_directory: Path
-):
+async def save_memory_state(memory: Memory, node: ActionNode | None, step_index: int):
+
+    step_directory = memory.logs_directory / f"step_{str(step_index)}"
+    step_directory.mkdir(parents=True, exist_ok=True)
+
     browser_state = memory.browser_states[-1]
     automation_state = memory.automation_state
-    save_screenshot(browser_state.screenshot, save_directory / "screenshot.png")
+
+    save_screenshot(browser_state.screenshot, step_directory / "screenshot.png")
 
     state_dict = {
         "title": browser_state.title,
         "url": browser_state.url,
         "step_index": automation_state.step_index,
         "try_index": automation_state.try_index,
+        "downloaded_files": [
+            downloaded_file.name for downloaded_file in memory.downloaded_files
+        ],
     }
 
-    async with aiofiles.open(save_directory / "state.json", "w") as f:
+    async with aiofiles.open(step_directory / "state.json", "w") as f:
         await f.write(json.dumps(state_dict, indent=4))
 
     if browser_state.axtree:
-        async with aiofiles.open(save_directory / "axtree.txt", "w") as f:
+        async with aiofiles.open(step_directory / "axtree.txt", "w") as f:
             await f.write(browser_state.axtree)
 
     if node:
-        async with aiofiles.open(save_directory / "action_node.json", "w") as f:
+        async with aiofiles.open(step_directory / "action_node.json", "w") as f:
             await f.write(json.dumps(node.model_dump(), indent=4))
 
-    async with aiofiles.open(save_directory / "input_variables.json", "w") as f:
+    async with aiofiles.open(step_directory / "input_variables.json", "w") as f:
         await f.write(json.dumps(memory.variables.input_variables, indent=4))
 
-    async with aiofiles.open(save_directory / "generated_variables.json", "w") as f:
+    async with aiofiles.open(step_directory / "generated_variables.json", "w") as f:
         await f.write(json.dumps(memory.variables.generated_variables, indent=4))
 
-    async with aiofiles.open(save_directory / "output_data.json", "w") as f:
+    async with aiofiles.open(step_directory / "output_data.json", "w") as f:
         await f.write(json.dumps(memory.variables.output_data, indent=4))
 
 

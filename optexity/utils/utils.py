@@ -1,7 +1,12 @@
 import base64
+import logging
+from pathlib import Path
 from typing import List, Optional
 
+import aiofiles
 from pydantic import create_model
+
+logger = logging.getLogger(__name__)
 
 
 def build_model(schema: dict, model_name="AutoModel"):
@@ -26,3 +31,14 @@ def build_model(schema: dict, model_name="AutoModel"):
 def save_screenshot(screenshot: str, path: str):
     with open(path, "wb") as f:
         f.write(base64.b64decode(screenshot))
+
+
+async def save_and_clear_downloaded_files(content: bytes | str, filename: Path):
+    if isinstance(content, bytes):
+        async with aiofiles.open(filename, "wb") as f:
+            await f.write(content)
+    elif isinstance(content, str):
+        async with aiofiles.open(filename, "w") as f:
+            await f.write(content)
+    else:
+        logger.error(f"Unsupported content type: {type(content)}")
