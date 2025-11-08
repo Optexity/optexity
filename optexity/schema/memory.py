@@ -29,6 +29,7 @@ class NetworkResponse(BaseModel):
 class AutomationState(BaseModel):
     step_index: int = Field(default_factory=lambda: -1)
     try_index: int = Field(default_factory=lambda: -1)
+    start_2fa_time: float | None = Field(default=None)
 
 
 class BrowserState(BaseModel):

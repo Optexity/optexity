@@ -2,6 +2,7 @@ from optexity.schema.actions.assertion_action import AssertionAction
 from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
 from optexity.schema.actions.misc_action import PythonScriptAction
+from optexity.schema.actions.two_factor_auth_action import Fetch2faAction
 from pydantic import BaseModel, model_validator
 
 # TODO: add a time sleep before extraction action else page might not have loaded yet.
@@ -13,6 +14,7 @@ class ActionNode(BaseModel):
     assertion_action: AssertionAction | None = None
     extraction_action: ExtractionAction | None = None
     python_script_action: PythonScriptAction | None = None
+    fetch_2fa_action: Fetch2faAction | None = None
     before_sleep_time: float = 0.0
     end_sleep_time: float = 1.0
     expect_new_tab: bool = False
@@ -26,12 +28,13 @@ class ActionNode(BaseModel):
             "assertion_action": model.assertion_action,
             "extraction_action": model.extraction_action,
             "python_script_action": model.python_script_action,
+            "fetch_2fa_action": model.fetch_2fa_action,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of interaction_action, assertion_action, extraction_action, or python_script_action must be provided"
+                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, or fetch_2fa_action must be provided"
             )
 
         assert (
@@ -51,6 +54,7 @@ class ActionNode(BaseModel):
                 if model.assertion_action
                 or model.extraction_action
                 or model.python_script_action
+                or model.fetch_2fa_action
                 else 1.0
             )
 
@@ -79,6 +83,8 @@ class ActionNode(BaseModel):
             raise NotImplementedError(
                 "Python script replacement function is not implemented"
             )
+        if self.fetch_2fa_action:
+            pass
 
         return self
 

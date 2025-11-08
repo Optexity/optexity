@@ -5,6 +5,7 @@ from pathlib import Path
 
 import aiofiles
 
+from optexity.inference.core.run_2fa import run_2fa_action
 from optexity.inference.core.run_extraction import run_extraction_action
 from optexity.inference.core.run_interaction import run_interaction_action
 from optexity.inference.infra.browser import Browser
@@ -84,6 +85,8 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
                     await run_extraction_action(
                         action_node.extraction_action, memory, browser
                     )
+                elif action_node.fetch_2fa_action:
+                    await run_2fa_action(action_node.fetch_2fa_action, memory, browser)
 
             except Exception as e:
                 logger.error(

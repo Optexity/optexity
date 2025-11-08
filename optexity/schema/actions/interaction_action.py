@@ -158,6 +158,9 @@ class CloseAllButLastTabAction(BaseModel):
 
 
 class InteractionAction(BaseModel):
+    start_2fa_timer: bool = False
+    max_tries: int = 10
+    max_timeout_seconds_per_try: float = 1.0
     click_element: ClickElementAction | None = None
     input_text: InputTextAction | None = None
     select_option: SelectOptionAction | None = None
@@ -194,6 +197,11 @@ class InteractionAction(BaseModel):
             raise ValueError(
                 "Exactly one of click_element, input_text, select_option, check, download_url_as_pdf, scroll, upload_file, go_to_url, go_back, switch_tab, close_current_tab, or close_all_but_last_tab must be provided"
             )
+
+        if model.start_2fa_timer:
+            assert (
+                model.click_element is not None
+            ), "2fa timer can only be started when clicking on an element"
 
         return model
 
