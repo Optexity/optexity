@@ -41,19 +41,22 @@ async def handle_llm_extraction(
     )
     response_dict = response.model_dump()
 
+    logger.debug(f"Response: {response_dict}")
+
     memory.token_usage += token_usage
     memory.variables.output_data.append(response_dict)
 
-    for output_variable_name in llm_extraction.output_variable_names:
-        if isinstance(response_dict[output_variable_name], list):
-            memory.variables.generated_variables[output_variable_name] = response_dict[
-                output_variable_name
-            ]
-        elif isinstance(response_dict[output_variable_name], str):
-            memory.variables.generated_variables[output_variable_name] = [
-                response_dict[output_variable_name]
-            ]
-        else:
-            raise ValueError(
-                f"Output variable {output_variable_name} must be a string or a list of strings"
-            )
+    if llm_extraction.output_variable_names is not None:
+        for output_variable_name in llm_extraction.output_variable_names:
+            if isinstance(response_dict[output_variable_name], list):
+                memory.variables.generated_variables[output_variable_name] = (
+                    response_dict[output_variable_name]
+                )
+            elif isinstance(response_dict[output_variable_name], str):
+                memory.variables.generated_variables[output_variable_name] = [
+                    response_dict[output_variable_name]
+                ]
+            else:
+                raise ValueError(
+                    f"Output variable {output_variable_name} must be a string or a list of strings"
+                )

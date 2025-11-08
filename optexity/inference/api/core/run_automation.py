@@ -1,6 +1,9 @@
 import asyncio
+import json
 import logging
 from copy import deepcopy
+
+import aiofiles
 
 from optexity.inference.api.core.run_extraction import run_extraction_action
 from optexity.inference.api.core.run_interaction import run_interaction_action
@@ -26,11 +29,13 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
     memory.automation_state.step_index = -1
     memory.automation_state.try_index = 0
 
+    full_automation = []
+
     for node in automation.nodes:
         if isinstance(node, ForLoopNode):
             action_nodes = expand_for_loop_node(node, memory)
             logger.debug(
-                f"Expanded for loop node {node.variable_name} into {action_nodes}"
+                f"Expanded for loop node {node.variable_name} into {len(action_nodes)} nodes"
             )
         else:
             action_nodes = [node]
@@ -47,6 +52,8 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
             logger.debug(
                 f"--------------------------------Running node {memory.automation_state.step_index}--------------------------------"
             )
+
+            full_automation.append(action_node.model_dump())
 
             try:
                 if action_node.interaction_action:
@@ -82,28 +89,50 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
                     )
 
             else:
-                await asyncio.sleep(action_node.end_sleep_time)
+                await sleep_for_page_to_load(browser, action_node.end_sleep_time)
 
             logger.debug(
                 f"--------------------------------Finished node {memory.automation_state.step_index}--------------------------------"
             )
 
+            async with aiofiles.open("automation.json", "w") as f:
+                await f.write(json.dumps(full_automation, indent=4))
+
+            async with aiofiles.open("memory.json", "w") as f:
+                await f.write(json.dumps(memory.model_dump(), indent=4))
+
+
+async def sleep_for_page_to_load(browser: Browser, sleep_time: float):
+    page = await browser.get_current_page()
+    if page is None:
+        return
+    try:
+        await page.wait_for_load_state("domcontentloaded", timeout=sleep_time * 1000)
+    except TimeoutError as e:
+        pass
+
 
 def expand_for_loop_node(
     for_loop_node: ForLoopNode, memory: Memory
 ) -> list[ActionNode]:
-    assert (
-        for_loop_node.variable_name in memory.variables.input_variables
-        or for_loop_node.variable_name in memory.variables.generated_variables
-    ), "Variable name must be in input variables or generated variables"
+
+    if for_loop_node.variable_name in memory.variables.input_variables:
+        values = memory.variables.input_variables[for_loop_node.variable_name]
+    elif for_loop_node.variable_name in memory.variables.generated_variables:
+        values = memory.variables.generated_variables[for_loop_node.variable_name]
+    else:
+        raise ValueError(
+            f"Variable name {for_loop_node.variable_name} not found in input variables or generated variables"
+        )
 
     new_nodes = []
-    for index, action_node in enumerate(for_loop_node.nodes):
-        new_node = deepcopy(action_node)
-        new_node.replace(
-            f"{{{for_loop_node.variable_name}[index]}}",
-            f"{{{for_loop_node.variable_name}[{index}]}}",
-        )
-        new_nodes.append(new_node)
+    for index in range(len(values)):
+        for action_node in for_loop_node.nodes:
+            new_node = deepcopy(action_node)
+            new_node.replace(
+                f"{{{for_loop_node.variable_name}[index]}}",
+                f"{{{for_loop_node.variable_name}[{index}]}}",
+            )
+            new_nodes.append(new_node)
 
     return new_nodes

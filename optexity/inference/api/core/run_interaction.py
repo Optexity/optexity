@@ -46,16 +46,21 @@ async def handle_click_element(
                 locator = await browser.get_locator_from_command(
                     click_element_action.command
                 )
-                if click_element_action.double_click:
-                    await locator.dblclick()
-                else:
-                    await locator.click(timeout=max_timeout_per_try * 1000)
+                try:
+                    if click_element_action.double_click:
+                        await locator.dblclick(timeout=max_timeout_per_try * 1000)
+                    else:
+                        await locator.click(timeout=max_timeout_per_try * 1000)
+                    logger.debug(
+                        f"Click element successful after {try_index + 1} tries"
+                    )
+                    return
+                except TimeoutError as e:
+                    asyncio.sleep(max_timeout_per_try)
 
                 # if download_filename:
                 #     await self.expect_download(download_filename)
-                asyncio.sleep(max_timeout_per_try)
-                logger.debug(f"Click element successful after {try_index + 1} tries")
-                return
+
             except Exception as e:
                 last_error = e
 

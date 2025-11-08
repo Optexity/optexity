@@ -121,15 +121,16 @@ pshpgeorgia_medicaid_test = Automation(
                     prompt_instructions="Click the Authorizations link",
                 )
             ),
+            end_sleep_time=5,
         ),
         ActionNode(
             extraction_action=ExtractionAction(
                 llm=LLMExtraction(
                     source=["axtree"],
                     extraction_format={
-                        "authorization_numbers": "list[str]",
+                        "authorization_numbers": "List[str]",
                     },
-                    extraction_instructions="Extract the authorization numbers from the page",
+                    extraction_instructions="I am giving you an axtree of a webpage that shows the information about authorizations in a tabular format. Status, Auth Nbr, From Date, To Date, Diagnosis, Auth Type, Service. You need to output me a list of all Auth Nbr. Do not output any other information.",
                     output_variable_names=["authorization_numbers"],
                 )
             ),
@@ -143,7 +144,26 @@ pshpgeorgia_medicaid_test = Automation(
                             command="""get_by_role("link", name="{authorization_numbers[index]}")""",
                             prompt_instructions="Click the Authorizations link for the authorization number {authorization_numbers[index]}",
                         )
-                    )
+                    ),
+                    end_sleep_time=5,
+                ),
+                ActionNode(
+                    extraction_action=ExtractionAction(
+                        llm=LLMExtraction(
+                            source=["axtree"],
+                            extraction_format={
+                                "Auth Nbr": "str",
+                                "End Date": "str",
+                                "Auth Type": "str",
+                                "Start Date": "str",
+                                "Auth Status": "str",
+                                "Service Type": "str",
+                                "Units Approved": "str",
+                                "Units Required": "str",
+                            },
+                            extraction_instructions="I am giving you an axtree of a webpage that shows information about authorizations, and I want the 8 following fields. 'Auth Status', 'Auth Nbr', 'Auth Type', 'Service Type', 'Start Date', 'End Date', 'Units Required', 'Units Approved'. Fields 'Auth Status', 'Auth Nbr', 'Auth Type' can be found in the top and rest of the information can be found in the tabular format. You need to output me key-value pairs for all 8 fields.",
+                        )
+                    ),
                 ),
                 ActionNode(
                     interaction_action=InteractionAction(go_back=GoBackAction())

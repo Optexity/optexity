@@ -8,7 +8,7 @@ class LLMExtraction(BaseModel):
     source: list[Literal["axtree", "screenshot"]]
     extraction_format: dict
     extraction_instructions: str
-    output_variable_names: list[str]
+    output_variable_names: list[str] | None = None
 
     def build_model(self):
         return build_model(self.extraction_format)
@@ -25,16 +25,17 @@ class LLMExtraction(BaseModel):
 
     @model_validator(mode="after")
     def validate_output_var_in_format(self):
-        ## TODO: implement this
-        for key in self.output_variable_names:
-            if key not in self.extraction_format:
-                raise ValueError(
-                    f"Output variable {key} not found in extraction_format"
-                )
-            if eval(self.extraction_format[key]) not in [str, list[str], List[str]]:
-                raise ValueError(
-                    f"Output variable {key} must be a string or a list of strings"
-                )
+
+        if self.output_variable_names is not None:
+            for key in self.output_variable_names:
+                if key not in self.extraction_format:
+                    raise ValueError(
+                        f"Output variable {key} not found in extraction_format"
+                    )
+                if eval(self.extraction_format[key]) not in [str, list[str], List[str]]:
+                    raise ValueError(
+                        f"Output variable {key} must be a string or a list of strings"
+                    )
 
         return self
 
