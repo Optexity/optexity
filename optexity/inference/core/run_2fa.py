@@ -1,5 +1,7 @@
 import logging
 
+import pyotp
+
 from optexity.inference.core.two_factor_auth.gmail import get_code_from_gmail
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.two_factor_auth_action import (
@@ -62,7 +64,9 @@ async def handle_fetch_email_2fa(
 async def handle_fetch_totp_2fa(
     fetch_totp_2fa_action: FetchTotp2FaAction, memory: Memory, browser: Browser
 ):
-    pass
+    totp = pyotp.TOTP(fetch_totp_2fa_action.totp_secret)
+    code_2fa = totp.now()
+    return code_2fa
 
 
 async def handle_fetch_2fa_api_call(
