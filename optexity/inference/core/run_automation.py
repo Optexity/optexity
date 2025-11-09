@@ -95,6 +95,7 @@ async def run_automation_node(
 
     try:
         if action_node.interaction_action:
+            ## Assuming network calls are only made during interaction actions and not during extraction actions
             await browser.clear_network_calls()
             await browser.attach_network_listeners()
 
