@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 
 from optexity.utils.utils import build_model
-from pydantic import BaseModel, create_model, field_validator, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 class LLMExtraction(BaseModel):

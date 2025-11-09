@@ -6,6 +6,9 @@ from typing import Callable
 import aiofiles
 import requests
 
+from optexity.inference.agents.index_prediction.action_prediction_locator_axtree import (
+    ActionPredictionLocatorAxtree,
+)
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import (
     ClickElementAction,
@@ -20,8 +23,7 @@ from optexity.schema.memory import Memory
 logger = logging.getLogger(__name__)
 
 
-def get_index_from_prompt(prompt: str, axtree: str) -> int | None:
-    raise NotImplementedError("Not implemented")
+index_prediction_agent = ActionPredictionLocatorAxtree()
 
 
 async def run_interaction_action(
@@ -83,7 +85,7 @@ async def command_based_action_with_retry(
             return
         except Exception as e:
             last_error = e
-            asyncio.sleep(max_timeout_seconds_per_try)
+            await asyncio.sleep(max_timeout_seconds_per_try)
 
     logger.debug(f"{func.__name__} failed after {max_tries} tries: {last_error}")
 
@@ -102,7 +104,11 @@ async def prompt_based_action(
     memory.automation_state.try_index += 1
     axtree = memory.browser_states[-1].axtree
     try:
-        index = get_index_from_prompt(prompt_instructions, axtree)
+        index, token_usage = index_prediction_agent.predict_action(
+            prompt_instructions, axtree
+        )
+        memory.token_usage += token_usage
+        memory.variables.output_data.append(index)
         await func(index)
     except Exception as e:
         logger.error(f"Error in prompt_based_action for {func.__name__}: {e}")

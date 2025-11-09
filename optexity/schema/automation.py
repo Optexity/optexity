@@ -77,9 +77,7 @@ class ActionNode(BaseModel):
         if self.extraction_action:
             self.extraction_action.replace(pattern, replacement)
         if self.python_script_action:
-            raise NotImplementedError(
-                "Python script replacement function is not implemented"
-            )
+            pass
         if self.fetch_2fa_action:
             pass
 
@@ -100,7 +98,19 @@ class ForLoopNode(BaseModel):
     nodes: list[ActionNode]
 
 
+class ParametersWithExamples(BaseModel):
+    input_parameters: dict[str, list[str]]
+    generated_parameter: dict[str, list[str]]
+
+
 class Automation(BaseModel):
     name: str
     description: str
+    url: str
+    parameters_with_examples: ParametersWithExamples
     nodes: list[ActionNode | ForLoopNode]
+
+    @model_validator(mode="after")
+    def validate_parameters_with_examples(cls, model: "Automation"):
+        ## TODO: static check that all parameters with examples are used in the nodes
+        return model

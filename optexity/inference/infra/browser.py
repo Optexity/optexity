@@ -174,6 +174,7 @@ class Browser:
         browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
             include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
             include_recent_events=self.backend_agent.include_recent_events,
+            cached=False,
         )
 
         return browser_state_summary

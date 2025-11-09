@@ -4,6 +4,7 @@ import os
 
 from dotenv import load_dotenv
 
+from optexity.examples.i94 import i94_test
 from optexity.examples.pshpgeorgia_medicaid import (
     pshpgeorgia_login_test,
     pshpgeorgia_medicaid_test,
@@ -87,6 +88,43 @@ async def run_pshpgeorgia_test():
         await browser.stop()
 
 
+async def run_i94_test():
+    try:
+        logger.debug("Starting I-94 test")
+        browser = Browser()
+        memory = Memory(
+            variables=Variables(
+                input_variables={
+                    "last_name": [os.environ.get("LAST_NAME")],
+                    "first_name": [os.environ.get("FIRST_NAME")],
+                    "nationality": [os.environ.get("NATIONALITY")],
+                    "date_of_birth": [os.environ.get("DATE_OF_BIRTH")],
+                    "document_number": [os.environ.get("DOCUMENT_NUMBER")],
+                }
+            )
+        )
+
+        await browser.start()
+        logger.debug("Browser started")
+        logger.debug("Navigating to I-94")
+        await browser.go_to_url(i94_test.url)
+        logger.debug("Navigated to I-94")
+
+        logger.debug("Running I-94 test")
+        await asyncio.sleep(5)
+        await run_automation(i94_test, memory, browser)
+        logger.debug("I-94 test finished")
+
+        await asyncio.sleep(5)
+        await browser.stop()
+    except Exception as e:
+        logger.error(f"Error running I-94 test: {e}")
+        raise e
+    finally:
+        await browser.stop()
+
+
 if __name__ == "__main__":
     # asyncio.run(run_supabase_login_test())
-    asyncio.run(run_pshpgeorgia_test())
+    # asyncio.run(run_pshpgeorgia_test())
+    asyncio.run(run_i94_test())

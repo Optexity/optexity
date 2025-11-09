@@ -27,16 +27,15 @@ class BaseAction(BaseModel):
     @model_validator(mode="after")
     def validate_one_extraction(cls, model: "BaseAction"):
         """Ensure exactly one of the extraction types is set and matches the type."""
+
         provided = {
             "xpath": model.xpath,
             "command": model.command,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
-        if len(non_null) != 1:
-            raise ValueError(
-                "Exactly one of llm, networkcall, or python must be provided"
-            )
+        if len(non_null) > 1:
+            raise ValueError("Exactly one of xpath, command must be provided")
 
         if model.assert_locator_presence:
             assert (

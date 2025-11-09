@@ -8,6 +8,7 @@ import aiofiles
 from optexity.inference.core.run_2fa import run_2fa_action
 from optexity.inference.core.run_extraction import run_extraction_action
 from optexity.inference.core.run_interaction import run_interaction_action
+from optexity.inference.core.run_python_script import run_python_script_action
 from optexity.inference.infra.browser import Browser
 from optexity.schema.automation import ActionNode, Automation, ForLoopNode
 from optexity.schema.memory import BrowserState, Memory
@@ -82,6 +83,10 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
                     )
                 elif action_node.fetch_2fa_action:
                     await run_2fa_action(action_node.fetch_2fa_action, memory, browser)
+                elif action_node.python_script_action:
+                    await run_python_script_action(
+                        action_node.python_script_action, memory, browser
+                    )
 
             except Exception as e:
                 logger.error(
