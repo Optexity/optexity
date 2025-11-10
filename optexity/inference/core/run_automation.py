@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from copy import deepcopy
@@ -71,7 +72,7 @@ async def run_automation_node(
     action_node: ActionNode, memory: Memory, browser: Browser
 ):
 
-    await sleep_for_page_to_load(browser, action_node.before_sleep_time)
+    await asyncio.sleep(action_node.before_sleep_time)
     await browser.handle_new_tabs(0)
 
     memory.automation_state.step_index += 1
