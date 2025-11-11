@@ -11,3 +11,10 @@ repos:
       - id: isort
         name: isort (python imports)
         args: ["--profile", "black"]
+
+  # --- Frontend formatters ---
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        files: "\\.(js|jsx|ts|tsx|css|scss|json|html|md|yml|yaml)$"

@@ -25,3 +25,18 @@ jobs:
 
       - name: Check imports with isort
         run: isort --check-only --profile black .
+
+      # Node formatting checks
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Node dependencies
+        run: npm ci || npm install
+
+      - name: Run Prettier check
+        run: npx prettier --check "**/*.{js,jsx,ts,tsx,css,scss,json,html,md,yml,yaml}"
+
+      - name: Run ESLint check
+        run: npx eslint . --ext .js,.jsx,.ts,.tsx
