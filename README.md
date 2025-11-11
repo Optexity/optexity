@@ -26,4 +26,8 @@ Install the required packages and build the Playwright framework. Run everything
 ```bash
 pip install -e "external/browser-use"
 pip install -e .
+pre-commit install
+pre-commit install --hook-type pre-push
 ```
+
+Running manual pre-commit check `pre-commit install --hook-type pre-push`
