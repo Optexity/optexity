@@ -11,4 +11,4 @@ logging.basicConfig(
     ],
 )
 
-logging.getLogger("optexity").setLevel(logging.DEBUG)
+logging.getLogger(__name__).setLevel(logging.DEBUG)

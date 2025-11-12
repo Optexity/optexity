@@ -105,8 +105,6 @@ class Parameters(BaseModel):
 
 
 class Automation(BaseModel):
-    name: str
-    description: str
     url: str
     parameters: Parameters
     nodes: list[ActionNode | ForLoopNode]
