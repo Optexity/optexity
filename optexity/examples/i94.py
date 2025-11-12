@@ -11,9 +11,7 @@ from optexity.schema.actions.misc_action import PythonScriptAction
 from optexity.schema.automation import ActionNode, Automation, Parameters
 
 i94_test = Automation(
-    name="I-94 Test",
     url="https://i94.cbp.dhs.gov/search/recent-search",
-    description="Fill out the I-94 form",
     parameters=Parameters(
         input_parameters={
             "first_name": ["First Name"],
