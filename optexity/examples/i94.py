@@ -8,13 +8,11 @@ from optexity.schema.actions.interaction_action import (
     InteractionAction,
 )
 from optexity.schema.actions.misc_action import PythonScriptAction
-from optexity.schema.automation import ActionNode, Automation, ParametersWithExamples
+from optexity.schema.automation import ActionNode, Automation, Parameters
 
 i94_test = Automation(
-    name="I-94 Test",
     url="https://i94.cbp.dhs.gov/search/recent-search",
-    description="Fill out the I-94 form",
-    parameters_with_examples=ParametersWithExamples(
+    parameters=Parameters(
         input_parameters={
             "first_name": ["First Name"],
             "last_name": ["Last Name"],
@@ -22,7 +20,7 @@ i94_test = Automation(
             "date_of_birth": ["MM/DD/YYYY"],
             "document_number": ["Document Number"],
         },
-        generated_parameter={},
+        generated_parameters={},
     ),
     nodes=[
         ActionNode(

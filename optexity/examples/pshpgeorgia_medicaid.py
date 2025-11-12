@@ -6,17 +6,11 @@ from optexity.schema.actions.interaction_action import (
     InteractionAction,
     SelectOptionAction,
 )
-from optexity.schema.automation import (
-    ActionNode,
-    Automation,
-    ForLoopNode,
-    ParametersWithExamples,
-)
+from optexity.schema.automation import ActionNode, Automation, ForLoopNode, Parameters
 
 pshpgeorgia_login_test = Automation(
-    name="PSHP Georgia Login Test",
     url="https://sso.entrykeyid.com/as/authorization.oauth2?response_type=code&client_id=f6a6219c-be42-421b-b86c-e4fc509e2e87&scope=openid%20profile&state=_igWklSsnrkO5DQfjBMMuN41ksMJePZQ_SM_61wTJlA%3D&redirect_uri=https://provider.pshpgeorgia.com/careconnect/login/oauth2/code/pingcloud&code_challenge_method=S256&nonce=xG41TJjco_x7Vs_MQgcS3bw5njLiJsXCqvO-V8THmY0&code_challenge=ZTaVHaZCNFTejXNJo51RlJ3Kv9dH0tMODPTqO7hiP3A&app_origin=https://provider.pshpgeorgia.com/careconnect/login/oauth2/code/pingcloud&brand=pshpgeorgia",
-    parameters_with_examples=ParametersWithExamples(
+    parameters=Parameters(
         input_parameters={
             "username": [],
             "password": [],
@@ -24,9 +18,8 @@ pshpgeorgia_login_test = Automation(
             "member_id": [],
             "dob": [],
         },
-        generated_parameter={},
+        generated_parameters={},
     ),
-    description="Login to PSHP Georgia",
     nodes=[
         ActionNode(
             interaction_action=InteractionAction(
@@ -67,12 +60,10 @@ pshpgeorgia_login_test = Automation(
 
 
 pshpgeorgia_medicaid_test = Automation(
-    name="PSHP Georgia Medicaid Test",
-    description="Get the PSHP Georgia Medicaid application",
     url="https://provider.pshpgeorgia.com/careconnect/login",
-    parameters_with_examples=ParametersWithExamples(
+    parameters=Parameters(
         input_parameters={},
-        generated_parameter={},
+        generated_parameters={},
     ),
     nodes=[
         ActionNode(

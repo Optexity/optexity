@@ -31,6 +31,7 @@ class Gemini(LLMModel):
         response_schema: BaseModel,
         screenshot: Optional[str] = None,
         pdf_url: Optional[str] = None,
+        system_instruction: Optional[str] = None,
     ) -> tuple[BaseModel, TokenUsage]:
 
         if pdf_url is not None and screenshot is not None:
@@ -59,7 +60,8 @@ class Gemini(LLMModel):
                 contents=prompt,
                 config={
                     "response_mime_type": "application/json",
-                    "response_schema": response_schema,
+                    "system_instruction": system_instruction,
+                    "response_json_schema": response_schema.model_json_schema(),
                 },
             )
             parsed_response: response_schema = response.parsed

@@ -2,8 +2,9 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from optexity.schema.token_usage import TokenUsage
 from pydantic import BaseModel, Field, model_validator
+
+from optexity.schema.token_usage import TokenUsage
 
 
 class NetworkRequest(BaseModel):

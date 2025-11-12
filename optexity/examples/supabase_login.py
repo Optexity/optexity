@@ -3,19 +3,17 @@ from optexity.schema.actions.interaction_action import (
     InputTextAction,
     InteractionAction,
 )
-from optexity.schema.automation import ActionNode, Automation, ParametersWithExamples
+from optexity.schema.automation import ActionNode, Automation, Parameters
 
 supabase_login_test = Automation(
-    name="Supabase Login Test",
     url="https://supabase.com",
-    parameters_with_examples=ParametersWithExamples(
+    parameters=Parameters(
         input_parameters={
             "username": ["test@test.com"],
             "password": ["password"],
         },
-        generated_parameter={},
+        generated_parameters={},
     ),
-    description="Login to Supabase",
     nodes=[
         ActionNode(
             interaction_action=InteractionAction(

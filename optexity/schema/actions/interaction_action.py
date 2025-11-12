@@ -62,17 +62,13 @@ class CheckAction(BaseAction):
 class SelectOptionAction(BaseAction):
     select_values: list[str]
     expect_download: bool = False
-    download_filename: str = Field(default_factory=lambda: str(uuid4()))
+    download_filename: str | None = None
 
     @model_validator(mode="after")
     def set_download_filename(cls, model: "SelectOptionAction"):
 
-        user_set = model.__pydantic_fields_set__
-
-        if "download_filename" in user_set:
-            assert (
-                model.expect_download
-            ), "download_filename is only allowed when expect_download is True"
+        if model.expect_download and model.download_filename is None:
+            model.download_filename = str(uuid4())
 
         return model
 
@@ -92,17 +88,13 @@ class SelectOptionAction(BaseAction):
 class ClickElementAction(BaseAction):
     double_click: bool = False
     expect_download: bool = False
-    download_filename: str = Field(default_factory=lambda: str(uuid4()))
+    download_filename: str | None = None
 
     @model_validator(mode="after")
     def set_download_filename(cls, model: "ClickElementAction"):
 
-        user_set = model.__pydantic_fields_set__
-
-        if "download_filename" in user_set:
-            assert (
-                model.expect_download
-            ), "download_filename is only allowed when expect_download is True"
+        if model.expect_download and model.download_filename is None:
+            model.download_filename = str(uuid4())
 
         return model
 

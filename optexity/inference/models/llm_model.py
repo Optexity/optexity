@@ -54,6 +54,7 @@ class LLMModel:
         response_schema: BaseModel,
         screenshot: Optional[str] = None,
         pdf_url: Optional[str] = None,
+        system_instruction: Optional[str] = None,
     ) -> tuple[BaseModel, TokenUsage]:
         raise NotImplementedError("This method should be implemented by subclasses.")
 
@@ -77,6 +78,7 @@ class LLMModel:
         response_schema: BaseModel,
         screenshot: Optional[str] = None,
         pdf_url: Optional[str] = None,
+        system_instruction: Optional[str] = None,
     ) -> tuple[BaseModel, TokenUsage]:
 
         max_retries = 3
@@ -85,7 +87,11 @@ class LLMModel:
             try:
                 # raise Exception("Test error")
                 return self._get_model_response_with_structured_output(
-                    prompt, response_schema, screenshot, pdf_url
+                    prompt=prompt,
+                    response_schema=response_schema,
+                    screenshot=screenshot,
+                    pdf_url=pdf_url,
+                    system_instruction=system_instruction,
                 )
             except Exception as e:
                 logger.error(f"LLM with structured output Error during inference: {e}")
