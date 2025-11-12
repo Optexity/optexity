@@ -99,6 +99,12 @@ class ForLoopNode(BaseModel):
     nodes: list[ActionNode]
 
 
+class IfElseNode(BaseModel):
+    condition: str
+    if_nodes: list[ActionNode]
+    else_nodes: list[ActionNode] = []
+
+
 class Parameters(BaseModel):
     input_parameters: dict[str, list[str]]
     generated_parameters: dict[str, list[str]]
@@ -107,7 +113,7 @@ class Parameters(BaseModel):
 class Automation(BaseModel):
     url: str
     parameters: Parameters
-    nodes: list[ActionNode | ForLoopNode]
+    nodes: list[ActionNode | ForLoopNode | IfElseNode]
 
     @model_validator(mode="after")
     def validate_parameters_with_examples(cls, model: "Automation"):

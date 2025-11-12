@@ -11,7 +11,7 @@ from optexity.inference.core.run_extraction import run_extraction_action
 from optexity.inference.core.run_interaction import run_interaction_action
 from optexity.inference.core.run_python_script import run_python_script_action
 from optexity.inference.infra.browser import Browser
-from optexity.schema.automation import ActionNode, Automation, ForLoopNode
+from optexity.schema.automation import ActionNode, Automation, ForLoopNode, IfElseNode
 from optexity.schema.memory import BrowserState, Memory
 from optexity.utils.utils import save_screenshot
 
@@ -45,6 +45,9 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
             logger.debug(
                 f"Expanded for loop node {node.variable_name} into {len(action_nodes)} nodes"
             )
+        elif isinstance(node, IfElseNode):
+            action_nodes = handle_if_else_node(node, memory)
+            logger.debug(f"nodes for if else node {node.condition} are {action_nodes}")
         else:
             action_nodes = [node]
 
@@ -224,3 +227,19 @@ def expand_for_loop_node(
             new_nodes.append(new_node)
 
     return new_nodes
+
+
+def evaluate_condition(condition: str, memory: Memory) -> bool:
+    return eval(
+        condition,
+        {},
+        {**memory.variables.input_variables, **memory.variables.generated_variables},
+    )
+
+
+def handle_if_else_node(if_else_node: IfElseNode, memory: Memory) -> list[ActionNode]:
+    condition_result = evaluate_condition(if_else_node.condition, memory)
+    if condition_result:
+        return if_else_node.if_nodes
+    else:
+        return if_else_node.else_nodes
