@@ -73,7 +73,7 @@ class Memory(BaseModel):
     automation_state: AutomationState = Field(default_factory=AutomationState)
     browser_states: list[BrowserState] = Field(default_factory=list)
     token_usage: TokenUsage = Field(default_factory=TokenUsage)
-    downloaded_files: list[Path] = Field(default_factory=list)
+    downloads: list[Path] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def set_dependent_paths(self):

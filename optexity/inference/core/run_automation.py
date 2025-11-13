@@ -156,7 +156,7 @@ async def save_memory_state(memory: Memory, node: ActionNode | None):
         "step_index": automation_state.step_index,
         "try_index": automation_state.try_index,
         "downloaded_files": [
-            downloaded_file.name for downloaded_file in memory.downloaded_files
+            downloaded_file.name for downloaded_file in memory.downloads
         ],
         "token_usage": memory.token_usage.model_dump(),
     }

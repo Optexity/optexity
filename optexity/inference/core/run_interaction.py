@@ -176,7 +176,7 @@ async def handle_click_element(
                 download = await download_info.value
                 if download:
                     await download.save_as(download_path)
-                    memory.downloaded_files.append(download_path)
+                    memory.downloads.append(download_path)
                 else:
                     logger.error("No download found")
         else:
@@ -269,7 +269,7 @@ async def handle_select_option(
                 download = await download_info.value
                 if download:
                     await download.save_as(download_path)
-                    memory.downloaded_files.append(download_path)
+                    memory.downloads.append(download_path)
                 else:
                     logger.error("No download found")
         else:
@@ -325,7 +325,7 @@ async def handle_download_url_as_pdf(
         logger.error(f"Unsupported content type: {type(r.content)}")
         return
 
-    memory.downloaded_files.append(download_path)
+    memory.downloads.append(download_path)
 
 
 async def handle_agentic_task(
@@ -404,12 +404,16 @@ async def handle_assert_locator_presence_error(
         memory.token_usage += token_usage
 
         if response.error_type == "website_not_loaded":
+            asyncio.sleep(5)
             await run_interaction_action(
                 interaction_action, memory, browser, retries_left - 1
             )
         elif response.error_type == "overlay_popup_blocking":
             close_overlay_popup_action = CloseOverlayPopupAction()
             await handle_agentic_task(close_overlay_popup_action, memory, browser)
+            await run_interaction_action(
+                interaction_action, memory, browser, retries_left - 1
+            )
         elif response.error_type == "fatal_error":
             logger.error(
                 f"Fatal error running node {memory.automation_state.step_index} after {retries_left} retries: {error.original_error}"
