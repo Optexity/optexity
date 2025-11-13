@@ -46,9 +46,20 @@ class BrowserState(BaseModel):
     llm_response: str | dict | None = Field(default=None)
 
 
+class ScreenshotData(BaseModel):
+    filename: str = Field(...)
+    base64: str = Field(...)
+
+
+class OutputData(BaseModel):
+    dict_data: dict | None = Field(default=None)
+    screenshot: ScreenshotData = Field(default=None)
+    text: str | None = Field(default=None)
+
+
 class Variables(BaseModel):
     input_variables: dict[str, list[str]]
-    output_data: list = Field(default_factory=list)
+    output_data: list[OutputData] = Field(default_factory=list)
     generated_variables: dict = Field(default_factory=dict)
 
 

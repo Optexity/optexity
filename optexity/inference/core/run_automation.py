@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import logging
 from copy import deepcopy
@@ -186,7 +187,23 @@ async def save_memory_state(memory: Memory, node: ActionNode | None):
         await f.write(json.dumps(memory.variables.generated_variables, indent=4))
 
     async with aiofiles.open(step_directory / "output_data.json", "w") as f:
-        await f.write(json.dumps(memory.variables.output_data, indent=4))
+        await f.write(
+            json.dumps(
+                [
+                    output_data.model_dump(exclude_none=True, exclude={"screenshot"})
+                    for output_data in memory.variables.output_data
+                ],
+                indent=4,
+            )
+        )
+
+    for output_data in memory.variables.output_data:
+        if output_data.screenshot:
+            async with aiofiles.open(
+                step_directory / f"screenshot_{output_data.screenshot.filename}.png",
+                "wb",
+            ) as f:
+                await f.write(base64.b64decode(output_data.screenshot.base64))
 
 
 async def save_automation(automation: Automation, save_directory: Path):

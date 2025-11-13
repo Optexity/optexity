@@ -1,6 +1,7 @@
+import base64
 import logging
 
-import requests
+import aiofiles
 
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import GeminiModels, get_llm_model
@@ -8,8 +9,9 @@ from optexity.schema.actions.extraction_action import (
     ExtractionAction,
     LLMExtraction,
     NetworkCallExtraction,
+    ScreenshotExtraction,
 )
-from optexity.schema.memory import Memory
+from optexity.schema.memory import Memory, OutputData, ScreenshotData
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,29 @@ async def run_extraction_action(
         await handle_network_call_extraction(
             extraction_action.network_call, memory, browser
         )
+    elif extraction_action.screenshot:
+        await handle_screenshot_extraction(
+            extraction_action.screenshot, memory, browser
+        )
+
+
+async def handle_screenshot_extraction(
+    screenshot_extraction: ScreenshotExtraction, memory: Memory, browser: Browser
+):
+    page = await browser.get_current_page()
+    if page is None:
+        return
+
+    screenshot_bytes = await page.screenshot(full_page=True)
+    screenshot_base64 = base64.b64encode(screenshot_bytes)
+
+    memory.variables.output_data.append(
+        OutputData(
+            screenshot=ScreenshotData(
+                filename=screenshot_extraction.filename, base64=screenshot_base64
+            )
+        )
+    )
 
 
 async def handle_llm_extraction(
@@ -56,7 +81,7 @@ async def handle_llm_extraction(
     logger.debug(f"Response: {response_dict}")
 
     memory.token_usage += token_usage
-    memory.variables.output_data.append(response_dict)
+    memory.variables.output_data.append(OutputData(dict_data=response_dict))
 
     if llm_extraction.output_variable_names is not None:
         for output_variable_name in llm_extraction.output_variable_names:
@@ -80,4 +105,6 @@ async def handle_network_call_extraction(
 
     for network_call in browser.network_calls:
         if network_call_extraction.url_pattern in network_call.url:
-            memory.variables.output_data.append(network_call.model_dump())
+            memory.variables.output_data.append(
+                OutputData(dict_data=network_call.model_dump())
+            )

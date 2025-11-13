@@ -9,7 +9,7 @@ from optexity.examples.pshpgeorgia_medicaid import (
     pshpgeorgia_login_test,
     pshpgeorgia_medicaid_test,
 )
-from optexity.examples.shien import shien_test
+from optexity.examples.shein import shein_test
 from optexity.examples.supabase_login import supabase_login_test
 from optexity.inference.core.run_automation import run_automation
 from optexity.inference.infra.browser import Browser
@@ -127,18 +127,18 @@ async def run_i94_test():
         await browser.stop()
 
 
-async def run_shien_test():
+async def run_shein_test():
 
     try:
-        logger.debug("Starting Shien test")
+        logger.debug("Starting Shein test")
         browser = Browser()
         memory = Memory(variables=Variables(input_variables={}))
         await browser.start()
-        await browser.go_to_url(shien_test.url)
-        await run_automation(shien_test, memory, browser)
+        await browser.go_to_url(shein_test.url)
+        await run_automation(shein_test, memory, browser)
         await asyncio.sleep(5)
     except Exception as e:
-        logger.error(f"Error running Shien test: {e}")
+        logger.error(f"Error running Shein test: {e}")
         raise e
     finally:
         logger.debug("Inside finally, stopping browser")
@@ -151,7 +151,7 @@ async def run_shien_test():
 
         logger.debug("Printed all tasks")
 
-    logger.debug("Shien test finished")
+    logger.debug("Shein test finished")
 
 
 if __name__ == "__main__":
@@ -159,4 +159,4 @@ if __name__ == "__main__":
     # asyncio.run(run_supabase_login_test())
     # asyncio.run(run_pshpgeorgia_test())
     # asyncio.run(run_i94_test())
-    asyncio.run(run_shien_test())
+    asyncio.run(run_shein_test())

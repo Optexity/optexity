@@ -68,10 +68,15 @@ class PythonScriptExtraction(BaseModel):
         return self
 
 
+class ScreenshotExtraction(BaseModel):
+    filename: str
+
+
 class ExtractionAction(BaseModel):
     network_call: Optional[NetworkCallExtraction] = None
     llm: Optional[LLMExtraction] = None
     python_script: Optional[PythonScriptExtraction] = None
+    screenshot: Optional[ScreenshotExtraction] = None
 
     @model_validator(mode="after")
     def validate_one_extraction(cls, model: "ExtractionAction"):
@@ -80,12 +85,13 @@ class ExtractionAction(BaseModel):
             "llm": model.llm,
             "network_call": model.network_call,
             "python_script": model.python_script,
+            "screenshot": model.screenshot,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of llm, networkcall, or python must be provided"
+                "Exactly one of llm, networkcall, python_script, or screenshot must be provided"
             )
 
         return model
