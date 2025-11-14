@@ -70,6 +70,7 @@ class PythonScriptExtraction(BaseModel):
 
 class ScreenshotExtraction(BaseModel):
     filename: str
+    full_page: bool = True
 
 
 class ExtractionAction(BaseModel):

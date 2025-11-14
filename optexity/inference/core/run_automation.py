@@ -7,6 +7,13 @@ from pathlib import Path
 
 import aiofiles
 
+from optexity.inference.core.logging import (
+    complete_task_in_server,
+    save_downloads_in_server,
+    save_output_data_in_server,
+    save_trajectory_in_server,
+    start_task_in_server,
+)
 from optexity.inference.core.run_2fa import run_2fa_action
 from optexity.inference.core.run_extraction import run_extraction_action
 from optexity.inference.core.run_interaction import run_interaction_action
@@ -28,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 
 async def run_automation(automation: Automation, memory: Memory, browser: Browser):
+    await start_task_in_server(memory)
+
     file_handler = logging.FileHandler(str(memory.log_file_path))
     file_handler.setLevel(logging.DEBUG)
 
@@ -42,21 +51,29 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
 
     full_automation = []
 
-    for node in automation.nodes:
-        if isinstance(node, ForLoopNode):
-            action_nodes = expand_for_loop_node(node, memory)
-            logger.debug(
-                f"Expanded for loop node {node.variable_name} into {len(action_nodes)} nodes"
-            )
-        elif isinstance(node, IfElseNode):
-            action_nodes = handle_if_else_node(node, memory)
-            logger.debug(f"nodes for if else node {node.condition} are {action_nodes}")
-        else:
-            action_nodes = [node]
+    try:
+        for node in automation.nodes:
+            if isinstance(node, ForLoopNode):
+                action_nodes = expand_for_loop_node(node, memory)
+                logger.debug(
+                    f"Expanded for loop node {node.variable_name} into {len(action_nodes)} nodes"
+                )
+            elif isinstance(node, IfElseNode):
+                action_nodes = handle_if_else_node(node, memory)
+                logger.debug(
+                    f"nodes for if else node {node.condition} are {action_nodes}"
+                )
+            else:
+                action_nodes = [node]
 
-        for action_node in action_nodes:
-            full_automation.append(action_node.model_dump())
-            await run_automation_node(action_node, memory, browser)
+            for action_node in action_nodes:
+                full_automation.append(action_node.model_dump())
+                await run_automation_node(action_node, memory, browser)
+
+        memory.status = "success"
+    except Exception as e:
+        memory.status = "failed"
+        memory.error = str(e)
 
     memory.automation_state.step_index += 1
     browser_state_summary = await browser.get_browser_state_summary()
@@ -68,6 +85,13 @@ async def run_automation(automation: Automation, memory: Memory, browser: Browse
             axtree=browser_state_summary.dom_state.llm_representation(),
         )
     )
+
+    memory.final_screenshot = await browser.get_screenshot(full_page=True)
+
+    await complete_task_in_server(memory)
+    await save_output_data_in_server(memory)
+    await save_downloads_in_server(memory)
+    await save_trajectory_in_server(memory)
 
     await save_memory_state(memory, None)
 
@@ -122,8 +146,8 @@ async def run_automation_node(
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
         raise e
     finally:
-
         await save_memory_state(memory, action_node)
+
     if action_node.expect_new_tab:
         found_new_tab, total_time = await browser.handle_new_tabs(
             action_node.max_new_tab_wait_time

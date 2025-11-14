@@ -15,20 +15,22 @@ import logging
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from uvicorn import run
 
+from optexity.inference.core.logging import create_task_in_server
 from optexity.inference.core.run_automation import run_automation
 from optexity.inference.infra.browser import Browser
 from optexity.schema.automation import Automation
 from optexity.schema.memory import Memory, Variables
+from optexity.utils.settings import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,7 +55,7 @@ class TaskStatus(str, Enum):
 
     QUEUED = "queued"
     RUNNING = "running"
-    COMPLETED = "completed"
+    SUCCESS = "success"
     FAILED = "failed"
     CANCELLED = "cancelled"
 
@@ -63,9 +65,13 @@ class Task:
     """Represents a queued automation task."""
 
     task_id: str
+    recording_id: str
     endpoint_name: str
     automation: Automation
+
     input_variables: Dict[str, Any]
+    unique_parameters: list[str] = field(default_factory=list)
+
     status: TaskStatus = TaskStatus.QUEUED
     created_at: datetime = field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
@@ -76,6 +82,7 @@ class Task:
 
 
 class RecordingResponse(BaseModel):
+    id: str
     endpoint_name: str | None
     automation: Automation | None
     description: str | None = None
@@ -85,6 +92,16 @@ class TaskRequest(BaseModel):
     """Request body for dynamic endpoint tasks."""
 
     input_variables: Dict[str, list[str]] = {}
+    unique_parameters: list[str] = []
+
+    @model_validator(mode="after")
+    def validate_unique_parameters(self):
+        for unique_parameter in self.unique_parameters:
+            if unique_parameter not in self.input_variables:
+                raise ValueError(
+                    f"unique_parameter {unique_parameter} not found in input_variables"
+                )
+        return self
 
 
 # Store recordings and their automations
@@ -96,12 +113,10 @@ tasks: Dict[str, Task] = {}
 task_processor_running = False
 
 
-async def fetch_recordings(
-    api_key: str, base_url: str = "http://localhost:8000"
-) -> list[RecordingResponse]:
+async def fetch_recordings() -> list[RecordingResponse]:
     """Fetch all recordings from the API."""
-    url = f"{base_url}/api/v1/get_recordings"
-    headers = {"X-API-Key": api_key}
+    url = f"{settings.SERVER_URL}/api/v1/get_recordings"
+    headers = {"x-api-key": settings.API_KEY}
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -112,6 +127,7 @@ async def fetch_recordings(
                 for recording in response.json()
             ]
             logger.info(f"Fetched {len(recordings)} recordings")
+
             return recordings
     except httpx.HTTPStatusError as e:
         logger.error(
@@ -128,11 +144,11 @@ async def execute_automation_task(task: Task):
     # Check if task was cancelled before starting
     if task.cancelled:
         task.status = TaskStatus.CANCELLED
-        task.completed_at = datetime.now()
+        task.completed_at = datetime.now(timezone.utc)
         return
 
     task.status = TaskStatus.RUNNING
-    task.started_at = datetime.now()
+    task.started_at = datetime.now(timezone.utc)
 
     # Convert input_variables to the format expected by Memory
     formatted_variables = {
@@ -140,7 +156,15 @@ async def execute_automation_task(task: Task):
         for key, value in task.input_variables.items()
     }
 
-    memory = Memory(variables=Variables(input_variables=formatted_variables))
+    memory = Memory(
+        variables=Variables(
+            input_variables=formatted_variables,
+            unique_parameters=task.unique_parameters,
+        ),
+        recording_id=task.recording_id,
+        task_id=task.task_id,
+        created_at=task.created_at,
+    )
     browser = Browser(headless=False)
 
     try:
@@ -149,7 +173,7 @@ async def execute_automation_task(task: Task):
         # Check if cancelled after browser start
         if task.cancelled:
             task.status = TaskStatus.CANCELLED
-            task.completed_at = datetime.now()
+            task.completed_at = datetime.now(timezone.utc)
             await browser.stop()
             return
 
@@ -161,7 +185,7 @@ async def execute_automation_task(task: Task):
         # Check if cancelled before running automation
         if task.cancelled:
             task.status = TaskStatus.CANCELLED
-            task.completed_at = datetime.now()
+            task.completed_at = datetime.now(timezone.utc)
             await browser.stop()
             return
 
@@ -170,12 +194,15 @@ async def execute_automation_task(task: Task):
 
         # Store the results
         task.result = {
-            "success": True,
+            "success": memory.status == "success",
             "output_data": memory.variables.output_data,
             "generated_variables": memory.variables.generated_variables,
             "browser_states_count": len(memory.browser_states),
         }
-        task.status = TaskStatus.COMPLETED
+        task.status = (
+            TaskStatus.SUCCESS if memory.status == "success" else TaskStatus.FAILED
+        )
+        task.completed_at = memory.completed_at
 
     except Exception as e:
         logger.error(f"Error executing automation task {task.task_id}: {e}")
@@ -205,7 +232,7 @@ async def task_processor():
             # Check if task was cancelled while in queue
             if task.cancelled:
                 task.status = TaskStatus.CANCELLED
-                task.completed_at = datetime.now()
+                task.completed_at = datetime.now(timezone.utc)
                 task_queue.task_done()
                 continue
 
@@ -227,7 +254,7 @@ async def task_processor():
             if task:
                 task.status = TaskStatus.FAILED
                 task.error = str(e)
-                task.completed_at = datetime.now()
+                task.completed_at = datetime.now(timezone.utc)
             if task:
                 task_queue.task_done()
 
@@ -235,7 +262,10 @@ async def task_processor():
 
 
 def create_dynamic_endpoint(
-    endpoint_name: str, automation: Automation, description: str = None
+    endpoint_name: str,
+    automation: Automation,
+    recording_id: str,
+    description: str = None,
 ):
     """Create a dynamic FastAPI endpoint for a recording."""
 
@@ -247,20 +277,27 @@ def create_dynamic_endpoint(
     async def dynamic_endpoint(body: TaskRequest):
         """Dynamically created endpoint for automation execution."""
         try:
-            # Extract input variables from request body
-            input_variables: dict = body.input_variables
-
             # Create a new task
             task_id = str(uuid.uuid4())
             task = Task(
                 task_id=task_id,
+                recording_id=recording_id,
                 endpoint_name=endpoint_name,
                 automation=automation,
-                input_variables=input_variables,
+                input_variables=body.input_variables,
+                unique_parameters=body.unique_parameters,
             )
 
             # Store task
             tasks[task_id] = task
+
+            await create_task_in_server(
+                task_id=task_id,
+                recording_id=recording_id,
+                input_parameters=body.input_variables,
+                unique_parameters=body.unique_parameters,
+                created_at=datetime.now(timezone.utc),
+            )
 
             # Queue the task
             await task_queue.put(task)
@@ -292,14 +329,15 @@ def create_dynamic_endpoint(
             "description": description,
             "url": automation.url if automation else None,
             "parameters": automation.parameters if automation else [],
+            "recording_id": recording_id,
         }
 
     logger.info(f"Created endpoint: POST {endpoint_path}")
 
 
-async def setup_endpoints(api_key: str, base_url: str = "http://localhost:8000"):
+async def setup_endpoints():
     """Fetch recordings and create dynamic endpoints."""
-    recordings = await fetch_recordings(api_key, base_url)
+    recordings = await fetch_recordings()
 
     for recording in recordings:
 
@@ -321,7 +359,10 @@ async def setup_endpoints(api_key: str, base_url: str = "http://localhost:8000")
 
             # Create dynamic endpoint
             create_dynamic_endpoint(
-                recording.endpoint_name, recording.automation, recording.description
+                recording.endpoint_name,
+                recording.automation,
+                recording.id,
+                recording.description,
             )
 
         except Exception as e:
@@ -415,7 +456,7 @@ async def get_task(task_id: str):
     }
 
     # Include result if task is completed or failed
-    if task.status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
+    if task.status in [TaskStatus.SUCCESS, TaskStatus.FAILED]:
         response["result"] = task.result
 
     if task.error:
@@ -461,10 +502,10 @@ async def cancel_task(task_id: str):
     )
 
 
-async def setup_app(api_key: str, base_url: str):
+async def setup_app():
     """Setup the application by fetching recordings and creating endpoints."""
     logger.info("Setting up dynamic endpoints...")
-    await setup_endpoints(api_key, base_url)
+    await setup_endpoints()
 
     if len(recordings_cache) == 0:
         logger.warning("No recordings found. Server will start with no endpoints.")
@@ -475,18 +516,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Dynamic API endpoint generator for Optexity recordings"
     )
-    parser.add_argument(
-        "--api-key",
-        type=str,
-        required=True,
-        help="API key for authenticating with the recordings API",
-    )
-    parser.add_argument(
-        "--base-url",
-        type=str,
-        default="http://localhost:8000",
-        help="Base URL for the recordings API (default: http://localhost:8000)",
-    )
+
     parser.add_argument(
         "--host",
         type=str,
@@ -503,7 +533,7 @@ def main():
     args = parser.parse_args()
 
     # Setup endpoints before starting server (run in async context)
-    asyncio.run(setup_app(args.api_key, args.base_url))
+    asyncio.run(setup_app())
 
     # Start the server (this is blocking and manages its own event loop)
     logger.info(f"Starting server on {args.host}:{args.port}")

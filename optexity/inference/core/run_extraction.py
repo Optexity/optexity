@@ -40,12 +40,12 @@ async def run_extraction_action(
 async def handle_screenshot_extraction(
     screenshot_extraction: ScreenshotExtraction, memory: Memory, browser: Browser
 ):
-    page = await browser.get_current_page()
-    if page is None:
-        return
 
-    screenshot_bytes = await page.screenshot(full_page=True)
-    screenshot_base64 = base64.b64encode(screenshot_bytes)
+    screenshot_base64 = await browser.get_screenshot(
+        full_page=screenshot_extraction.full_page
+    )
+    if screenshot_base64 is None:
+        return
 
     memory.variables.output_data.append(
         OutputData(
@@ -81,7 +81,7 @@ async def handle_llm_extraction(
     logger.debug(f"Response: {response_dict}")
 
     memory.token_usage += token_usage
-    memory.variables.output_data.append(OutputData(dict_data=response_dict))
+    memory.variables.output_data.append(OutputData(json_data=response_dict))
 
     if llm_extraction.output_variable_names is not None:
         for output_variable_name in llm_extraction.output_variable_names:
@@ -106,5 +106,5 @@ async def handle_network_call_extraction(
     for network_call in browser.network_calls:
         if network_call_extraction.url_pattern in network_call.url:
             memory.variables.output_data.append(
-                OutputData(dict_data=network_call.model_dump())
+                OutputData(json_data=network_call.model_dump())
             )
