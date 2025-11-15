@@ -83,13 +83,16 @@ async def start_task_in_server(task: Task):
             raise ValueError(f"Failed to start task in server: {e}")
 
 
-async def complete_task_in_server(task: Task, token_usage: TokenUsage):
+async def complete_task_in_server(
+    task: Task, token_usage: TokenUsage, child_process_id: int
+):
     task.completed_at = datetime.now(timezone.utc)
 
     url = urljoin(settings.SERVER_URL, settings.COMPLETE_TASK_ENDPOINT)
     headers = {"x-api-key": settings.API_KEY}
     body = {
         "task_id": task.task_id,
+        "child_process_id": child_process_id,
         "completed_at": task.completed_at.isoformat(),
         "status": task.status,
         "error": task.error,

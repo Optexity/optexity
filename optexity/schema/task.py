@@ -1,3 +1,5 @@
+import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
@@ -28,6 +30,8 @@ class Task(BaseModel):
     downloads_directory: Path | None = Field(default=None)
     log_file_path: Path | None = Field(default=None)
 
+    dedup_key: str = Field(init=False)
+
     @model_validator(mode="after")
     def validate_unique_parameters(self):
         if len(self.unique_parameter_names) > 0:
@@ -35,6 +39,9 @@ class Task(BaseModel):
                 unique_parameter_name: self.input_parameters[unique_parameter_name]
                 for unique_parameter_name in self.unique_parameter_names
             }
+            self.dedup_key = json.dumps(self.unique_parameters, sort_keys=True)
+        else:
+            self.dedup_key = str(uuid.uuid4())
         return self
 
     @model_validator(mode="after")

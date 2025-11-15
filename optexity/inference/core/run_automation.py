@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # TODO: give a warning where any variable of type {variable_name[index]} is used but variable_name is not in the memory in generated variables or in input variables
 
 
-async def run_automation(task: Task):
+async def run_automation(task: Task, child_process_id: int):
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
 
@@ -75,7 +75,7 @@ async def run_automation(task: Task):
         task.error = str(e)
         task.status = "failed"
     finally:
-        await complete_task_in_server(task, memory.token_usage)
+        await complete_task_in_server(task, memory.token_usage, child_process_id)
 
         memory.automation_state.step_index += 1
         browser_state_summary = await browser.get_browser_state_summary()

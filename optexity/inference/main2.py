@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 
 from fastapi import Body, FastAPI
 from fastapi.responses import JSONResponse
@@ -13,6 +12,8 @@ from optexity.schema.task import Task
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+child_process_id = None
 
 
 @asynccontextmanager
@@ -29,7 +30,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Optexity Inference", lifespan=lifespan)
 task_running = False
 task_queue: asyncio.Queue[Task] = asyncio.Queue()
-global_lock = asyncio.Lock()
 
 
 async def task_processor():
@@ -58,19 +58,23 @@ async def task_processor():
 async def allocate_task(task: Task = Body(...)):
     """Get details of a specific task."""
     try:
-        async with global_lock:
-            task.allocated_at = datetime.now(timezone.utc)
-            task.status = "allocated"
-            await task_queue.put(task)
-            return JSONResponse(
-                content={"success": True, "message": "Task has been allocated"},
-                status_code=202,
-            )
+
+        await task_queue.put(task)
+        return JSONResponse(
+            content={"success": True, "message": "Task has been allocated"},
+            status_code=202,
+        )
     except Exception as e:
         logger.error(f"Error allocating task {task.task_id}: {e}")
         return JSONResponse(
             content={"success": False, "message": str(e)}, status_code=500
         )
+
+
+@app.get("/is_task_running", tags=["info"])
+async def is_task_running():
+    """Is task running endpoint."""
+    return task_running
 
 
 @app.get("/health", tags=["info"])
@@ -81,11 +85,6 @@ async def health():
         "task_running": task_running,
         "queued_tasks": task_queue.qsize(),
     }
-
-
-async def setup_app():
-    """Setup the application by fetching recordings and creating endpoints."""
-    logger.info("Setting up dynamic endpoints...")
 
 
 def main():
@@ -101,20 +100,24 @@ def main():
         help="Host to bind the server to (default: 0.0.0.0)",
     )
     parser.add_argument(
-        "--port",
+        "--child_process_id",
         type=int,
-        default=8001,
-        help="Port to run the server on (default: 8001)",
+        help="Number of child processes to run",
     )
 
     args = parser.parse_args()
 
-    # Setup endpoints before starting server (run in async context)
-    asyncio.run(setup_app())
+    assert args.child_process_id is not None
+    assert args.child_process_id >= 0
+    assert args.child_process_id < 10
 
+    global child_process_id
+    child_process_id = args.child_process_id
+
+    port = 9000 + args.child_process_id
     # Start the server (this is blocking and manages its own event loop)
-    logger.info(f"Starting server on {args.host}:{args.port}")
-    run(app, host=args.host, port=args.port)
+    logger.info(f"Starting server on {args.host}:{port}")
+    run(app, host=args.host, port=port)
 
 
 if __name__ == "__main__":
