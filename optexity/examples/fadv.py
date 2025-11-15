@@ -136,22 +136,23 @@ fadv_test = Automation(
         ActionNode(
             interaction_action=InteractionAction(
                 click_element=ClickElementAction(
-                    command="""locator('#ext-gen93')""",
+                    # command="""locator('#ext-gen93')""",
                     prompt_instructions="Click the search button at the bottom near the reset button.",
-                    end_sleep_time=10.0,
-                )
-            )
+                ),
+            ),
+            before_sleep_time=5.0,
         ),
         ActionNode(
             interaction_action=InteractionAction(
                 select_option=SelectOptionAction(
-                    command="""locator('#ext-gen124')""",
+                    # command="""locator('#ext-gen124')""",
                     select_values=["ETC"],
                     prompt_instructions="Click on the <select >Select button below the <td >Actions /> and above the Order Details. ",
                     expect_download=True,
                     download_filename="fadv_orders.csv",
                 )
-            )
+            ),
+            before_sleep_time=5.0,
         ),
         ActionNode(
             interaction_action=InteractionAction(

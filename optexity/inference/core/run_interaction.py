@@ -325,6 +325,15 @@ async def handle_select_option(
         if last_error is None:
             return
 
+    await prompt_based_action(
+        browser.input_text_index,
+        memory,
+        select_option_action.prompt_instructions,
+        select_option_action.skip_prompt,
+        browser,
+        text=select_option_action.select_values[0],
+    )
+
 
 async def handle_go_back(
     go_back_action: GoBackAction, memory: Memory, browser: Browser
@@ -378,26 +387,29 @@ async def handle_agentic_task(
 
     if agentic_task_action.backend == "browser_use":
 
-        tools = Tools(
-            exclude_actions=[
-                "search",
-                "navigate",
-                "go_back",
-                "upload_file",
-                "scroll",
-                "find_text",
-                "send_keys",
-                "evaluate",
-                "switch",
-                "close",
-                "extract",
-                "dropdown_options",
-                "select_dropdown",
-                "write_file",
-                "read_file",
-                "replace_file",
-            ]
-        )
+        if isinstance(agentic_task_action, CloseOverlayPopupAction):
+            tools = Tools(
+                exclude_actions=[
+                    "search",
+                    "navigate",
+                    "go_back",
+                    "upload_file",
+                    "scroll",
+                    "find_text",
+                    "send_keys",
+                    "evaluate",
+                    "switch",
+                    "close",
+                    "extract",
+                    "dropdown_options",
+                    "select_dropdown",
+                    "write_file",
+                    "read_file",
+                    "replace_file",
+                ]
+            )
+        else:
+            tools = Tools()
         llm = ChatGoogle(model="gemini-flash-latest")
         browser_session = BrowserSession(
             cdp_url=browser.cdp_url, keep_alive=agentic_task_action.keep_alive

@@ -186,6 +186,12 @@ class Browser:
         )
         results = await self.backend_agent.multi_act([action_model])
 
+    async def select_option_index(self, index: int, text: str):
+        action_model = self.backend_agent.ActionModel(
+            **{"select_dropdown": {"index": int(index), "text": text}}
+        )
+        results = await self.backend_agent.multi_act([action_model])
+
     async def go_to_url(self, url: str):
         page = await self.get_current_page()
         if page is None:
