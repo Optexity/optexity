@@ -23,7 +23,7 @@ from optexity.schema.actions.interaction_action import (
     InteractionAction,
     SelectOptionAction,
 )
-from optexity.schema.memory import Memory
+from optexity.schema.memory import Memory, OutputData
 
 error_handler_agent = ErrorHandlerAgent()
 
@@ -153,6 +153,10 @@ async def handle_click_element(
     max_timeout_seconds_per_try: float,
     max_tries: int,
 ):
+    if click_element_action.skip_prompt:
+        max_tries = 1
+        max_timeout_seconds_per_try = 20.0
+
     async def _click_locator():
         async def _actual_click():
             locator = await browser.get_locator_from_command(
@@ -209,6 +213,10 @@ async def handle_input_text(
     max_timeout_seconds_per_try: float,
     max_tries: int,
 ):
+    if input_text_action.skip_prompt:
+        max_tries = 1
+        max_timeout_seconds_per_try = 20.0
+
     async def _input_text_locator():
         locator = await browser.get_locator_from_command(input_text_action.command)
         if input_text_action.fill_or_type == "fill":
@@ -416,7 +424,10 @@ async def handle_assert_locator_presence_error(
             )
         elif response.error_type == "fatal_error":
             logger.error(
-                f"Fatal error running node {memory.automation_state.step_index} after {retries_left} retries: {error.original_error}"
+                f"Fatal error running node {memory.automation_state.step_index} after {retries_left} retries: {error.original_error}. Error: {response.detailed_reason}"
+            )
+            memory.variables.output_data.append(
+                OutputData(text=response.detailed_reason)
             )
             raise error
         return

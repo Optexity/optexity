@@ -207,6 +207,7 @@ class Browser:
         return page.url
 
     async def attach_network_listeners(self):
+        return
         page = await self.get_current_page()
 
         # remove old listeners first
@@ -218,6 +219,7 @@ class Browser:
         page.on("response", self._on_response)
 
     async def detach_network_listeners(self):
+        return
         page = await self.get_current_page()
         try:
             page.remove_listener("response", self._on_response)

@@ -4,6 +4,7 @@ import os
 
 from dotenv import load_dotenv
 
+from optexity.examples.fadv import fadv_test
 from optexity.examples.i94 import i94_test
 from optexity.examples.pshpgeorgia_medicaid import (
     pshpgeorgia_login_test,
@@ -94,7 +95,7 @@ async def run_pshpgeorgia_test():
 async def run_i94_test():
     try:
         logger.debug("Starting I-94 test")
-        browser = Browser()
+        browser = Browser(stealth=True)
         memory = Memory(
             variables=Variables(
                 input_variables={
@@ -154,9 +155,42 @@ async def run_shein_test():
     logger.debug("Shein test finished")
 
 
+async def run_fadv_test():
+    try:
+        logger.debug("Starting FADV test")
+        browser = Browser()
+        memory = Memory(
+            variables=Variables(
+                input_variables={
+                    "client_id": ["********"],
+                    "user_id": ["********"],
+                    "password": ["********"],
+                    "secret_answer": ["********"],
+                }
+            )
+        )
+        await browser.start()
+        await browser.go_to_url(fadv_test.url)
+        await run_automation(fadv_test, memory, browser)
+        await asyncio.sleep(5)
+    except Exception as e:
+        logger.error(f"Error running FADV test: {e}")
+        raise e
+    finally:
+        await browser.stop()
+        logger.debug("Inside finally, browser stopped")
+        logger.debug("Remaining tasks:")
+        for task in asyncio.all_tasks():
+            if task is not asyncio.current_task():
+                logger.debug(f"Remaining task: {task.get_coro()}")
+        logger.debug("Printed all tasks")
+    logger.debug("FADV test finished")
+
+
 if __name__ == "__main__":
 
     # asyncio.run(run_supabase_login_test())
     # asyncio.run(run_pshpgeorgia_test())
-    # asyncio.run(run_i94_test())
-    asyncio.run(run_shein_test())
+    asyncio.run(run_i94_test())
+    # asyncio.run(run_fadv_test())
+    # asyncio.run(run_shein_test())
