@@ -19,7 +19,6 @@ class DialogAction(BaseModel):
 
 
 class BaseAction(BaseModel):
-    index: int | None = None
     xpath: str | None = None
     command: str | None = None
     prompt_instructions: str

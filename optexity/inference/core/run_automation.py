@@ -47,7 +47,7 @@ async def run_automation(task: Task, child_process_id: int):
     try:
         await start_task_in_server(task)
         memory = Memory(variables=Variables(input_variables=task.input_parameters))
-        browser = Browser(headless=False)
+        browser = Browser(headless=False, downloads_directory=task.downloads_directory)
         await browser.start()
         await browser.go_to_url(task.automation.url)
 
@@ -74,7 +74,7 @@ async def run_automation(task: Task, child_process_id: int):
 
             for action_node in action_nodes:
                 full_automation.append(action_node.model_dump())
-                await run_automation_node(action_node, task, memory, browser)
+                await run_action_node(action_node, task, memory, browser)
         task.status = "success"
     except Exception as e:
         task.error = str(e)
@@ -117,7 +117,7 @@ async def run_final_logging(
         logger.error(f"Error running final logging: {e}")
 
 
-async def run_automation_node(
+async def run_action_node(
     action_node: ActionNode, task: Task, memory: Memory, browser: Browser
 ):
 
