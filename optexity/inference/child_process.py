@@ -41,6 +41,8 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown."""
     # Startup
 
+    asyncio.create_task(register_with_master())
+    logger.info("Registered with master")
     asyncio.create_task(task_processor())
     logger.info("Task processor background task started")
     yield
@@ -51,6 +53,25 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Optexity Inference", lifespan=lifespan)
 task_running = False
 task_queue: asyncio.Queue[Task] = asyncio.Queue()
+
+
+async def register_with_master():
+    """Register with master on startup (handles restarts automatically)."""
+
+    # Get my task metadata from ECS
+    metadata = await httpx.get("http://169.254.170.2/v3/task").json()
+
+    my_task_arn = metadata["TaskARN"]
+    my_ip = metadata["Containers"][0]["Networks"][0]["IPv4Addresses"][0]
+    my_port = settings.CHILD_PORT_OFFSET
+
+    # Register with master
+    response = await httpx.post(
+        f"http://{settings.SERVER_URL}/register_child",
+        json={"task_arn": my_task_arn, "private_ip": my_ip, "port": my_port},
+    )
+
+    logger.info(f"Registered with master: {response.json()}")
 
 
 async def task_processor():
