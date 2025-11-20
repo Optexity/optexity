@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     API_KEY: str
 
     DEPLOYMENT: Literal["local", "cloud"]
+    CHILD_PORT_OFFSET: int = 9000
 
     class Config:
         env_file = env_path if env_path else None
