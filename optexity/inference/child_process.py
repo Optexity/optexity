@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from urllib.parse import urljoin
 
 import httpx
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Optexity Inference", lifespan=lifespan)
 task_running = False
+last_task_start_time = None
 task_queue: asyncio.Queue[Task] = asyncio.Queue()
 
 
@@ -63,7 +65,16 @@ async def register_with_master():
 
     my_task_arn = metadata["TaskARN"]
     my_ip = metadata["Containers"][0]["Networks"][0]["IPv4Addresses"][0]
-    my_port = settings.CHILD_PORT_OFFSET
+
+    my_port = None
+    for binding in metadata["Containers"][0].get("NetworkBindings", []):
+        if binding["containerPort"] == settings.CHILD_PORT_OFFSET:
+            my_port = binding["hostPort"]
+            break
+
+    if not my_port:
+        logger.error("Could not find host port binding")
+        raise ValueError("Host port not found in metadata")
 
     # Register with master
     response = await httpx.post(
@@ -77,6 +88,7 @@ async def register_with_master():
 async def task_processor():
     """Background worker that processes tasks from the queue one at a time."""
     global task_running
+    global last_task_start_time
     logger.info("Task processor started")
 
     while True:
@@ -84,6 +96,7 @@ async def task_processor():
             # Get next task from queue (blocks until one is available)
             task = await task_queue.get()
             task_running = True
+            last_task_start_time = datetime.now()
             await run_automation(task, child_process_id)
 
         except asyncio.CancelledError:
@@ -133,11 +146,27 @@ async def is_task_running():
 @app.get("/health", tags=["info"])
 async def health():
     """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "task_running": task_running,
-        "queued_tasks": task_queue.qsize(),
-    }
+    global last_task_start_time
+    if (
+        task_running
+        and last_task_start_time
+        and datetime.now() - last_task_start_time > timedelta(minutes=15)
+    ):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "message": "Task not finished in the last 15 minutes",
+            },
+        )
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "healthy",
+            "task_running": task_running,
+            "queued_tasks": task_queue.qsize(),
+        },
+    )
 
 
 def main():
