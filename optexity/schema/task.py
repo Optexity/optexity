@@ -89,11 +89,14 @@ class TaskCreateRequest(BaseModel):
 class TaskStartedRequest(BaseModel):
     task_id: str
     started_at: datetime
+    allocated_at: Optional[datetime] = None
 
     @model_validator(mode="after")
     def must_have_timezone(self):
         if self.started_at.tzinfo is None:
             raise ValueError("started_at must include timezone information")
+        if self.allocated_at is not None and self.allocated_at.tzinfo is None:
+            raise ValueError("allocated_at must include timezone information")
         return self
 
 

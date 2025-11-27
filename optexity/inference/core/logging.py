@@ -59,9 +59,6 @@ async def create_task_in_server(task: Task):
 
 
 async def start_task_in_server(task: Task):
-    if settings.DEPLOYMENT == "local":
-        return
-
     try:
         task.started_at = datetime.now(timezone.utc)
         task.status = "running"
@@ -72,6 +69,8 @@ async def start_task_in_server(task: Task):
             "task_id": task.task_id,
             "started_at": task.started_at.isoformat(),
         }
+        if task.allocated_at:
+            body["allocated_at"] = task.allocated_at.isoformat()
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 url,

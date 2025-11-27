@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Literal
 
 from pydantic_settings import BaseSettings
 
@@ -15,7 +14,7 @@ class Settings(BaseSettings):
     SERVER_URL: str = "http://localhost:8000"
     HEALTH_ENDPOINT: str = "api/v1/health"
 
-    CREATE_TASK_ENDPOINT: str = "api/v1/create_task"
+    INFERENCE_ENDPOINT: str = "api/v1/inference"
     START_TASK_ENDPOINT: str = "api/v1/start_task"
     COMPLETE_TASK_ENDPOINT: str = "api/v1/complete_task"
     SAVE_OUTPUT_DATA_ENDPOINT: str = "api/v1/save_output_data"
@@ -24,7 +23,6 @@ class Settings(BaseSettings):
 
     API_KEY: str
 
-    DEPLOYMENT: Literal["local", "cloud"]
     CHILD_PORT_OFFSET: int = 9000
 
     class Config:
