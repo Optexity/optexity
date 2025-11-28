@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Literal
 
 from pydantic_settings import BaseSettings
 
@@ -24,6 +25,7 @@ class Settings(BaseSettings):
     API_KEY: str
 
     CHILD_PORT_OFFSET: int = 9000
+    DEPLOYMENT: Literal["dev", "prod"]
 
     class Config:
         env_file = env_path if env_path else None

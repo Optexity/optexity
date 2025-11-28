@@ -8,8 +8,9 @@ from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
 from optexity.inference.core.logging import (
     complete_task_in_server,
+    delete_local_data,
     save_downloads_in_server,
-    save_memory_state_locally,
+    save_latest_memory_state_locally,
     save_output_data_in_server,
     save_trajectory_in_server,
     start_task_in_server,
@@ -113,8 +114,9 @@ async def run_final_logging(
 
         await save_output_data_in_server(task, memory)
         await save_downloads_in_server(task, memory)
+        await save_latest_memory_state_locally(task, memory, None)
         await save_trajectory_in_server(task, memory)
-        await save_memory_state_locally(task, memory, None)
+        await delete_local_data(task)
     except Exception as e:
         logger.error(f"Error running final logging: {e}")
 
@@ -167,7 +169,7 @@ async def run_action_node(
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
         raise e
     finally:
-        await save_memory_state_locally(task, memory, action_node)
+        await save_latest_memory_state_locally(task, memory, action_node)
 
     if action_node.expect_new_tab:
         found_new_tab, total_time = await browser.handle_new_tabs(

@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import logging
+import shutil
 import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -220,7 +221,7 @@ async def save_trajectory_in_server(task: Task, memory: Memory):
         logger.error(f"Failed to save trajectory in server: {e}")
 
 
-async def save_memory_state_locally(
+async def save_latest_memory_state_locally(
     task: Task, memory: Memory, node: ActionNode | None
 ):
 
@@ -285,3 +286,11 @@ async def save_memory_state_locally(
                 "wb",
             ) as f:
                 await f.write(base64.b64decode(output_data.screenshot.base64))
+
+
+async def delete_local_data(task: Task):
+
+    if settings.DEPLOYMENT == "dev" or task.task_directory is None:
+        return
+
+    shutil.rmtree(task.task_directory, ignore_errors=True)
