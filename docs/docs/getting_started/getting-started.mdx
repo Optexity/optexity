@@ -1,10 +1,8 @@
 ---
-title: Getting Started
+title: Running first inference
 ---
 
-Get from zero to a running Optexity inference server and a working request.
-
-This guide assumes you have already completed the steps in `Installation`.
+This guide assumes you have already completed the steps in [Installation](/docs/installation).
 
 ## 1. Configure your environment
 
@@ -19,7 +17,7 @@ touch .env
 Add the required values:
 
 ```bash
-API_KEY=YOUR_OPTEXTITY_API_KEY          # API key used for authenticated requests
+API_KEY=YOUR_OPTEXITY_API_KEY           # API key used for authenticated requests
 DEPLOYMENT=dev                          # or "prod" in production
 ```
 
@@ -82,18 +80,34 @@ Constraints:
 - Every entry in `unique_parameter_names` **must** also exist as a key in `input_parameters`.
 - Each value in `input_parameters` should be a list of strings, even if you only pass a single value.
 
+### Example
+When you first log in to your account, you will see built-in example automations.
+The first automation is to download a PDF. You can see this on your dashboard.
+![Example automation](/images/example_workflow.png)
+
+The name of the automation is "download_pdf_url". Use this as the `endpoint_name` in your request.
+The input parameter is `pdf_url`:
+```json
+{
+  "endpoint_name": "download_pdf_url",
+  "input_parameters": {
+    "pdf_url": ["https://s24.q4cdn.com/216390268/files/doc_downloads/test.pdf"]
+  },
+  "unique_parameter_names": ["pdf_url"]
+}
+```
+
 ### Example `curl` request
 
 ```bash
 curl -X POST http://localhost:9000/inference \
   -H "Content-Type: application/json" \
   -d '{
-    "endpoint_name": "signup-flow",
+    "endpoint_name": "download_pdf_url",
     "input_parameters": {
-      "email": ["alice@example.com"],
-      "full_name": ["Alice Doe"]
+      "pdf_url": ["https://s24.q4cdn.com/216390268/files/doc_downloads/test.pdf"]
     },
-    "unique_parameter_names": ["email"]
+    "unique_parameter_names": []
   }'
 ```
 
@@ -111,21 +125,13 @@ On success, the inference server:
 }
 ```
 
-> Task execution (browser automation, screenshots, outputs, etc.) happens asynchronously in the background worker.
+> Task execution (browser automation, screenshots, outputs, etc.) happens asynchronously in the background worker. You can see it running locally in your browser.
 
 ## 4. Monitor health and execution
 
-The child process server exposes simple introspection endpoints:
+You can monitor the task on the dashboard. It will show the status, errors, outputs, and all the downloaded files.
+![Task runs](/images/task_runs.png)
 
-- `GET /health`
-  - Returns HTTP 200 when healthy.
-  - Returns HTTP 503 if a task has been running for more than 15 minutes without finishing.
-  - Includes `task_running` and `queued_tasks` in the JSON body.
-
-- `GET /is_task_running`
-  - Returns `true` or `false` indicating whether a task is currently executing.
-
-You can integrate these into your monitoring/alerting system or use them during local development.
 
 ## 5. Next steps
 

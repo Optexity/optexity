@@ -16,18 +16,18 @@
                     {
                         "group": "Getting Started",
                         "pages": [
-                            "/docs/installation",
-                            "/docs/getting-started",
-                            "/docs/inference-api"
+                            "/docs/getting_started/installation",
+                            "/docs/getting_started/getting-started",
+                            "/docs/getting_started/inference-api"
                         ]
                     },
                     {
                         "group": "Building Automations",
                         "pages": [
-                            "/docs/quickstart",
-                            "/docs/core-concepts",
-                            "/docs/locators",
-                            "/docs/parameters-variables"
+                            "/docs/building_automations/quickstart",
+                            "/docs/building_automations/core-concepts",
+                            "/docs/building_automations/locators",
+                            "/docs/building_automations/parameters-variables"
                         ]
                     },
                     {

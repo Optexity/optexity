@@ -1,0 +1,57 @@
+---
+title: Installation
+---
+
+Follow these steps to set up your Optexity account, grab your API key, and install the toolchain locally.
+
+## 1. Create an account
+
+Head to [dashboard.optexity.com](https://dashboard.optexity.com) and sign up for a free account.
+
+## 2. Get your API key
+
+Once logged in, navigate to the **API Keys** section in your dashboard and create a new key.
+
+![Get API key from dashboard](/images/gen_api_key.png)
+
+Copy the key and store it securely, you'll need it to authenticate your automation runs. Once you have your API key, you can add it to your `.env` file.
+
+## 3. Clone the repositories
+
+```bash
+git clone git@github.com:Optexity/optexity.git
+cd optexity
+git submodule sync
+git submodule update --init --recursive
+```
+
+## 4. Create and activate a Python environment
+
+Choose **one** of the options below.
+
+### Option A – Conda (includes Python 3.11 and Node.js)
+
+```bash
+conda create -n optexity python=3.11 nodejs
+conda activate optexity
+```
+
+### Option B – Python `venv`
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+> If you pick `venv`, ensure Node.js 18+ is already available on your machine before continuing.
+
+## 5. Install dependencies
+
+```bash
+pip install -e "external/browser-use"
+pip install -e .
+playwright install
+```
+
+Once these commands finish, the Optexity is ready for local development or agent experimentation.
+
