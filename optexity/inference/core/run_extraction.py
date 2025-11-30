@@ -1,7 +1,4 @@
-import base64
 import logging
-
-import aiofiles
 
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import GeminiModels, get_llm_model
@@ -71,6 +68,12 @@ async def handle_llm_extraction(
         screenshot = None
 
     prompt = "Extract the following from the axtree: " + axtree
+    if llm_extraction.llm_provider == "gemini":
+        model_name = GeminiModels(llm_extraction.llm_model_name)
+        llm_model.model_name = model_name
+    else:
+        raise ValueError(f"Invalid LLM provider: {llm_extraction.llm_provider}")
+
     response, token_usage = llm_model.get_model_response_with_structured_output(
         prompt=prompt,
         response_schema=llm_extraction.build_model(),

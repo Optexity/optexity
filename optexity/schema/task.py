@@ -13,6 +13,25 @@ from optexity.schema.automation import Automation
 from optexity.schema.token_usage import TokenUsage
 
 
+class CallbackUrl(BaseModel):
+    url: str
+    api_key: str | None = None
+    username: str | None = None
+    password: str | None = None
+
+    @model_validator(mode="after")
+    def validate_callback_url(self):
+
+        if self.api_key is not None and (
+            self.username is not None or self.password is not None
+        ):
+            raise ValueError(
+                "api_key and username/password cannot be used together. Please provide only one of them."
+            )
+
+        return self
+
+
 class Task(BaseModel):
     task_id: str
     user_id: str
@@ -38,7 +57,7 @@ class Task(BaseModel):
     retry_count: int = 0
     max_retries: int = 1
     api_key: str
-    callback_url: str | None = None
+    callback_url: CallbackUrl | None = None
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}

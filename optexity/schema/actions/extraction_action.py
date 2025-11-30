@@ -10,6 +10,8 @@ class LLMExtraction(BaseModel):
     extraction_format: dict
     extraction_instructions: str
     output_variable_names: list[str] | None = None
+    llm_provider: Literal["gemini"] = "gemini"
+    llm_model_name: str = "gemini-2.5-flash"
 
     def build_model(self):
         return build_model(self.extraction_format)

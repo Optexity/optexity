@@ -233,7 +233,7 @@ async def initiate_callback(task: Task):
 
         data = {
             "task_id": task.task_id,  # form field
-            "callback_url": task.callback_url,
+            "callback_url": task.callback_url.model_dump(),
         }
 
         async with httpx.AsyncClient() as client:
