@@ -67,7 +67,18 @@ async def handle_llm_extraction(
     else:
         screenshot = None
 
-    prompt = "Extract the following from the axtree: " + axtree
+    system_instruction = f"""
+    You are an expert in extracting information from a website. You will be given an axtree of a webpage.
+    Your task is to extract the information from the webpage and return it in the format specified by the instructions.
+    {llm_extraction.extraction_instructions}
+    """
+
+    prompt = f"""
+    [INPUT]
+    Axtree: {axtree}
+    [/INPUT]
+    """
+
     if llm_extraction.llm_provider == "gemini":
         model_name = GeminiModels(llm_extraction.llm_model_name)
         llm_model.model_name = model_name
@@ -78,6 +89,7 @@ async def handle_llm_extraction(
         prompt=prompt,
         response_schema=llm_extraction.build_model(),
         screenshot=screenshot,
+        system_instruction=system_instruction,
     )
     response_dict = response.model_dump()
 
