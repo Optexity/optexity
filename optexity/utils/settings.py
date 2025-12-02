@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     SERVER_URL: str = "http://localhost:8000"
     HEALTH_ENDPOINT: str = "api/v1/health"
     INFERENCE_ENDPOINT: str = "api/v1/inference"
+    ADD_EXAMPLE_ENDPOINT: str = "api/v1/add_example"
+    UPDATE_EXAMPLE_ENDPOINT: str = "api/v1/update_example"
     START_TASK_ENDPOINT: str = "api/v1/start_task"
     COMPLETE_TASK_ENDPOINT: str = "api/v1/complete_task"
     SAVE_OUTPUT_DATA_ENDPOINT: str = "api/v1/save_output_data"

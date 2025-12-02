@@ -1,3 +1,4 @@
+from optexity.schema.actions.assertion_action import AssertionAction, LLMAssertion
 from optexity.schema.actions.interaction_action import (
     ClickElementAction,
     InputTextAction,
@@ -48,6 +49,13 @@ automation = Automation(
                 click_element=ClickElementAction(
                     command="""get_by_role("button", name="Sign In")""",
                     prompt_instructions="Click the Sign In button",
+                )
+            )
+        ),
+        ActionNode(
+            assertion_action=AssertionAction(
+                llm=LLMAssertion(
+                    extraction_instructions="Check if the login was successful",
                 )
             )
         ),

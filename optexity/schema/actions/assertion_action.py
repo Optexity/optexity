@@ -2,12 +2,25 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, field_validator, model_validator
 
+from optexity.schema.actions.extraction_action import LLMExtraction
 
-class LLMAssertion(BaseModel):
-    source: list[Literal["axtree", "screenshot"]]
-    output_format: str | BaseModel
-    extraction_instruction: str
-    ## TODO: add output to memory variables
+
+class LLMAssertion(LLMExtraction):
+    source: list[Literal["axtree", "screenshot"]] = ["screenshot"]
+    extraction_format: dict = {"assertion_result": "bool", "assertion_reason": "str"}
+
+    @model_validator(mode="after")
+    def validate_output_var_in_format(self):
+        instruction = """You are a helpful assistant that verifies if the condition is met. 
+        Use the info supplied below to verify the condition.
+        The assertion_reason should be a short explanation of why the condition was met or not met.
+        The assertion_result should be True if the condition is met, False otherwise.
+        """
+        self.extraction_instructions = instruction + "\n" + self.extraction_instructions
+        if "screenshot" not in self.source:
+            self.source.append("screenshot")
+
+        return self
 
 
 class NetworkCallAssertion(BaseModel):
@@ -48,3 +61,12 @@ class AssertionAction(BaseModel):
             )
 
         return model
+
+    def replace(self, pattern: str, replacement: str):
+        if self.network_call:
+            pass
+        if self.llm:
+            self.llm.replace(pattern, replacement)
+        if self.python_script:
+            pass
+        return self

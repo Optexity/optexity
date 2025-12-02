@@ -92,11 +92,12 @@ async def handle_llm_extraction(
         system_instruction=system_instruction,
     )
     response_dict = response.model_dump()
+    output_data = OutputData(json_data=response_dict)
 
     logger.debug(f"Response: {response_dict}")
 
     memory.token_usage += token_usage
-    memory.variables.output_data.append(OutputData(json_data=response_dict))
+    memory.variables.output_data.append(output_data)
 
     if llm_extraction.output_variable_names is not None:
         for output_variable_name in llm_extraction.output_variable_names:
@@ -112,6 +113,7 @@ async def handle_llm_extraction(
                 raise ValueError(
                     f"Output variable {output_variable_name} must be a string or a list of strings"
                 )
+    return output_data
 
 
 async def handle_network_call_extraction(

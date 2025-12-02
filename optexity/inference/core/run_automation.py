@@ -17,6 +17,7 @@ from optexity.inference.core.logging import (
     start_task_in_server,
 )
 from optexity.inference.core.run_2fa import run_2fa_action
+from optexity.inference.core.run_assertion import run_assertion_action
 from optexity.inference.core.run_extraction import run_extraction_action
 from optexity.inference.core.run_interaction import run_interaction_action
 from optexity.inference.core.run_python_script import run_python_script_action
@@ -79,6 +80,10 @@ async def run_automation(task: Task, child_process_id: int):
                 full_automation.append(action_node.model_dump())
                 await run_action_node(action_node, task, memory, browser)
         task.status = "success"
+    except AssertionError as e:
+        logger.error(f"Assertion error: {e}")
+        task.error = str(e)
+        task.status = "failed"
     except Exception as e:
         logger.error(f"Error running automation: {traceback.format_exc()}")
         task.error = str(e)
@@ -167,6 +172,8 @@ async def run_action_node(
             await run_python_script_action(
                 action_node.python_script_action, memory, browser
             )
+        elif action_node.assertion_action:
+            await run_assertion_action(action_node.assertion_action, memory, browser)
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")

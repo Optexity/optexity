@@ -72,9 +72,7 @@ class ActionNode(BaseModel):
         if self.interaction_action:
             self.interaction_action.replace(pattern, replacement)
         if self.assertion_action:
-            raise NotImplementedError(
-                "Assertion replacement function is not implemented"
-            )
+            self.assertion_action.replace(pattern, replacement)
         if self.extraction_action:
             self.extraction_action.replace(pattern, replacement)
         if self.python_script_action:
