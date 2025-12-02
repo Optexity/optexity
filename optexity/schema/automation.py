@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, model_validator
 
 from optexity.schema.actions.assertion_action import AssertionAction
@@ -109,6 +111,7 @@ class Parameters(BaseModel):
 
 
 class Automation(BaseModel):
+    browser_channel: Literal["chromium", "chrome"] = "chromium"
     url: str
     parameters: Parameters
     nodes: list[ActionNode | ForLoopNode | IfElseNode]

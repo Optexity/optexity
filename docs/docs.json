@@ -72,6 +72,23 @@
                         ]
                     }
                 ]
+            },
+            {
+                "tab": "Examples",
+                "groups": [
+                    {
+                        "group": "Data Extraction",
+                        "pages": ["/examples/data_extraction/i94"]
+                    },
+                    {
+                        "group": "QA Testing",
+                        "pages": ["/examples/qa_testing/supabase-login"]
+                    },
+                    {
+                        "group": "Healthcare",
+                        "pages": ["/examples/healthcare/peachstate-medicaid"]
+                    }
+                ]
             }
         ],
         "global": {

@@ -22,6 +22,7 @@ class Browser:
         stealth: bool = True,
         backend: Literal["browser-use", "browserbase"] = "browser-use",
         debug_port: int = 9222,
+        channel: Literal["chromium", "chrome"] = "chromium",
     ):
 
         if proxy:
@@ -40,6 +41,7 @@ class Browser:
         self.page = None
         self.cdp_url = f"http://localhost:{self.debug_port}"
         self.backend_agent = None
+        self.channel = channel
 
         self.page_to_target_id = []
         self.previous_total_pages = 0
@@ -59,7 +61,7 @@ class Browser:
 
             self.playwright = await async_playwright().start()
             self.browser = await self.playwright.chromium.launch(
-                channel="chromium",
+                channel=self.channel,
                 headless=self.headless,
                 args=[
                     "--start-fullscreen",

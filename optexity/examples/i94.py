@@ -13,6 +13,7 @@ from optexity.schema.automation import ActionNode, Automation, Parameters
 description = "I94 Example"
 endpoint_name = "i94"
 automation = Automation(
+    browser_channel="chrome",
     url="https://i94.cbp.dhs.gov/search/recent-search",
     parameters=Parameters(
         input_parameters={
@@ -29,6 +30,7 @@ automation = Automation(
             python_script_action=PythonScriptAction(
                 execution_code="""async def code_fn(page):\n    print(\"entering code_fn\")\n    await page.evaluate(\n        \"\"\"  const el = document.querySelector('mat-dialog-content');  if (el) el.scrollTop = el.scrollHeight;\"\"\"\n    )\n    print(\"exiting code_fn\")\n"""
             ),
+            before_sleep_time=2.0,
         ),
         ActionNode(
             interaction_action=InteractionAction(
