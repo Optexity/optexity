@@ -2,34 +2,11 @@
 title: Running first inference
 ---
 
-This guide assumes you have already completed the steps in [Installation](/docs/installation).
+This guide assumes you have already completed the steps in [Local Setup](/docs/building_automations/installation).
+You should have already [recorded your first automation](/docs/getting_started/recording-first-inference) and saved it as a recording in the Optexity dashboard.
 
-## 1. Configure your environment
 
-Optexity reads configuration from a standard `.env` file via the `ENV_PATH` environment variable.
-
-Create a `.env` file in the repo root:
-
-```bash
-touch .env
-```
-
-Add the required values:
-
-```bash
-API_KEY=YOUR_OPTEXITY_API_KEY           # API key used for authenticated requests
-DEPLOYMENT=dev                          # or "prod" in production
-```
-
-Then export `ENV_PATH` when running processes that rely on these settings:
-
-```bash
-export ENV_PATH=.env
-```
-
-> If `ENV_PATH` is not set, the inference server will try to start with defaults and log a warning. For normal usage you should always point `ENV_PATH` at a real `.env` file.
-
-## 2. Start the inference child process server
+## Start the inference child process server
 
 The primary way to run browser automations locally is via the inference child process server in `optexity/inference/child_process.py`.
 
@@ -50,7 +27,7 @@ When this process starts, it exposes:
 - `GET /is_task_running` – whether a task is currently executing
 - `POST /inference` – main endpoint to allocate and execute tasks (see next section)
 
-## 3. Call the `/inference` endpoint
+## Call the `/inference` endpoint
 
 With the server running on `http://localhost:9000`, you can allocate a task by sending an `InferenceRequest` to `/inference`.
 
@@ -66,34 +43,13 @@ A minimal JSON example:
 
 ```json
 {
-  "endpoint_name": "signup-flow",
-  "input_parameters": {
-    "email": ["alice@example.com"],
-    "full_name": ["Alice Doe"]
-  },
-  "unique_parameter_names": ["email"]
-}
-```
-
-Constraints:
-
-- Every entry in `unique_parameter_names` **must** also exist as a key in `input_parameters`.
-- Each value in `input_parameters` should be a list of strings, even if you only pass a single value.
-
-### Example
-When you first log in to your account, you will see built-in example automations.
-The first automation is to download a PDF. You can see this on your dashboard.
-![Example automation](/images/example_workflow.png)
-
-The name of the automation is "download_pdf_url". Use this as the `endpoint_name` in your request.
-The input parameter is `pdf_url`:
-```json
-{
-  "endpoint_name": "download_pdf_url",
-  "input_parameters": {
-    "pdf_url": ["https://s24.q4cdn.com/216390268/files/doc_downloads/test.pdf"]
-  },
-  "unique_parameter_names": ["pdf_url"]
+    "endpoint_name": "extract_stock_price",
+    "input_parameters": {
+        "search_term": [
+            "NVDA"
+        ]
+    },
+    "unique_parameter_names": []
 }
 ```
 
@@ -103,9 +59,9 @@ The input parameter is `pdf_url`:
 curl -X POST http://localhost:9000/inference \
   -H "Content-Type: application/json" \
   -d '{
-    "endpoint_name": "download_pdf_url",
+    "endpoint_name": "extract_stock_price",
     "input_parameters": {
-      "pdf_url": ["https://s24.q4cdn.com/216390268/files/doc_downloads/test.pdf"]
+      "search_term": ["NVDA"]
     },
     "unique_parameter_names": []
   }'
@@ -127,15 +83,7 @@ On success, the inference server:
 
 > Task execution (browser automation, screenshots, outputs, etc.) happens asynchronously in the background worker. You can see it running locally in your browser.
 
-## 4. Monitor health and execution
+## Monitor health and execution
 
 You can monitor the task on the dashboard. It will show the status, errors, outputs, and all the downloaded files.
-![Task runs](/images/task_runs.png)
-
-
-## 5. Next steps
-
-- See **Inference API Reference** for a deeper look at `InferenceRequest` and `Task` models.
-- Explore the internal code in `optexity/inference` and `optexity/schema` to build higher-level integrations or orchestration around Optexity.
-
-
+![Task runs](/images/dashboard_task_run.png)

@@ -1,5 +1,5 @@
 ---
-title: Installation
+title: Local Setup
 ---
 
 Follow these steps to set up your Optexity account, grab your API key, and install the toolchain locally.
@@ -52,6 +52,35 @@ pip install -e "external/browser-use"
 pip install -e .
 playwright install
 ```
+
+## 6. Configure your environment
+
+Optexity reads configuration from a standard `.env` file via the `ENV_PATH` environment variable.
+
+Create a `.env` file in the repo root:
+
+```bash
+touch .env
+```
+
+Add the required values:
+
+```bash
+API_KEY=YOUR_OPTEXITY_API_KEY           # API key used for authenticated requests
+GOOGLE_API_KEY=YOUR_GOOGLE_API_KEY      # API key used for Google Gemini
+DEPLOYMENT=dev                          # or "prod" in production
+```
+
+You can get your free Google Gemini API key from the [Google AI Studio Console](https://aistudio.google.com).
+
+Then export `ENV_PATH` when running processes that rely on these settings:
+
+```bash
+export ENV_PATH=.env
+```
+
+> If `ENV_PATH` is not set, the inference server will try to start with defaults and log a warning. For normal usage you should always point `ENV_PATH` at a real `.env` file.
+
 
 Once these commands finish, the Optexity is ready for local development or agent experimentation.
 

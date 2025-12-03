@@ -14,20 +14,21 @@
                 "tab": "Guides",
                 "groups": [
                     {
-                        "group": "Getting Started",
+                        "group": "Quickstart",
                         "pages": [
-                            "/docs/getting_started/installation",
-                            "/docs/getting_started/getting-started",
-                            "/docs/getting_started/inference-api"
+                            "/docs/getting_started/recording-first-inference",
+                            "/docs/getting_started/running-first-inference"
                         ]
                     },
                     {
                         "group": "Building Automations",
                         "pages": [
+                            "/docs/building_automations/local-setup",
                             "/docs/building_automations/quickstart",
                             "/docs/building_automations/core-concepts",
                             "/docs/building_automations/locators",
-                            "/docs/building_automations/parameters-variables"
+                            "/docs/building_automations/parameters-variables",
+                            "/docs/getting_started/inference-api"
                         ]
                     },
                     {
