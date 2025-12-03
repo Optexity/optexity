@@ -40,7 +40,7 @@ def main(args):
                 headers=headers,
                 json={
                     "automation": example.automation.model_dump(
-                        exclude_unset=True, exclude_none=True, exclude_defaults=True
+                        exclude_none=True, exclude_defaults=True
                     ),
                     "description": example.description,
                     "endpoint_name": example.endpoint_name,
