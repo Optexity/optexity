@@ -22,7 +22,9 @@ class CallbackUrl(BaseModel):
     @model_validator(mode="after")
     def validate_callback_url(self):
 
-        if self.api_key is None and (self.username is None or self.password is None):
+        if self.api_key is not None and (
+            self.username is not None or self.password is not None
+        ):
             raise ValueError(
                 "api_key and username/password cannot be used together. Please provide only one of them."
             )
