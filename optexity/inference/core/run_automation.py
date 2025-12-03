@@ -199,6 +199,9 @@ async def run_action_node(
 
 
 async def sleep_for_page_to_load(browser: Browser, sleep_time: float):
+    if float(sleep_time) == 0.0:
+        return
+
     page = await browser.get_current_page()
     if page is None:
         return

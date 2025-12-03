@@ -6,6 +6,8 @@ from typing import Literal
 
 from browser_use import Agent, BrowserSession, ChatGoogle
 from browser_use.browser.views import BrowserStateSummary
+from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
+from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import Locator, Response
 
 from optexity.schema.memory import NetworkResponse
@@ -177,12 +179,19 @@ class Browser:
         raise NotImplementedError("Not implemented")
 
     async def go_to_url(self, url: str):
-        if url == "about:blank":
-            return
-        page = await self.get_current_page()
-        if page is None:
-            return None
-        await page.goto(url)
+        try:
+            if url == "about:blank":
+                return
+            page = await self.get_current_page()
+            if page is None:
+                return None
+            await page.goto(url, timeout=10000)
+        except TimeoutError as e:
+            pass
+        except PatchrightTimeoutError as e:
+            pass
+        except PlaywrightTimeoutError as e:
+            pass
 
     async def get_browser_state_summary(self) -> BrowserStateSummary:
         browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
