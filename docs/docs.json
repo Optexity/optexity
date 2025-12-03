@@ -115,8 +115,19 @@
     "navbar": {
         "links": [
             {
-                "label": "Support",
-                "href": "mailto:founders@optexity.com"
+                "label": "Discord",
+                "icon": "discord",
+                "href": "https://discord.gg/ugeeGbme"
+            },
+            {
+                "label": "GitHub",
+                "icon": "github",
+                "href": "https://github.com/Optexity/optexity"
+            },
+            {
+                "label": "Recorder Extension",
+                "icon": "chrome",
+                "href": "https://chromewebstore.google.com/detail/pbaganbicadeoacahamnbgohafchgakp"
             }
         ],
         "primary": {

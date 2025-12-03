@@ -198,24 +198,23 @@ You can monitor the task on the dashboard. It will show the status, errors, outp
 
 For detailed documentation, visit our [documentation site](https://docs.optexity.com):
 
-- [Recording First Automation](/docs/getting_started/recording-first-inference)
-- [Running First Inference](/docs/getting_started/running-first-inference)
-- [Local Setup](/docs/building_automations/local-setup)
-- [Building Automations](/docs/building_automations/quickstart)
-- [API Reference](/docs/api-reference/introduction)
+- [Recording First Automation](https://docs.optexity.com/docs/getting_started/recording-first-inference)
+- [Running First Inference](https://docs.optexity.com/docs/getting_started/running-first-inference)
+- [Local Setup](https://docs.optexity.com/docs/building_automations/local-setup)
+- [Building Automations](https://docs.optexity.com/docs/building_automations/quickstart)
+- [API Reference](https://docs.optexity.com/docs/api-reference/introduction)
 
 ## Roadmap
 
 We're actively working on improving Optexity. Here's what's coming:
 
-- 🔜 **Enhanced Error Handling**: Better retry mechanisms and error recovery
+- 🔜 **Self Improvement**: Agent adaption using self exploration
 - 🔜 **More Action Types**: Additional interaction and extraction capabilities
 - 🔜 **Performance Optimizations**: Faster execution and reduced resource usage
 - 🔜 **Advanced Scheduling**: Built-in task scheduling and cron support
-- 🔜 **Multi-Browser Support**: Support for Firefox and Safari
 - 🔜 **Cloud Deployment**: Simplified cloud deployment options
 
-Have ideas or feature requests? [Open an issue](https://github.com/Optexity/optexity/issues) or [join our Discord](https://discord.gg/optexity) to discuss!
+Have ideas or feature requests? [Open an issue](https://github.com/Optexity/optexity/issues) or [join our Discord](https://discord.gg/ugeeGbme) to discuss!
 
 ## Contributing
 
@@ -248,7 +247,7 @@ Join our Discord community to:
 - Share your automations
 - Connect with other users
 
-[**Join Discord →**](https://discord.gg/optexity)
+[**Join Discord →**](https://discord.gg/ugeeGbme)
 
 ### Development Setup
 
@@ -264,9 +263,9 @@ Join our Discord community to:
 
 Check out our examples directory for sample automations:
 
-- [Stock Price Extraction](optexity/examples/i94.py)
-- [Healthcare Form Automation](optexity/examples/peachstate_medicaid.py)
-- [Login Automation](optexity/examples/supabase_login.py)
+- [I94 extraction](https://docs.optexity.com/examples/data_extraction/i94)
+- [Healthcare Form Automation](https://docs.optexity.com/examples/healthcare/peachstate-medicaid)
+- [QA Testing](https://docs.optexity.com/examples/qa_testing/supabase-login)
 
 ## License
 
@@ -275,10 +274,10 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 ## Support
 
 - 📖 [Documentation](https://docs.optexity.com)
-- 💬 [Discord Community](https://discord.gg/optexity)
+- 💬 [Discord Community](https://discord.gg/ugeeGbme)
 - 🐛 [Report Issues](https://github.com/Optexity/optexity/issues)
 - 💭 [Discussions](https://github.com/Optexity/optexity/discussions)
-- 📧 [Email Support](mailto:support@optexity.com)
+- 📧 [Email Support](mailto:founders@optexity.com)
 
 ---
 
