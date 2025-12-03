@@ -205,6 +205,8 @@ You can monitor the task on the dashboard. It will show the status, errors, outp
   allowfullscreen
 />
 
+[![Watch the video](https://img.youtube.com/vi/q51r3idYtxo/0.jpg)](https://www.youtube.com/watch?v=q51r3idYtxo)
+
 ## Documentation
 
 For detailed documentation, visit our [documentation site](https://docs.optexity.com):
