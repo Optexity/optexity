@@ -56,7 +56,11 @@ async def run_automation(task: Task, child_process_id: int):
     try:
         await start_task_in_server(task)
         memory = Memory(variables=Variables(input_variables=task.input_parameters))
-        browser = Browser(headless=False, channel=task.automation.browser_channel)
+        browser = Browser(
+            headless=False,
+            channel=task.automation.browser_channel,
+            debug_port=9222 + child_process_id,
+        )
         await browser.start()
         await browser.go_to_url(task.automation.url)
 
