@@ -4,18 +4,41 @@ from optexity.schema.actions.interaction_action import (
     InputTextAction,
     InteractionAction,
 )
-from optexity.schema.automation import ActionNode, Automation, Parameters
+from optexity.schema.automation import (
+    ActionNode,
+    Automation,
+    OnePasswordParameter,
+    Parameters,
+    SecureParameter,
+)
 
 description = "Supabase Login Example"
 endpoint_name = "supabase_login"
 automation = Automation(
     url="https://supabase.com",
     parameters=Parameters(
-        input_parameters={
-            "username": ["test@test.com"],
-            "password": ["password"],
-        },
+        input_parameters={},
         generated_parameters={},
+        secure_parameters={
+            "username": [
+                SecureParameter(
+                    onepassword=OnePasswordParameter(
+                        vault_name="optexity_automation",
+                        item_name="supabase",
+                        field_name="username",
+                    )
+                )
+            ],
+            "password": [
+                SecureParameter(
+                    onepassword=OnePasswordParameter(
+                        vault_name="optexity_automation",
+                        item_name="supabase",
+                        field_name="password",
+                    )
+                )
+            ],
+        },
     ),
     nodes=[
         ActionNode(
