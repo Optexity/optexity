@@ -12,7 +12,7 @@ if not env_path:
 
 
 class Settings(BaseSettings):
-    SERVER_URL: str = "http://localhost:8000"
+    SERVER_URL: str = "https://api.optexity.com"
     HEALTH_ENDPOINT: str = "api/v1/health"
     INFERENCE_ENDPOINT: str = "api/v1/inference"
     ADD_EXAMPLE_ENDPOINT: str = "api/v1/add_example"
