@@ -2,21 +2,25 @@ import asyncio
 import base64
 import json
 import logging
+import os
+import uuid
 from typing import Literal
 
 from browser_use import Agent, BrowserSession, ChatGoogle
 from browser_use.browser.views import BrowserStateSummary
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import Download, Locator, Response
+from playwright.async_api import Download, Locator, Request, Response
 
-from optexity.schema.memory import NetworkResponse
+from optexity.schema.memory import NetworkRequest, NetworkResponse
 
 logger = logging.getLogger(__name__)
 
 
 async def handle_random_download(download: Download):
-    target_path = "/Users/sankalp/Downloads/my_file.pdf"
+    return
+    target_path = "downloads_directory" / str(uuid.uuid4())
+    os.makedirs("downloads_directory", exist_ok=True)
     await download.save_as(target_path)
     print("Downloaded:", target_path)
 
@@ -54,7 +58,7 @@ class Browser:
         self.page_to_target_id = []
         self.previous_total_pages = 0
 
-        self.network_calls: list[NetworkResponse] = []
+        self.network_calls: list[NetworkResponse | NetworkRequest] = []
 
     async def start(self):
         logger.debug("Starting browser")
@@ -74,16 +78,20 @@ class Browser:
                 args=[
                     "--start-fullscreen",
                     "--disable-popup-blocking",
+                    "--window-size=1920,1080",
                     f"--remote-debugging-port={self.debug_port}",
                 ],
                 chromium_sandbox=False,
             )
 
             self.context = await self.browser.new_context(no_viewport=True)
-            self.context.on(
-                "page", lambda p: print("AUTO POPUP OPENED:", p.url) and p.goto(p.url)
-            )
-            self.context.on("page", lambda p: p.on("download", handle_random_download))
+
+            async def log_request(req: Request):
+                await self.log_request(req)
+
+            self.context.on("request", log_request)
+            # self.context.on("page", lambda p: p.on("download", handle_random_download))
+
             self.page = await self.context.new_page()
 
             browser_session = BrowserSession(cdp_url=self.cdp_url, keep_alive=True)
@@ -219,7 +227,31 @@ class Browser:
             return None
         return page.url
 
+    async def log_request(self, req: Request):
+        try:
+            body = req.post_data  # this is None for GET/HEAD
+            # Rebuild cookies exactly like curl -b
+            cookies = await req.frame.page.context.cookies()
+            cookie_header = "; ".join(f"{c['name']}={c['value']}" for c in cookies)
+
+            # Rebuild headers
+            headers = dict(req.headers)
+            headers["cookie"] = cookie_header
+
+            # Body as raw bytes
+            body = req.post_data
+
+            self.network_calls.append(
+                NetworkRequest(
+                    url=req.url, method=req.method, headers=headers, body=body
+                )
+            )
+
+        except Exception as e:
+            logger.error(f"Could not get body: {e}")
+
     async def attach_network_listeners(self):
+        return
         page = await self.get_current_page()
 
         # remove old listeners first

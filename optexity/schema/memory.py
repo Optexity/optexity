@@ -7,11 +7,10 @@ from optexity.schema.token_usage import TokenUsage
 
 
 class NetworkRequest(BaseModel):
-    url: str = Field(...)
-    method: str = Field(...)
-    status: int = Field(...)
-    headers: dict = Field(...)
-    body: str = Field(...)
+    url: str
+    method: str
+    headers: dict
+    body: str | bytes | None
 
 
 class NetworkError(BaseModel):

@@ -1,6 +1,7 @@
 from typing import List, Literal, Optional
+from uuid import uuid4
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from optexity.utils.utils import build_model
 
@@ -49,6 +50,9 @@ class LLMExtraction(BaseModel):
 class NetworkCallExtraction(BaseModel):
     url_pattern: Optional[str] = None
     header_filter: Optional[dict[str, str]] = None
+    extract_from: None | Literal["request", "response"] = None
+    download_from: None | Literal["request", "response"] = None
+    download_filename: str = Field(default_factory=lambda: str(uuid4()))
 
     def replace(self, pattern: str, replacement: str):
         return self

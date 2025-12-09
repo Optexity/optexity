@@ -188,7 +188,9 @@ async def run_action_node(
                 action_node.interaction_action, task, memory, browser, 2
             )
         elif action_node.extraction_action:
-            await run_extraction_action(action_node.extraction_action, memory, browser)
+            await run_extraction_action(
+                action_node.extraction_action, memory, browser, task
+            )
         elif action_node.fetch_2fa_action:
             await run_2fa_action(action_node.fetch_2fa_action, memory, browser)
         elif action_node.python_script_action:

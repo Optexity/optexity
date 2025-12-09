@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Callable
 
 import aiofiles
-from playwright.async_api import Download
 
 from optexity.exceptions import AssertLocatorPresenceException
 from optexity.inference.agents.index_prediction.action_prediction_locator_axtree import (

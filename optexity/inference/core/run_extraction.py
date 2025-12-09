@@ -1,4 +1,8 @@
 import logging
+import traceback
+
+import aiofiles
+import httpx
 
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import GeminiModels, get_llm_model
@@ -8,7 +12,14 @@ from optexity.schema.actions.extraction_action import (
     NetworkCallExtraction,
     ScreenshotExtraction,
 )
-from optexity.schema.memory import Memory, OutputData, ScreenshotData
+from optexity.schema.memory import (
+    Memory,
+    NetworkRequest,
+    NetworkResponse,
+    OutputData,
+    ScreenshotData,
+)
+from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +27,7 @@ llm_model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
 
 
 async def run_extraction_action(
-    extraction_action: ExtractionAction, memory: Memory, browser: Browser
+    extraction_action: ExtractionAction, memory: Memory, browser: Browser, task: Task
 ):
     logger.debug(
         f"---------Running extraction action {extraction_action.model_dump_json()}---------"
@@ -26,7 +37,7 @@ async def run_extraction_action(
         await handle_llm_extraction(extraction_action.llm, memory, browser)
     elif extraction_action.network_call:
         await handle_network_call_extraction(
-            extraction_action.network_call, memory, browser
+            extraction_action.network_call, memory, browser, task
         )
     elif extraction_action.screenshot:
         await handle_screenshot_extraction(
@@ -117,11 +128,54 @@ async def handle_llm_extraction(
 
 
 async def handle_network_call_extraction(
-    network_call_extraction: NetworkCallExtraction, memory: Memory, browser: Browser
+    network_call_extraction: NetworkCallExtraction,
+    memory: Memory,
+    browser: Browser,
+    task: Task,
 ):
 
     for network_call in browser.network_calls:
-        if network_call_extraction.url_pattern in network_call.url:
+        if network_call_extraction.url_pattern not in network_call.url:
+            continue
+
+        if network_call_extraction.download_from == "request" and isinstance(
+            network_call, NetworkRequest
+        ):
+            await download_request(
+                network_call, network_call_extraction.download_filename, task, memory
+            )
+
+        if (
+            network_call_extraction.extract_from == "request"
+            and isinstance(network_call, NetworkRequest)
+        ) or (
+            network_call_extraction.extract_from == "response"
+            and isinstance(network_call, NetworkResponse)
+        ):
             memory.variables.output_data.append(
                 OutputData(json_data=network_call.model_dump())
             )
+
+
+async def download_request(
+    network_call: NetworkRequest, download_filename: str, task: Task, memory: Memory
+):
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await client.request(
+                network_call.method,
+                network_call.url,
+                headers=network_call.headers,
+                content=network_call.body,  # not data=
+            )
+
+            response.raise_for_status()
+
+        # Save raw response to PDF
+        download_path = task.downloads_directory / download_filename
+        async with aiofiles.open(download_path, "wb") as f:
+            await f.write(response.content)
+
+        memory.downloads.append(download_path)
+    except Exception as e:
+        logger.error(f"Failed to download request: {e}, {traceback.format_exc()}")
