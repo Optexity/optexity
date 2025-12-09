@@ -183,7 +183,11 @@ def get_app_with_endpoints(is_aws: bool):
                 await task_queue.put(task)
 
                 return JSONResponse(
-                    content={"success": True, "message": "Task has been allocated"},
+                    content={
+                        "success": True,
+                        "message": "Task has been allocated",
+                        "task_id": task.task_id,
+                    },
                     status_code=202,
                 )
 

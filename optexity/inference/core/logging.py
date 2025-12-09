@@ -259,75 +259,87 @@ async def save_latest_memory_state_locally(
     task: Task, memory: Memory, node: ActionNode | None
 ):
 
-    browser_state = memory.browser_states[-1]
-    automation_state = memory.automation_state
-    step_directory = task.logs_directory / f"step_{str(automation_state.step_index)}"
-    step_directory.mkdir(parents=True, exist_ok=True)
-
-    if browser_state.screenshot:
-        save_screenshot(browser_state.screenshot, step_directory / "screenshot.png")
-    else:
-        logger.warning("No screenshot found for step %s", automation_state.step_index)
-
-    state_dict = {
-        "title": browser_state.title,
-        "url": browser_state.url,
-        "step_index": automation_state.step_index,
-        "try_index": automation_state.try_index,
-        "downloaded_files": [
-            downloaded_file.name for downloaded_file in memory.downloads
-        ],
-        "token_usage": memory.token_usage.model_dump(),
-    }
-
-    async with aiofiles.open(step_directory / "state.json", "w") as f:
-        await f.write(json.dumps(state_dict, indent=4))
-
-    if browser_state.axtree:
-        async with aiofiles.open(step_directory / "axtree.txt", "w") as f:
-            await f.write(browser_state.axtree)
-
-    if browser_state.final_prompt:
-        async with aiofiles.open(step_directory / "final_prompt.txt", "w") as f:
-            await f.write(browser_state.final_prompt)
-
-    if browser_state.llm_response:
-        async with aiofiles.open(step_directory / "llm_response.json", "w") as f:
-            await f.write(json.dumps(browser_state.llm_response, indent=4))
-
-    if node:
-        async with aiofiles.open(step_directory / "action_node.json", "w") as f:
-            await f.write(json.dumps(node.model_dump(), indent=4))
-
-    async with aiofiles.open(step_directory / "input_variables.json", "w") as f:
-        await f.write(json.dumps(memory.variables.input_variables, indent=4))
-
-    async with aiofiles.open(step_directory / "generated_variables.json", "w") as f:
-        await f.write(json.dumps(memory.variables.generated_variables, indent=4))
-
-    async with aiofiles.open(step_directory / "output_data.json", "w") as f:
-        await f.write(
-            json.dumps(
-                [
-                    output_data.model_dump(exclude_none=True, exclude={"screenshot"})
-                    for output_data in memory.variables.output_data
-                ],
-                indent=4,
-            )
+    try:
+        browser_state = memory.browser_states[-1]
+        automation_state = memory.automation_state
+        step_directory = (
+            task.logs_directory / f"step_{str(automation_state.step_index)}"
         )
+        step_directory.mkdir(parents=True, exist_ok=True)
 
-    for output_data in memory.variables.output_data:
-        if output_data.screenshot:
-            async with aiofiles.open(
-                step_directory / f"screenshot_{output_data.screenshot.filename}.png",
-                "wb",
-            ) as f:
-                await f.write(base64.b64decode(output_data.screenshot.base64))
+        if browser_state.screenshot:
+            save_screenshot(browser_state.screenshot, step_directory / "screenshot.png")
+        else:
+            logger.warning(
+                "No screenshot found for step %s", automation_state.step_index
+            )
+
+        state_dict = {
+            "title": browser_state.title,
+            "url": browser_state.url,
+            "step_index": automation_state.step_index,
+            "try_index": automation_state.try_index,
+            "downloaded_files": [
+                downloaded_file.name for downloaded_file in memory.downloads
+            ],
+            "token_usage": memory.token_usage.model_dump(),
+        }
+
+        async with aiofiles.open(step_directory / "state.json", "w") as f:
+            await f.write(json.dumps(state_dict, indent=4))
+
+        if browser_state.axtree:
+            async with aiofiles.open(step_directory / "axtree.txt", "w") as f:
+                await f.write(browser_state.axtree)
+
+        if browser_state.final_prompt:
+            async with aiofiles.open(step_directory / "final_prompt.txt", "w") as f:
+                await f.write(browser_state.final_prompt)
+
+        if browser_state.llm_response:
+            async with aiofiles.open(step_directory / "llm_response.json", "w") as f:
+                await f.write(json.dumps(browser_state.llm_response, indent=4))
+
+        if node:
+            async with aiofiles.open(step_directory / "action_node.json", "w") as f:
+                await f.write(json.dumps(node.model_dump(), indent=4))
+
+        async with aiofiles.open(step_directory / "input_variables.json", "w") as f:
+            await f.write(json.dumps(memory.variables.input_variables, indent=4))
+
+        async with aiofiles.open(step_directory / "generated_variables.json", "w") as f:
+            await f.write(json.dumps(memory.variables.generated_variables, indent=4))
+
+        async with aiofiles.open(step_directory / "output_data.json", "w") as f:
+            await f.write(
+                json.dumps(
+                    [
+                        output_data.model_dump(
+                            exclude_none=True, exclude={"screenshot"}
+                        )
+                        for output_data in memory.variables.output_data
+                    ],
+                    indent=4,
+                )
+            )
+
+        for output_data in memory.variables.output_data:
+            if output_data.screenshot:
+                async with aiofiles.open(
+                    step_directory
+                    / f"screenshot_{output_data.screenshot.filename}.png",
+                    "wb",
+                ) as f:
+                    await f.write(base64.b64decode(output_data.screenshot.base64))
+    except Exception as e:
+        logger.error(f"Failed to save latest memory state locally: {e}")
 
 
 async def delete_local_data(task: Task):
+    try:
+        if settings.DEPLOYMENT == "dev" or task.task_directory is None:
+            return
 
-    if settings.DEPLOYMENT == "dev" or task.task_directory is None:
-        return
-
-    shutil.rmtree(task.task_directory, ignore_errors=True)
+        shutil.rmtree(task.task_directory, ignore_errors=True)
+    except Exception as e:
+        logger.error(f"Failed to delete local data: {e}")

@@ -120,18 +120,21 @@ async def run_final_logging(
     try:
         await complete_task_in_server(task, memory.token_usage, child_process_id)
 
-        memory.automation_state.step_index += 1
-        browser_state_summary = await browser.get_browser_state_summary()
-        memory.browser_states.append(
-            BrowserState(
-                url=browser_state_summary.url,
-                screenshot=browser_state_summary.screenshot,
-                title=browser_state_summary.title,
-                axtree=browser_state_summary.dom_state.llm_representation(),
+        try:
+            memory.automation_state.step_index += 1
+            browser_state_summary = await browser.get_browser_state_summary()
+            memory.browser_states.append(
+                BrowserState(
+                    url=browser_state_summary.url,
+                    screenshot=browser_state_summary.screenshot,
+                    title=browser_state_summary.title,
+                    axtree=browser_state_summary.dom_state.llm_representation(),
+                )
             )
-        )
 
-        memory.final_screenshot = await browser.get_screenshot(full_page=True)
+            memory.final_screenshot = await browser.get_screenshot(full_page=True)
+        except Exception as e:
+            logger.error(f"Error getting final screenshot: {e}")
 
         await save_output_data_in_server(task, memory)
         await save_downloads_in_server(task, memory)

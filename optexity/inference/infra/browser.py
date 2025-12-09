@@ -8,11 +8,17 @@ from browser_use import Agent, BrowserSession, ChatGoogle
 from browser_use.browser.views import BrowserStateSummary
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import Locator, Response
+from playwright.async_api import Download, Locator, Response
 
 from optexity.schema.memory import NetworkResponse
 
 logger = logging.getLogger(__name__)
+
+
+async def handle_random_download(download: Download):
+    target_path = "/Users/sankalp/Downloads/my_file.pdf"
+    await download.save_as(target_path)
+    print("Downloaded:", target_path)
 
 
 class Browser:
@@ -73,6 +79,7 @@ class Browser:
             )
 
             self.context = await self.browser.new_context(no_viewport=True)
+            self.context.on("page", lambda p: p.on("download", handle_random_download))
             self.page = await self.context.new_page()
 
             browser_session = BrowserSession(cdp_url=self.cdp_url, keep_alive=True)
