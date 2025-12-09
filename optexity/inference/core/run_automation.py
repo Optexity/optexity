@@ -256,6 +256,7 @@ def expand_for_loop_node(
                 f"{{{for_loop_node.variable_name}[index]}}",
                 f"{{{for_loop_node.variable_name}[{index}]}}",
             )
+            new_node.replace(f"{{index_of({for_loop_node.variable_name})}}", f"{index}")
             new_nodes.append(new_node)
 
     return new_nodes
