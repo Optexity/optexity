@@ -171,6 +171,7 @@ The full Python definition for this automation lives in `optexity/examples/i94.p
   "nodes": [
     {
       "end_sleep_time": 1,
+      "before_sleep_time": 3,
       "python_script_action": {
         "execution_code": "async def code_fn(page):\n    print(\"entering code_fn\")\n    await page.evaluate(\n        \"\"\"  const el = document.querySelector('mat-dialog-content');  if (el) el.scrollTop = el.scrollHeight;\"\"\"\n    )\n    print(\"exiting code_fn\")\n"
       }
@@ -256,7 +257,9 @@ The full Python definition for this automation lives in `optexity/examples/i94.p
       "before_sleep_time": 3,
       "extraction_action": {
         "network_call": {
-          "url_pattern": "https://i94.cbp.dhs.gov/api/services/i94/recent"
+          "url_pattern": "https://i94.cbp.dhs.gov/api/services/i94/recent",
+          "extract_from": "response",
+          "download_filename": "185dfa24-7d2c-40d2-9f39-2515976e59a4"
         }
       }
     }
@@ -280,6 +283,7 @@ The full Python definition for this automation lives in `optexity/examples/i94.p
       ]
     },
     "generated_parameters": {}
-  }
+  },
+  "browser_channel": "chrome"
 }
 ```
