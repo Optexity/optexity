@@ -202,7 +202,7 @@ You can monitor the task on the dashboard. It will show the status, errors, outp
 
 For detailed documentation, visit our [documentation site](https://docs.optexity.com):
 
-- [Recording First Automation](https://docs.optexity.com/docs/getting_started/recording-first-automation)
+- [Recording First Automation](https://docs.optexity.com/docs/getting_started/recording-first-inference)
 - [Running First Inference](https://docs.optexity.com/docs/getting_started/running-first-inference)
 - [Local Setup](https://docs.optexity.com/docs/building_automations/local-setup)
 - [Building Automations](https://docs.optexity.com/docs/building_automations/quickstart)
