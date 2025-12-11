@@ -7,7 +7,7 @@ automation_json = {
     "nodes": [
         {
             "end_sleep_time": 1,
-            "before_sleep_time": 2,
+            "before_sleep_time": 3,
             "python_script_action": {
                 "execution_code": 'async def code_fn(page):\n    print("entering code_fn")\n    await page.evaluate(\n        """  const el = document.querySelector(\'mat-dialog-content\');  if (el) el.scrollTop = el.scrollHeight;"""\n    )\n    print("exiting code_fn")\n'
             },
@@ -93,7 +93,8 @@ automation_json = {
             "before_sleep_time": 3,
             "extraction_action": {
                 "network_call": {
-                    "url_pattern": "https://i94.cbp.dhs.gov/api/services/i94/recent"
+                    "extract_from": "response",
+                    "url_pattern": "https://i94.cbp.dhs.gov/api/services/i94/recent",
                 }
             },
         },
