@@ -15,92 +15,32 @@ The automation:
 Use network call extraction pattern any time a site exposes a clean JSON API behind the UI. It is usually simpler and more stable than DOM-based scraping. Network call extraction is faster and more reliable than DOM scraping.
 </Tip>
 
-Before starting, please look at the [Quickstart](/docs/building_automations/quickstart) guide to understand the basics of the optexity platform.
+Before starting, please look at the [Local Setup](/docs/building_automations/local-setup) guide to setup the environment.
 
 ---
 
-### Part 1: Record the base workflow
+# Quickstart using built-in automation
 
-1. Go to the I‑94 site and **record** a workflow that:
-   - Navigates to the recent‑search page
-   - Fills in first name, last name, nationality, date of birth, and document number
-   - Submits the form and waits for the result
+You can use the built-in `i94` automation to quickly start the inference server and run the automation. The automation is available in the repository under `optexity/examples/i94.py`.
 
-2. After saving, you will see an `i94` automation in your dashboard that contains only the **interaction actions** (clicks, fills, selects).
-We have also built this automation by default and you can find it in your dashboard.
+## Add automation to the dashboard
+
+To quickly add the automation to the dashboard, you can use the following command:
+```bash
+ENV_PATH=.env python optexity/examples/add_example.py --example i94
+```
+
+The `.env` file should be created in the root of the repository in the [Local Setup](/docs/building_automations/local-setup) guide. This will add the automation to your dashboard.
 
 ![I94 Automation](/images/i94_workflow.png)
 
 ---
 
-### Part 2: Refine the automation
-
-Recording captures clicks and inputs, but you still need to:
-- **Tighten** some interaction instructions
-- **Add** a network‑call extraction action
-- **Add** a Python script to handle the scroll‑to‑accept popup
-
-#### 2.1. Clarify the nationality selection
-
-In the recorded flow, the nationality selection might not have a precise locator. You can let the model drive the selection using **`prompt_instructions`**:
-
-```json
-{
-  "end_sleep_time": 1,
-  "interaction_action": {
-    "click_element": {
-      "prompt_instructions": "Select {nationality[0]} from the options. Be careful to select the correct option, which will be of the format `nationality (code)`."
-    }
-  }
-}
-```
-
-If a `command` is not provided, Optexity uses `prompt_instructions` to decide how to perform the action.
-
-#### 2.2. Add a network‑call extraction action
-
-To capture the I‑94 result, add an `extraction_action` that listens for the specific network call:
-
-```json
-{
-  "before_sleep_time": 3,
-  "end_sleep_time": 0,
-  "extraction_action": {
-    "network_call": {
-      "url_pattern": "https://i94.cbp.dhs.gov/api/services/i94/recent"
-    }
-  }
-}
-```
-
-This action waits for the matching network request and returns its JSON payload as structured extracted data.
-
-> **Tip**: If extraction does not fire, verify the `url_pattern` in your browser devtools Network tab and make the pattern as specific as needed (path + query if required).
-
-#### 2.3. Scroll the popup via Python script
-
-The I‑94 site requires scrolling inside a popup before the **“I ACKNOWLEDGE AND AGREE”** button becomes clickable. Use a `python_script_action` to scroll the popup content:
-
-```json
-{
-  "end_sleep_time": 1,
-  "python_script_action": {
-    "execution_code": "async def code_fn(page):\n    print(\"entering code_fn\")\n    await page.evaluate(\n        \"\"\"  const el = document.querySelector('mat-dialog-content');  if (el) el.scrollTop = el.scrollHeight;\"\"\"\n    )\n    print(\"exiting code_fn\")\n"
-  }
-}
-```
-
-The full Python definition for this automation lives in `optexity/examples/i94.py`. You can also use the optexity dashboard to edit the automation and save it as a new automation.
-
-> **Note**: Script actions run in the same browser context as the page. They are ideal for edge cases like scrolling a specific container, dismissing tricky popups, or calling custom JS helpers.
-
----
-
-### Part 3: Run the `i94` automation via inference
+# Run the `i94` automation via inference
 
 For a detailed explanation of the inference server, see the **Quickstart** guide. Below is the minimal flow to run this example.
 
-#### 3.1. Start the inference server
+## Start the inference server
 
 From the project root:
 
@@ -108,7 +48,7 @@ From the project root:
 ENV_PATH=.env python optexity/inference/child_process.py --port 9000 --child_process_id 0
 ```
 
-#### 3.2. Invoke the `i94` endpoint
+## Invoke the `i94` endpoint
 
 You can call the `i94` automation via the `/inference` endpoint:
 
@@ -132,10 +72,98 @@ While the request runs, the browser will execute the steps on your behalf. When 
 - Inspect the **task run** and **extracted data** in the dashboard
 - Re‑use the extracted JSON in downstream systems
 
+## Viewing the task run
+
+You can view the task run in the https://dashboard.optexity.com. The task run will show the steps that were executed and the extracted data.
+
+![I94 Task Run](/images/i94_task.png)
+
+
+
+
+
+---
+
+# Build the automation from scratch
+
+## Record the base workflow
+
+1. Go to the I‑94 site and **record** a workflow that:
+   - Navigates to the recent‑search page
+   - Fills in first name, last name, nationality, date of birth, and document number
+   - Submits the form and waits for the result
+
+2. After saving, you will see an `i94` automation in your dashboard that contains only the **interaction actions** (clicks, fills, selects).
+We have also built this automation by default and you can find it in your dashboard.
+
+![I94 Automation](/images/i94_workflow.png)
+
+---
+
+## Refine the automation
+
+Recording captures clicks and inputs, but you still need to:
+- **Tighten** some interaction instructions
+- **Add** a network‑call extraction action
+- **Add** a Python script to handle the scroll‑to‑accept popup
+
+### Clarify the nationality selection
+
+In the recorded flow, the nationality selection might not have a precise locator. You can let the model drive the selection using **`prompt_instructions`**:
+
+```json
+{
+  "end_sleep_time": 1,
+  "interaction_action": {
+    "click_element": {
+      "prompt_instructions": "Select {nationality[0]} from the options. Be careful to select the correct option, which will be of the format `nationality (code)`."
+    }
+  }
+}
+```
+
+If a `command` is not provided, Optexity uses `prompt_instructions` to decide how to perform the action.
+
+### Add a network‑call extraction action
+
+To capture the I‑94 result, add an `extraction_action` that listens for the specific network call:
+
+```json
+{
+  "before_sleep_time": 3,
+  "end_sleep_time": 0,
+  "extraction_action": {
+    "network_call": {
+      "url_pattern": "https://i94.cbp.dhs.gov/api/services/i94/recent"
+    }
+  }
+}
+```
+
+This action waits for the matching network request and returns its JSON payload as structured extracted data.
+
+> **Tip**: If extraction does not fire, verify the `url_pattern` in your browser devtools Network tab and make the pattern as specific as needed (path + query if required).
+
+### Scroll the popup via Python script
+
+The I‑94 site requires scrolling inside a popup before the **“I ACKNOWLEDGE AND AGREE”** button becomes clickable. Use a `python_script_action` to scroll the popup content:
+
+```json
+{
+  "end_sleep_time": 1,
+  "python_script_action": {
+    "execution_code": "async def code_fn(page):\n    print(\"entering code_fn\")\n    await page.evaluate(\n        \"\"\"  const el = document.querySelector('mat-dialog-content');  if (el) el.scrollTop = el.scrollHeight;\"\"\"\n    )\n    print(\"exiting code_fn\")\n"
+  }
+}
+```
+
+The full Python definition for this automation lives in `optexity/examples/i94.py`. You can also use the optexity dashboard to edit the automation and save it as a new automation.
+
+> **Note**: Script actions run in the same browser context as the page. They are ideal for edge cases like scrolling a specific container, dismissing tricky popups, or calling custom JS helpers.
 
 ----
 
-### Final Automation
+# Final Automation
 
 ```json
 {
