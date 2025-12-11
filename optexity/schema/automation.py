@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import ForwardRef, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -176,11 +176,13 @@ class ForLoopNode(BaseModel):
     nodes: list[ActionNode]
 
 
-## TODO:
+IfElseNodeRef = ForwardRef("IfElseNode")
+
+
 class IfElseNode(BaseModel):
     condition: str
-    if_nodes: list[ActionNode]
-    else_nodes: list[ActionNode] = []
+    if_nodes: list[ActionNode | IfElseNodeRef]
+    else_nodes: list[ActionNode | IfElseNodeRef] = []
 
 
 class Parameters(BaseModel):
