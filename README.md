@@ -218,7 +218,7 @@ We're actively working on improving Optexity. Here's what's coming:
 - 🔜 **Advanced Scheduling**: Built-in task scheduling and cron support
 - 🔜 **Cloud Deployment**: Simplified cloud deployment options
 
-Have ideas or feature requests? [Open an issue](https://github.com/Optexity/optexity/issues) or [join our Discord](https://discord.gg/ugeeGbme) to discuss!
+Have ideas or feature requests? [Open an issue](https://github.com/Optexity/optexity/issues) or [join our Discord](https://discord.gg/VsRSAZSw7m) to discuss!
 
 ## Contributing
 
@@ -251,7 +251,7 @@ Join our Discord community to:
 - Share your automations
 - Connect with other users
 
-[**Join Discord →**](https://discord.gg/ugeeGbme)
+[**Join Discord →**](https://discord.gg/VsRSAZSw7m)
 
 ### Development Setup
 
@@ -278,7 +278,7 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 ## Support
 
 - 📖 [Documentation](https://docs.optexity.com)
-- 💬 [Discord Community](https://discord.gg/ugeeGbme)
+- 💬 [Discord Community](https://discord.gg/VsRSAZSw7m)
 - 🐛 [Report Issues](https://github.com/Optexity/optexity/issues)
 - 💭 [Discussions](https://github.com/Optexity/optexity/discussions)
 - 📧 [Email Support](mailto:founders@optexity.com)
