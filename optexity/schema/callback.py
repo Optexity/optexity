@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class CallbackResponse(BaseModel):
     task_id: str
     recording_id: str
-    output_data: list[dict] | None
+    output_data: list[dict | str] | None
     status: Literal["queued", "allocated", "running", "success", "failed", "cancelled"]
     error: str | None
     final_screenshot: str | None = None
