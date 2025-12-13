@@ -48,7 +48,8 @@
                             "/docs/agentic-tasks",
                             "/docs/best-practices",
                             "/docs/advanced/onepassword",
-                            "/docs/advanced/totp-integration"
+                            "/docs/advanced/totp-integration",
+                            "/docs/advanced/orchestration"
                         ]
                     }
                 ]
