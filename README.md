@@ -71,7 +71,8 @@ Run everything from the repository root:
 ```bash
 pip install -e "external/browser-use"
 pip install -e .
-playwright install
+playwright install --with-deps chromium chrome
+patchright install chromium chrome
 pre-commit install --install-hooks
 pre-commit install --hook-type pre-push
 ```

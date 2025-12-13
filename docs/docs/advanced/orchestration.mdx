@@ -1,0 +1,168 @@
+---
+title: Orchestration
+description: Orchestrating your automations
+---
+
+Optexity APIs are very powerful and flexible. You can combine them to create complex workflows. This page will show you how to orchestrate your automations. This is only a sample approach and you can use the APIs to create your own orchestration logic.
+
+Optexity provides callback URLs for each automation. You can use these URLs to receive status of the task when it is completed and the data when it is available. You can read about the callback URLs [here](/docs/api-reference/callback.mdx). By using the callbacks, you prevent the need to poll the API to check the status of the task.
+
+## Dependencies
+
+-   `asyncio`
+-   `httpx`
+-   `fastapi`
+-   `uvicorn`
+
+Install the dependencies using `pip install fastapi uvicorn httpx asyncio`.
+
+## Minimal Script
+
+```python
+import asyncio
+import httpx
+from fastapi import FastAPI, Request
+from contextlib import asynccontextmanager
+
+callbacks: dict[str, dict] = {}
+CALLBACK_TIMEOUT = 600  # seconds
+
+
+async def run_workflow(items: list[str]):
+    async with httpx.AsyncClient() as client:
+        for item in items:
+            print(f"Starting task for {item}")
+
+            resp = await client.post(
+                "https://inference.optexity.com/api/v1/inference",
+                json={
+                    "endpoint_name": "login-flow",
+                    "input_parameters": {
+                        "email": [item],
+                    },
+                    "unique_parameter_names": ["email"]
+                },
+            )
+            task_id = resp.json()["task_id"]
+
+            callbacks[task_id] = {
+                "event": asyncio.Event(),
+                "data": None,
+            }
+
+            try:
+                await asyncio.wait_for(
+                    callbacks[task_id]["event"].wait(),
+                    timeout=CALLBACK_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                raise RuntimeError(f"Timeout waiting for {task_id}")
+
+            result = callbacks[task_id]["data"]
+            print("Completed:", result)
+
+            callbacks.pop(task_id, None)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    task = asyncio.create_task(run_workflow(["a", "b", "c"]))
+    yield
+    # shutdown
+    task.cancel()
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+@app.post("/receive_callback")
+async def receive_callback(req: Request):
+    payload = await req.json()
+    task_id = payload.get("task_id")
+
+    entry = callbacks.get(task_id)
+    if not entry:
+        return {"ok": True}
+
+    entry["data"] = payload
+    entry["event"].set()
+    return {"ok": True}
+```
+
+## Run the script
+
+```bash
+uvicorn main:app --reload --port 4000
+```
+
+## Explanation
+
+This orchestration pattern demonstrates how to coordinate multiple asynchronous tasks using callback URLs and asyncio events. Here's how it works:
+
+### Architecture Overview
+
+The script creates a FastAPI server that serves two purposes:
+1. **Workflow execution**: Processes items sequentially by starting tasks via API calls
+2. **Callback receiver**: Receives completion notifications from Optexity APIs
+
+### Workflow Execution (`run_workflow`)
+
+The `run_workflow` function processes items one at a time:
+
+1. **Start a task**: For each item, it makes a POST request to the Optexity API with:
+   - The item to process
+   - A `callback_url` pointing to your local server
+
+2. **Register the callback**: When the API returns a `task_id`, it creates an entry in the `callbacks` dictionary containing:
+   - An `asyncio.Event()` to signal when the callback is received
+   - A `data` field (initially `None`) to store the callback payload
+
+3. **Wait for completion**: The workflow waits for the event to be set, with a timeout to prevent indefinite waiting. This is where the async coordination happens - the workflow pauses until Optexity sends a callback.
+
+4. **Process result**: Once the callback is received, it retrieves the data, processes it, and cleans up the callback entry.
+
+### Callback Endpoint (`/callback`)
+
+The callback endpoint receives HTTP POST requests from Optexity when tasks complete:
+
+1. **Extract task ID**: It reads the `task_id` from the incoming payload
+2. **Find matching entry**: It looks up the corresponding entry in the `callbacks` dictionary
+3. **Signal completion**: It stores the payload data and calls `event.set()` to wake up the waiting workflow
+4. **Return acknowledgment**: It returns a success response to Optexity
+
+Note: Optexity needs a publicly accessible URL to reach your server.
+
+### Event-Based Coordination
+
+The key to this pattern is the `asyncio.Event()` object:
+
+- **Waiting side** (workflow): Calls `event.wait()` which suspends execution until the event is set
+- **Signaling side** (callback): Calls `event.set()` which wakes up all waiting coroutines
+
+This eliminates the need for polling - instead of repeatedly checking task status, the workflow simply waits until notified.
+
+### Lifecycle Management
+
+The `lifespan` context manager ensures the workflow starts when the FastAPI server starts and can be properly cancelled during shutdown. This is important for graceful server restarts and cleanup.
+
+### Benefits of This Pattern
+
+- **No polling**: Tasks complete asynchronously without constantly checking status
+- **Efficient**: Uses asyncio events for lightweight coordination
+- **Scalable**: Can be extended to handle parallel tasks or more complex workflows
+- **Reliable**: Includes timeout handling to prevent indefinite waits
+
+You can extend this pattern to handle parallel tasks, retry logic, error handling, or more complex dependency chains between tasks.
+
+### Example Production Setup
+
+```bash
+# Set your production callback URL
+export CALLBACK_BASE_URL=https://api.yourcompany.com
+
+# Run your server
+uvicorn main:app --host 0.0.0.0 --port 4000
+```
+
+Remember: Optexity needs to be able to make HTTP POST requests to your callback URL. If it can't reach your server, callbacks will fail and your workflow will timeout.
