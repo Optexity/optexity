@@ -47,7 +47,7 @@
                             "/docs/downloads-files",
                             "/docs/agentic-tasks",
                             "/docs/best-practices",
-                            "/docs/callbacks",
+                            "/docs/advanced/callbacks",
                             "/docs/advanced/onepassword",
                             "/docs/advanced/totp-integration",
                             "/docs/advanced/orchestration"
