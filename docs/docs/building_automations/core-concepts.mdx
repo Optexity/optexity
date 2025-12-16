@@ -149,7 +149,17 @@ Use `ForLoopNode` to iterate over extracted data. This is powerful for processin
       }
     }
     // More actions for each iteration...
-  ]
+  ],
+  "reset_nodes": [
+    {
+      "interaction_action": {
+        "close_all_but_one_tab": {
+          "matching_url": "https://example.com/order-confirmation"
+        }
+      }
+    }
+  ],
+  "on_error_in_loop": "continue"
 }
 ```
 
@@ -160,6 +170,8 @@ The loop iterates over all values in the specified variable. Inside the loop, us
 1. Before the loop, an extraction action populates `order_ids` with values like `["ORD-001", "ORD-002", "ORD-003"]`
 2. The loop runs 3 times, once for each order ID
 3. On each iteration, `{order_ids[index]}` is replaced with the current value
+4. After we finish a loop, we can call optional `reset_nodes` to execute actions to reset the state of the browser after the loop. For example, we can close the current tab and go back to the previous tab. This is useful if we want to clear the state of the browser after the loop.
+5. We can also specify what to do if an error occurs in the loop. We can continue the loop, break the loop, or raise an error. The default is to raise an error.
 
 ## IfElseNode
 
