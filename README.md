@@ -38,8 +38,7 @@ Install the **Optexity Recorder** extension from the [Chrome Web Store](https://
 ```bash
 git clone git@github.com:Optexity/optexity.git
 cd optexity
-git submodule sync
-git submodule update --init --recursive
+./update_submodule.sh
 ```
 
 ### Step 2: Create and Activate a Python Environment
