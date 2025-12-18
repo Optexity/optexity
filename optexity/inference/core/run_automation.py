@@ -426,16 +426,19 @@ async def handle_for_loop_node(
             else:
                 raise e
 
-        for node in for_loop_node.reset_nodes:
-            if isinstance(node, IfElseNode):
-                await handle_if_else_node(node, memory, task, browser, full_automation)
+        if index < len(values) - 1:
+            for node in for_loop_node.reset_nodes:
+                if isinstance(node, IfElseNode):
+                    await handle_if_else_node(
+                        node, memory, task, browser, full_automation
+                    )
 
-            else:
-                full_automation.append(node.model_dump())
-                await run_action_node(
-                    node,
-                    task.automation.parameters.secure_parameters,
-                    task,
-                    memory,
-                    browser,
-                )
+                else:
+                    full_automation.append(node.model_dump())
+                    await run_action_node(
+                        node,
+                        task.automation.parameters.secure_parameters,
+                        task,
+                        memory,
+                        browser,
+                    )
