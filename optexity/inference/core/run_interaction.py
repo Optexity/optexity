@@ -131,12 +131,18 @@ async def handle_close_tabs_until(
     memory: Memory,
     browser: Browser,
 ):
+
     while True:
         page = await browser.get_current_page()
         if page is None:
             return
-        if close_tabs_until_action.matching_url in page.url:
-            break
+
+        if close_tabs_until_action.matching_url:
+            if close_tabs_until_action.matching_url in page.url:
+                break
+        elif close_tabs_until_action.tab_index:
+            if len(browser.context.pages) == close_tabs_until_action.tab_index + 1:
+                break
 
         await browser.close_current_tab()
 

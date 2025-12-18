@@ -181,7 +181,17 @@ class CloseAllButLastTabAction(BaseModel):
 
 
 class CloseTabsUntil(BaseModel):
-    matching_url: str
+    matching_url: str | None = None
+    tab_index: int | None = None
+
+    @model_validator(mode="after")
+    def validate_one_of_matching_url_or_tab_index(self):
+        non_null = [k for k, v in self.model_fields.items() if v is not None]
+        if len(non_null) != 1:
+            raise ValueError(
+                "Exactly one of matching_url or tab_index must be provided"
+            )
+        return self
 
     def replace(self, pattern: str, replacement: str):
         if self.matching_url:
