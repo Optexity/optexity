@@ -134,7 +134,7 @@ async def run_automation(task: Task, child_process_id: int):
         task.status = "failed"
     finally:
         if task and memory:
-            await run_final_downloads_check(task, memory)
+            await run_final_downloads_check(task, memory, browser)
         if memory and browser:
             await run_final_logging(task, memory, browser, child_process_id)
         if browser:
@@ -144,30 +144,28 @@ async def run_automation(task: Task, child_process_id: int):
     logging.getLogger(current_module).removeHandler(file_handler)
 
 
-async def run_final_downloads_check(task: Task, memory: Memory):
+async def run_final_downloads_check(task: Task, memory: Memory, browser: Browser):
 
     try:
         logger.debug("Running final downloads check")
-        max_tries = 10
-        tries = 0
-        while tries < max_tries:
-            tries += 1
-            for temp_download_path, (
-                is_downloaded,
-                download,
-            ) in memory.raw_downloads.items():
-                if is_downloaded:
-                    continue
+        await asyncio.wait_for(
+            browser.all_active_downloads_done.wait(),
+            timeout=10,
+        )
 
-                download_path = task.downloads_directory / download.suggested_filename
-                await download.save_as(download_path)
-                memory.downloads.append(download_path)
-                await clean_download(download_path)
-                memory.raw_downloads[temp_download_path] = (True, download)
+        for temp_download_path, (
+            is_downloaded,
+            download,
+        ) in memory.raw_downloads.items():
+            if is_downloaded:
+                continue
 
-            if len(memory.downloads) >= task.automation.expected_downloads:
-                break
-            await asyncio.sleep(1)
+            download_path = task.downloads_directory / download.suggested_filename
+            await download.save_as(download_path)
+            memory.downloads.append(download_path)
+            await clean_download(download_path)
+            memory.raw_downloads[temp_download_path] = (True, download)
+
     except Exception as e:
         logger.error(f"Error running final downloads check: {e}")
 

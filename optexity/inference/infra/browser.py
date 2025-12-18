@@ -53,6 +53,10 @@ class Browser:
         self.page_to_target_id = []
         self.previous_total_pages = 0
 
+        self.active_downloads = 0
+        self.all_active_downloads_done = asyncio.Event()
+        self.all_active_downloads_done.set()
+
         self.network_calls: list[NetworkResponse | NetworkRequest] = []
 
     async def start(self):
@@ -117,10 +121,17 @@ class Browser:
                 await self.log_request(req)
 
             async def handle_random_download(download: Download):
+                self.active_downloads += 1
+                self.all_active_downloads_done.clear()
+
                 temp_path = await download.path()
                 async with self.memory.download_lock:
                     if temp_path not in self.memory.raw_downloads:
                         self.memory.raw_downloads[temp_path] = (False, download)
+                self.active_downloads -= 1
+
+                if self.active_downloads == 0:
+                    self.all_active_downloads_done.set()
 
             self.context.on("request", log_request)
             self.context.on("page", lambda p: p.on("download", handle_random_download))
@@ -137,6 +148,13 @@ class Browser:
             )
 
             await self.backend_agent.browser_session.start()
+
+            tabs = await self.backend_agent.browser_session.get_tabs()
+
+            for tab in tabs[::-1]:
+                if tab.target_id not in self.page_to_target_id:
+                    self.page_to_target_id.append(tab.target_id)
+            self.previous_total_pages = len(self.context.pages)
 
             logger.debug("Browser started successfully")
 
@@ -220,17 +238,16 @@ class Browser:
             logger.warning("Atleast one tab should be open, skipping close current tab")
             return False
 
-        tab_id_after_close = self.page_to_target_id[-2][-4:]
+        if len(self.page_to_target_id) > 1:
+            tab_id_after_close = self.page_to_target_id[-2][-4:]
+            action_model = self.backend_agent.ActionModel(
+                **{"switch": {"tab_id": tab_id_after_close}}
+            )
+            await self.backend_agent.multi_act([action_model])
+            self.page_to_target_id.pop()
+
         last_page = pages[-1]
         await last_page.close()
-
-        action_model = self.backend_agent.ActionModel(
-            **{"switch": {"tab_id": tab_id_after_close}}
-        )
-        await self.backend_agent.multi_act([action_model])
-
-        await last_page.close()
-        self.page_to_target_id.pop()
 
     async def switch_tab(self, tab_index: int):
         if self.context is None:
