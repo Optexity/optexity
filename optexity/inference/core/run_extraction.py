@@ -56,7 +56,7 @@ async def handle_state_extraction(
         return
 
     memory.variables.output_data.append(
-        OutputData(json_data={"page_url": page.url, "page_title": page.title})
+        OutputData(json_data={"page_url": page.url, "page_title": await page.title()})
     )
 
 
