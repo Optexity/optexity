@@ -43,7 +43,7 @@ async def run_interaction_action(
         return
 
     logger.debug(
-        f"---------Running interaction action {interaction_action.model_dump_json()}---------"
+        f"---------Running interaction action {interaction_action.model_dump_json(exclude_none=True)}---------"
     )
 
     try:
@@ -111,6 +111,8 @@ async def run_interaction_action(
             )
         elif interaction_action.close_current_tab:
             await browser.close_current_tab()
+        elif interaction_action.switch_tab:
+            await browser.switch_tab(interaction_action.switch_tab.tab_index)
         elif interaction_action.close_tabs_until:
             await handle_close_tabs_until(
                 interaction_action.close_tabs_until, task, memory, browser
