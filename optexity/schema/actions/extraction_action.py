@@ -104,6 +104,7 @@ class StateExtraction(BaseModel):
 
 
 class ExtractionAction(BaseModel):
+    unique_identifier: str | None = None
     network_call: Optional[NetworkCallExtraction] = None
     llm: Optional[LLMExtraction] = None
     python_script: Optional[PythonScriptExtraction] = None
@@ -136,4 +137,8 @@ class ExtractionAction(BaseModel):
             self.llm.replace(pattern, replacement)
         if self.python_script:
             self.python_script.replace(pattern, replacement)
+        if self.unique_identifier:
+            self.unique_identifier = self.unique_identifier.replace(
+                pattern, replacement
+            )
         return self

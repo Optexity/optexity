@@ -35,33 +35,56 @@ async def run_extraction_action(
     )
 
     if extraction_action.llm:
-        await handle_llm_extraction(extraction_action.llm, memory, browser)
+        await handle_llm_extraction(
+            extraction_action.llm, memory, browser, extraction_action.unique_identifier
+        )
     elif extraction_action.network_call:
         await handle_network_call_extraction(
-            extraction_action.network_call, memory, browser, task
+            extraction_action.network_call,
+            memory,
+            browser,
+            task,
+            extraction_action.unique_identifier,
         )
     elif extraction_action.screenshot:
         await handle_screenshot_extraction(
-            extraction_action.screenshot, memory, browser
+            extraction_action.screenshot,
+            memory,
+            browser,
+            extraction_action.unique_identifier,
         )
     elif extraction_action.state:
-        await handle_state_extraction(extraction_action.state, memory, browser)
+        await handle_state_extraction(
+            extraction_action.state,
+            memory,
+            browser,
+            extraction_action.unique_identifier,
+        )
 
 
 async def handle_state_extraction(
-    state_extraction: StateExtraction, memory: Memory, browser: Browser
+    state_extraction: StateExtraction,
+    memory: Memory,
+    browser: Browser,
+    unique_identifier: str | None = None,
 ):
     page = await browser.get_current_page()
     if page is None:
         return
 
     memory.variables.output_data.append(
-        OutputData(json_data={"page_url": page.url, "page_title": await page.title()})
+        OutputData(
+            unique_identifier=unique_identifier,
+            json_data={"page_url": page.url, "page_title": await page.title()},
+        )
     )
 
 
 async def handle_screenshot_extraction(
-    screenshot_extraction: ScreenshotExtraction, memory: Memory, browser: Browser
+    screenshot_extraction: ScreenshotExtraction,
+    memory: Memory,
+    browser: Browser,
+    unique_identifier: str | None = None,
 ):
 
     screenshot_base64 = await browser.get_screenshot(
@@ -72,15 +95,19 @@ async def handle_screenshot_extraction(
 
     memory.variables.output_data.append(
         OutputData(
+            unique_identifier=unique_identifier,
             screenshot=ScreenshotData(
                 filename=screenshot_extraction.filename, base64=screenshot_base64
-            )
+            ),
         )
     )
 
 
 async def handle_llm_extraction(
-    llm_extraction: LLMExtraction, memory: Memory, browser: Browser
+    llm_extraction: LLMExtraction,
+    memory: Memory,
+    browser: Browser,
+    unique_identifier: str | None = None,
 ):
     # TODO: fix this double calling of screenshot and axtree
     if "axtree" in llm_extraction.source:
@@ -118,7 +145,9 @@ async def handle_llm_extraction(
         system_instruction=system_instruction,
     )
     response_dict = response.model_dump()
-    output_data = OutputData(json_data=response_dict)
+    output_data = OutputData(
+        unique_identifier=unique_identifier, json_data=response_dict
+    )
 
     logger.debug(f"Response: {response_dict}")
 
@@ -149,6 +178,7 @@ async def handle_network_call_extraction(
     memory: Memory,
     browser: Browser,
     task: Task,
+    unique_identifier: str | None = None,
 ):
 
     for network_call in browser.network_calls:
@@ -170,7 +200,10 @@ async def handle_network_call_extraction(
             and isinstance(network_call, NetworkResponse)
         ):
             memory.variables.output_data.append(
-                OutputData(json_data=network_call.model_dump(include={"body"}))
+                OutputData(
+                    unique_identifier=unique_identifier,
+                    json_data=network_call.model_dump(include={"body"}),
+                )
             )
 
 

@@ -1,7 +1,7 @@
 From bc8a8ea0739155750ed55acdc2a64d8f6e96dfb8 Mon Sep 17 00:00:00 2001
 From: Sankalp Garg <sankalp@optexity.com>
 Date: Thu, 18 Dec 2025 17:04:04 +0530
-Subject: [PATCH] stopped extra handlers in browseruse
+Subject: [PATCH 1/2] stopped extra handlers in browseruse
 
 ---
  browser_use/browser/session.py | 14 +++++++-------
@@ -29,6 +29,43 @@ index d05afd9b..4dd00329 100644
 +		# BaseWatchdog.attach_handler_to_session(self, AgentFocusChangedEvent, self.on_AgentFocusChangedEvent)
 +		# BaseWatchdog.attach_handler_to_session(self, FileDownloadedEvent, self.on_FileDownloadedEvent)
 +		# BaseWatchdog.attach_handler_to_session(self, CloseTabEvent, self.on_CloseTabEvent)
+ 
+ 	@observe_debug(ignore_input=True, ignore_output=True, name='browser_session_start')
+ 	async def start(self) -> None:
+-- 
+2.50.1 (Apple Git-155)
+
+
+From dc890c839e6214e8137774c3d0c33740ee03dcb7 Mon Sep 17 00:00:00 2001
+From: Sankalp Garg <sankalp@optexity.com>
+Date: Mon, 22 Dec 2025 13:07:32 -0800
+Subject: [PATCH 2/2] revert back switch tab event
+
+---
+ browser_use/browser/session.py | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/browser_use/browser/session.py b/browser_use/browser/session.py
+index 4dd00329..2a1e8166 100644
+--- a/browser_use/browser/session.py
++++ b/browser_use/browser/session.py
+@@ -565,13 +565,13 @@ class BrowserSession(BaseModel):
+ 
+ 		BaseWatchdog.attach_handler_to_session(self, BrowserStartEvent, self.on_BrowserStartEvent)
+ 		BaseWatchdog.attach_handler_to_session(self, BrowserStopEvent, self.on_BrowserStopEvent)
+-		# BaseWatchdog.attach_handler_to_session(self, NavigateToUrlEvent, self.on_NavigateToUrlEvent)
+-		# BaseWatchdog.attach_handler_to_session(self, SwitchTabEvent, self.on_SwitchTabEvent)
+-		# BaseWatchdog.attach_handler_to_session(self, TabCreatedEvent, self.on_TabCreatedEvent)
+-		# BaseWatchdog.attach_handler_to_session(self, TabClosedEvent, self.on_TabClosedEvent)
+-		# BaseWatchdog.attach_handler_to_session(self, AgentFocusChangedEvent, self.on_AgentFocusChangedEvent)
++		BaseWatchdog.attach_handler_to_session(self, NavigateToUrlEvent, self.on_NavigateToUrlEvent)
++		BaseWatchdog.attach_handler_to_session(self, SwitchTabEvent, self.on_SwitchTabEvent)
++		BaseWatchdog.attach_handler_to_session(self, TabCreatedEvent, self.on_TabCreatedEvent)
++		BaseWatchdog.attach_handler_to_session(self, TabClosedEvent, self.on_TabClosedEvent)
++		BaseWatchdog.attach_handler_to_session(self, AgentFocusChangedEvent, self.on_AgentFocusChangedEvent)
+ 		# BaseWatchdog.attach_handler_to_session(self, FileDownloadedEvent, self.on_FileDownloadedEvent)
+-		# BaseWatchdog.attach_handler_to_session(self, CloseTabEvent, self.on_CloseTabEvent)
++		BaseWatchdog.attach_handler_to_session(self, CloseTabEvent, self.on_CloseTabEvent)
  
  	@observe_debug(ignore_input=True, ignore_output=True, name='browser_session_start')
  	async def start(self) -> None:

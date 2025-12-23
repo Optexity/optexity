@@ -3,7 +3,6 @@ import logging
 import time
 
 import aiofiles
-import requests
 
 from optexity.exceptions import AssertLocatorPresenceException
 from optexity.inference.agents.error_handler.error_handler import ErrorHandlerAgent
@@ -168,30 +167,27 @@ async def handle_download_url_as_pdf(
     memory: Memory,
     browser: Browser,
 ):
-    pdf_url = await browser.get_current_page_url()
+    if download_url_as_pdf_action.url is not None:
+        pdf_url = download_url_as_pdf_action.url
+    else:
+        pdf_url = await browser.get_current_page_url()
 
     if pdf_url is None:
         logger.error("No PDF URL found for current page")
         return
-
-    r = requests.get(pdf_url)
-    if r.status_code != 200:
-        logger.error(f"Failed to download PDF from {pdf_url}: {r.status_code}")
-        return
-
     download_path = (
         task.downloads_directory / download_url_as_pdf_action.download_filename
     )
 
-    if isinstance(r.content, bytes):
-        async with aiofiles.open(download_path, "wb") as f:
-            await f.write(r.content)
-    elif isinstance(r.content, str):
-        async with aiofiles.open(download_path, "w") as f:
-            await f.write(r.content)
-    else:
-        logger.error(f"Unsupported content type: {type(r.content)}")
+    resp = await browser.context.request.get(pdf_url)
+
+    if not resp.ok:
+        logger.error(f"Failed to download PDF: {resp.status}")
         return
+
+    content = await resp.body()
+    async with aiofiles.open(download_path, "wb") as f:
+        await f.write(content)
 
     memory.downloads.append(download_path)
 
@@ -227,7 +223,7 @@ async def handle_assert_locator_presence_error(
                 f"Fatal error running node {memory.automation_state.step_index} after {retries_left} retries: {error.original_error}. Error: {response.detailed_reason}"
             )
             memory.variables.output_data.append(
-                OutputData(text=response.detailed_reason)
+                OutputData(unique_identifier="error", text=response.detailed_reason)
             )
             raise Exception(
                 f"Fatal error running node {memory.automation_state.step_index} after {retries_left} retries: {error.original_error}. Final reason: {response.detailed_reason}"

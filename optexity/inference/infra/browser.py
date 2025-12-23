@@ -2,7 +2,9 @@ import asyncio
 import base64
 import json
 import logging
+import re
 from typing import Literal
+from uuid import uuid4
 
 from browser_use import Agent, BrowserSession, ChatGoogle
 from browser_use.browser.views import BrowserStateSummary
@@ -121,20 +123,17 @@ class Browser:
                 await self.log_request(req)
 
             async def handle_random_download(download: Download):
-                self.active_downloads += 1
-                self.all_active_downloads_done.clear()
+                await self.handle_random_download(download)
 
-                temp_path = await download.path()
-                async with self.memory.download_lock:
-                    if temp_path not in self.memory.raw_downloads:
-                        self.memory.raw_downloads[temp_path] = (False, download)
-                self.active_downloads -= 1
-
-                if self.active_downloads == 0:
-                    self.all_active_downloads_done.set()
+            async def handle_random_url_downloads(resp: Response):
+                await self.handle_random_url_downloads(resp)
 
             self.context.on("request", log_request)
-            self.context.on("page", lambda p: p.on("download", handle_random_download))
+            self.context.on("response", handle_random_url_downloads)
+
+            self.context.on(
+                "page", lambda p: (p.on("download", handle_random_download))
+            )
 
             self.page = await self.context.new_page()
 
@@ -274,16 +273,6 @@ class Browser:
         locator: Locator = eval(f"page.{command}")
         return locator
 
-    # async def get_axtree(self) -> str:
-    #     browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
-    #         include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
-    #         include_recent_events=self.backend_agent.include_recent_events,
-    #     )
-
-    #     llm_representation = browser_state_summary.dom_state.llm_representation()
-
-    #     return llm_representation
-
     def get_xpath_from_index(self, index: int) -> str:
         raise NotImplementedError("Not implemented")
 
@@ -316,6 +305,48 @@ class Browser:
         if page is None:
             return None
         return page.url
+
+    async def handle_random_download(self, download: Download):
+        self.active_downloads += 1
+        self.all_active_downloads_done.clear()
+
+        temp_path = await download.path()
+        async with self.memory.download_lock:
+            if temp_path not in self.memory.raw_downloads:
+                self.memory.raw_downloads[temp_path] = (False, download)
+        self.active_downloads -= 1
+
+        if self.active_downloads == 0:
+            self.all_active_downloads_done.set()
+
+    async def handle_random_url_downloads(self, resp: Response):
+        try:
+
+            if "application/pdf" in resp.headers.get("content-type", ""):
+                self.active_downloads += 1
+                self.all_active_downloads_done.clear()
+
+                # Default filename fallback
+                filename = f"{uuid4()}.pdf"
+
+                # Try to get suggested filename from headers
+                content_disposition = resp.headers.get("content-disposition")
+                if content_disposition:
+                    match = re.search(
+                        r'filename\*?=(?:UTF-8\'\')?"?([^";]+)"?',
+                        content_disposition,
+                    )
+                    if match:
+                        filename = match.group(1)
+
+                self.memory.urls_to_downloads.append((resp.url, filename))
+                logger.info(f"Added URL to downloads: {resp.url}, {filename}")
+                self.active_downloads -= 1
+        except Exception as e:
+            logger.error(f"Error handling random responses: {e}")
+
+        if self.active_downloads == 0:
+            self.all_active_downloads_done.set()
 
     async def log_request(self, req: Request):
         try:

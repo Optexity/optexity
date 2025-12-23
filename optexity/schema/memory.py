@@ -52,6 +52,7 @@ class ScreenshotData(BaseModel):
 
 
 class OutputData(BaseModel):
+    unique_identifier: str | None = None
     json_data: dict | None = Field(default=None)
     screenshot: ScreenshotData = Field(default=None)
     text: str | None = Field(default=None)
@@ -81,6 +82,7 @@ class Memory(BaseModel):
     raw_downloads: dict[Path, tuple[bool, Download | None]] = Field(
         default_factory=dict
     )
+    urls_to_downloads: list[tuple[str, str]] = Field(default_factory=list)
     downloads: list[Path] = Field(default_factory=list)
     final_screenshot: str | None = Field(default=None)
 
