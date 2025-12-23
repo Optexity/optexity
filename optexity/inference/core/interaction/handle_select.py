@@ -41,9 +41,20 @@ async def handle_select_option(
         await select_option_index(select_option_action, browser, memory, task)
 
 
+def score_match(pat: str, val: str) -> int:
+    # higher is better
+    if pat == val:
+        return 100
+    if val.startswith(pat):
+        return 80
+    if pat in val:
+        return 60
+    return 0
+
+
 async def smart_select(locator: Locator, patterns: list[str]):
     # Get all options from the <select>
-    options = await locator.evaluate(
+    options: list[dict[str, str]] = await locator.evaluate(
         """
         sel => Array.from(sel.options).map(o => ({
             value: o.value,
@@ -58,18 +69,42 @@ async def smart_select(locator: Locator, patterns: list[str]):
         # If pattern contains regex characters, treat as regex
         is_regex = p.startswith("^") or p.endswith("$") or ".*" in p
 
+        ## Check if reggex pattern and then try finding the option by value and label
         if is_regex:
             regex = re.compile(p)
             for opt in options:
                 if regex.search(opt["value"]) or regex.search(opt["label"]):
                     matched_values.append(opt["value"])
         else:
-            # exact match
+            # try exact match
             for opt in options:
                 if opt["value"] == p or opt["label"] == p:
                     matched_values.append(opt["value"])
 
-    if not matched_values:
+    if len(matched_values) == 0:
+        ## If no matches, check if all values are unique
+
+        processed_values = [
+            (v["value"].lower().replace(" ", ""), v["value"]) for v in options
+        ]
+
+        if len(processed_values) == len(set(processed_values)):
+            for p in patterns:
+                processed_pattern = p.lower().replace(" ", "")
+
+                best_score = 0
+                best_value = None
+
+                for processed_value, value in processed_values:
+                    score = score_match(processed_pattern, processed_value)
+                    if score > best_score:
+                        best_score = score
+                        best_value = value
+
+                if best_value:
+                    matched_values.append(best_value)
+
+    if len(matched_values) == 0:
         matched_values = patterns
 
     return matched_values
