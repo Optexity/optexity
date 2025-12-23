@@ -1,4 +1,5 @@
 import logging
+import re
 
 from optexity.inference.core.interaction.utils import (
     command_based_action_with_retry,
@@ -18,6 +19,15 @@ async def handle_input_text(
     max_timeout_seconds_per_try: float,
     max_tries: int,
 ):
+
+    # {some english chars [0]}
+    INT_INDEX_PATTERN = re.compile(r"^\{([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\}$")
+
+    if INT_INDEX_PATTERN.match(input_text_action.input_text) is not None:
+        logger.debug(
+            "Skipping input text because input variable was not present for this step"
+        )
+        return
 
     if input_text_action.command:
         last_error = await command_based_action_with_retry(
