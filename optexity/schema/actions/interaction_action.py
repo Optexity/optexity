@@ -44,6 +44,9 @@ class BaseAction(BaseModel):
                 model.command is not None
             ), "command is required when assert_locator_presence is True"
 
+        if model.command is not None and model.command.strip() == "":
+            model.command = None
+
         return model
 
     def replace(self, pattern: str, replacement: str):
