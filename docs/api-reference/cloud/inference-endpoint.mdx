@@ -14,50 +14,53 @@ The inference endpoint is the primary way to submit automation tasks to an Optex
 ## Authentication
 
 <Info>
-  Local endpoint (`http://localhost:9000/inference`) does not require authentication and is free to use for development and testing.
+    Local endpoint (`http://localhost:9000/inference`) does not require authentication and is free
+    to use for development and testing.
 </Info>
 
 <Info>
-  Cloud endpoint (`https://api.optexity.com/api/v1/inference`) requires authentication with an API key in the request header. API keys can be found in the Optexity dashboard under the "API Keys" section. This requires a paid plan. Contact us at founders@optexity.com to get a paid plan.
+    Cloud endpoint (`https://api.optexity.com/api/v1/inference`) requires authentication with an API
+    key in the request header. API keys can be found in the Optexity dashboard under the "API Keys"
+    section. This requires a paid plan. Contact us at founders@optexity.com to get a paid plan.
 </Info>
 
 ## Parameters
 
 ### Headers
 
-- **`Content-Type`** `string` *required*
-  
-  Must be set to `application/json`
+- **`Content-Type`** `string` _required_
 
-- **`Authorization`** `string` *required* (cloud endpoint only)
-  
-  API key for authentication. Format: `x-api-key YOUR_API_KEY`
-  
-  Not required for local endpoint
+    Must be set to `application/json`
+
+- **`Authorization`** `string` _required_ (cloud endpoint only)
+
+    API key for authentication. Format: `x-api-key YOUR_API_KEY`
+
+    Not required for local endpoint
 
 ### Body Parameters
 
-- **`endpoint_name`** `string` *required*
-  
-  Name of the automation endpoint to execute. Must match a recording/automation configured in the Optexity control plane.
+- **`endpoint_name`** `string` _required_
 
-- **`input_parameters`** `dict[str, list[str]]` *required*
-  
-  Input values for the automation. Keys are parameter names, values are lists of strings. Every parameter defined in the automation's `input_parameters` should be provided here.
-  
-  If a parameter is given an empty list and it is used in an `input text` action, the action will be skipped.
+    Name of the automation endpoint to execute. Must match a recording/automation configured in the Optexity control plane.
 
-- **`secure_parameters`** `dict[str, list[SecureParameter]]` *optional*
-  
-  Secure parameters for the automation. Keys are parameter names, values are lists of secure parameters. Every parameter defined in the automation's `secure_parameters` should be provided here.
-  
-  These are used to securely store sensitive information like passwords, API keys, and other secrets. Please refer to the [Secure Parameters API Reference](/api-reference/schema-reference/secure-parameters) and [One Password Integration](/docs/advanced/onepassword) documentation for more information.
+- **`input_parameters`** `dict[str, list[str]]` _required_
 
-- **`unique_parameter_names`** `list[str]` *optional*
-  
-  Subset of keys from `input_parameters` that uniquely identify this task. Used for deduplication.
-  
-  Every name in this list must exist as a key in `input_parameters`.
+    Input values for the automation. Keys are parameter names, values are lists of strings. Every parameter defined in the automation's `input_parameters` should be provided here.
+
+    If a parameter is given an empty list and it is used in an `input text` action, the action will be skipped.
+
+- **`secure_parameters`** `dict[str, list[SecureParameter]]` _optional_
+
+    Secure parameters for the automation. Keys are parameter names, values are lists of secure parameters. Every parameter defined in the automation's `secure_parameters` should be provided here.
+
+    These are used to securely store sensitive information like passwords, API keys, and other secrets. Please refer to the [Secure Parameters API Reference](/api-reference/schema-reference/secure-parameters) and [One Password Integration](/docs/advanced/onepassword) documentation for more information.
+
+- **`unique_parameter_names`** `list[str]` _optional_
+
+    Subset of keys from `input_parameters` that uniquely identify this task. Used for deduplication.
+
+    Every name in this list must exist as a key in `input_parameters`.
 
 ## Code Examples
 
@@ -100,26 +103,26 @@ else:
 ```
 
 ```javascript JavaScript
-const response = await fetch('http://localhost:9000/inference', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    endpoint_name: 'login-flow',
-    input_parameters: {
-      email: ['user@example.com'],
-      password: ['secret123']
+const response = await fetch("http://localhost:9000/inference", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json",
     },
-    unique_parameter_names: ['email']
-  })
+    body: JSON.stringify({
+        endpoint_name: "login-flow",
+        input_parameters: {
+            email: ["user@example.com"],
+            password: ["secret123"],
+        },
+        unique_parameter_names: ["email"],
+    }),
 });
 
 const data = await response.json();
 if (response.status === 202) {
-  console.log('Task submitted successfully');
+    console.log("Task submitted successfully");
 } else {
-  console.error('Error:', data);
+    console.error("Error:", data);
 }
 ```
 
@@ -167,17 +170,17 @@ The task has been enqueued and will execute asynchronously.
 
 ```json
 {
-  "success": true,
-  "message": "Task has been allocated"
+    "success": true,
+    "message": "Task has been allocated"
 }
 ```
 
 **Response Fields:**
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field     | Type    | Description                                  |
+| --------- | ------- | -------------------------------------------- |
 | `success` | boolean | Indicates whether the request was successful |
-| `message` | string | Status message describing the result |
+| `message` | string  | Status message describing the result         |
 
 ## Error Responses
 
@@ -187,12 +190,13 @@ Returned when request parameters are invalid.
 
 ```json
 {
-  "success": false,
-  "message": "unique_parameter_names contains key 'username' not found in input_parameters"
+    "success": false,
+    "message": "unique_parameter_names contains key 'username' not found in input_parameters"
 }
 ```
 
 **Common causes:**
+
 - `unique_parameter_names` contains a key that doesn't exist in `input_parameters`
 - Parameter values are not lists of strings
 - Missing required `endpoint_name` or `input_parameters` fields
@@ -203,12 +207,13 @@ Returned when the specified endpoint does not exist.
 
 ```json
 {
-  "success": false,
-  "message": "Endpoint 'invalid-endpoint' not found"
+    "success": false,
+    "message": "Endpoint 'invalid-endpoint' not found"
 }
 ```
 
 **Common causes:**
+
 - `endpoint_name` doesn't match any configured automation
 - Endpoint has been deleted or is not accessible
 
@@ -218,12 +223,13 @@ Returned when authentication fails (cloud endpoint only).
 
 ```json
 {
-  "success": false,
-  "message": "Invalid or missing API key"
+    "success": false,
+    "message": "Invalid or missing API key"
 }
 ```
 
 **Common causes:**
+
 - Missing `Authorization` header
 - Invalid API key format
 - Expired or revoked API key
@@ -234,12 +240,13 @@ Returned when an unexpected server error occurs.
 
 ```json
 {
-  "success": false,
-  "message": "Control plane error: Network issue or invalid API key"
+    "success": false,
+    "message": "Control plane error: Network issue or invalid API key"
 }
 ```
 
 **Common causes:**
+
 - Network connectivity issues with the control plane
 - Control plane service unavailable
 - Internal server configuration errors
@@ -265,10 +272,10 @@ The endpoint validates:
 
 The endpoint uses these settings from environment variables:
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `API_KEY` | Required | API key for control plane authentication |
-| `INFERENCE_ENDPOINT` | `api/v1/inference` | Control plane endpoint path |
+| Setting              | Default            | Description                              |
+| -------------------- | ------------------ | ---------------------------------------- |
+| `API_KEY`            | Required           | API key for control plane authentication |
+| `INFERENCE_ENDPOINT` | `api/v1/inference` | Control plane endpoint path              |
 
 <AccordionGroup>
   <Accordion title="Task Object Structure">
@@ -309,11 +316,12 @@ class Task:
     # Authentication
     api_key: str
 ```
+
   </Accordion>
 </AccordionGroup>
 
 ## Related
 
--   [Health Endpoints](/api-reference/health-endpoints) - Monitor task status
--   [Getting Started Guide](/docs/getting-started) - Server setup
--   [Automation Schema](/api-reference/automation-schema) - Task definition
+- [Health Endpoints](/api-reference/health-endpoints) - Monitor task status
+- [Getting Started Guide](/docs/getting-started) - Server setup
+- [Automation Schema](/api-reference/automation-schema) - Task definition

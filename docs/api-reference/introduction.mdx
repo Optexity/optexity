@@ -12,21 +12,25 @@ Welcome to the Optexity API Reference. This documentation covers all schemas, en
 Complete documentation for automation schema types:
 
 <CardGroup cols={2}>
-<Card title="Automation Schema" icon="sitemap" href="/api-reference/automation-schema">
-  Automation, ActionNode, ForLoopNode, IfElseNode, Parameters
-</Card>
-<Card title="Interaction Actions" icon="hand-pointer" href="/api-reference/interaction-actions-ref">
-  Click, input, select, scroll, navigate, tabs, and agentic actions
-</Card>
-<Card title="Extraction Actions" icon="database" href="/api-reference/extraction-actions-ref">
-  LLM extraction, network calls, Python scripts, screenshots
-</Card>
-<Card title="Assertion Actions" icon="check-double" href="/api-reference/assertion-actions-ref">
-  LLM, network call, and Python script assertions
-</Card>
-<Card title="Miscellaneous Actions" icon="puzzle-piece" href="/api-reference/misc-actions-ref">
-  PythonScriptAction and 2FA actions
-</Card>
+    <Card title="Automation Schema" icon="sitemap" href="/api-reference/automation-schema">
+        Automation, ActionNode, ForLoopNode, IfElseNode, Parameters
+    </Card>
+    <Card
+        title="Interaction Actions"
+        icon="hand-pointer"
+        href="/api-reference/interaction-actions-ref"
+    >
+        Click, input, select, scroll, navigate, tabs, and agentic actions
+    </Card>
+    <Card title="Extraction Actions" icon="database" href="/api-reference/extraction-actions-ref">
+        LLM extraction, network calls, Python scripts, screenshots
+    </Card>
+    <Card title="Assertion Actions" icon="check-double" href="/api-reference/assertion-actions-ref">
+        LLM, network call, and Python script assertions
+    </Card>
+    <Card title="Miscellaneous Actions" icon="puzzle-piece" href="/api-reference/misc-actions-ref">
+        PythonScriptAction and 2FA actions
+    </Card>
 </CardGroup>
 
 ### HTTP API
@@ -34,35 +38,35 @@ Complete documentation for automation schema types:
 Documentation for the inference server endpoints:
 
 <CardGroup cols={2}>
-<Card title="Inference Endpoint" icon="play" href="/api-reference/inference-endpoint">
-  POST /inference - Submit automation tasks
-</Card>
-<Card title="Health Endpoints" icon="heart-pulse" href="/api-reference/health-endpoints">
-  GET /health, GET /is_task_running - Monitor server status
-</Card>
+    <Card title="Inference Endpoint" icon="play" href="/api-reference/inference-endpoint">
+        POST /inference - Submit automation tasks
+    </Card>
+    <Card title="Health Endpoints" icon="heart-pulse" href="/api-reference/health-endpoints">
+        GET /health, GET /is_task_running - Monitor server status
+    </Card>
 </CardGroup>
 
 ## Quick Reference
 
 ### Core Types
 
-| Type | Description |
-|------|-------------|
-| `Automation` | Top-level container with URL, parameters, and nodes |
-| `ActionNode` | Single action (interaction, extraction, assertion, etc.) |
-| `ForLoopNode` | Iterate over a variable's values |
-| `IfElseNode` | Conditional execution |
-| `Parameters` | Input and generated variables |
+| Type          | Description                                              |
+| ------------- | -------------------------------------------------------- |
+| `Automation`  | Top-level container with URL, parameters, and nodes      |
+| `ActionNode`  | Single action (interaction, extraction, assertion, etc.) |
+| `ForLoopNode` | Iterate over a variable's values                         |
+| `IfElseNode`  | Conditional execution                                    |
+| `Parameters`  | Input and generated variables                            |
 
 ### Action Types
 
-| Category | Actions |
-|----------|---------|
+| Category        | Actions                                                                  |
+| --------------- | ------------------------------------------------------------------------ |
 | **Interaction** | click, input, select, check, scroll, navigate, upload, download, agentic |
-| **Extraction** | LLM, network call, Python script, screenshot |
-| **Assertion** | LLM, network call, Python script |
-| **2FA** | Email, TOTP, API call |
-| **Misc** | Python script execution |
+| **Extraction**  | LLM, network call, Python script, screenshot                             |
+| **Assertion**   | LLM, network call, Python script                                         |
+| **2FA**         | Email, TOTP, API call                                                    |
+| **Misc**        | Python script execution                                                  |
 
 ### Key Concepts
 
@@ -143,4 +147,3 @@ from optexity.schema.actions.two_factor_auth_action import (
 # Misc actions
 from optexity.schema.actions.misc_action import PythonScriptAction
 ```
-

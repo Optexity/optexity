@@ -23,37 +23,37 @@ InteractionAction(
 ### Properties
 
 <ParamField path="start_2fa_timer" type="bool" default="False">
-  Start the 2FA timer when this action executes. Only valid with `click_element`.
+    Start the 2FA timer when this action executes. Only valid with `click_element`.
 </ParamField>
 
 <ParamField path="max_tries" type="int" default="10">
-  Maximum attempts to find the element. Reduced to 5 if `skip_prompt=True`.
+    Maximum attempts to find the element. Reduced to 5 if `skip_prompt=True`.
 </ParamField>
 
 <ParamField path="max_timeout_seconds_per_try" type="float" default="1.0">
-  Seconds to wait for element on each attempt.
+    Seconds to wait for element on each attempt.
 </ParamField>
 
 ### Action Types
 
 Exactly one must be provided:
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `click_element` | `ClickElementAction` | Click on an element |
-| `input_text` | `InputTextAction` | Type text into a field |
-| `select_option` | `SelectOptionAction` | Select from dropdown |
-| `check` | `CheckAction` | Check/uncheck checkbox |
-| `download_url_as_pdf` | `DownloadUrlAsPdfAction` | Save page as PDF |
-| `scroll` | `ScrollAction` | Scroll the page |
-| `upload_file` | `UploadFileAction` | Upload a file |
-| `go_to_url` | `GoToUrlAction` | Navigate to URL |
-| `go_back` | `GoBackAction` | Go back in history |
-| `switch_tab` | `SwitchTabAction` | Switch browser tab |
-| `close_current_tab` | `CloseCurrentTabAction` | Close current tab |
+| Property                 | Type                       | Description               |
+| ------------------------ | -------------------------- | ------------------------- |
+| `click_element`          | `ClickElementAction`       | Click on an element       |
+| `input_text`             | `InputTextAction`          | Type text into a field    |
+| `select_option`          | `SelectOptionAction`       | Select from dropdown      |
+| `check`                  | `CheckAction`              | Check/uncheck checkbox    |
+| `download_url_as_pdf`    | `DownloadUrlAsPdfAction`   | Save page as PDF          |
+| `scroll`                 | `ScrollAction`             | Scroll the page           |
+| `upload_file`            | `UploadFileAction`         | Upload a file             |
+| `go_to_url`              | `GoToUrlAction`            | Navigate to URL           |
+| `go_back`                | `GoBackAction`             | Go back in history        |
+| `switch_tab`             | `SwitchTabAction`          | Switch browser tab        |
+| `close_current_tab`      | `CloseCurrentTabAction`    | Close current tab         |
 | `close_all_but_last_tab` | `CloseAllButLastTabAction` | Close all except last tab |
-| `agentic_task` | `AgenticTask` | AI-controlled task |
-| `close_overlay_popup` | `CloseOverlayPopupAction` | Dismiss popups |
+| `agentic_task`           | `AgenticTask`              | AI-controlled task        |
+| `close_overlay_popup`    | `CloseOverlayPopupAction`  | Dismiss popups            |
 
 ---
 
@@ -62,23 +62,24 @@ Exactly one must be provided:
 These properties are shared by `ClickElementAction`, `InputTextAction`, `SelectOptionAction`, `CheckAction`, and `UploadFileAction`:
 
 <ParamField path="xpath" type="str | None" default="None">
-  XPath selector for the element. Mutually exclusive with `command`.
+    XPath selector for the element. Mutually exclusive with `command`.
 </ParamField>
 
 <ParamField path="command" type="str | None" default="None">
-  Playwright locator command (e.g., `get_by_role("button", name="Submit")`). Mutually exclusive with `xpath`.
+    Playwright locator command (e.g., `get_by_role("button", name="Submit")`). Mutually exclusive
+    with `xpath`.
 </ParamField>
 
 <ParamField path="prompt_instructions" type="str" required>
-  Natural language description for AI fallback when locators fail.
+    Natural language description for AI fallback when locators fail.
 </ParamField>
 
 <ParamField path="skip_prompt" type="bool" default="False">
-  Skip AI prompt if locator fails. Reduces `max_tries` to 5.
+    Skip AI prompt if locator fails. Reduces `max_tries` to 5.
 </ParamField>
 
 <ParamField path="assert_locator_presence" type="bool" default="False">
-  Only execute if element exists. Requires `command` to be set.
+    Only execute if element exists. Requires `command` to be set.
 </ParamField>
 
 ---
@@ -104,15 +105,15 @@ ClickElementAction(
 Inherits all [BaseAction properties](#baseaction-properties), plus:
 
 <ParamField path="double_click" type="bool" default="False">
-  Perform a double-click instead of single click.
+    Perform a double-click instead of single click.
 </ParamField>
 
 <ParamField path="expect_download" type="bool" default="False">
-  Whether this click triggers a file download.
+    Whether this click triggers a file download.
 </ParamField>
 
 <ParamField path="download_filename" type="str | None" default="Auto-generated UUID">
-  Filename to save the download. Only used when `expect_download=True`.
+    Filename to save the download. Only used when `expect_download=True`.
 </ParamField>
 
 ---
@@ -142,13 +143,12 @@ Inherits all [BaseAction properties](#baseaction-properties), plus:
 </ParamField>
 
 <ParamField path="is_slider" type="bool" default="False">
-  Whether the element is a slider input.
+    Whether the element is a slider input.
 </ParamField>
 
 <ParamField path="fill_or_type" type="'fill' | 'type'" default="'fill'">
-  How to enter text:
-  - `fill`: Set value instantly (default)
-  - `type`: Type each character (for autocomplete fields)
+    How to enter text: - `fill`: Set value instantly (default) - `type`: Type each character (for
+    autocomplete fields)
 </ParamField>
 
 ---
@@ -174,15 +174,15 @@ SelectOptionAction(
 Inherits all [BaseAction properties](#baseaction-properties), plus:
 
 <ParamField path="select_values" type="list[str]" required>
-  Values to select. Supports variable substitution.
+    Values to select. Supports variable substitution.
 </ParamField>
 
 <ParamField path="expect_download" type="bool" default="False">
-  Whether selecting triggers a file download.
+    Whether selecting triggers a file download.
 </ParamField>
 
 <ParamField path="download_filename" type="str | None" default="Auto-generated UUID">
-  Filename for download. Only used when `expect_download=True`.
+    Filename for download. Only used when `expect_download=True`.
 </ParamField>
 
 ---
@@ -221,7 +221,7 @@ DownloadUrlAsPdfAction(
 ### Properties
 
 <ParamField path="download_filename" type="str" default="Auto-generated UUID">
-  Filename for the PDF. Supports variable substitution.
+    Filename for the PDF. Supports variable substitution.
 </ParamField>
 
 ---
@@ -241,7 +241,7 @@ ScrollAction(
 ### Properties
 
 <ParamField path="down" type="bool" required>
-  Direction to scroll. `True` for down, `False` for up.
+    Direction to scroll. `True` for down, `False` for up.
 </ParamField>
 
 ---
@@ -265,7 +265,7 @@ UploadFileAction(
 Inherits all [BaseAction properties](#baseaction-properties), plus:
 
 <ParamField path="file_path" type="str" required>
-  Absolute path to the file to upload. Supports variable substitution.
+    Absolute path to the file to upload. Supports variable substitution.
 </ParamField>
 
 ---
@@ -286,11 +286,11 @@ GoToUrlAction(
 ### Properties
 
 <ParamField path="url" type="str" required>
-  URL to navigate to.
+    URL to navigate to.
 </ParamField>
 
 <ParamField path="new_tab" type="bool" default="False">
-  Open in new tab instead of current tab.
+    Open in new tab instead of current tab.
 </ParamField>
 
 ---
@@ -324,7 +324,7 @@ SwitchTabAction(
 ### Properties
 
 <ParamField path="tab_index" type="int" required>
-  Zero-based index of the tab to switch to.
+    Zero-based index of the tab to switch to.
 </ParamField>
 
 ---
@@ -376,23 +376,23 @@ AgenticTask(
 ### Properties
 
 <ParamField path="task" type="str" required>
-  Natural language description of the goal. Supports variable substitution.
+    Natural language description of the goal. Supports variable substitution.
 </ParamField>
 
 <ParamField path="max_steps" type="int" required>
-  Maximum number of actions the agent can take.
+    Maximum number of actions the agent can take.
 </ParamField>
 
 <ParamField path="backend" type="'browser_use' | 'browserbase'" required>
-  Agent backend to use.
+    Agent backend to use.
 </ParamField>
 
 <ParamField path="use_vision" type="bool" default="False">
-  Whether agent receives screenshots.
+    Whether agent receives screenshots.
 </ParamField>
 
 <ParamField path="keep_alive" type="bool" default="True">
-  Keep browser session alive after task completes.
+    Keep browser session alive after task completes.
 </ParamField>
 
 ---
@@ -412,23 +412,23 @@ CloseOverlayPopupAction(
 ### Properties
 
 <ParamField path="task" type="str" default="Built-in popup dismissal prompt">
-  Task description. Uses comprehensive default prompt.
+    Task description. Uses comprehensive default prompt.
 </ParamField>
 
 <ParamField path="max_steps" type="int" default="5">
-  Maximum actions for popup dismissal.
+    Maximum actions for popup dismissal.
 </ParamField>
 
 <ParamField path="backend" type="'browser_use' | 'browserbase'" default="'browser_use'">
-  Agent backend.
+    Agent backend.
 </ParamField>
 
 <ParamField path="use_vision" type="bool" default="True">
-  Uses vision for popup detection.
+    Uses vision for popup detection.
 </ParamField>
 
 <ParamField path="keep_alive" type="bool" default="True">
-  Keep browser session alive.
+    Keep browser session alive.
 </ParamField>
 
 ---
@@ -438,4 +438,3 @@ CloseOverlayPopupAction(
 - [Interaction Actions Guide](/docs/interaction-actions)
 - [Locators Guide](/docs/locators)
 - [Agentic Tasks Guide](/docs/agentic-tasks)
-

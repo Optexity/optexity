@@ -6,13 +6,16 @@ description: Automating I‑94 lookup and extracting data from network calls
 This example shows how to automate the I‑94 recent travel history lookup and extract the result data from a **network call**, instead of scraping the page.
 
 The automation:
+
 - **Opens** the I‑94 site
 - **Fills** the traveler details (name, nationality, DOB, document number)
 - **Handles** a scroll‑to‑accept popup using a **Python script action**
 - **Submits** the form and **extracts** the result from a network request
 
 <Tip>
-Use network call extraction pattern any time a site exposes a clean JSON API behind the UI. It is usually simpler and more stable than DOM-based scraping. Network call extraction is faster and more reliable than DOM scraping.
+    Use network call extraction pattern any time a site exposes a clean JSON API behind the UI. It
+    is usually simpler and more stable than DOM-based scraping. Network call extraction is faster
+    and more reliable than DOM scraping.
 </Tip>
 
 Before starting, please look at the [Local Setup](/docs/building-automations/local-setup) guide to setup the environment.
@@ -26,6 +29,7 @@ You can use the built-in `i94` automation to quickly start the inference server 
 ## Add automation to the dashboard
 
 To quickly add the automation to the dashboard, you can use the following command:
+
 ```bash
 ENV_PATH=.env python optexity/examples/add_example.py --example i94
 ```
@@ -69,6 +73,7 @@ curl -X POST http://localhost:9000/inference \
 ```
 
 While the request runs, the browser will execute the steps on your behalf. When the run finishes, you can:
+
 - Inspect the **task run** and **extracted data** in the dashboard
 - Re‑use the extracted JSON in downstream systems
 
@@ -120,12 +125,12 @@ The automation structure is identical to the recent search example, with only th
 ## Record the base workflow
 
 1. Go to the I‑94 site and **record** a workflow that:
-   - Navigates to the recent‑search page
-   - Fills in first name, last name, nationality, date of birth, and document number
-   - Submits the form and waits for the result
+    - Navigates to the recent‑search page
+    - Fills in first name, last name, nationality, date of birth, and document number
+    - Submits the form and waits for the result
 
 2. After saving, you will see an `i94` automation in your dashboard that contains only the **interaction actions** (clicks, fills, selects).
-We have also built this automation by default and you can find it in your dashboard.
+   We have also built this automation by default and you can find it in your dashboard.
 
 ![I94 Automation](/images/i94_workflow.png)
 
@@ -134,6 +139,7 @@ We have also built this automation by default and you can find it in your dashbo
 ## Refine the automation
 
 Recording captures clicks and inputs, but you still need to:
+
 - **Tighten** some interaction instructions
 - **Add** a network‑call extraction action
 - **Add** a Python script to handle the scroll‑to‑accept popup
@@ -144,12 +150,12 @@ In the recorded flow, the nationality selection might not have a precise locator
 
 ```json
 {
-  "end_sleep_time": 1,
-  "interaction_action": {
-    "click_element": {
-      "prompt_instructions": "Select {nationality[0]} from the options. Be careful to select the correct option, which will be of the format `nationality (code)`."
+    "end_sleep_time": 1,
+    "interaction_action": {
+        "click_element": {
+            "prompt_instructions": "Select {nationality[0]} from the options. Be careful to select the correct option, which will be of the format `nationality (code)`."
+        }
     }
-  }
 }
 ```
 
@@ -161,13 +167,13 @@ To capture the I‑94 result, add an `extraction_action` that listens for the sp
 
 ```json
 {
-  "before_sleep_time": 3,
-  "end_sleep_time": 0,
-  "extraction_action": {
-    "network_call": {
-      "url_pattern": "https://i94.cbp.dhs.gov/api/services/i94/recent"
+    "before_sleep_time": 3,
+    "end_sleep_time": 0,
+    "extraction_action": {
+        "network_call": {
+            "url_pattern": "https://i94.cbp.dhs.gov/api/services/i94/recent"
+        }
     }
-  }
 }
 ```
 
@@ -181,10 +187,10 @@ The I‑94 site requires scrolling inside a popup before the **“I ACKNOWLEDGE 
 
 ```json
 {
-  "end_sleep_time": 1,
-  "python_script_action": {
-    "execution_code": "async def code_fn(page):\n    print(\"entering code_fn\")\n    await page.evaluate(\n        \"\"\"  const el = document.querySelector('mat-dialog-content');  if (el) el.scrollTop = el.scrollHeight;\"\"\"\n    )\n    print(\"exiting code_fn\")\n"
-  }
+    "end_sleep_time": 1,
+    "python_script_action": {
+        "execution_code": "async def code_fn(page):\n    print(\"entering code_fn\")\n    await page.evaluate(\n        \"\"\"  const el = document.querySelector('mat-dialog-content');  if (el) el.scrollTop = el.scrollHeight;\"\"\"\n    )\n    print(\"exiting code_fn\")\n"
+    }
 }
 ```
 
@@ -192,129 +198,119 @@ The full Python definition for this automation lives in `optexity/examples/i94.p
 
 > **Note**: Script actions run in the same browser context as the page. They are ideal for edge cases like scrolling a specific container, dismissing tricky popups, or calling custom JS helpers.
 
-----
+---
 
 # Final Automation
 
 ```json
 {
-  "url": "https://i94.cbp.dhs.gov/search/recent-search",
-  "nodes": [
-    {
-      "end_sleep_time": 1,
-      "before_sleep_time": 3,
-      "python_script_action": {
-        "execution_code": "async def code_fn(page):\n    print(\"entering code_fn\")\n    await page.evaluate(\n        \"\"\"  const el = document.querySelector('mat-dialog-content');  if (el) el.scrollTop = el.scrollHeight;\"\"\"\n    )\n    print(\"exiting code_fn\")\n"
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"I ACKNOWLEDGE AND AGREE\")",
-          "prompt_instructions": "Click the I ACKNOWLEDGE AND AGREE button"
+    "url": "https://i94.cbp.dhs.gov/search/recent-search",
+    "nodes": [
+        {
+            "end_sleep_time": 1,
+            "before_sleep_time": 3,
+            "python_script_action": {
+                "execution_code": "async def code_fn(page):\n    print(\"entering code_fn\")\n    await page.evaluate(\n        \"\"\"  const el = document.querySelector('mat-dialog-content');  if (el) el.scrollTop = el.scrollHeight;\"\"\"\n    )\n    print(\"exiting code_fn\")\n"
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"button\", name=\"I ACKNOWLEDGE AND AGREE\")",
+                    "prompt_instructions": "Click the I ACKNOWLEDGE AND AGREE button"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_role(\"textbox\", name=\"Please enter your first name\")",
+                    "input_text": "{first_name[0]}",
+                    "prompt_instructions": "Enter the First Name"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_role(\"textbox\", name=\"Please enter your last name\")",
+                    "input_text": "{last_name[0]}",
+                    "prompt_instructions": "Enter the Last Name"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_role(\"textbox\", name=\"Date of Birth\")",
+                    "input_text": "{date_of_birth[0]}",
+                    "prompt_instructions": "Enter the Date of Birth"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_role(\"textbox\", name=\"Please enter your document\")",
+                    "input_text": "{document_number[0]}",
+                    "prompt_instructions": "Enter the Document Number"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_role(\"combobox\", name=\"Please enter your document\")",
+                    "input_text": "{nationality[0]}",
+                    "prompt_instructions": "Enter the Nationality"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "prompt_instructions": "Select {nationality[0]} from the options. Be careful to select the correct option. which will be of the format `nationality (code)`"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"button\", name=\"Click to submit the form\")",
+                    "prompt_instructions": "Click the Submit button"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 0,
+            "before_sleep_time": 3,
+            "extraction_action": {
+                "network_call": {
+                    "url_pattern": "https://i94.cbp.dhs.gov/api/services/i94/recent",
+                    "extract_from": "response",
+                    "download_filename": "185dfa24-7d2c-40d2-9f39-2515976e59a4"
+                }
+            }
         }
-      }
+    ],
+    "parameters": {
+        "input_parameters": {
+            "last_name": ["Last Name"],
+            "first_name": ["First Name"],
+            "nationality": ["IND"],
+            "date_of_birth": ["MM/DD/YYYY"],
+            "document_number": ["Document Number"]
+        },
+        "generated_parameters": {}
     },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_role(\"textbox\", name=\"Please enter your first name\")",
-          "input_text": "{first_name[0]}",
-          "prompt_instructions": "Enter the First Name"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_role(\"textbox\", name=\"Please enter your last name\")",
-          "input_text": "{last_name[0]}",
-          "prompt_instructions": "Enter the Last Name"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_role(\"textbox\", name=\"Date of Birth\")",
-          "input_text": "{date_of_birth[0]}",
-          "prompt_instructions": "Enter the Date of Birth"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_role(\"textbox\", name=\"Please enter your document\")",
-          "input_text": "{document_number[0]}",
-          "prompt_instructions": "Enter the Document Number"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_role(\"combobox\", name=\"Please enter your document\")",
-          "input_text": "{nationality[0]}",
-          "prompt_instructions": "Enter the Nationality"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "prompt_instructions": "Select {nationality[0]} from the options. Be careful to select the correct option. which will be of the format `nationality (code)`"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"Click to submit the form\")",
-          "prompt_instructions": "Click the Submit button"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 0,
-      "before_sleep_time": 3,
-      "extraction_action": {
-        "network_call": {
-          "url_pattern": "https://i94.cbp.dhs.gov/api/services/i94/recent",
-          "extract_from": "response",
-          "download_filename": "185dfa24-7d2c-40d2-9f39-2515976e59a4"
-        }
-      }
-    }
-  ],
-  "parameters": {
-    "input_parameters": {
-      "last_name": [
-        "Last Name"
-      ],
-      "first_name": [
-        "First Name"
-      ],
-      "nationality": [
-        "IND"
-      ],
-      "date_of_birth": [
-        "MM/DD/YYYY"
-      ],
-      "document_number": [
-        "Document Number"
-      ]
-    },
-    "generated_parameters": {}
-  },
-  "browser_channel": "chrome"
+    "browser_channel": "chrome"
 }
 ```

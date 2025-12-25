@@ -3,7 +3,7 @@ title: Proxy Setup
 description: Setting up proxies for your automations
 ---
 
-Optexity supports using proxies for your automations. You can use proxies from any provider. 
+Optexity supports using proxies for your automations. You can use proxies from any provider.
 
 ## Proxy setup in local development
 
@@ -14,7 +14,7 @@ PROXY_URL=http://proxy-server:8080
 PROXY_USERNAME=proxy-user # optional
 PROXY_PASSWORD=proxy-pass # optional
 PROXY_PROVIDER=other # optional, default is oxylabs
-``` 
+```
 
 ## Proxy setup in production
 
@@ -28,14 +28,12 @@ If you want to use proxies in your inference, you can set the `use_proxy` flag t
 {
     "endpoint_name": "extract_stock_price",
     "input_parameters": {
-      "search_term": ["NVDA"]
+        "search_term": ["NVDA"]
     },
     "unique_parameter_names": [],
     "use_proxy": true
 }
 ```
-
-
 
 ## Proxy providers
 

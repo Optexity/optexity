@@ -3,18 +3,15 @@ title: For Loop Node
 description: Understanding the For Loop Node of Optexity automations
 ---
 
-
-
 ## For Loop Node
 
 Use `For Loop Node` to iterate over extracted data. This is powerful for processing lists of items, like clicking through search results or processing multiple records.
 
-| Parameter           | Description                                                                                                              |
-|---------------------|--------------------------------------------------------------------------------------------------------------------------|
-| `nodes`             | List of `action_node` or `if_else_node` nodes.                                                                           |
-| `reset_nodes`       | List of `action_node` or `if_else_node` nodes.                                                                           |
-| `on_error_in_loop`  | Action to execute if an error occurs in the loop. Can be `continue`, `break`, or `raise`. Default is to raise an error.  |
-
+| Parameter          | Description                                                                                                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `nodes`            | List of `action_node` or `if_else_node` nodes.                                                                          |
+| `reset_nodes`      | List of `action_node` or `if_else_node` nodes.                                                                          |
+| `on_error_in_loop` | Action to execute if an error occurs in the loop. Can be `continue`, `break`, or `raise`. Default is to raise an error. |
 
 ```json
 {
@@ -67,19 +64,19 @@ If `order_ids = ["ORD-001", "ORD-002", "ORD-003"]`:
 
 ```json
 {
-  "type": "for_loop",
-  "variable_name": "product_names",
-  "nodes": [
-    {
-      "type": "action",
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"link\", name=\"{product_names[index]}\")",
-          "prompt_instructions": "Click on product {product_names[index]}"
+    "type": "for_loop",
+    "variable_name": "product_names",
+    "nodes": [
+        {
+            "type": "action",
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"link\", name=\"{product_names[index]}\")",
+                    "prompt_instructions": "Click on product {product_names[index]}"
+                }
+            }
         }
-      }
-    }
-  ]
+    ]
 }
 ```
 
@@ -127,51 +124,50 @@ The default is to raise an error.
 
 `raise` will raise an error and stop the loop. This is useful if we want the whole automation to fail if an error occurs in the loop.
 
-
 ## Common Patterns
 
 ### Process All Items in a Table
 
 ```json
 [
-  {
-    "type": "action",
-    "extraction_action": {
-      "llm": {
-        "extraction_format": {
-          "item_ids": "List[str]"
-        },
-        "output_variable_names": ["item_ids"],
-        "extraction_instructions": "Extract all item IDs from the table",
-        "source": ["axtree"]
-      }
+    {
+        "type": "action",
+        "extraction_action": {
+            "llm": {
+                "extraction_format": {
+                    "item_ids": "List[str]"
+                },
+                "output_variable_names": ["item_ids"],
+                "extraction_instructions": "Extract all item IDs from the table",
+                "source": ["axtree"]
+            }
+        }
+    },
+    {
+        "type": "for_loop",
+        "variable_name": "item_ids",
+        "nodes": [
+            {
+                "type": "action",
+                "interaction_action": {
+                    "click_element": {
+                        "command": "get_by_text(\"{item_ids[index]}\")",
+                        "prompt_instructions": "Click on item {item_ids[index]}"
+                    }
+                }
+            },
+            {
+                "type": "action",
+                "action": {}
+            },
+            {
+                "type": "action",
+                "interaction_action": {
+                    "go_back": {}
+                }
+            }
+        ]
     }
-  },
-  {
-    "type": "for_loop",
-    "variable_name": "item_ids",
-    "nodes": [
-      {
-        "type": "action",
-        "interaction_action": {
-          "click_element": {
-            "command": "get_by_text(\"{item_ids[index]}\")",
-            "prompt_instructions": "Click on item {item_ids[index]}"
-          }
-        }
-      },
-      {
-        "type": "action",
-        "action": {}
-      },
-      {
-        "type": "action",
-        "interaction_action": {
-          "go_back": {}
-        }
-      }
-    ]
-  }
 ]
 ```
 
@@ -179,23 +175,23 @@ The default is to raise an error.
 
 ```json
 {
-  "type": "for_loop",
-  "variable_name": "page_numbers",
-  "nodes": [
-    {
-      "type": "action",
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_text(\"{page_numbers[index]}\")",
-          "prompt_instructions": "Click page {page_numbers[index]}"
+    "type": "for_loop",
+    "variable_name": "page_numbers",
+    "nodes": [
+        {
+            "type": "action",
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_text(\"{page_numbers[index]}\")",
+                    "prompt_instructions": "Click page {page_numbers[index]}"
+                }
+            }
+        },
+        {
+            "type": "action",
+            "extraction_action": {}
         }
-      }
-    },
-    {
-      "type": "action",
-      "extraction_action": {}
-    }
-  ]
+    ]
 }
 ```
 
@@ -203,20 +199,20 @@ The default is to raise an error.
 
 ```json
 {
-  "type": "for_loop",
-  "variable_name": "document_links",
-  "nodes": [
-    {
-      "type": "action",
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"link\", name=\"{document_links[index]}\")",
-          "prompt_instructions": "Click to download {document_links[index]}",
-          "expect_download": true
+    "type": "for_loop",
+    "variable_name": "document_links",
+    "nodes": [
+        {
+            "type": "action",
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"link\", name=\"{document_links[index]}\")",
+                    "prompt_instructions": "Click to download {document_links[index]}",
+                    "expect_download": true
+                }
+            }
         }
-      }
-    }
-  ]
+    ]
 }
 ```
 

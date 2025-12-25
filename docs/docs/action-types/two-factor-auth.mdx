@@ -9,11 +9,11 @@ Many websites require two-factor authentication (2FA). Optexity provides built-i
 
 Optexity supports three methods for fetching 2FA codes:
 
-| Method | Source | Use Case |
-|--------|--------|----------|
-| **Email 2FA** | Gmail inbox | Codes sent via email |
-| **TOTP 2FA** | Authenticator apps | Time-based one-time passwords |
-| **API 2FA** | Custom API endpoint | Third-party 2FA services |
+| Method        | Source              | Use Case                      |
+| ------------- | ------------------- | ----------------------------- |
+| **Email 2FA** | Gmail inbox         | Codes sent via email          |
+| **TOTP 2FA**  | Authenticator apps  | Time-based one-time passwords |
+| **API 2FA**   | Custom API endpoint | Third-party 2FA services      |
 
 ## The 2FA Flow
 
@@ -65,18 +65,19 @@ Before fetching a 2FA code, you need to indicate when the 2FA was triggered. Thi
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Send Code\")",
-      "prompt_instructions": "Click to send verification code"
-    },
-    "start_2fa_timer": true
-  }
+    "interaction_action": {
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Send Code\")",
+            "prompt_instructions": "Click to send verification code"
+        },
+        "start_2fa_timer": true
+    }
 }
 ```
 
 <Warning>
-`start_2fa_timer` can only be set on `click_element` actions. This makes sense because 2FA is typically triggered by clicking a button.
+    `start_2fa_timer` can only be set on `click_element` actions. This makes sense because 2FA is
+    typically triggered by clicking a button.
 </Warning>
 
 ## Email 2FA
@@ -85,24 +86,24 @@ Fetch verification codes from email messages.
 
 ```json
 {
-  "fetch_2fa_action": {
-    "fetch_email_2fa_action": {
-      "email_address": "user@example.com",
-      "subject": "Your login verification code",
-      "service": "gmail"
-    },
-    "output_variable_name": "email_code"
-  }
+    "fetch_2fa_action": {
+        "fetch_email_2fa_action": {
+            "email_address": "user@example.com",
+            "subject": "Your login verification code",
+            "service": "gmail"
+        },
+        "output_variable_name": "email_code"
+    }
 }
 ```
 
 ### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `email_address` | `str` | Email address to check |
-| `subject` | `str` | Email subject to search for |
-| `service` | `"gmail"` | Email service (currently only Gmail supported) |
+| Property        | Type      | Description                                    |
+| --------------- | --------- | ---------------------------------------------- |
+| `email_address` | `str`     | Email address to check                         |
+| `subject`       | `str`     | Email subject to search for                    |
+| `service`       | `"gmail"` | Email service (currently only Gmail supported) |
 
 ### How It Works
 
@@ -117,19 +118,19 @@ Generate time-based one-time passwords from a TOTP secret.
 
 ```json
 {
-  "fetch_2fa_action": {
-    "fetch_totp_2fa_action": {
-      "totp_secret": "JBSWY3DPEHPK3PXP"
-    },
-    "output_variable_name": "totp_code"
-  }
+    "fetch_2fa_action": {
+        "fetch_totp_2fa_action": {
+            "totp_secret": "JBSWY3DPEHPK3PXP"
+        },
+        "output_variable_name": "totp_code"
+    }
 }
 ```
 
 ### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property      | Type  | Description                    |
+| ------------- | ----- | ------------------------------ |
 | `totp_secret` | `str` | Base32-encoded TOTP secret key |
 
 ### Getting the TOTP Secret
@@ -162,31 +163,31 @@ Fetch codes from a custom API endpoint.
 
 ```json
 {
-  "fetch_2fa_action": {
-    "fetch_2fa_api_call_action": {
-      "api_call_url": "https://api.example.com/get-2fa-code",
-      "api_call_method": "POST",
-      "api_call_headers": {
-        "Authorization": "Bearer {api_token[0]}",
-        "Content-Type": "application/json"
-      },
-      "api_call_body": {
-        "account_id": "{account_id[0]}"
-      }
-    },
-    "output_variable_name": "api_code"
-  }
+    "fetch_2fa_action": {
+        "fetch_2fa_api_call_action": {
+            "api_call_url": "https://api.example.com/get-2fa-code",
+            "api_call_method": "POST",
+            "api_call_headers": {
+                "Authorization": "Bearer {api_token[0]}",
+                "Content-Type": "application/json"
+            },
+            "api_call_body": {
+                "account_id": "{account_id[0]}"
+            }
+        },
+        "output_variable_name": "api_code"
+    }
 }
 ```
 
 ### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `api_call_url` | `str` | API endpoint URL |
-| `api_call_method` | `"GET" \| "POST"` | HTTP method |
-| `api_call_headers` | `dict` | Request headers |
-| `api_call_body` | `dict` | Request body (for POST) |
+| Property           | Type              | Description             |
+| ------------------ | ----------------- | ----------------------- |
+| `api_call_url`     | `str`             | API endpoint URL        |
+| `api_call_method`  | `"GET" \| "POST"` | HTTP method             |
+| `api_call_headers` | `dict`            | Request headers         |
+| `api_call_body`    | `dict`            | Request body (for POST) |
 
 ## Using the 2FA Code
 
@@ -219,72 +220,72 @@ After fetching, the code is available in `generated_parameters` under the specif
 
 ```json
 {
-  "url": "https://secure.example.com/login",
-  "parameters": {
-    "input_parameters": {
-      "username": ["user@example.com"],
-      "password": ["secretpassword"]
-    },
-    "generated_parameters": {
-      "verification_code": []
-    }
-  },
-  "nodes": [
-    {
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_label(\"Email\")",
-          "input_text": "{username[0]}",
-          "prompt_instructions": "Enter email"
-        }
-      }
-    },
-    {
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_label(\"Password\")",
-          "input_text": "{password[0]}",
-          "prompt_instructions": "Enter password"
-        }
-      }
-    },
-    {
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"Sign In\")",
-          "prompt_instructions": "Click sign in"
+    "url": "https://secure.example.com/login",
+    "parameters": {
+        "input_parameters": {
+            "username": ["user@example.com"],
+            "password": ["secretpassword"]
         },
-        "start_2fa_timer": true
-      }
+        "generated_parameters": {
+            "verification_code": []
+        }
     },
-    {
-      "fetch_2fa_action": {
-        "fetch_email_2fa_action": {
-          "email_address": "user@example.com",
-          "subject": "Verification code",
-          "service": "gmail"
+    "nodes": [
+        {
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_label(\"Email\")",
+                    "input_text": "{username[0]}",
+                    "prompt_instructions": "Enter email"
+                }
+            }
         },
-        "output_variable_name": "verification_code"
-      }
-    },
-    {
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_label(\"Code\")",
-          "input_text": "{verification_code[0]}",
-          "prompt_instructions": "Enter verification code"
+        {
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_label(\"Password\")",
+                    "input_text": "{password[0]}",
+                    "prompt_instructions": "Enter password"
+                }
+            }
+        },
+        {
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"button\", name=\"Sign In\")",
+                    "prompt_instructions": "Click sign in"
+                },
+                "start_2fa_timer": true
+            }
+        },
+        {
+            "fetch_2fa_action": {
+                "fetch_email_2fa_action": {
+                    "email_address": "user@example.com",
+                    "subject": "Verification code",
+                    "service": "gmail"
+                },
+                "output_variable_name": "verification_code"
+            }
+        },
+        {
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_label(\"Code\")",
+                    "input_text": "{verification_code[0]}",
+                    "prompt_instructions": "Enter verification code"
+                }
+            }
+        },
+        {
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"button\", name=\"Verify\")",
+                    "prompt_instructions": "Click verify"
+                }
+            }
         }
-      }
-    },
-    {
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"Verify\")",
-          "prompt_instructions": "Click verify"
-        }
-      }
-    }
-  ]
+    ]
 }
 ```
 
@@ -296,11 +297,11 @@ Never hardcode secrets in your automation. Pass them via input parameters:
 
 ```json
 {
-  "parameters": {
-    "input_parameters": {
-      "totp_secret": ["..."]
+    "parameters": {
+        "input_parameters": {
+            "totp_secret": ["..."]
+        }
     }
-  }
 }
 ```
 
@@ -327,4 +328,3 @@ Design your automations with appropriate retries and error handling.
 - See [Timing & Retries](/docs/timing-retries) for handling slow 2FA delivery
 - Check [Best Practices](/docs/best-practices) for security tips
 - Learn about [Interaction Actions](/docs/interaction-actions) for entering codes
-

@@ -64,8 +64,8 @@ The most powerful extraction method. Uses an LLM to parse page content and extra
 | `llm_provider`            | `Literal["gemini"]`                     | `"gemini"`           | LLM provider                                                           |
 | `llm_model_name`          | `str`                                   | `"gemini-2.5-flash"` | LLM model name                                                         |
 
--   `source` - Data sources for the LLM to analyze. It can be either `axtree` or `screenshot`. `axtree` is the default and is used for most use cases. `screenshot` is used for visual layouts, charts, and images.
-    You can combine sources to get the best of both worlds.
+- `source` - Data sources for the LLM to analyze. It can be either `axtree` or `screenshot`. `axtree` is the default and is used for most use cases. `screenshot` is used for visual layouts, charts, and images.
+  You can combine sources to get the best of both worlds.
 
 ```json
 {
@@ -252,10 +252,10 @@ Capture data directly from network requests. Useful for APIs and AJAX calls.
 | `download_from`     | `Literal["request", "response"] \| None` | `None`  | Download from request or response |
 | `download_filename` | `str \| None`                            | `None`  | Download filename                 |
 
--   `url_pattern` - URL pattern to match. Captured requests must contain this substring.
--   `extract_from` - Extract from request or response.
--   `download_from` - Download from request or response. This is useful when the response contains the data and you want to save it as a file because the pdf viewer is hard to read. Currently only supports `request`. Currently we only look for pdf content in the network call body.
--   `download_filename` - Download filename. this is optional and if not provided, a random uuid will be generated. this is used only if `download_from` is set.
+- `url_pattern` - URL pattern to match. Captured requests must contain this substring.
+- `extract_from` - Extract from request or response.
+- `download_from` - Download from request or response. This is useful when the response contains the data and you want to save it as a file because the pdf viewer is hard to read. Currently only supports `request`. Currently we only look for pdf content in the network call body.
+- `download_filename` - Download filename. this is optional and if not provided, a random uuid will be generated. this is used only if `download_from` is set.
 
 ## Python Script Extraction
 
@@ -320,8 +320,8 @@ Capture a screenshot of the current page. this saves the screenshot to the downl
 | `filename`  | `str`  | Required | Output filename for the screenshot   |
 | `full_page` | `bool` | `True`   | Capture entire page or just viewport |
 
--   `filename` - Output filename for the screenshot. Supports variable substitution.
--   `full_page` - Capture entire page or just viewport.
+- `filename` - Output filename for the screenshot. Supports variable substitution.
+- `full_page` - Capture entire page or just viewport.
 
 ## State Extraction
 
@@ -334,6 +334,7 @@ Capture the state of the page. this is useful when you need to capture the state
     }
 }
 ```
+
 ## Timing Considerations
 
 Extraction actions have different default timing:
@@ -370,6 +371,6 @@ This allows the page to fully load before extraction. Override if needed:
 
 ## Next Steps
 
--   Learn about [Control Flow](/docs/control-flow) to iterate over extracted data
--   See [Parameters & Variables](/docs/parameters-variables) for using extracted values
--   Check [Best Practices](/docs/best-practices) for extraction tips
+- Learn about [Control Flow](/docs/control-flow) to iterate over extracted data
+- See [Parameters & Variables](/docs/parameters-variables) for using extracted values
+- Check [Best Practices](/docs/best-practices) for extraction tips

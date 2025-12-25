@@ -23,11 +23,11 @@ AssertionAction(
 
 Exactly one must be provided:
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `llm` | `LLMAssertion` | Verify conditions using an LLM |
-| `network_call` | `NetworkCallAssertion` | Check network request/response |
-| `python_script` | `PythonScriptAssertion` | Run custom verification code |
+| Property        | Type                    | Description                    |
+| --------------- | ----------------------- | ------------------------------ |
+| `llm`           | `LLMAssertion`          | Verify conditions using an LLM |
+| `network_call`  | `NetworkCallAssertion`  | Check network request/response |
+| `python_script` | `PythonScriptAssertion` | Run custom verification code   |
 
 ---
 
@@ -48,19 +48,17 @@ LLMAssertion(
 ### Properties
 
 <ParamField path="source" type="list[Literal['axtree', 'screenshot']]" required>
-  Data sources for the LLM to analyze:
-  - `"axtree"`: Accessibility tree (structured text representation)
-  - `"screenshot"`: Visual screenshot of the page
-  
-  Can include both: `["axtree", "screenshot"]`
+    Data sources for the LLM to analyze: - `"axtree"`: Accessibility tree (structured text
+    representation) - `"screenshot"`: Visual screenshot of the page Can include both: `["axtree",
+    "screenshot"]`
 </ParamField>
 
 <ParamField path="output_format" type="str | BaseModel" required>
-  Expected output format. Can be a type string or Pydantic model.
+    Expected output format. Can be a type string or Pydantic model.
 </ParamField>
 
 <ParamField path="extraction_instruction" type="str" required>
-  Natural language instruction describing what to verify.
+    Natural language instruction describing what to verify.
 </ParamField>
 
 ### Example Usage
@@ -110,11 +108,11 @@ NetworkCallAssertion(
 ### Properties
 
 <ParamField path="url_pattern" type="str | None" default="None">
-  URL pattern to match. Checks if a matching request was made.
+    URL pattern to match. Checks if a matching request was made.
 </ParamField>
 
 <ParamField path="header_filter" type="dict[str, str] | None" default="None">
-  Headers that must be present in the request/response.
+    Headers that must be present in the request/response.
 </ParamField>
 
 ### Example Usage
@@ -164,16 +162,14 @@ assert success is not None, "Success message not found"
 ### Properties
 
 <ParamField path="script" type="str" required>
-  Python code to execute. Cannot be empty.
-  
-  The script runs in an async context with access to the Playwright `page` object.
-  Use assertions to verify conditions.
+    Python code to execute. Cannot be empty. The script runs in an async context with access to the
+    Playwright `page` object. Use assertions to verify conditions.
 </ParamField>
 
 ### Available Objects
 
-| Object | Description |
-|--------|-------------|
+| Object | Description            |
+| ------ | ---------------------- |
 | `page` | Playwright Page object |
 
 ### Example Usage
@@ -232,10 +228,10 @@ print(f"Found {len(items)} order items")
 
 Assertion actions have special timing defaults on `ActionNode`:
 
-| Property | Default for Assertions |
-|----------|----------------------|
-| `before_sleep_time` | `0.0` seconds |
-| `end_sleep_time` | `0.0` seconds |
+| Property            | Default for Assertions |
+| ------------------- | ---------------------- |
+| `before_sleep_time` | `0.0` seconds          |
+| `end_sleep_time`    | `0.0` seconds          |
 
 Assertions check the current state without additional waiting.
 
@@ -340,4 +336,3 @@ print(f"Order confirmed: {match.group(1)}")
 
 - [Extraction Actions Reference](/api-reference/extraction-actions-ref)
 - [Best Practices Guide](/docs/best-practices)
-

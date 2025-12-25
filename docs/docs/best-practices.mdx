@@ -25,6 +25,7 @@ nodes=[
 ```
 
 Then add complexity as needed:
+
 - Error handling
 - Optional steps
 - Extraction actions
@@ -161,11 +162,11 @@ ActionNode(
 
 ### Choose the Right Source
 
-| Scenario | Source |
-|----------|--------|
-| Tables, forms, text content | `["axtree"]` |
-| Visual layouts, images | `["screenshot"]` |
-| Complex pages | `["axtree", "screenshot"]` |
+| Scenario                    | Source                     |
+| --------------------------- | -------------------------- |
+| Tables, forms, text content | `["axtree"]`               |
+| Visual layouts, images      | `["screenshot"]`           |
+| Complex pages               | `["axtree", "screenshot"]` |
 
 ## Timing Best Practices
 
@@ -366,12 +367,12 @@ When actions fail:
 
 Common timing issues:
 
-| Symptom | Solution |
-|---------|----------|
-| "Element not found" | Increase `before_sleep_time` |
-| Wrong element clicked | Wait for page to settle |
+| Symptom                  | Solution                        |
+| ------------------------ | ------------------------------- |
+| "Element not found"      | Increase `before_sleep_time`    |
+| Wrong element clicked    | Wait for page to settle         |
 | Extraction returns empty | Increase wait before extraction |
-| Random failures | Increase retry count |
+| Random failures          | Increase retry count            |
 
 ### Use Screenshots for Debugging
 
@@ -504,4 +505,3 @@ Before deploying an automation:
 - [ ] Tested on realistic data
 - [ ] Variable names are descriptive
 - [ ] Complex logic is commented
-

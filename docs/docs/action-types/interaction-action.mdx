@@ -39,17 +39,17 @@ An `interaction_action` contains exactly one of the following action types:
 
 ### Other properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `max_tries` | `int` | `10` | Maximum number of attempts to find and interact with the element |
-| `max_timeout_seconds_per_try` | `float` | `1.0` | Seconds to wait for the element on each attempt |
+| Property                      | Type    | Default | Description                                                      |
+| ----------------------------- | ------- | ------- | ---------------------------------------------------------------- |
+| `max_tries`                   | `int`   | `10`    | Maximum number of attempts to find and interact with the element |
+| `max_timeout_seconds_per_try` | `float` | `1.0`   | Seconds to wait for the element on each attempt                  |
 
 Refer to bottom of the page for more details on these properties.
 
-{/* {/_ | `scroll` | Scroll the page (Currently not supported. Request the founder or contribute to opensource) |
+{/_ {/* | `scroll` | Scroll the page (Currently not supported. Request the founder or contribute to opensource) |
 | `switch_tab` | Switch to a different tab |
 | `close_current_tab` | Close the current tab |
-| `close_all_but_last_tab` | Close all tabs except the last | _/} */}
+| `close_all_but_last_tab` | Close all tabs except the last | */} _/}
 
 ## Click, Input Text, Select Option, Check, Upload File
 
@@ -65,14 +65,14 @@ These actions are used to interact with the browser. They all have general same 
 | `skip_prompt`             | `bool`        | `False`  | Skip AI prompt if locator fails         |
 | `assert_locator_presence` | `bool`        | `False`  | Only act if element exists              |
 
--   `command` and `xpath` are mutually exclusive. You can only provide one of them. They are used to find the element on the page deterministically. There is no LLM tokens spent on finding the element. These are fast and highly reliable if you know the element locator.
+- `command` and `xpath` are mutually exclusive. You can only provide one of them. They are used to find the element on the page deterministically. There is no LLM tokens spent on finding the element. These are fast and highly reliable if you know the element locator.
 
--   `prompt_instructions` is used to describe the element to the AI. This is used when the element is not found using the `command` or `xpath` locator. This is a fallback and is used to find the element visually.
+- `prompt_instructions` is used to describe the element to the AI. This is used when the element is not found using the `command` or `xpath` locator. This is a fallback and is used to find the element visually.
 
--   `skip_prompt` is used to skip the AI prompt if the locator fails. This is useful there are some optional elements that appear sometimes but not always.
+- `skip_prompt` is used to skip the AI prompt if the locator fails. This is useful there are some optional elements that appear sometimes but not always.
 
--   `assert_locator_presence` is used as a checkpoint to verify that the element exists before performing the action.
-    Say you always know the element exists then you can set `assert_locator_presence` to `true`. If somehow this fails you know there has been some error in the automation and you want it to fail early rather than continuing with the automation.
+- `assert_locator_presence` is used as a checkpoint to verify that the element exists before performing the action.
+  Say you always know the element exists then you can set `assert_locator_presence` to `true`. If somehow this fails you know there has been some error in the automation and you want it to fail early rather than continuing with the automation.
 
 ## Click Element
 
@@ -127,11 +127,11 @@ The `download_filename` property is optional and will be auto-generated if not p
 | `expect_download`   | `bool`        | `False`        | Whether click triggers a file download |
 | `download_filename` | `str \| None` | Auto-generated | Filename for downloaded file           |
 
--   `double_click` is used to perform a double-click instead of a single click.
+- `double_click` is used to perform a double-click instead of a single click.
 
--   `expect_download` is used to specify that the click triggers a file download. Useful to track downloads. Optexity can handle random downloads even if you don't specify expect_download. However, it is recommended to specify expect_download to track downloads in better way.
+- `expect_download` is used to specify that the click triggers a file download. Useful to track downloads. Optexity can handle random downloads even if you don't specify expect_download. However, it is recommended to specify expect_download to track downloads in better way.
 
--   `download_filename` is used to specify the filename for the downloaded file. This is optional and will be auto-generated if not provided. The auto-generated filename will be a UUID.
+- `download_filename` is used to specify the filename for the downloaded file. This is optional and will be auto-generated if not provided. The auto-generated filename will be a UUID.
 
 ## Input Text
 
@@ -197,14 +197,14 @@ Slider input:
 | `is_slider`    | `bool`             | `False`  | Whether element is a slider                    |
 | `press_enter`  | `bool`             | `False`  | Whether to press enter after typing            |
 
--   `input_text` is used to specify the text to enter. It supports variable substitution. if the input text is a variable which is empty, then this action is skipped. Eg: `input_text="{email[0]}"` will enter the email address if the email address is not empty. If the email address list is empty, then this action is skipped.
+- `input_text` is used to specify the text to enter. It supports variable substitution. if the input text is a variable which is empty, then this action is skipped. Eg: `input_text="{email[0]}"` will enter the email address if the email address is not empty. If the email address list is empty, then this action is skipped.
 
--   `assert_locator_presence` is used as a checkpoint to verify that the element exists before performing the action.
-    Say you always know the element exists then you can set `assert_locator_presence` to `true`. If somehow this fails you know there has been some error in the automation and you want it to fail early rather than continuing with the automation.
+- `assert_locator_presence` is used as a checkpoint to verify that the element exists before performing the action.
+  Say you always know the element exists then you can set `assert_locator_presence` to `true`. If somehow this fails you know there has been some error in the automation and you want it to fail early rather than continuing with the automation.
 
--   `skip_prompt` is used to skip the AI prompt if the locator fails. This is useful there are some optional elements that appear sometimes but not always.
+- `skip_prompt` is used to skip the AI prompt if the locator fails. This is useful there are some optional elements that appear sometimes but not always.
 
--   `press_enter` is used to press enter after typing. This is useful when you want to submit a form or perform an action after typing.
+- `press_enter` is used to press enter after typing. This is useful when you want to submit a form or perform an action after typing.
 
 ## Select Option
 
@@ -262,11 +262,11 @@ Select that triggers download:
 | `expect_download`   | `bool`        | `False`        | Whether selection triggers download |
 | `download_filename` | `str \| None` | Auto-generated | Filename for download               |
 
--   `select_values` is used to specify the values to select. It is list of values and hence it can select multiple values if the website allows multiple selection.
+- `select_values` is used to specify the values to select. It is list of values and hence it can select multiple values if the website allows multiple selection.
 
--   `expect_download` is used to specify that the click triggers a file download. Useful to track downloads. Optexity can handle random downloads even if you don't specify expect_download. However, it is recommended to specify expect_download to track downloads in better way.
+- `expect_download` is used to specify that the click triggers a file download. Useful to track downloads. Optexity can handle random downloads even if you don't specify expect_download. However, it is recommended to specify expect_download to track downloads in better way.
 
--   `download_filename` is used to specify the filename for the downloaded file. This is optional and will be auto-generated if not provided. The auto-generated filename will be a UUID.
+- `download_filename` is used to specify the filename for the downloaded file. This is optional and will be auto-generated if not provided. The auto-generated filename will be a UUID.
 
 ### Fuzzy matching
 
@@ -322,14 +322,14 @@ Open in new tab:
 
 ### Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `url` | `str` | Required | URL to navigate to |
-| `new_tab` | `bool` | `False` | Open in new tab instead of current tab |
+| Property  | Type   | Default  | Description                            |
+| --------- | ------ | -------- | -------------------------------------- |
+| `url`     | `str`  | Required | URL to navigate to                     |
+| `new_tab` | `bool` | `False`  | Open in new tab instead of current tab |
 
--   `url` is used to specify the URL to navigate to. It supports variable substitution. Eg: `url="{url[0]}"` will navigate to the URL specified by the url variable.
+- `url` is used to specify the URL to navigate to. It supports variable substitution. Eg: `url="{url[0]}"` will navigate to the URL specified by the url variable.
 
--   `new_tab` is used to specify that the URL should be opened in a new tab.
+- `new_tab` is used to specify that the URL should be opened in a new tab.
 
 ### Go Back
 
@@ -359,14 +359,14 @@ Navigate back in browser history.
 
 ### Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `matching_url` | `str \| None` | `None` | URL to close tabs until |
-| `tab_index` | `int \| None` | `None` | Index of the tab to close |
+| Property       | Type          | Default | Description               |
+| -------------- | ------------- | ------- | ------------------------- |
+| `matching_url` | `str \| None` | `None`  | URL to close tabs until   |
+| `tab_index`    | `int \| None` | `None`  | Index of the tab to close |
 
--   `matching_url` is used to specify the URL to close tabs until. It supports variable substitution. Eg: `matching_url="{url[0]}"` will close tabs until the URL specified by the url variable is opened. If you know the url of the home page or some page, and then if your actions lead to more tabs opening up, you can use this to close the tabs until you are back to the home page.
+- `matching_url` is used to specify the URL to close tabs until. It supports variable substitution. Eg: `matching_url="{url[0]}"` will close tabs until the URL specified by the url variable is opened. If you know the url of the home page or some page, and then if your actions lead to more tabs opening up, you can use this to close the tabs until you are back to the home page.
 
--   `tab_index` is used to specify the index of the tab to close. It is the index of the tab to close. It is 0 based index. Eg: `tab_index=0` will close all tabs except the first one. If you specify `tab_index=3`, then it will close all tabs after the fourth one.
+- `tab_index` is used to specify the index of the tab to close. It is the index of the tab to close. It is 0 based index. Eg: `tab_index=0` will close all tabs except the first one. If you specify `tab_index=3`, then it will close all tabs after the fourth one.
 
 ## File Operations
 
@@ -402,10 +402,10 @@ Download the current page content as a PDF file. This is useful when say you cli
 
 ### Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
+| Property            | Type          | Default        | Description                  |
+| ------------------- | ------------- | -------------- | ---------------------------- |
 | 'download_filename' | `str \| None` | Auto-generated | Filename for downloaded file |
-| `url` | `str \| None` | `None` | URL to download |
+| `url`               | `str \| None` | `None`         | URL to download              |
 
 - `download_filename` is used to specify the filename for the downloaded file. This is optional and will be auto-generated if not provided. The auto-generated filename will be a UUID.
 - `url` is optional. By default we download the url of the current page if nothing is specified. This works in most cases if you open a pdf in a new tab and then download it. If in anycase you know the url of the pdf file, then you can specify it here.
@@ -426,11 +426,11 @@ When an action opens a new tab, use `expect_new_tab`:
 }
 ```
 
-{/* ## 2FA Timer
+{/\* ## 2FA Timer
 
 Start a 2FA timer when clicking a button that triggers 2FA:
 
-```json
+````json
 {
     "interaction_action": {
         "click_element": {
@@ -457,15 +457,15 @@ Control how many times Optexity retries finding an element:
         }
     }
 }
-```
+````
 
 ### Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `max_tries` | `int` | `10` | Maximum number of attempts to find and interact with the element |
-| `max_timeout_seconds_per_try` | `float` | `1.0` | Seconds to wait for the element on each attempt |
+| Property                      | Type    | Default | Description                                                      |
+| ----------------------------- | ------- | ------- | ---------------------------------------------------------------- |
+| `max_tries`                   | `int`   | `10`    | Maximum number of attempts to find and interact with the element |
+| `max_timeout_seconds_per_try` | `float` | `1.0`   | Seconds to wait for the element on each attempt                  |
 
--   `max_tries` is used to specify the maximum number of attempts to find and interact with the element. If you think website is slow, most likely you will need to increase this. It is generally better to increase this compared to `max_timeout_seconds_per_try`. This way opetixity will wait for the element to appear for a longer time before giving up but will also continue to next step faster as soon as the element is found. Minimum wait time is `max_timeout_seconds_per_try` per try.
+- `max_tries` is used to specify the maximum number of attempts to find and interact with the element. If you think website is slow, most likely you will need to increase this. It is generally better to increase this compared to `max_timeout_seconds_per_try`. This way opetixity will wait for the element to appear for a longer time before giving up but will also continue to next step faster as soon as the element is found. Minimum wait time is `max_timeout_seconds_per_try` per try.
 
--   `max_timeout_seconds_per_try` is used to specify the seconds to wait for the element on each attempt.
+- `max_timeout_seconds_per_try` is used to specify the seconds to wait for the element on each attempt.

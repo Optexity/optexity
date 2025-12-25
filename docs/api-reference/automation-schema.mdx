@@ -25,15 +25,15 @@ automation = Automation(
 ### Properties
 
 <ParamField path="url" type="str" required>
-  The starting URL where the browser navigates when the automation begins.
+    The starting URL where the browser navigates when the automation begins.
 </ParamField>
 
 <ParamField path="parameters" type="Parameters" required>
-  Container for input and generated parameters.
+    Container for input and generated parameters.
 </ParamField>
 
 <ParamField path="nodes" type="list[ActionNode | ForLoopNode | IfElseNode]" required>
-  Ordered list of nodes to execute. Nodes are processed sequentially.
+    Ordered list of nodes to execute. Nodes are processed sequentially.
 </ParamField>
 
 ---
@@ -59,11 +59,11 @@ params = Parameters(
 ### Properties
 
 <ParamField path="input_parameters" type="dict[str, list[str]]" required>
-  Values provided before execution. Keys are variable names, values are lists of strings.
+    Values provided before execution. Keys are variable names, values are lists of strings.
 </ParamField>
 
 <ParamField path="generated_parameters" type="dict[str, list[str]]" required>
-  Placeholders for values extracted during execution. Initially empty lists.
+    Placeholders for values extracted during execution. Initially empty lists.
 </ParamField>
 
 ---
@@ -94,41 +94,41 @@ node = ActionNode(
 Exactly one of these must be provided:
 
 <ParamField path="interaction_action" type="InteractionAction | None" default="None">
-  User interaction: click, type, select, scroll, navigate, etc.
+    User interaction: click, type, select, scroll, navigate, etc.
 </ParamField>
 
 <ParamField path="assertion_action" type="AssertionAction | None" default="None">
-  Verify conditions on the page.
+    Verify conditions on the page.
 </ParamField>
 
 <ParamField path="extraction_action" type="ExtractionAction | None" default="None">
-  Extract data from the page via LLM, network calls, or screenshots.
+    Extract data from the page via LLM, network calls, or screenshots.
 </ParamField>
 
 <ParamField path="python_script_action" type="PythonScriptAction | None" default="None">
-  Execute custom Python code.
+    Execute custom Python code.
 </ParamField>
 
 <ParamField path="fetch_2fa_action" type="Fetch2faAction | None" default="None">
-  Fetch two-factor authentication codes.
+    Fetch two-factor authentication codes.
 </ParamField>
 
 ### Timing Properties
 
 <ParamField path="before_sleep_time" type="float" default="0.0 (3.0 for extractions)">
-  Seconds to wait before executing the action. Must be between 0 and 10.
+    Seconds to wait before executing the action. Must be between 0 and 10.
 </ParamField>
 
 <ParamField path="end_sleep_time" type="float" default="1.0 (0.0 for extractions/assertions/2FA)">
-  Seconds to wait after the action completes. Must be between 0 and 10.
+    Seconds to wait after the action completes. Must be between 0 and 10.
 </ParamField>
 
 <ParamField path="expect_new_tab" type="bool" default="False">
-  Whether this action is expected to open a new browser tab. Only valid for interaction actions.
+    Whether this action is expected to open a new browser tab. Only valid for interaction actions.
 </ParamField>
 
 <ParamField path="max_new_tab_wait_time" type="float" default="0.0 (10.0 if expect_new_tab=True)">
-  Maximum seconds to wait for a new tab to appear. Must be between 0 and 10.
+    Maximum seconds to wait for a new tab to appear. Must be between 0 and 10.
 </ParamField>
 
 ### Validation Rules
@@ -158,11 +158,12 @@ loop = ForLoopNode(
 ### Properties
 
 <ParamField path="variable_name" type="str" required>
-  Name of the variable to iterate over. The variable must be populated before the loop executes.
+    Name of the variable to iterate over. The variable must be populated before the loop executes.
 </ParamField>
 
 <ParamField path="nodes" type="list[ActionNode]" required>
-  Actions to execute for each iteration. Inside these nodes, use `{variable_name[index]}` to reference the current value.
+    Actions to execute for each iteration. Inside these nodes, use `{variable_name[index]}` to
+    reference the current value.
 </ParamField>
 
 ### How Iteration Works
@@ -170,10 +171,10 @@ loop = ForLoopNode(
 Given `order_ids = ["A", "B", "C"]`:
 
 | Iteration | `index` value | `{order_ids[index]}` |
-|-----------|---------------|----------------------|
-| 1 | 0 | "A" |
-| 2 | 1 | "B" |
-| 3 | 2 | "C" |
+| --------- | ------------- | -------------------- |
+| 1         | 0             | "A"                  |
+| 2         | 1             | "B"                  |
+| 3         | 2             | "C"                  |
 
 ---
 
@@ -198,15 +199,15 @@ conditional = IfElseNode(
 ### Properties
 
 <ParamField path="condition" type="str" required>
-  Condition string to evaluate.
+    Condition string to evaluate.
 </ParamField>
 
 <ParamField path="if_nodes" type="list[ActionNode]" required>
-  Actions to execute when condition is true.
+    Actions to execute when condition is true.
 </ParamField>
 
 <ParamField path="else_nodes" type="list[ActionNode]" default="[]">
-  Actions to execute when condition is false. Can be empty.
+    Actions to execute when condition is false. Can be empty.
 </ParamField>
 
 ---
@@ -230,7 +231,7 @@ Variables are substituted using the `{variable_name[index]}` syntax.
 # Access first value
 "{username[0]}"
 
-# Access second value  
+# Access second value
 "{items[1]}"
 
 # Inside ForLoopNode, current iteration value
@@ -304,7 +305,7 @@ automation = Automation(
                 )
             )
         ),
-        
+
         # Extract order IDs
         ActionNode(
             extraction_action=ExtractionAction(
@@ -316,7 +317,7 @@ automation = Automation(
                 )
             )
         ),
-        
+
         # Process each order
         ForLoopNode(
             variable_name="order_ids",
@@ -354,4 +355,3 @@ automation = Automation(
 - [InteractionAction Reference](/api-reference/interaction-actions-ref)
 - [ExtractionAction Reference](/api-reference/extraction-actions-ref)
 - [Core Concepts Guide](/docs/core-concepts)
-

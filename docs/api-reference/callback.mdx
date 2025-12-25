@@ -3,7 +3,6 @@ title: Callback Reference
 description: Complete reference for all callback schemas
 ---
 
-
 ### Callback Response
 
 The callback response is a JSON object with the following fields:
@@ -19,21 +18,18 @@ The callback response is a JSON object with the following fields:
 
 ```json
 {
-  "task_id": "123",
-  "recording_id": "456",
-  "endpoint_name": "login-flow",
-  "output_data": [
-        {"name": "email", "value": "test@example.com"}, 
-        "test_output_data"
-    ],
-  "error": "An error occurred" ,
-  "status": "success",
-  "final_screenshot": "base64 encoded string",
-  "downloads": [
-    {
-      "url": "signed url",
-      "filename": "filename"
-    }
-  ]
+    "task_id": "123",
+    "recording_id": "456",
+    "endpoint_name": "login-flow",
+    "output_data": [{ "name": "email", "value": "test@example.com" }, "test_output_data"],
+    "error": "An error occurred",
+    "status": "success",
+    "final_screenshot": "base64 encoded string",
+    "downloads": [
+        {
+            "url": "signed url",
+            "filename": "filename"
+        }
+    ]
 }
 ```

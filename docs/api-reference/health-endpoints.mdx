@@ -21,9 +21,9 @@ GET http://localhost:9000/health
 
 ```json
 {
-  "status": "healthy",
-  "task_running": false,
-  "queued_tasks": 0
+    "status": "healthy",
+    "task_running": false,
+    "queued_tasks": 0
 }
 ```
 
@@ -31,29 +31,29 @@ GET http://localhost:9000/health
 
 ```json
 {
-  "status": "unhealthy",
-  "message": "Task running for more than 15 minutes",
-  "task_running": true,
-  "queued_tasks": 2
+    "status": "unhealthy",
+    "message": "Task running for more than 15 minutes",
+    "task_running": true,
+    "queued_tasks": 2
 }
 ```
 
 ### Response Fields
 
 <ParamField path="status" type="'healthy' | 'unhealthy'">
-  Overall server health status.
+    Overall server health status.
 </ParamField>
 
 <ParamField path="task_running" type="bool">
-  Whether a task is currently executing.
+    Whether a task is currently executing.
 </ParamField>
 
 <ParamField path="queued_tasks" type="int">
-  Number of tasks waiting in the queue.
+    Number of tasks waiting in the queue.
 </ParamField>
 
 <ParamField path="message" type="str" optional>
-  Additional information when unhealthy.
+    Additional information when unhealthy.
 </ParamField>
 
 ### Health Criteria
@@ -142,7 +142,7 @@ import requests
 
 def get_queue_stats(hosts: list[str]) -> dict:
     stats = {"total_queued": 0, "running": 0, "available": 0}
-    
+
     for host in hosts:
         try:
             response = requests.get(f"{host}/health", timeout=5)
@@ -154,7 +154,7 @@ def get_queue_stats(hosts: list[str]) -> dict:
                 stats["available"] += 1
         except:
             pass
-    
+
     return stats
 ```
 
@@ -237,4 +237,3 @@ Content-Type: application/json
 
 - [Inference Endpoint](/api-reference/inference-endpoint) - Submit tasks
 - [Getting Started Guide](/docs/getting-started) - Server setup
-

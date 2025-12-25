@@ -169,9 +169,9 @@ Use the `{variable_name[index]}` syntax to reference parameter values:
 
 Examples:
 
--   `"{username[0]}"` - Access first value
--   `"{search_query[1]}"` - Access second value
--   `"{order_id[index]}"` - In loops, use `{variable_name[index]}` where index iterates
+- `"{username[0]}"` - Access first value
+- `"{search_query[1]}"` - Access second value
+- `"{order_id[index]}"` - In loops, use `{variable_name[index]}` where index iterates
 
 Most parameters are single values. Hence to access the value, you need to use the index `0`. eg `"{username[0]}"`.
 
@@ -183,7 +183,7 @@ Reference parameter values using the `{variable_name[index]}` syntax:
 
 ```json
 {
-  "input_text": "{username[0]}"
+    "input_text": "{username[0]}"
 }
 ```
 
@@ -191,15 +191,14 @@ Reference parameter values using the `{variable_name[index]}` syntax:
 
 Variable substitution works in these fields:
 
-| Field | Example |
-|-------|---------|
-| `input_text` | `input_text="{email[0]}"` |
+| Field                 | Example                                           |
+| --------------------- | ------------------------------------------------- |
+| `input_text`          | `input_text="{email[0]}"`                         |
 | `prompt_instructions` | `prompt_instructions="Click order {order_id[0]}"` |
-| `command` | `command="""get_by_text("{item_name[0]}")"""` |
-| `xpath` | `xpath="//td[text()='{order_id[0]}']"` |
-| `select_values` | `select_values=["{country[0]}"]` |
-| `task` (agentic) | `task="Search for {query[0]}"` |
-
+| `command`             | `command="""get_by_text("{item_name[0]}")"""`     |
+| `xpath`               | `xpath="//td[text()='{order_id[0]}']"`            |
+| `select_values`       | `select_values=["{country[0]}"]`                  |
+| `task` (agentic)      | `task="Search for {query[0]}"`                    |
 
 ### Loop Index Variable
 
@@ -207,23 +206,24 @@ In `for_loop_node`, use `{variable_name[index]}` to reference the current iterat
 
 ```json
 {
-  "type": "for_loop_node",
-  "variable_name": "product_ids",
-  "nodes": [
-    {
-      "type": "action_node",
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_text(\"{product_ids[index]}\")",
-          "prompt_instructions": "Click on product {product_ids[index]}"
+    "type": "for_loop_node",
+    "variable_name": "product_ids",
+    "nodes": [
+        {
+            "type": "action_node",
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_text(\"{product_ids[index]}\")",
+                    "prompt_instructions": "Click on product {product_ids[index]}"
+                }
+            }
         }
-      }
-    }
-  ]
+    ]
 }
 ```
 
 If `product_ids` contains `["PROD-1", "PROD-2", "PROD-3"]`:
+
 - First iteration: `{product_ids[index]}` → `"PROD-1"`
 - Second iteration: `{product_ids[index]}` → `"PROD-2"`
 - Third iteration: `{product_ids[index]}` → `"PROD-3"`
@@ -232,30 +232,30 @@ If `product_ids` contains `["PROD-1", "PROD-2", "PROD-3"]`:
 
 ```json
 {
-  "parameters": {
-    "input_parameters": {
-      "search_terms": ["laptop", "monitor", "keyboard"]
+    "parameters": {
+        "input_parameters": {
+            "search_terms": ["laptop", "monitor", "keyboard"]
+        },
+        "generated_parameters": {}
     },
-    "generated_parameters": {}
-  },
-  "nodes": [
-    {
-      "type": "for_loop_node",
-      "variable_name": "search_terms",
-      "nodes": [
+    "nodes": [
         {
-          "type": "action_node",
-          "interaction_action": {
-            "input_text": {
-              "command": "get_by_role(\"searchbox\")",
-              "input_text": "{search_terms[index]}",
-              "prompt_instructions": "Enter search term"
-            }
-          }
+            "type": "for_loop_node",
+            "variable_name": "search_terms",
+            "nodes": [
+                {
+                    "type": "action_node",
+                    "interaction_action": {
+                        "input_text": {
+                            "command": "get_by_role(\"searchbox\")",
+                            "input_text": "{search_terms[index]}",
+                            "prompt_instructions": "Enter search term"
+                        }
+                    }
+                }
+            ]
         }
-      ]
-    }
-  ]
+    ]
 }
 ```
 
@@ -269,18 +269,18 @@ Use `output_variable_names` in `LLMExtraction` to specify which extracted fields
 
 ```json
 {
-  "type": "action_node",
-  "extraction_action": {
-    "llm": {
-      "source": ["axtree"],
-      "extraction_format": {
-        "order_ids": "List[str]",
-        "total_count": "str"
-      },
-      "extraction_instructions": "Extract all order IDs from the table",
-      "output_variable_names": ["order_ids"]
+    "type": "action_node",
+    "extraction_action": {
+        "llm": {
+            "source": ["axtree"],
+            "extraction_format": {
+                "order_ids": "List[str]",
+                "total_count": "str"
+            },
+            "extraction_instructions": "Extract all order IDs from the table",
+            "output_variable_names": ["order_ids"]
+        }
     }
-  }
 }
 ```
 
@@ -290,39 +290,39 @@ After this action executes, `order_ids` will be available in `generated_paramete
 
 ```json
 {
-  "parameters": {
-    "input_parameters": {},
-    "generated_parameters": {
-      "order_ids": []
-    }
-  },
-  "nodes": [
-    {
-      "type": "action_node",
-      "extraction_action": {
-        "llm": {
-          "extraction_format": {
-            "order_ids": "List[str]"
-          },
-          "output_variable_names": ["order_ids"]
+    "parameters": {
+        "input_parameters": {},
+        "generated_parameters": {
+            "order_ids": []
         }
-      }
     },
-    {
-      "type": "for_loop_node",
-      "variable_name": "order_ids",
-      "nodes": [
+    "nodes": [
         {
-          "type": "action_node",
-          "interaction_action": {
-            "click_element": {
-              "prompt_instructions": "Click on order {order_ids[index]}"
+            "type": "action_node",
+            "extraction_action": {
+                "llm": {
+                    "extraction_format": {
+                        "order_ids": "List[str]"
+                    },
+                    "output_variable_names": ["order_ids"]
+                }
             }
-          }
+        },
+        {
+            "type": "for_loop_node",
+            "variable_name": "order_ids",
+            "nodes": [
+                {
+                    "type": "action_node",
+                    "interaction_action": {
+                        "click_element": {
+                            "prompt_instructions": "Click on order {order_ids[index]}"
+                        }
+                    }
+                }
+            ]
         }
-      ]
-    }
-  ]
+    ]
 }
 ```
 
@@ -332,76 +332,76 @@ Here's a complete example showing how data flows through an automation:
 
 ```json
 {
-  "url": "https://orders.example.com",
-  "parameters": {
-    "input_parameters": {
-      "username": ["admin@example.com"],
-      "password": ["secret123"],
-      "date_range": ["last-30-days"]
-    },
-    "generated_parameters": {
-      "order_numbers": []
-    }
-  },
-  "nodes": [
-    {
-      "type": "action_node",
-      "interaction_action": {
-        "input_text": {
-          "input_text": "{username[0]}",
-          "prompt_instructions": "Enter username",
-          "command": "get_by_label(\"Email\")"
+    "url": "https://orders.example.com",
+    "parameters": {
+        "input_parameters": {
+            "username": ["admin@example.com"],
+            "password": ["secret123"],
+            "date_range": ["last-30-days"]
+        },
+        "generated_parameters": {
+            "order_numbers": []
         }
-      }
     },
-    {
-      "type": "action_node",
-      "interaction_action": {
-        "input_text": {
-          "input_text": "{password[0]}",
-          "prompt_instructions": "Enter password",
-          "command": "get_by_label(\"Password\")"
-        }
-      }
-    },
-    {
-      "type": "action_node",
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_text(\"{date_range[0]}\")",
-          "prompt_instructions": "Select the date range filter"
-        }
-      }
-    },
-    {
-      "type": "action_node",
-      "extraction_action": {
-        "llm": {
-          "source": ["axtree"],
-          "extraction_format": {
-            "order_numbers": "List[str]"
-          },
-          "extraction_instructions": "Extract all order numbers from the table",
-          "output_variable_names": ["order_numbers"]
-        }
-      }
-    },
-    {
-      "type": "for_loop_node",
-      "variable_name": "order_numbers",
-      "nodes": [
+    "nodes": [
         {
-          "type": "action_node",
-          "interaction_action": {
-            "click_element": {
-              "command": "get_by_text(\"{order_numbers[index]}\")",
-              "prompt_instructions": "Click on order {order_numbers[index]}"
+            "type": "action_node",
+            "interaction_action": {
+                "input_text": {
+                    "input_text": "{username[0]}",
+                    "prompt_instructions": "Enter username",
+                    "command": "get_by_label(\"Email\")"
+                }
             }
-          }
+        },
+        {
+            "type": "action_node",
+            "interaction_action": {
+                "input_text": {
+                    "input_text": "{password[0]}",
+                    "prompt_instructions": "Enter password",
+                    "command": "get_by_label(\"Password\")"
+                }
+            }
+        },
+        {
+            "type": "action_node",
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_text(\"{date_range[0]}\")",
+                    "prompt_instructions": "Select the date range filter"
+                }
+            }
+        },
+        {
+            "type": "action_node",
+            "extraction_action": {
+                "llm": {
+                    "source": ["axtree"],
+                    "extraction_format": {
+                        "order_numbers": "List[str]"
+                    },
+                    "extraction_instructions": "Extract all order numbers from the table",
+                    "output_variable_names": ["order_numbers"]
+                }
+            }
+        },
+        {
+            "type": "for_loop_node",
+            "variable_name": "order_numbers",
+            "nodes": [
+                {
+                    "type": "action_node",
+                    "interaction_action": {
+                        "click_element": {
+                            "command": "get_by_text(\"{order_numbers[index]}\")",
+                            "prompt_instructions": "Click on order {order_numbers[index]}"
+                        }
+                    }
+                }
+            ]
         }
-      ]
-    }
-  ]
+    ]
 }
 ```
 
@@ -413,11 +413,11 @@ Use descriptive, consistent names:
 
 ```json
 {
-  "input_parameters": {
-    "search_query": ["..."],
-    "date_of_birth": ["..."],
-    "member_ids": ["..."]
-  }
+    "input_parameters": {
+        "search_query": ["..."],
+        "date_of_birth": ["..."],
+        "member_ids": ["..."]
+    }
 }
 ```
 
@@ -425,11 +425,11 @@ Avoid abbreviated or unclear names:
 
 ```json
 {
-  "input_parameters": {
-    "q": ["..."],
-    "dob": ["..."],
-    "ids": ["..."]
-  }
+    "input_parameters": {
+        "q": ["..."],
+        "dob": ["..."],
+        "ids": ["..."]
+    }
 }
 ```
 
@@ -439,11 +439,11 @@ When defining automations, use placeholder values that are easy to replace:
 
 ```json
 {
-  "input_parameters": {
-    "username": ["test@test.com"],
-    "password": ["password"],
-    "account_id": ["ACC-XXXXX"]
-  }
+    "input_parameters": {
+        "username": ["test@test.com"],
+        "password": ["password"],
+        "account_id": ["ACC-XXXXX"]
+    }
 }
 ```
 
@@ -453,15 +453,16 @@ Use type hints in extraction formats:
 
 ```json
 {
-  "extraction_format": {
-    "single_value": "str",
-    "multiple_values": "List[str]"
-  }
+    "extraction_format": {
+        "single_value": "str",
+        "multiple_values": "List[str]"
+    }
 }
 ```
 
 <Note>
-Only `str` and `List[str]` are supported for `output_variable_names`. Other types can be extracted but won't be stored as variables.
+    Only `str` and `List[str]` are supported for `output_variable_names`. Other types can be
+    extracted but won't be stored as variables.
 </Note>
 
 ## Next Steps
@@ -469,4 +470,3 @@ Only `str` and `List[str]` are supported for `output_variable_names`. Other type
 - Learn about [Extraction Actions](/docs/extraction-actions) to populate generated parameters
 - See [Control Flow](/docs/control-flow) for using variables in loops
 - Check [Best Practices](/docs/best-practices) for more tips
-

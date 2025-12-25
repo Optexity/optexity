@@ -3,16 +3,15 @@ title: If Else Node
 description: Understanding the If Else Node of Optexity automations
 ---
 
-
 ## If Else Node
 
-Use `If Else Node` for conditional execution based on a condition string. 
+Use `If Else Node` for conditional execution based on a condition string.
 
-| Parameter           | Description                                                                                                              |
-|---------------------|--------------------------------------------------------------------------------------------------------------------------|
-| `condition`         | Condition string to evaluate.                                                                                           |
-| `if_nodes`          | List of `action_node` or `if_else_node` nodes.                                                                           |
-| `else_nodes`        | List of `action_node` or `if_else_node` nodes.                                                                           |
+| Parameter    | Description                                    |
+| ------------ | ---------------------------------------------- |
+| `condition`  | Condition string to evaluate.                  |
+| `if_nodes`   | List of `action_node` or `if_else_node` nodes. |
+| `else_nodes` | List of `action_node` or `if_else_node` nodes. |
 
 ```json
 {
@@ -40,7 +39,7 @@ Condiiton is a python like expresstion that is evaluated to a boolean value. It 
 
 ```json
 {
-    "condition": "{variable_name[0]} is not None and {variable_name[0]} != 'random_value'",
+    "condition": "{variable_name[0]} is not None and {variable_name[0]} != 'random_value'"
 }
 ```
 
@@ -48,31 +47,31 @@ Condiiton is a python like expresstion that is evaluated to a boolean value. It 
 
 ```json
 {
-  "type": "if_else",
-  "condition": "has_captcha",
-  "if_nodes": [
-    {
-      "type": "action",
-      "interaction_action": {
-        "agentic_task": {
-          "task": "Solve the captcha",
-          "max_steps": 10,
-          "backend": "browser_use"
+    "type": "if_else",
+    "condition": "has_captcha",
+    "if_nodes": [
+        {
+            "type": "action",
+            "interaction_action": {
+                "agentic_task": {
+                    "task": "Solve the captcha",
+                    "max_steps": 10,
+                    "backend": "browser_use"
+                }
+            }
         }
-      }
-    }
-  ],
-  "else_nodes": [
-    {
-      "type": "action",
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"Continue\")",
-          "prompt_instructions": "Click continue"
+    ],
+    "else_nodes": [
+        {
+            "type": "action",
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"button\", name=\"Continue\")",
+                    "prompt_instructions": "Click continue"
+                }
+            }
         }
-      }
-    }
-  ]
+    ]
 }
 ```
 
@@ -82,14 +81,14 @@ If you only need to act when a condition is true:
 
 ```json
 {
-  "type": "if_else",
-  "condition": "needs_verification",
-  "if_nodes": [
-    {
-      "type": "action",
-      "action": {}
-    }
-  ],
-  "else_nodes": []
+    "type": "if_else",
+    "condition": "needs_verification",
+    "if_nodes": [
+        {
+            "type": "action",
+            "action": {}
+        }
+    ],
+    "else_nodes": []
 }
 ```

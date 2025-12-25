@@ -4,15 +4,15 @@ description: Automating Peachstate Medicaid insurance lookup and extracting data
 ---
 
 This example shows how to automate the Peachstate Medicaid insurance lookup and extract the resulting data.
-You will learn how to use a `ForLoopNode` to iterate over multiple links to extract data. 
+You will learn how to use a `ForLoopNode` to iterate over multiple links to extract data.
 You can use this pattern to extract data from multiple pages of a website.
 
 The automation:
+
 - **Opens** the Peachstate Medicaid insurance site
 - **Fills** the insurance details (plan type, member id, dob)
 - **Clicks** on the authorization links to extract data
 - **Extracts** the data from the authorization links
-
 
 Before starting, please look at the [Quickstart](/docs/building-automations/quickstart) guide to understand the basics of the Optexity platform.
 
@@ -21,14 +21,14 @@ Before starting, please look at the [Quickstart](/docs/building-automations/quic
 ### Part 1: Record the base workflow
 
 1. Go to the Peachstate Medicaid insurance site and **record** a workflow that:
-   - Navigates to the login page
-   - Fills in username, password
-   - Clicks on the login button
-   - Navigates to the authorization page
-   - Clicks on the authorization links to extract data
+    - Navigates to the login page
+    - Fills in username, password
+    - Clicks on the login button
+    - Navigates to the authorization page
+    - Clicks on the authorization links to extract data
 
 2. After saving, you will see a `peachstate_medicaid_insurance` automation in your dashboard that contains only the **interaction actions** (clicks, fills, selects).
-We have also built this automation by default, and you can find it in your dashboard.
+   We have also built this automation by default, and you can find it in your dashboard.
 
 ![Peachstate Medicaid Insurance Automation](/images/peachstate_medicaid_insurance_workflow.png)
 
@@ -37,10 +37,10 @@ We have also built this automation by default, and you can find it in your dashb
 ### Part 2: Refine the automation
 
 Recording captures clicks and inputs, but you still need to:
+
 - **Tighten** some interaction instructions
 - **Add** a `ForLoopNode` to iterate over multiple links to extract data
 - **Add** an `ExtractionAction` to extract the data from the authorization links
-
 
 #### 2.1. ForLoopNode to iterate over multiple links to extract data
 
@@ -54,65 +54,63 @@ To automatically build the list of authorization numbers, we can use the LLM ext
 
 ```json
 {
-      "end_sleep_time": 0,
-      "before_sleep_time": 3,
-      "extraction_action": {
+    "end_sleep_time": 0,
+    "before_sleep_time": 3,
+    "extraction_action": {
         "llm": {
-          "extraction_format": {
-            "authorization_numbers": "List[str]"
-          },
-          "output_variable_names": [
-            "authorization_numbers"
-          ],
-          "extraction_instructions": "I am giving you an axtree of a webpage that shows the information about authorizations in a tabular format. Status, Auth Nbr, From Date, To Date, Diagnosis, Auth Type, Service. You need to output me a list of all Auth Nbr. Do not output any other information."
+            "extraction_format": {
+                "authorization_numbers": "List[str]"
+            },
+            "output_variable_names": ["authorization_numbers"],
+            "extraction_instructions": "I am giving you an axtree of a webpage that shows the information about authorizations in a tabular format. Status, Auth Nbr, From Date, To Date, Diagnosis, Auth Type, Service. You need to output me a list of all Auth Nbr. Do not output any other information."
         }
-      }
     }
+}
 ```
 
 Then we will use the ForLoopNode to iterate over the authorization numbers and extract the data from the authorization link.
+
 ```json
 {
-      "nodes": [
+    "nodes": [
         {
-          "end_sleep_time": 1,
-          "interaction_action": {
-            "click_element": {
-              "command": "get_by_role(\"link\", name=\"{authorization_numbers[index]}\")",
-              "prompt_instructions": "Click the Authorizations link for the authorization number {authorization_numbers[index]}"
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"link\", name=\"{authorization_numbers[index]}\")",
+                    "prompt_instructions": "Click the Authorizations link for the authorization number {authorization_numbers[index]}"
+                }
             }
-          }
         },
         {
-          "end_sleep_time": 0,
-          "before_sleep_time": 3,
-          "extraction_action": {
-            "llm": {
-              "extraction_format": {
-                "Auth Nbr": "str",
-                "End Date": "str",
-                "Auth Type": "str",
-                "Start Date": "str",
-                "Auth Status": "str",
-                "Service Type": "str",
-                "Units Approved": "str",
-                "Units Required": "str"
-              },
-              "extraction_instructions": "I am giving you an axtree of a webpage that shows information about authorizations, and I want the 8 following fields. 'Auth Status', 'Auth Nbr', 'Auth Type', 'Service Type', 'Start Date', 'End Date', 'Units Required', 'Units Approved'. Fields 'Auth Status', 'Auth Nbr', 'Auth Type' can be found in the top and rest of the information can be found in the tabular format. You need to output me key-value pairs for all 8 fields."
+            "end_sleep_time": 0,
+            "before_sleep_time": 3,
+            "extraction_action": {
+                "llm": {
+                    "extraction_format": {
+                        "Auth Nbr": "str",
+                        "End Date": "str",
+                        "Auth Type": "str",
+                        "Start Date": "str",
+                        "Auth Status": "str",
+                        "Service Type": "str",
+                        "Units Approved": "str",
+                        "Units Required": "str"
+                    },
+                    "extraction_instructions": "I am giving you an axtree of a webpage that shows information about authorizations, and I want the 8 following fields. 'Auth Status', 'Auth Nbr', 'Auth Type', 'Service Type', 'Start Date', 'End Date', 'Units Required', 'Units Approved'. Fields 'Auth Status', 'Auth Nbr', 'Auth Type' can be found in the top and rest of the information can be found in the tabular format. You need to output me key-value pairs for all 8 fields."
+                }
             }
-          }
         },
         {
-          "end_sleep_time": 1,
-          "interaction_action": {
-            "go_back": {}
-          }
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "go_back": {}
+            }
         }
-      ],
-      "variable_name": "authorization_numbers"
-    }
+    ],
+    "variable_name": "authorization_numbers"
+}
 ```
-
 
 The full Python definition for this automation lives in `optexity/examples/peachstate_medicaid.py`. You can also use the optexity dashboard to edit the automation and save it as a new automation.
 
@@ -151,199 +149,195 @@ curl -X POST http://localhost:9000/inference \
 ```
 
 While the request runs, the browser will execute the steps on your behalf. When the run finishes, you can:
+
 - Inspect the **task run** and **extracted data** in the dashboard
 - Re‑use the extracted JSON in downstream systems
 
-
-----
+---
 
 ### Final Automation
 
 ```json
 {
-  "url": "https://sso.entrykeyid.com/as/authorization.oauth2?response_type=code&client_id=f6a6219c-be42-421b-b86c-e4fc509e2e87&scope=openid%20profile&state=_igWklSsnrkO5DQfjBMMuN41ksMJePZQ_SM_61wTJlA%3D&redirect_uri=https://provider.pshpgeorgia.com/careconnect/login/oauth2/code/pingcloud&code_challenge_method=S256&nonce=xG41TJjco_x7Vs_MQgcS3bw5njLiJsXCqvO-V8THmY0&code_challenge=ZTaVHaZCNFTejXNJo51RlJ3Kv9dH0tMODPTqO7hiP3A&app_origin=https://provider.pshpgeorgia.com/careconnect/login/oauth2/code/pingcloud&brand=pshpgeorgia",
-  "nodes": [
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_test_id(\"text-field\")",
-          "input_text": "{username[0]}",
-          "prompt_instructions": "Enter the email in the text field"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"Continue\")",
-          "prompt_instructions": "Click the Continue button"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_role(\"textbox\", name=\"Password\")",
-          "input_text": "{password[0]}",
-          "prompt_instructions": "Enter the password"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"Login\")",
-          "prompt_instructions": "Click the Login button"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "select_option": {
-          "command": "get_by_label(\"Plan Type\")",
-          "select_values": [
-            "{plan_type[0]}"
-          ],
-          "prompt_instructions": "Select the Plan Type 8774789"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"GO\")",
-          "prompt_instructions": "Click the GO button"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_test_id(\"MemberIDOrLastName\")",
-          "input_text": "{member_id[0]}",
-          "prompt_instructions": "Enter the Member ID or Last Name"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "locator(\"#tDatePicker\")",
-          "input_text": "{dob[0]}",
-          "prompt_instructions": "Enter the Date of Birth"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"combobox\", name=\"Select Action Type Select\")",
-          "prompt_instructions": "Click the Select Action Type Select combobox"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_test_id(\"ActionType-option-0\")",
-          "prompt_instructions": "Click the View eligibility & patient info option"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "expect_new_tab": true,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_test_id(\"submitBtn\")",
-          "prompt_instructions": "Click the Submit button"
-        }
-      },
-      "max_new_tab_wait_time": 10
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_label(\"Eligibility\", exact=True).get_by_role(\"link\", name=\"Authorizations\")",
-          "prompt_instructions": "Click the Authorizations link"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 0,
-      "before_sleep_time": 3,
-      "extraction_action": {
-        "llm": {
-          "extraction_format": {
-            "authorization_numbers": "List[str]"
-          },
-          "output_variable_names": [
-            "authorization_numbers"
-          ],
-          "extraction_instructions": "I am giving you an axtree of a webpage that shows the information about authorizations in a tabular format. Status, Auth Nbr, From Date, To Date, Diagnosis, Auth Type, Service. You need to output me a list of all Auth Nbr. Do not output any other information."
-        }
-      }
-    },
-    {
-      "nodes": [
+    "url": "https://sso.entrykeyid.com/as/authorization.oauth2?response_type=code&client_id=f6a6219c-be42-421b-b86c-e4fc509e2e87&scope=openid%20profile&state=_igWklSsnrkO5DQfjBMMuN41ksMJePZQ_SM_61wTJlA%3D&redirect_uri=https://provider.pshpgeorgia.com/careconnect/login/oauth2/code/pingcloud&code_challenge_method=S256&nonce=xG41TJjco_x7Vs_MQgcS3bw5njLiJsXCqvO-V8THmY0&code_challenge=ZTaVHaZCNFTejXNJo51RlJ3Kv9dH0tMODPTqO7hiP3A&app_origin=https://provider.pshpgeorgia.com/careconnect/login/oauth2/code/pingcloud&brand=pshpgeorgia",
+    "nodes": [
         {
-          "end_sleep_time": 1,
-          "interaction_action": {
-            "click_element": {
-              "command": "get_by_role(\"link\", name=\"{authorization_numbers[index]}\")",
-              "prompt_instructions": "Click the Authorizations link for the authorization number {authorization_numbers[index]}"
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_test_id(\"text-field\")",
+                    "input_text": "{username[0]}",
+                    "prompt_instructions": "Enter the email in the text field"
+                }
             }
-          }
         },
         {
-          "end_sleep_time": 0,
-          "before_sleep_time": 3,
-          "extraction_action": {
-            "llm": {
-              "extraction_format": {
-                "Auth Nbr": "str",
-                "End Date": "str",
-                "Auth Type": "str",
-                "Start Date": "str",
-                "Auth Status": "str",
-                "Service Type": "str",
-                "Units Approved": "str",
-                "Units Required": "str"
-              },
-              "extraction_instructions": "I am giving you an axtree of a webpage that shows information about authorizations, and I want the 8 following fields. 'Auth Status', 'Auth Nbr', 'Auth Type', 'Service Type', 'Start Date', 'End Date', 'Units Required', 'Units Approved'. Fields 'Auth Status', 'Auth Nbr', 'Auth Type' can be found in the top and rest of the information can be found in the tabular format. You need to output me key-value pairs for all 8 fields."
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"button\", name=\"Continue\")",
+                    "prompt_instructions": "Click the Continue button"
+                }
             }
-          }
         },
         {
-          "end_sleep_time": 1,
-          "interaction_action": {
-            "go_back": {}
-          }
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_role(\"textbox\", name=\"Password\")",
+                    "input_text": "{password[0]}",
+                    "prompt_instructions": "Enter the password"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"button\", name=\"Login\")",
+                    "prompt_instructions": "Click the Login button"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "select_option": {
+                    "command": "get_by_label(\"Plan Type\")",
+                    "select_values": ["{plan_type[0]}"],
+                    "prompt_instructions": "Select the Plan Type 8774789"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"button\", name=\"GO\")",
+                    "prompt_instructions": "Click the GO button"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_test_id(\"MemberIDOrLastName\")",
+                    "input_text": "{member_id[0]}",
+                    "prompt_instructions": "Enter the Member ID or Last Name"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "locator(\"#tDatePicker\")",
+                    "input_text": "{dob[0]}",
+                    "prompt_instructions": "Enter the Date of Birth"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"combobox\", name=\"Select Action Type Select\")",
+                    "prompt_instructions": "Click the Select Action Type Select combobox"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_test_id(\"ActionType-option-0\")",
+                    "prompt_instructions": "Click the View eligibility & patient info option"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "expect_new_tab": true,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_test_id(\"submitBtn\")",
+                    "prompt_instructions": "Click the Submit button"
+                }
+            },
+            "max_new_tab_wait_time": 10
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_label(\"Eligibility\", exact=True).get_by_role(\"link\", name=\"Authorizations\")",
+                    "prompt_instructions": "Click the Authorizations link"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 0,
+            "before_sleep_time": 3,
+            "extraction_action": {
+                "llm": {
+                    "extraction_format": {
+                        "authorization_numbers": "List[str]"
+                    },
+                    "output_variable_names": ["authorization_numbers"],
+                    "extraction_instructions": "I am giving you an axtree of a webpage that shows the information about authorizations in a tabular format. Status, Auth Nbr, From Date, To Date, Diagnosis, Auth Type, Service. You need to output me a list of all Auth Nbr. Do not output any other information."
+                }
+            }
+        },
+        {
+            "nodes": [
+                {
+                    "end_sleep_time": 1,
+                    "interaction_action": {
+                        "click_element": {
+                            "command": "get_by_role(\"link\", name=\"{authorization_numbers[index]}\")",
+                            "prompt_instructions": "Click the Authorizations link for the authorization number {authorization_numbers[index]}"
+                        }
+                    }
+                },
+                {
+                    "end_sleep_time": 0,
+                    "before_sleep_time": 3,
+                    "extraction_action": {
+                        "llm": {
+                            "extraction_format": {
+                                "Auth Nbr": "str",
+                                "End Date": "str",
+                                "Auth Type": "str",
+                                "Start Date": "str",
+                                "Auth Status": "str",
+                                "Service Type": "str",
+                                "Units Approved": "str",
+                                "Units Required": "str"
+                            },
+                            "extraction_instructions": "I am giving you an axtree of a webpage that shows information about authorizations, and I want the 8 following fields. 'Auth Status', 'Auth Nbr', 'Auth Type', 'Service Type', 'Start Date', 'End Date', 'Units Required', 'Units Approved'. Fields 'Auth Status', 'Auth Nbr', 'Auth Type' can be found in the top and rest of the information can be found in the tabular format. You need to output me key-value pairs for all 8 fields."
+                        }
+                    }
+                },
+                {
+                    "end_sleep_time": 1,
+                    "interaction_action": {
+                        "go_back": {}
+                    }
+                }
+            ],
+            "variable_name": "authorization_numbers"
         }
-      ],
-      "variable_name": "authorization_numbers"
+    ],
+    "parameters": {
+        "input_parameters": {
+            "dob": [],
+            "password": [],
+            "username": [],
+            "member_id": [],
+            "plan_type": []
+        },
+        "generated_parameters": {}
     }
-  ],
-  "parameters": {
-    "input_parameters": {
-      "dob": [],
-      "password": [],
-      "username": [],
-      "member_id": [],
-      "plan_type": []
-    },
-    "generated_parameters": {}
-  }
 }
 ```

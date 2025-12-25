@@ -9,11 +9,11 @@ Optexity can download files from websites and upload files to forms. This is ess
 
 Files can be downloaded in several ways:
 
-| Method | Trigger |
-|--------|---------|
+| Method                     | Trigger                                     |
+| -------------------------- | ------------------------------------------- |
 | Click download link/button | `click_element` with `expect_download=True` |
-| Select export option | `select_option` with `expect_download=True` |
-| Save current page as PDF | `download_url_as_pdf` |
+| Select export option       | `select_option` with `expect_download=True` |
+| Save current page as PDF   | `download_url_as_pdf`                       |
 
 ### Click to Download
 
@@ -21,23 +21,23 @@ When clicking an element triggers a file download:
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Download Report\")",
-      "prompt_instructions": "Click to download the report",
-      "expect_download": true,
-      "download_filename": "monthly_report.pdf"
+    "interaction_action": {
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Download Report\")",
+            "prompt_instructions": "Click to download the report",
+            "expect_download": true,
+            "download_filename": "monthly_report.pdf"
+        }
     }
-  }
 }
 ```
 
 ### Properties for Downloads
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `expect_download` | `bool` | `False` | Whether the action triggers a download |
-| `download_filename` | `str \| None` | Auto-generated UUID | Filename to save the download as |
+| Property            | Type          | Default             | Description                            |
+| ------------------- | ------------- | ------------------- | -------------------------------------- |
+| `expect_download`   | `bool`        | `False`             | Whether the action triggers a download |
+| `download_filename` | `str \| None` | Auto-generated UUID | Filename to save the download as       |
 
 ### Auto-Generated Filenames
 
@@ -45,9 +45,9 @@ If you don't specify `download_filename`, a UUID is generated:
 
 ```json
 {
-  "command": "get_by_text(\"Export\")",
-  "prompt_instructions": "Export data",
-  "expect_download": true
+    "command": "get_by_text(\"Export\")",
+    "prompt_instructions": "Export data",
+    "expect_download": true
 }
 ```
 
@@ -57,15 +57,15 @@ Some sites trigger downloads when selecting dropdown options:
 
 ```json
 {
-  "interaction_action": {
-    "select_option": {
-      "command": "get_by_label(\"Export Format\")",
-      "select_values": ["CSV"],
-      "prompt_instructions": "Select CSV to download",
-      "expect_download": true,
-      "download_filename": "data_export.csv"
+    "interaction_action": {
+        "select_option": {
+            "command": "get_by_label(\"Export Format\")",
+            "select_values": ["CSV"],
+            "prompt_instructions": "Select CSV to download",
+            "expect_download": true,
+            "download_filename": "data_export.csv"
+        }
     }
-  }
 }
 ```
 
@@ -75,15 +75,16 @@ Save the current page content as a PDF file:
 
 ```json
 {
-  "interaction_action": {
-    "download_url_as_pdf": {
-      "download_filename": "page_snapshot.pdf"
+    "interaction_action": {
+        "download_url_as_pdf": {
+            "download_filename": "page_snapshot.pdf"
+        }
     }
-  }
 }
 ```
 
 This is useful for:
+
 - Capturing receipts or confirmations
 - Saving page state as documentation
 - Archiving web content
@@ -94,36 +95,36 @@ When downloading multiple files in a loop:
 
 ```json
 [
-  {
-    "extraction_action": {
-      "llm": {
-        "extraction_format": {
-          "doc_ids": "List[str]"
-        },
-        "output_variable_names": ["doc_ids"]
-      }
-    }
-  },
-  {
-    "variable_name": "doc_ids",
-    "nodes": [
-      {
-        "interaction_action": {
-          "click_element": {
-            "command": "get_by_text(\"{doc_ids[index]}\")",
-            "prompt_instructions": "Click to download document {doc_ids[index]}",
-            "expect_download": true,
-            "download_filename": "document_{doc_ids[index]}.pdf"
-          }
+    {
+        "extraction_action": {
+            "llm": {
+                "extraction_format": {
+                    "doc_ids": "List[str]"
+                },
+                "output_variable_names": ["doc_ids"]
+            }
         }
-      }
-    ]
-  }
+    },
+    {
+        "variable_name": "doc_ids",
+        "nodes": [
+            {
+                "interaction_action": {
+                    "click_element": {
+                        "command": "get_by_text(\"{doc_ids[index]}\")",
+                        "prompt_instructions": "Click to download document {doc_ids[index]}",
+                        "expect_download": true,
+                        "download_filename": "document_{doc_ids[index]}.pdf"
+                    }
+                }
+            }
+        ]
+    }
 ]
 ```
 
 <Note>
-Use variable substitution in `download_filename` to create unique filenames for each download.
+    Use variable substitution in `download_filename` to create unique filenames for each download.
 </Note>
 
 ## Uploading Files
@@ -132,24 +133,24 @@ Upload files to file input elements:
 
 ```json
 {
-  "interaction_action": {
-    "upload_file": {
-      "command": "get_by_label(\"Upload Document\")",
-      "file_path": "/path/to/document.pdf",
-      "prompt_instructions": "Upload the PDF document"
+    "interaction_action": {
+        "upload_file": {
+            "command": "get_by_label(\"Upload Document\")",
+            "file_path": "/path/to/document.pdf",
+            "prompt_instructions": "Upload the PDF document"
+        }
     }
-  }
 }
 ```
 
 ### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `command` | `str \| None` | Playwright locator for the file input |
-| `xpath` | `str \| None` | XPath selector (alternative) |
-| `file_path` | `str` | Absolute path to the file to upload |
-| `prompt_instructions` | `str` | Description for AI fallback |
+| Property              | Type          | Description                           |
+| --------------------- | ------------- | ------------------------------------- |
+| `command`             | `str \| None` | Playwright locator for the file input |
+| `xpath`               | `str \| None` | XPath selector (alternative)          |
+| `file_path`           | `str`         | Absolute path to the file to upload   |
+| `prompt_instructions` | `str`         | Description for AI fallback           |
 
 ### Upload with Variables
 
@@ -157,18 +158,18 @@ Use input parameters for dynamic file paths:
 
 ```json
 {
-  "parameters": {
-    "input_parameters": {
-      "document_path": ["/data/uploads/report.pdf"]
+    "parameters": {
+        "input_parameters": {
+            "document_path": ["/data/uploads/report.pdf"]
+        }
+    },
+    "interaction_action": {
+        "upload_file": {
+            "command": "locator(\"input[type='file']\")",
+            "file_path": "{document_path[0]}",
+            "prompt_instructions": "Upload the document"
+        }
     }
-  },
-  "interaction_action": {
-    "upload_file": {
-      "command": "locator(\"input[type='file']\")",
-      "file_path": "{document_path[0]}",
-      "prompt_instructions": "Upload the document"
-    }
-  }
 }
 ```
 
@@ -199,15 +200,15 @@ For large files, you may need to increase timing:
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "command": "get_by_text(\"Download Large File\")",
-      "prompt_instructions": "Download the large file",
-      "expect_download": true,
-      "download_filename": "large_file.zip"
-    }
-  },
-  "end_sleep_time": 10.0
+    "interaction_action": {
+        "click_element": {
+            "command": "get_by_text(\"Download Large File\")",
+            "prompt_instructions": "Download the large file",
+            "expect_download": true,
+            "download_filename": "large_file.zip"
+        }
+    },
+    "end_sleep_time": 10.0
 }
 ```
 
@@ -217,33 +218,33 @@ For large files, you may need to increase timing:
 
 ```json
 [
-  {
-    "interaction_action": {
-      "click_element": {
-        "command": "get_by_role(\"link\", name=\"Reports\")",
-        "prompt_instructions": "Go to reports section"
-      }
+    {
+        "interaction_action": {
+            "click_element": {
+                "command": "get_by_role(\"link\", name=\"Reports\")",
+                "prompt_instructions": "Go to reports section"
+            }
+        }
+    },
+    {
+        "interaction_action": {
+            "select_option": {
+                "command": "get_by_label(\"Date Range\")",
+                "select_values": ["Last 30 Days"],
+                "prompt_instructions": "Select date range"
+            }
+        }
+    },
+    {
+        "interaction_action": {
+            "click_element": {
+                "command": "get_by_role(\"button\", name=\"Export CSV\")",
+                "prompt_instructions": "Export as CSV",
+                "expect_download": true,
+                "download_filename": "report_last_30_days.csv"
+            }
+        }
     }
-  },
-  {
-    "interaction_action": {
-      "select_option": {
-        "command": "get_by_label(\"Date Range\")",
-        "select_values": ["Last 30 Days"],
-        "prompt_instructions": "Select date range"
-      }
-    }
-  },
-  {
-    "interaction_action": {
-      "click_element": {
-        "command": "get_by_role(\"button\", name=\"Export CSV\")",
-        "prompt_instructions": "Export as CSV",
-        "expect_download": true,
-        "download_filename": "report_last_30_days.csv"
-      }
-    }
-  }
 ]
 ```
 
@@ -251,33 +252,33 @@ For large files, you may need to increase timing:
 
 ```json
 [
-  {
-    "extraction_action": {
-      "llm": {
-        "extraction_format": {
-          "attachment_names": "List[str]"
-        },
-        "output_variable_names": ["attachment_names"],
-        "extraction_instructions": "List all attachment filenames",
-        "source": ["axtree"]
-      }
-    }
-  },
-  {
-    "variable_name": "attachment_names",
-    "nodes": [
-      {
-        "interaction_action": {
-          "click_element": {
-            "command": "get_by_role(\"link\", name=\"{attachment_names[index]}\")",
-            "prompt_instructions": "Download {attachment_names[index]}",
-            "expect_download": true,
-            "download_filename": "{attachment_names[index]}"
-          }
+    {
+        "extraction_action": {
+            "llm": {
+                "extraction_format": {
+                    "attachment_names": "List[str]"
+                },
+                "output_variable_names": ["attachment_names"],
+                "extraction_instructions": "List all attachment filenames",
+                "source": ["axtree"]
+            }
         }
-      }
-    ]
-  }
+    },
+    {
+        "variable_name": "attachment_names",
+        "nodes": [
+            {
+                "interaction_action": {
+                    "click_element": {
+                        "command": "get_by_role(\"link\", name=\"{attachment_names[index]}\")",
+                        "prompt_instructions": "Download {attachment_names[index]}",
+                        "expect_download": true,
+                        "download_filename": "{attachment_names[index]}"
+                    }
+                }
+            }
+        ]
+    }
 ]
 ```
 
@@ -287,39 +288,39 @@ If a page doesn't offer a download but you need the content:
 
 ```json
 [
-  {
-    "extraction_action": {
-      "screenshot": {
-        "filename": "receipt.png",
-        "full_page": true
-      }
+    {
+        "extraction_action": {
+            "screenshot": {
+                "filename": "receipt.png",
+                "full_page": true
+            }
+        }
+    },
+    {
+        "interaction_action": {
+            "download_url_as_pdf": {
+                "download_filename": "receipt.pdf"
+            }
+        }
     }
-  },
-  {
-    "interaction_action": {
-      "download_url_as_pdf": {
-        "download_filename": "receipt.pdf"
-      }
-    }
-  }
 ]
 ```
 
 ## Best Practices
 
 <CardGroup cols={2}>
-<Card title="Use Descriptive Filenames" icon="file">
-  Include identifiers like dates or IDs in filenames
-</Card>
-<Card title="Set expect_download" icon="download">
-  Always set `expect_download=True` when a download is triggered
-</Card>
-<Card title="Handle Large Files" icon="file-zipper">
-  Increase `end_sleep_time` for large downloads
-</Card>
-<Card title="Validate Paths" icon="folder-open">
-  Ensure upload file paths are absolute and accessible
-</Card>
+    <Card title="Use Descriptive Filenames" icon="file">
+        Include identifiers like dates or IDs in filenames
+    </Card>
+    <Card title="Set expect_download" icon="download">
+        Always set `expect_download=True` when a download is triggered
+    </Card>
+    <Card title="Handle Large Files" icon="file-zipper">
+        Increase `end_sleep_time` for large downloads
+    </Card>
+    <Card title="Validate Paths" icon="folder-open">
+        Ensure upload file paths are absolute and accessible
+    </Card>
 </CardGroup>
 
 ## Next Steps
@@ -327,4 +328,3 @@ If a page doesn't offer a download but you need the content:
 - Learn about [Extraction Actions](/docs/extraction-actions) for screenshot captures
 - See [Timing & Retries](/docs/timing-retries) for download timing
 - Check [Best Practices](/docs/best-practices) for more tips
-

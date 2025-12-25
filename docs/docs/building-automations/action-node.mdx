@@ -7,17 +7,17 @@ description: Understanding the Action Node of Optexity automations
 
 An `Action Node` represents a single atomic action in your automation. Each node must contain exactly one action type.
 
-| Parameter           | Description                                                                                                              |
-|---------------------|--------------------------------------------------------------------------------------------------------------------------|
-| `interaction_action` | Interaction action to perform.                                                                                           |
-| `assertion_action`   | Assertion action to perform.                                                                                           |
-| `extraction_action`  | Extraction action to perform.                                                                                           |
-| `python_script_action` | Python script action to perform.                                                                                           |
-| `fetch_2fa_action`   | Fetch 2FA action to perform.                                                                                           |
-| `before_sleep_time`  | Seconds to wait before executing the action.                                                                           |
-| `end_sleep_time`     | Seconds to wait after the action completes.                                                                            |
-| `expect_new_tab`     | Whether this action opens a new tab. this helps better handle new tab as there might be wait time for the new tab to appear.                                                                                   |
-| `max_new_tab_wait_time` | Maximum seconds to wait for a new tab to appear.                                                                     |
+| Parameter               | Description                                                                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `interaction_action`    | Interaction action to perform.                                                                                               |
+| `assertion_action`      | Assertion action to perform.                                                                                                 |
+| `extraction_action`     | Extraction action to perform.                                                                                                |
+| `python_script_action`  | Python script action to perform.                                                                                             |
+| `fetch_2fa_action`      | Fetch 2FA action to perform.                                                                                                 |
+| `before_sleep_time`     | Seconds to wait before executing the action.                                                                                 |
+| `end_sleep_time`        | Seconds to wait after the action completes.                                                                                  |
+| `expect_new_tab`        | Whether this action opens a new tab. this helps better handle new tab as there might be wait time for the new tab to appear. |
+| `max_new_tab_wait_time` | Maximum seconds to wait for a new tab to appear.                                                                             |
 
 ```json
 {
@@ -37,11 +37,11 @@ An `Action Node` represents a single atomic action in your automation. Each node
 
 Each Action Node can contain exactly one of these action types:
 
-| Action Type            | Purpose                                                  | Read More |
-| ---------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
-| `interaction_action`   | User interactions: click, type, select, scroll, navigate | [Interaction Actions](/docs/action-types/interaction-action) |
-| `extraction_action`    | Data extraction: LLM-based, network calls, screenshots   | [Extraction Actions](/docs/action-types/extraction-action) |
-| `assertion_action`     | Verify conditions on the page                            | [Assertion Actions](/docs/action-types/assertion-action) |
+| Action Type            | Purpose                                                  | Read More                                                        |
+| ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------------- |
+| `interaction_action`   | User interactions: click, type, select, scroll, navigate | [Interaction Actions](/docs/action-types/interaction-action)     |
+| `extraction_action`    | Data extraction: LLM-based, network calls, screenshots   | [Extraction Actions](/docs/action-types/extraction-action)       |
+| `assertion_action`     | Verify conditions on the page                            | [Assertion Actions](/docs/action-types/assertion-action)         |
 | `python_script_action` | Execute custom Python code                               | [Python Script Actions](/docs/action-types/python-script-action) |
 
 ### Timing Properties

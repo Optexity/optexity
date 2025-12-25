@@ -11,9 +11,9 @@ Agentic tasks use a language model to control the browser, making decisions abou
 
 Two agentic action types are available:
 
-| Action | Purpose |
-|--------|---------|
-| `agentic_task` | General-purpose autonomous task execution |
+| Action                | Purpose                                      |
+| --------------------- | -------------------------------------------- |
+| `agentic_task`        | General-purpose autonomous task execution    |
 | `close_overlay_popup` | Specialized for dismissing popups and modals |
 
 ## AgenticTask
@@ -22,27 +22,27 @@ Use `agentic_task` when you need the AI to autonomously accomplish a goal.
 
 ```json
 {
-  "interaction_action": {
-    "agentic_task": {
-      "task": "Navigate to the settings page and enable two-factor authentication",
-      "max_steps": 15,
-      "backend": "browser_use",
-      "use_vision": false,
-      "keep_alive": true
+    "interaction_action": {
+        "agentic_task": {
+            "task": "Navigate to the settings page and enable two-factor authentication",
+            "max_steps": 15,
+            "backend": "browser_use",
+            "use_vision": false,
+            "keep_alive": true
+        }
     }
-  }
 }
 ```
 
 ### Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `task` | `str` | Required | Natural language description of the goal |
-| `max_steps` | `int` | Required | Maximum number of actions the agent can take |
-| `backend` | `"browser_use" \| "browserbase"` | Required | Agent backend to use |
-| `use_vision` | `bool` | `False` | Whether the agent should use screenshots |
-| `keep_alive` | `bool` | `True` | Keep browser session alive after task |
+| Property     | Type                             | Default  | Description                                  |
+| ------------ | -------------------------------- | -------- | -------------------------------------------- |
+| `task`       | `str`                            | Required | Natural language description of the goal     |
+| `max_steps`  | `int`                            | Required | Maximum number of actions the agent can take |
+| `backend`    | `"browser_use" \| "browserbase"` | Required | Agent backend to use                         |
+| `use_vision` | `bool`                           | `False`  | Whether the agent should use screenshots     |
+| `keep_alive` | `bool`                           | `True`   | Keep browser session alive after task        |
 
 ### Writing Good Task Descriptions
 
@@ -52,25 +52,25 @@ The `task` field should clearly describe the goal:
 
 ```json
 {
-  "agentic_task": {
-    "task": "Click the 'Account Settings' link in the sidebar, then scroll down and click 'Security'"
-  }
+    "agentic_task": {
+        "task": "Click the 'Account Settings' link in the sidebar, then scroll down and click 'Security'"
+    }
 }
 ```
 
 ```json
 {
-  "agentic_task": {
-    "task": "Fill out the contact form with name 'John Doe', email 'john@example.com', and message 'Hello', then submit"
-  }
+    "agentic_task": {
+        "task": "Fill out the contact form with name 'John Doe', email 'john@example.com', and message 'Hello', then submit"
+    }
 }
 ```
 
 ```json
 {
-  "agentic_task": {
-    "task": "1. Close any popup dialogs 2. Click the search icon 3. Search for 'laptop' 4. Click the first result"
-  }
+    "agentic_task": {
+        "task": "1. Close any popup dialogs 2. Click the search icon 3. Search for 'laptop' 4. Click the first result"
+    }
 }
 ```
 
@@ -78,25 +78,25 @@ The `task` field should clearly describe the goal:
 
 ```json
 {
-  "agentic_task": {
-    "task": "Do the thing"
-  }
+    "agentic_task": {
+        "task": "Do the thing"
+    }
 }
 ```
 
 ```json
 {
-  "agentic_task": {
-    "task": "Complete the form"
-  }
+    "agentic_task": {
+        "task": "Complete the form"
+    }
 }
 ```
 
 ```json
 {
-  "agentic_task": {
-    "task": "Browse the website"
-  }
+    "agentic_task": {
+        "task": "Browse the website"
+    }
 }
 ```
 
@@ -104,22 +104,23 @@ The `task` field should clearly describe the goal:
 
 Set `max_steps` based on task complexity:
 
-| Task Complexity | Suggested max_steps |
-|-----------------|---------------------|
-| Simple (1-2 clicks) | 3-5 |
-| Medium (navigate, fill form) | 10-15 |
-| Complex (multi-page workflow) | 20-30 |
+| Task Complexity               | Suggested max_steps |
+| ----------------------------- | ------------------- |
+| Simple (1-2 clicks)           | 3-5                 |
+| Medium (navigate, fill form)  | 10-15               |
+| Complex (multi-page workflow) | 20-30               |
 
 <Warning>
-Higher `max_steps` means longer execution time and higher LLM costs. Start low and increase if needed.
+    Higher `max_steps` means longer execution time and higher LLM costs. Start low and increase if
+    needed.
 </Warning>
 
 ### Backend Options
 
-| Backend | Description |
-|---------|-------------|
+| Backend       | Description                       |
+| ------------- | --------------------------------- |
 | `browser_use` | Local browser-use agent (default) |
-| `browserbase` | Cloud-based browser automation |
+| `browserbase` | Cloud-based browser automation    |
 
 ### use_vision
 
@@ -127,21 +128,23 @@ When `use_vision=true`, the agent receives screenshots:
 
 ```json
 {
-  "agentic_task": {
-    "task": "Click on the red 'Sale' banner",
-    "max_steps": 5,
-    "backend": "browser_use",
-    "use_vision": true
-  }
+    "agentic_task": {
+        "task": "Click on the red 'Sale' banner",
+        "max_steps": 5,
+        "backend": "browser_use",
+        "use_vision": true
+    }
 }
 ```
 
 Use vision for:
+
 - Visual elements without good text/ARIA labels
 - Image-based navigation
 - Verifying visual state
 
 Avoid vision when:
+
 - Text-based navigation is sufficient
 - Speed is critical
 - Minimizing LLM costs
@@ -152,11 +155,11 @@ A specialized agentic task for dismissing popups, modals, and overlays.
 
 ```json
 {
-  "interaction_action": {
-    "close_overlay_popup": {
-      "max_steps": 5
+    "interaction_action": {
+        "close_overlay_popup": {
+            "max_steps": 5
+        }
     }
-  }
 }
 ```
 
@@ -164,13 +167,13 @@ A specialized agentic task for dismissing popups, modals, and overlays.
 
 `close_overlay_popup` comes with pre-configured defaults:
 
-| Property | Default Value |
-|----------|---------------|
-| `task` | Comprehensive popup dismissal prompt |
-| `max_steps` | `5` |
-| `backend` | `"browser_use"` |
-| `use_vision` | `True` |
-| `keep_alive` | `True` |
+| Property     | Default Value                        |
+| ------------ | ------------------------------------ |
+| `task`       | Comprehensive popup dismissal prompt |
+| `max_steps`  | `5`                                  |
+| `backend`    | `"browser_use"`                      |
+| `use_vision` | `True`                               |
+| `keep_alive` | `True`                               |
 
 ### What It Handles
 
@@ -195,20 +198,20 @@ The agent follows these rules:
 
 ```json
 {
-  "interaction_action": {
-    "close_overlay_popup": {
-      "max_steps": 5
-    }
-  },
-  "before_sleep_time": 3.0
+    "interaction_action": {
+        "close_overlay_popup": {
+            "max_steps": 5
+        }
+    },
+    "before_sleep_time": 3.0
 }
 ```
 
 ```json
 {
-  "extraction_action": {
-    // ... extraction configuration
-  }
+    "extraction_action": {
+        // ... extraction configuration
+    }
 }
 ```
 
@@ -218,23 +221,23 @@ Variables can be substituted in the `task` field:
 
 ```json
 {
-  "parameters": {
-    "input_parameters": {
-      "search_query": ["laptop"],
-      "price_max": ["1000"]
-    }
-  },
-  "action_nodes": [
-    {
-      "interaction_action": {
-        "agentic_task": {
-          "task": "Search for '{search_query[0]}' and filter results to show items under ${price_max[0]}",
-          "max_steps": 10,
-          "backend": "browser_use"
+    "parameters": {
+        "input_parameters": {
+            "search_query": ["laptop"],
+            "price_max": ["1000"]
         }
-      }
-    }
-  ]
+    },
+    "action_nodes": [
+        {
+            "interaction_action": {
+                "agentic_task": {
+                    "task": "Search for '{search_query[0]}' and filter results to show items under ${price_max[0]}",
+                    "max_steps": 10,
+                    "backend": "browser_use"
+                }
+            }
+        }
+    ]
 }
 ```
 
@@ -244,70 +247,64 @@ Agentic tasks work best as part of a larger automation:
 
 ```json
 [
-  {
-    "interaction_action": {
-      "input_text": {
-        "command": "get_by_label(\"Email\")",
-        "input_text": "{email[0]}",
-        "prompt_instructions": "Enter email"
-      }
+    {
+        "interaction_action": {
+            "input_text": {
+                "command": "get_by_label(\"Email\")",
+                "input_text": "{email[0]}",
+                "prompt_instructions": "Enter email"
+            }
+        }
+    },
+    {
+        "interaction_action": {
+            "input_text": {
+                "command": "get_by_label(\"Password\")",
+                "input_text": "{password[0]}",
+                "prompt_instructions": "Enter password"
+            }
+        }
+    },
+    {
+        "interaction_action": {
+            "click_element": {
+                "command": "get_by_role(\"button\", name=\"Sign In\")",
+                "prompt_instructions": "Click sign in"
+            }
+        }
+    },
+    {
+        "interaction_action": {
+            "agentic_task": {
+                "task": "Navigate to the Reports section and find the Monthly Summary report",
+                "max_steps": 10,
+                "backend": "browser_use"
+            }
+        }
+    },
+    {
+        "interaction_action": {
+            "click_element": {
+                "command": "get_by_role(\"button\", name=\"Download\")",
+                "prompt_instructions": "Download the report",
+                "expect_download": true
+            }
+        }
     }
-  },
-  {
-    "interaction_action": {
-      "input_text": {
-        "command": "get_by_label(\"Password\")",
-        "input_text": "{password[0]}",
-        "prompt_instructions": "Enter password"
-      }
-    }
-  },
-  {
-    "interaction_action": {
-      "click_element": {
-        "command": "get_by_role(\"button\", name=\"Sign In\")",
-        "prompt_instructions": "Click sign in"
-      }
-    }
-  },
-  {
-    "interaction_action": {
-      "agentic_task": {
-        "task": "Navigate to the Reports section and find the Monthly Summary report",
-        "max_steps": 10,
-        "backend": "browser_use"
-      }
-    }
-  },
-  {
-    "interaction_action": {
-      "click_element": {
-        "command": "get_by_role(\"button\", name=\"Download\")",
-        "prompt_instructions": "Download the report",
-        "expect_download": true
-      }
-    }
-  }
 ]
 ```
 
 ## When to Use Agentic Tasks
 
 <CardGroup cols={2}>
-<Card title="Use Agentic For" icon="check">
-  - Unpredictable UI layouts
-  - Complex navigation paths
-  - Handling popups/modals
-  - Sites with frequent changes
-  - Multi-step form wizards
-</Card>
-<Card title="Prefer Static For" icon="x">
-  - Known, stable elements
-  - Simple click/type actions
-  - Performance-critical paths
-  - Cost-sensitive automations
-  - Deterministic workflows
-</Card>
+    <Card title="Use Agentic For" icon="check">
+        - Unpredictable UI layouts - Complex navigation paths - Handling popups/modals - Sites with
+        frequent changes - Multi-step form wizards
+    </Card>
+    <Card title="Prefer Static For" icon="x">
+        - Known, stable elements - Simple click/type actions - Performance-critical paths -
+        Cost-sensitive automations - Deterministic workflows
+    </Card>
 </CardGroup>
 
 ## Error Handling
@@ -322,25 +319,25 @@ Consider adding fallback static actions:
 
 ```json
 [
-  {
-    "interaction_action": {
-      "agentic_task": {
-        "task": "Find and click the logout button",
-        "max_steps": 5,
-        "backend": "browser_use"
-      }
+    {
+        "interaction_action": {
+            "agentic_task": {
+                "task": "Find and click the logout button",
+                "max_steps": 5,
+                "backend": "browser_use"
+            }
+        }
+    },
+    {
+        "interaction_action": {
+            "click_element": {
+                "command": "get_by_role(\"button\", name=\"Logout\")",
+                "prompt_instructions": "Click logout",
+                "skip_prompt": true,
+                "assert_locator_presence": true
+            }
+        }
     }
-  },
-  {
-    "interaction_action": {
-      "click_element": {
-        "command": "get_by_role(\"button\", name=\"Logout\")",
-        "prompt_instructions": "Click logout",
-        "skip_prompt": true,
-        "assert_locator_presence": true
-      }
-    }
-  }
 ]
 ```
 
@@ -352,21 +349,21 @@ Use static actions for predictable interactions:
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Submit\")"
+    "interaction_action": {
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Submit\")"
+        }
     }
-  }
 }
 ```
 
 ```json
 {
-  "interaction_action": {
-    "agentic_task": {
-      "task": "Handle any CAPTCHA that appears"
+    "interaction_action": {
+        "agentic_task": {
+            "task": "Handle any CAPTCHA that appears"
+        }
     }
-  }
 }
 ```
 
@@ -376,37 +373,37 @@ Break complex goals into smaller agentic tasks:
 
 ```json
 {
-  "interaction_action": {
-    "agentic_task": {
-      "task": "Sign up for an account, verify email, and complete profile"
+    "interaction_action": {
+        "agentic_task": {
+            "task": "Sign up for an account, verify email, and complete profile"
+        }
     }
-  }
 }
 ```
 
 ```json
 [
-  {
-    "interaction_action": {
-      "agentic_task": {
-        "task": "Fill out the signup form with the provided information"
-      }
+    {
+        "interaction_action": {
+            "agentic_task": {
+                "task": "Fill out the signup form with the provided information"
+            }
+        }
+    },
+    {
+        "interaction_action": {
+            "agentic_task": {
+                "task": "Click the verification link in the confirmation page"
+            }
+        }
+    },
+    {
+        "interaction_action": {
+            "agentic_task": {
+                "task": "Complete the profile setup wizard"
+            }
+        }
     }
-  },
-  {
-    "interaction_action": {
-      "agentic_task": {
-        "task": "Click the verification link in the confirmation page"
-      }
-    }
-  },
-  {
-    "interaction_action": {
-      "agentic_task": {
-        "task": "Complete the profile setup wizard"
-      }
-    }
-  }
 ]
 ```
 
@@ -424,4 +421,3 @@ Agentic tasks may need tuning:
 - See [Interaction Actions](/docs/interaction-actions) for static alternatives
 - Check [Timing & Retries](/docs/timing-retries) for agentic task timing
 - Learn [Best Practices](/docs/best-practices) for reliable automations
-

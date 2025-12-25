@@ -24,12 +24,12 @@ ExtractionAction(
 
 Exactly one must be provided:
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `llm` | `LLMExtraction` | Extract data using an LLM |
-| `network_call` | `NetworkCallExtraction` | Capture network request/response |
-| `python_script` | `PythonScriptExtraction` | Run custom Python code |
-| `screenshot` | `ScreenshotExtraction` | Capture page screenshot |
+| Property        | Type                     | Description                      |
+| --------------- | ------------------------ | -------------------------------- |
+| `llm`           | `LLMExtraction`          | Extract data using an LLM        |
+| `network_call`  | `NetworkCallExtraction`  | Capture network request/response |
+| `python_script` | `PythonScriptExtraction` | Run custom Python code           |
+| `screenshot`    | `ScreenshotExtraction`   | Capture page screenshot          |
 
 ---
 
@@ -54,26 +54,23 @@ LLMExtraction(
 ### Properties
 
 <ParamField path="source" type="list[Literal['axtree', 'screenshot']]" default='["axtree"]'>
-  Data sources for the LLM to analyze:
-  - `"axtree"`: Accessibility tree (structured text representation)
-  - `"screenshot"`: Visual screenshot of the page
-  
-  Can include both: `["axtree", "screenshot"]`
+    Data sources for the LLM to analyze: - `"axtree"`: Accessibility tree (structured text
+    representation) - `"screenshot"`: Visual screenshot of the page Can include both: `["axtree",
+    "screenshot"]`
 </ParamField>
 
 <ParamField path="extraction_format" type="dict" required>
-  Expected output structure. Keys are field names, values are type hints:
-  - `"str"`: Single string value
-  - `"List[str]"` or `"list[str]"`: List of strings
+    Expected output structure. Keys are field names, values are type hints: - `"str"`: Single string
+    value - `"List[str]"` or `"list[str]"`: List of strings
 </ParamField>
 
 <ParamField path="extraction_instructions" type="str" required>
-  Natural language instructions for the LLM describing what to extract.
+    Natural language instructions for the LLM describing what to extract.
 </ParamField>
 
 <ParamField path="output_variable_names" type="list[str] | None" default="None">
-  Fields to store in `generated_parameters` for use in subsequent actions.
-  Must be keys from `extraction_format` with type `str` or `List[str]`.
+    Fields to store in `generated_parameters` for use in subsequent actions. Must be keys from
+    `extraction_format` with type `str` or `List[str]`.
 </ParamField>
 
 ### extraction_format Examples
@@ -123,11 +120,11 @@ NetworkCallExtraction(
 ### Properties
 
 <ParamField path="url_pattern" type="str | None" default="None">
-  URL pattern to match. Captured requests must contain this substring.
+    URL pattern to match. Captured requests must contain this substring.
 </ParamField>
 
 <ParamField path="header_filter" type="dict[str, str] | None" default="None">
-  Headers that must be present in the request/response.
+    Headers that must be present in the request/response.
 </ParamField>
 
 ### Use Cases
@@ -173,15 +170,14 @@ print(f"Found {len(matches)} orders")
 ### Properties
 
 <ParamField path="script" type="str" required>
-  Python code to execute. Cannot be empty.
-  
-  The script runs in an async context with access to the Playwright `page` object.
+    Python code to execute. Cannot be empty. The script runs in an async context with access to the
+    Playwright `page` object.
 </ParamField>
 
 ### Available Objects
 
-| Object | Description |
-|--------|-------------|
+| Object | Description            |
+| ------ | ---------------------- |
 | `page` | Playwright Page object |
 
 ### Common Operations
@@ -225,13 +221,11 @@ ScreenshotExtraction(
 ### Properties
 
 <ParamField path="filename" type="str" required>
-  Output filename for the screenshot. Supports variable substitution.
+    Output filename for the screenshot. Supports variable substitution.
 </ParamField>
 
 <ParamField path="full_page" type="bool" default="True">
-  Capture mode:
-  - `True`: Capture entire scrollable page
-  - `False`: Capture only visible viewport
+    Capture mode: - `True`: Capture entire scrollable page - `False`: Capture only visible viewport
 </ParamField>
 
 ### Filename Patterns
@@ -253,10 +247,10 @@ filename="capture_2024_01_15.png"
 
 Extraction actions have special timing defaults on `ActionNode`:
 
-| Property | Default for Extractions |
-|----------|------------------------|
-| `before_sleep_time` | `3.0` seconds |
-| `end_sleep_time` | `0.0` seconds |
+| Property            | Default for Extractions |
+| ------------------- | ----------------------- |
+| `before_sleep_time` | `3.0` seconds           |
+| `end_sleep_time`    | `0.0` seconds           |
 
 This gives pages time to fully load before extraction.
 
@@ -393,4 +387,3 @@ for script in scripts:
 - [Extraction Actions Guide](/docs/extraction-actions)
 - [Parameters & Variables Guide](/docs/parameters-variables)
 - [Control Flow Guide](/docs/control-flow)
-

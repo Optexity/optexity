@@ -9,11 +9,11 @@ Optexity provides multiple ways to locate elements on a webpage. Understanding w
 
 Every interaction action has three ways to find elements:
 
-| Method | Field | When to Use |
-|--------|-------|-------------|
-| **Playwright Command** | `command` | Preferred. Uses Playwright's robust locator API |
-| **XPath** | `xpath` | Alternative for complex DOM traversal |
-| **AI Fallback** | `prompt_instructions` | Always provide. Used when locators fail |
+| Method                 | Field                 | When to Use                                     |
+| ---------------------- | --------------------- | ----------------------------------------------- |
+| **Playwright Command** | `command`             | Preferred. Uses Playwright's robust locator API |
+| **XPath**              | `xpath`               | Alternative for complex DOM traversal           |
+| **AI Fallback**        | `prompt_instructions` | Always provide. Used when locators fail         |
 
 ## Playwright Commands
 
@@ -62,6 +62,7 @@ Find elements by their ARIA role and accessible name:
 ```
 
 Role-based locators are the most resilient because they:
+
 - Don't depend on CSS classes or IDs that may change
 - Match how users perceive the page
 - Work across different implementations of the same component
@@ -184,17 +185,17 @@ Use XPath when you need complex DOM traversal that Playwright locators can't exp
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "xpath": "//table[@id='results']//tr[contains(@class, 'active')]/td[3]/button",
-      "prompt_instructions": "Click the action button in the active row"
+    "interaction_action": {
+        "click_element": {
+            "xpath": "//table[@id='results']//tr[contains(@class, 'active')]/td[3]/button",
+            "prompt_instructions": "Click the action button in the active row"
+        }
     }
-  }
 }
 ```
 
 <Warning>
-XPath locators are more fragile than Playwright commands. Prefer `command` when possible.
+    XPath locators are more fragile than Playwright commands. Prefer `command` when possible.
 </Warning>
 
 ### Common XPath Patterns
@@ -231,24 +232,24 @@ The `prompt_instructions` field provides a natural language description of the e
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Continue\")",
-      "prompt_instructions": "Click the green Continue button at the bottom of the checkout form"
+    "interaction_action": {
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Continue\")",
+            "prompt_instructions": "Click the green Continue button at the bottom of the checkout form"
+        }
     }
-  }
 }
 ```
 
 ### Writing Good Prompt Instructions
 
 <CardGroup cols={2}>
-<Card title="Be Specific" icon="bullseye">
-  Include visual details, position, and context
-</Card>
-<Card title="Add Context" icon="map">
-  Reference nearby elements or sections
-</Card>
+    <Card title="Be Specific" icon="bullseye">
+        Include visual details, position, and context
+    </Card>
+    <Card title="Add Context" icon="map">
+        Reference nearby elements or sections
+    </Card>
 </CardGroup>
 
 **Good examples:**
@@ -324,7 +325,7 @@ Always provide descriptive `prompt_instructions` as backup:
 
 ```json
 {
-  "prompt_instructions": "Click on the row containing order {order_id[0]}"
+    "prompt_instructions": "Click on the row containing order {order_id[0]}"
 }
 ```
 
@@ -334,17 +335,18 @@ When you want to verify an element exists before attempting interaction (useful 
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Proceed\")",
-      "prompt_instructions": "Click the Proceed button if visible",
-      "assert_locator_presence": true
+    "interaction_action": {
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Proceed\")",
+            "prompt_instructions": "Click the Proceed button if visible",
+            "assert_locator_presence": true
+        }
     }
-  }
 }
 ```
 
 When `assert_locator_presence=True`:
+
 - The action checks if the locator finds an element
 - If not found, it skips the action instead of failing
 - Useful for dismiss dialogs, optional popups, or conditional UI
@@ -354,4 +356,3 @@ When `assert_locator_presence=True`:
 - Learn about [Parameters and Variables](/docs/parameters-variables) for dynamic values
 - See [Interaction Actions](/docs/interaction-actions) for all available actions
 - Check [Best Practices](/docs/best-practices) for tips on building reliable automations
-

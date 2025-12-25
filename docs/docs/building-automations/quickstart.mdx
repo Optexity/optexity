@@ -6,11 +6,9 @@ description: Build your first browser automation in 5 minutes
 This guide walks you through creating a simple login automation from scratch. By the end, you'll understand how to define actions, use parameters, and run your first Optexity workflow.
 
 <Info>
-**What you'll learn:**
-- How to record browser interactions with the Optexity Recorder
-- How to understand and edit automation JSON/Python
-- How to use parameters for dynamic values
-- How to run your automation via the API
+    **What you'll learn:** - How to record browser interactions with the Optexity Recorder - How to
+    understand and edit automation JSON/Python - How to use parameters for dynamic values - How to
+    run your automation via the API
 </Info>
 
 ## Prerequisites
@@ -26,15 +24,13 @@ Before you begin, ensure you have:
 Install the **Optexity Recorder** extension from the [Chrome Web Store](https://chromewebstore.google.com/detail/optexity-recorder/pbaganbicadeoacahamnbgohafchgakp). This extension captures your browser interactions and converts them into automation workflows.
 
 <Steps>
-  <Step title="Install the extension">
-    Click "Add to Chrome" on the Chrome Web Store page
-  </Step>
-  <Step title="Pin the extension">
-    Click the puzzle icon in Chrome and pin Optexity Recorder for easy access
-  </Step>
-  <Step title="Add your API key">
-    Click the extension icon and enter your API key from the dashboard
-  </Step>
+    <Step title="Install the extension">Click "Add to Chrome" on the Chrome Web Store page</Step>
+    <Step title="Pin the extension">
+        Click the puzzle icon in Chrome and pin Optexity Recorder for easy access
+    </Step>
+    <Step title="Add your API key">
+        Click the extension icon and enter your API key from the dashboard
+    </Step>
 </Steps>
 
 ---
@@ -43,12 +39,12 @@ Install the **Optexity Recorder** extension from the [Chrome Web Store](https://
 
 Let's create an automation that logs into a website. This simple example demonstrates the core concepts you'll use in every Optexity workflow:
 
-| Step | Action | Description |
-|------|--------|-------------|
-| 1 | Click | Navigate to the login page by clicking "Sign in" |
-| 2 | Type | Enter the email address |
-| 3 | Type | Enter the password |
-| 4 | Click | Submit the login form |
+| Step | Action | Description                                      |
+| ---- | ------ | ------------------------------------------------ |
+| 1    | Click  | Navigate to the login page by clicking "Sign in" |
+| 2    | Type   | Enter the email address                          |
+| 3    | Type   | Enter the password                               |
+| 4    | Click  | Submit the login form                            |
 
 ---
 
@@ -57,25 +53,26 @@ Let's create an automation that logs into a website. This simple example demonst
 The fastest way to create an automation is by recording your actions directly in the browser.
 
 <Steps>
-  <Step title="Navigate to the target website">
-    Open Chrome and go to the website you want to automate (e.g., `https://example.com`)
-  </Step>
-  <Step title="Start capturing">
-    Click the Optexity Recorder extension icon and hit **Start Capture**
-  </Step>
-  <Step title="Perform your actions">
-    Interact with the website naturally, click buttons, fill in forms, navigate pages. The recorder captures every interaction.
-  </Step>
-  <Step title="Stop and save">
-    When finished, click **Complete Capture**. The automation is automatically saved to your dashboard as a JSON file.
-  </Step>
+    <Step title="Navigate to the target website">
+        Open Chrome and go to the website you want to automate (e.g., `https://example.com`)
+    </Step>
+    <Step title="Start capturing">
+        Click the Optexity Recorder extension icon and hit **Start Capture**
+    </Step>
+    <Step title="Perform your actions">
+        Interact with the website naturally, click buttons, fill in forms, navigate pages. The
+        recorder captures every interaction.
+    </Step>
+    <Step title="Stop and save">
+        When finished, click **Complete Capture**. The automation is automatically saved to your
+        dashboard as a JSON file.
+    </Step>
 </Steps>
 
 <Tip>
-**Recording Tips:**
-- Perform actions slowly and deliberately for better accuracy
-- Avoid unnecessary scrolling or hovering
-- The recorder captures clicks, text input, and form selections
+    **Recording Tips:** - Perform actions slowly and deliberately for better accuracy - Avoid
+    unnecessary scrolling or hovering - The recorder captures clicks, text input, and form
+    selections
 </Tip>
 
 ---
@@ -87,17 +84,14 @@ Once recorded, your automation is saved as JSON on the dashboard. Let's break do
 ### The Complete Automation
 
 Here is a sample automation:
+
 ```json
 {
     "url": "https://example.com",
     "parameters": {
         "input_parameters": {
-            "username": [
-                "user@example.com"
-            ],
-            "password": [
-                "mypassword123"
-            ]
+            "username": ["user@example.com"],
+            "password": ["mypassword123"]
         },
         "generated_parameters": {}
     },
@@ -251,30 +245,19 @@ login_automation = Automation(
     </Note>
   </Accordion>
 
-  <Accordion title="ActionNode — Individual Steps" icon="play">
-    Each `ActionNode` represents a single atomic action. An ActionNode contains exactly **one** of these action types:
-    
-    | Action Type | Purpose | Example |
-    |-------------|---------|---------|
-    | `interaction_action` | Click, type, select, scroll, navigate | Clicking a button |
-    | `extraction_action` | Extract data from the page | Scraping product prices |
-    | `assertion_action` | Verify conditions | Check if logged in |
-    | `python_script_action` | Run custom Python code | Data transformation |
-    | `fetch_2fa_action` | Handle two-factor authentication | Get OTP from email |
-    
-    ```python
-    ActionNode(
-        interaction_action=InteractionAction(
-            click_element=ClickElementAction(
-                command="""get_by_role("button", name="Submit")""",
-                prompt_instructions="Click the submit button",
-            )
-        ),
-        before_sleep_time=0.0,  # Wait before action
-        end_sleep_time=1.0,     # Wait after action
-    )
-    ```
-  </Accordion>
+<Accordion title="ActionNode — Individual Steps" icon="play">
+    Each `ActionNode` represents a single atomic action. An ActionNode contains exactly **one** of
+    these action types: | Action Type | Purpose | Example | |-------------|---------|---------| |
+    `interaction_action` | Click, type, select, scroll, navigate | Clicking a button | |
+    `extraction_action` | Extract data from the page | Scraping product prices | |
+    `assertion_action` | Verify conditions | Check if logged in | | `python_script_action` | Run
+    custom Python code | Data transformation | | `fetch_2fa_action` | Handle two-factor
+    authentication | Get OTP from email | ```python ActionNode(
+    interaction_action=InteractionAction( click_element=ClickElementAction(
+    command="""get_by_role("button", name="Submit")""", prompt_instructions="Click the submit
+    button", ) ), before_sleep_time=0.0, # Wait before action end_sleep_time=1.0, # Wait after
+    action ) ```
+</Accordion>
 
   <Accordion title="Locators — Finding Elements" icon="crosshairs">
     Optexity uses **Playwright locators** to find elements on the page. The `command` field accepts Playwright's powerful locator syntax:
@@ -367,10 +350,10 @@ curl -X POST http://localhost:9000/inference \
 
 ### Understanding the Request
 
-| Field | Description |
-|-------|-------------|
-| `endpoint_name` | The name of your automation (as saved on the dashboard) |
-| `input_parameters` | Values to inject into your automation |
+| Field                    | Description                                                    |
+| ------------------------ | -------------------------------------------------------------- |
+| `endpoint_name`          | The name of your automation (as saved on the dashboard)        |
+| `input_parameters`       | Values to inject into your automation                          |
 | `unique_parameter_names` | Parameters that uniquely identify this run (for deduplication) |
 
 ### Expected Response
@@ -379,12 +362,12 @@ A successful run returns:
 
 ```json
 {
-  "status": "success",
-  "run_id": "run_abc123",
-  "output": {
-    "generated_parameters": {},
-    "extracted_data": []
-  }
+    "status": "success",
+    "run_id": "run_abc123",
+    "output": {
+        "generated_parameters": {},
+        "extracted_data": []
+    }
 }
 ```
 
@@ -456,36 +439,26 @@ ActionNode(
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Element not found">
-    **Problem:** The automation fails to find an element.
-    
-    **Solutions:**
-    1. Improve `prompt_instructions` with more visual details
-    2. Try a different locator strategy (role → label → text → CSS)
-    3. Add `before_sleep_time` to wait for the element to appear
-    4. Check if the element is inside an iframe
-  </Accordion>
-  
-  <Accordion title="Action executed too fast">
-    **Problem:** The page hasn't loaded before the next action runs.
-    
-    **Solution:** Increase `end_sleep_time` on the previous action:
-    ```python
-    ActionNode(
-        interaction_action=InteractionAction(...),
-        end_sleep_time=3.0,  # Wait 3 seconds after action
-    )
-    ```
-  </Accordion>
-  
-  <Accordion title="Variable not substituted">
-    **Problem:** You see `{username[0]}` instead of the actual value.
-    
-    **Solutions:**
-    1. Ensure the variable is defined in `input_parameters`
-    2. Check the index is correct (starts at 0)
-    3. Verify the syntax: `{variable_name[index]}`
-  </Accordion>
+    <Accordion title="Element not found">
+        **Problem:** The automation fails to find an element. **Solutions:** 1. Improve
+        `prompt_instructions` with more visual details 2. Try a different locator strategy (role →
+        label → text → CSS) 3. Add `before_sleep_time` to wait for the element to appear 4. Check if
+        the element is inside an iframe
+    </Accordion>
+
+    <Accordion title="Action executed too fast">
+        **Problem:** The page hasn't loaded before the next action runs. **Solution:** Increase
+        `end_sleep_time` on the previous action: ```python ActionNode(
+        interaction_action=InteractionAction(...), end_sleep_time=3.0, # Wait 3 seconds after action
+        ) ```
+    </Accordion>
+
+    <Accordion title="Variable not substituted">
+        **Problem:** You see `{username[0]}` instead of the actual value. **Solutions:** 1. Ensure
+        the variable is defined in `input_parameters` 2. Check the index is correct (starts at 0) 3.
+        Verify the syntax: `{variable_name[index]}`
+    </Accordion>
+
 </AccordionGroup>
 
 ---
@@ -495,16 +468,16 @@ ActionNode(
 Now that you've built your first automation, explore these topics to level up:
 
 <CardGroup cols={2}>
-  <Card title="Core Concepts" icon="book" href="/docs/building-automations/core-concepts">
-    Deep dive into the automation model, nodes, and execution flow
-  </Card>
-  <Card title="Locators" icon="crosshairs" href="/docs/building-automations/locators">
-    Master element location strategies for reliable automations
-  </Card>
-  <Card title="Interaction Actions" icon="hand-pointer" href="/docs/interaction-actions">
-    Explore all available interaction types: clicks, inputs, navigation
-  </Card>
-  <Card title="Extraction Actions" icon="download" href="/docs/extraction-actions">
-    Learn to capture data from web pages into your workflow
-  </Card>
+    <Card title="Core Concepts" icon="book" href="/docs/building-automations/core-concepts">
+        Deep dive into the automation model, nodes, and execution flow
+    </Card>
+    <Card title="Locators" icon="crosshairs" href="/docs/building-automations/locators">
+        Master element location strategies for reliable automations
+    </Card>
+    <Card title="Interaction Actions" icon="hand-pointer" href="/docs/interaction-actions">
+        Explore all available interaction types: clicks, inputs, navigation
+    </Card>
+    <Card title="Extraction Actions" icon="download" href="/docs/extraction-actions">
+        Learn to capture data from web pages into your workflow
+    </Card>
 </CardGroup>

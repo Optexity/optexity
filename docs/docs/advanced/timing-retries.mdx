@@ -9,10 +9,10 @@ Web automation requires careful timing. Pages load at different speeds, elements
 
 Timing and retries are controlled at two levels:
 
-| Level | Properties |
-|-------|------------|
-| **action_node** | `before_sleep_time`, `end_sleep_time`, `expect_new_tab`, `max_new_tab_wait_time` |
-| **interaction_action** | `max_tries`, `max_timeout_seconds_per_try` |
+| Level                  | Properties                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------- |
+| **action_node**        | `before_sleep_time`, `end_sleep_time`, `expect_new_tab`, `max_new_tab_wait_time` |
+| **interaction_action** | `max_tries`, `max_timeout_seconds_per_try`                                       |
 
 ## Sleep Times
 
@@ -22,13 +22,13 @@ Time to wait **before** executing the action. Use this when you need the page to
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Submit\")",
-      "prompt_instructions": "Click submit"
-    }
-  },
-  "before_sleep_time": 3.0
+    "interaction_action": {
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Submit\")",
+            "prompt_instructions": "Click submit"
+        }
+    },
+    "before_sleep_time": 3.0
 }
 ```
 
@@ -38,13 +38,13 @@ Time to wait **after** the action completes. Use this when subsequent actions de
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Load More\")",
-      "prompt_instructions": "Click to load more results"
-    }
-  },
-  "end_sleep_time": 2.0
+    "interaction_action": {
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Load More\")",
+            "prompt_instructions": "Click to load more results"
+        }
+    },
+    "end_sleep_time": 2.0
 }
 ```
 
@@ -52,12 +52,12 @@ Time to wait **after** the action completes. Use this when subsequent actions de
 
 Different action types have different defaults:
 
-| Action Type | `before_sleep_time` | `end_sleep_time` |
-|-------------|---------------------|------------------|
-| Interaction actions | `0.0` | `1.0` |
-| Extraction actions | `3.0` | `0.0` |
-| Assertion actions | `0.0` | `0.0` |
-| 2FA actions | `0.0` | `0.0` |
+| Action Type         | `before_sleep_time` | `end_sleep_time` |
+| ------------------- | ------------------- | ---------------- |
+| Interaction actions | `0.0`               | `1.0`            |
+| Extraction actions  | `3.0`               | `0.0`            |
+| Assertion actions   | `0.0`               | `0.0`            |
+| 2FA actions         | `0.0`               | `0.0`            |
 
 These defaults are designed for typical use cases:
 
@@ -89,13 +89,13 @@ Maximum number of attempts to find and interact with the element.
 
 ```json
 {
-  "interaction_action": {
-    "max_tries": 10,
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Submit\")",
-      "prompt_instructions": "Click submit"
+    "interaction_action": {
+        "max_tries": 10,
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Submit\")",
+            "prompt_instructions": "Click submit"
+        }
     }
-  }
 }
 ```
 
@@ -107,14 +107,14 @@ How long to wait for the element on each attempt.
 
 ```json
 {
-  "interaction_action": {
-    "max_tries": 5,
-    "max_timeout_seconds_per_try": 2.0,
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Submit\")",
-      "prompt_instructions": "Click submit"
+    "interaction_action": {
+        "max_tries": 5,
+        "max_timeout_seconds_per_try": 2.0,
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Submit\")",
+            "prompt_instructions": "Click submit"
+        }
     }
-  }
 }
 ```
 
@@ -133,9 +133,9 @@ When `skip_prompt=True` on an action, retries are reduced:
 
 ```json
 {
-  "command": "get_by_role(\"button\", name=\"Dismiss\")",
-  "prompt_instructions": "Click dismiss if visible",
-  "skip_prompt": true
+    "command": "get_by_role(\"button\", name=\"Dismiss\")",
+    "prompt_instructions": "Click dismiss if visible",
+    "skip_prompt": true
 }
 ```
 
@@ -149,13 +149,13 @@ When an action opens a new browser tab, set `expect_new_tab=True`:
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "command": "get_by_role(\"link\", name=\"Open Report\")",
-      "prompt_instructions": "Click to open report in new tab"
-    }
-  },
-  "expect_new_tab": true
+    "interaction_action": {
+        "click_element": {
+            "command": "get_by_role(\"link\", name=\"Open Report\")",
+            "prompt_instructions": "Click to open report in new tab"
+        }
+    },
+    "expect_new_tab": true
 }
 ```
 
@@ -171,14 +171,14 @@ Maximum time to wait for a new tab to appear.
 
 ```json
 {
-  "interaction_action": {
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Generate PDF\")",
-      "prompt_instructions": "Click to generate PDF in new tab"
-    }
-  },
-  "expect_new_tab": true,
-  "max_new_tab_wait_time": 15.0
+    "interaction_action": {
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Generate PDF\")",
+            "prompt_instructions": "Click to generate PDF in new tab"
+        }
+    },
+    "expect_new_tab": true,
+    "max_new_tab_wait_time": 15.0
 }
 ```
 
@@ -193,21 +193,21 @@ For pages that take time to load:
 
 ```json
 [
-  {
-    "interaction_action": {
-      "click_element": {
-        "command": "get_by_role(\"button\", name=\"Search\")",
-        "prompt_instructions": "Click search"
-      }
+    {
+        "interaction_action": {
+            "click_element": {
+                "command": "get_by_role(\"button\", name=\"Search\")",
+                "prompt_instructions": "Click search"
+            }
+        },
+        "end_sleep_time": 5.0
     },
-    "end_sleep_time": 5.0
-  },
-  {
-    "extraction_action": {
-      "llm": {}
-    },
-    "before_sleep_time": 3.0
-  }
+    {
+        "extraction_action": {
+            "llm": {}
+        },
+        "before_sleep_time": 3.0
+    }
 ]
 ```
 
@@ -217,15 +217,15 @@ For content that loads dynamically:
 
 ```json
 {
-  "interaction_action": {
-    "max_tries": 15,
-    "max_timeout_seconds_per_try": 1.0,
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Load More\")",
-      "prompt_instructions": "Click load more when it appears"
-    }
-  },
-  "before_sleep_time": 2.0
+    "interaction_action": {
+        "max_tries": 15,
+        "max_timeout_seconds_per_try": 1.0,
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Load More\")",
+            "prompt_instructions": "Click load more when it appears"
+        }
+    },
+    "before_sleep_time": 2.0
 }
 ```
 
@@ -235,15 +235,15 @@ For elements that may or may not be present:
 
 ```json
 {
-  "interaction_action": {
-    "max_tries": 3,
-    "click_element": {
-      "command": "get_by_role(\"button\", name=\"Dismiss\")",
-      "prompt_instructions": "Dismiss popup if present",
-      "skip_prompt": true,
-      "assert_locator_presence": true
+    "interaction_action": {
+        "max_tries": 3,
+        "click_element": {
+            "command": "get_by_role(\"button\", name=\"Dismiss\")",
+            "prompt_instructions": "Dismiss popup if present",
+            "skip_prompt": true,
+            "assert_locator_presence": true
+        }
     }
-  }
 }
 ```
 
@@ -253,43 +253,43 @@ After submitting forms that trigger server processing:
 
 ```json
 [
-  {
-    "interaction_action": {
-      "click_element": {
-        "command": "get_by_role(\"button\", name=\"Submit\")",
-        "prompt_instructions": "Submit the form"
-      }
+    {
+        "interaction_action": {
+            "click_element": {
+                "command": "get_by_role(\"button\", name=\"Submit\")",
+                "prompt_instructions": "Submit the form"
+            }
+        },
+        "end_sleep_time": 3.0
     },
-    "end_sleep_time": 3.0
-  },
-  {
-    "interaction_action": {
-      "max_tries": 20,
-      "max_timeout_seconds_per_try": 1.0,
-      "click_element": {
-        "command": "get_by_text(\"Confirmation\")",
-        "prompt_instructions": "Wait for confirmation message"
-      }
+    {
+        "interaction_action": {
+            "max_tries": 20,
+            "max_timeout_seconds_per_try": 1.0,
+            "click_element": {
+                "command": "get_by_text(\"Confirmation\")",
+                "prompt_instructions": "Wait for confirmation message"
+            }
+        }
     }
-  }
 ]
 ```
 
 ## Timing Best Practices
 
 <CardGroup cols={2}>
-<Card title="Start Conservative" icon="clock">
-  Use longer waits initially, then optimize once it works
-</Card>
-<Card title="Use Action Defaults" icon="wand-magic-sparkles">
-  Let the defaults handle most cases
-</Card>
-<Card title="Wait Before Extraction" icon="magnifying-glass">
-  Ensure page is stable before extracting data
-</Card>
-<Card title="Wait After Navigation" icon="route">
-  Give pages time to load after clicks
-</Card>
+    <Card title="Start Conservative" icon="clock">
+        Use longer waits initially, then optimize once it works
+    </Card>
+    <Card title="Use Action Defaults" icon="wand-magic-sparkles">
+        Let the defaults handle most cases
+    </Card>
+    <Card title="Wait Before Extraction" icon="magnifying-glass">
+        Ensure page is stable before extracting data
+    </Card>
+    <Card title="Wait After Navigation" icon="route">
+        Give pages time to load after clicks
+    </Card>
 </CardGroup>
 
 ### When to Increase Timing
@@ -311,12 +311,10 @@ After submitting forms that trigger server processing:
 
 Signs of timing problems:
 
-| Symptom | Likely Cause | Solution |
-|---------|--------------|----------|
-| "Element not found" | Page not loaded | Increase `before_sleep_time` |
-| Clicking wrong element | Page still loading | Increase `before_sleep_time` |
-| Missing extracted data | Content not rendered | Increase `before_sleep_time` on extraction |
-| Next action fails | Previous action effect not ready | Increase `end_sleep_time` |
-| Random failures | Race conditions | Increase retries and timeouts |
-
-
+| Symptom                | Likely Cause                     | Solution                                   |
+| ---------------------- | -------------------------------- | ------------------------------------------ |
+| "Element not found"    | Page not loaded                  | Increase `before_sleep_time`               |
+| Clicking wrong element | Page still loading               | Increase `before_sleep_time`               |
+| Missing extracted data | Content not rendered             | Increase `before_sleep_time` on extraction |
+| Next action fails      | Previous action effect not ready | Increase `end_sleep_time`                  |
+| Random failures        | Race conditions                  | Increase retries and timeouts              |

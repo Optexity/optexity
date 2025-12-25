@@ -6,6 +6,7 @@ description: Automating Supabase login and verifying the login was successful
 Optexity can be used for any QA testing scenario. This example shows how to automate the Supabase login and verify the login was successful.
 
 The automation:
+
 - **Opens** the Supabase site
 - **Fills** the email and password
 - **Submits** the form and **verifies** the login was successful
@@ -17,12 +18,12 @@ Before starting, please look at the [Quickstart](/docs/building-automations/quic
 ### Part 1: Record the base workflow
 
 1. Go to the Supabase site and **record** a workflow that:
-   - Navigates to the login page
-   - Fills in the email and password
-   - Submits the form and verifies the login was successful
+    - Navigates to the login page
+    - Fills in the email and password
+    - Submits the form and verifies the login was successful
 
 2. After saving, you will see an `supabase_login` automation in your dashboard that contains only the **interaction actions** (clicks, fills, selects).
-We have also built this automation by default and you can find it in your dashboard.
+   We have also built this automation by default and you can find it in your dashboard.
 
 ![Supabase Login Automation](/images/supabase_workflow.png)
 
@@ -31,9 +32,9 @@ We have also built this automation by default and you can find it in your dashbo
 ### Part 2: Refine the automation
 
 Recording captures clicks and inputs, but you still need to:
+
 - **Tighten** some interaction instructions
 - **Add** a assertion action to verify the login was successful
-
 
 #### 2.1. Add a assertion action to verify the login was successful
 
@@ -41,13 +42,13 @@ To verify the login was successful, add an `assertion_action` that verifies the 
 
 ```json
 {
-  "assertion_action": {
     "assertion_action": {
-      "llm": {
-        "extraction_instructions": "Verify the login was successful"
-      }
+        "assertion_action": {
+            "llm": {
+                "extraction_instructions": "Verify the login was successful"
+            }
+        }
     }
-  }
 }
 ```
 
@@ -85,77 +86,72 @@ curl -X POST http://localhost:9000/inference \
 ```
 
 While the request runs, the browser will execute the steps on your behalf. When the run finishes, you can:
-- Inspect the **task run** and **assertion result** in the dashboard
 
+- Inspect the **task run** and **assertion result** in the dashboard
 
 You can now add cron or any other scheduling mechanism to run this automation periodically to QA test the website.
 
-
-----
+---
 
 ### Final Automation
 
 ```json
 {
-  "url": "https://supabase.com",
-  "nodes": [
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"link\", name=\"Sign in\")",
-          "prompt_instructions": "Click the Sign in link"
+    "url": "https://supabase.com",
+    "nodes": [
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"link\", name=\"Sign in\")",
+                    "prompt_instructions": "Click the Sign in link"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_role(\"textbox\", name=\"Email\")",
+                    "input_text": "{username[0]}",
+                    "prompt_instructions": "Enter the email"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_role(\"textbox\", name=\"Password\")",
+                    "input_text": "{password[0]}",
+                    "prompt_instructions": "Enter the password"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 1,
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"button\", name=\"Sign In\")",
+                    "prompt_instructions": "Click the Sign In button"
+                }
+            }
+        },
+        {
+            "end_sleep_time": 0,
+            "assertion_action": {
+                "llm": {
+                    "extraction_instructions": "Check if the login was successful"
+                }
+            }
         }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_role(\"textbox\", name=\"Email\")",
-          "input_text": "{username[0]}",
-          "prompt_instructions": "Enter the email"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_role(\"textbox\", name=\"Password\")",
-          "input_text": "{password[0]}",
-          "prompt_instructions": "Enter the password"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 1,
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"Sign In\")",
-          "prompt_instructions": "Click the Sign In button"
-        }
-      }
-    },
-    {
-      "end_sleep_time": 0,
-      "assertion_action": {
-        "llm": {
-          "extraction_instructions": "Check if the login was successful"
-        }
-      }
+    ],
+    "parameters": {
+        "input_parameters": {
+            "password": ["password"],
+            "username": ["test@test.com"]
+        },
+        "generated_parameters": {}
     }
-  ],
-  "parameters": {
-    "input_parameters": {
-      "password": [
-        "password"
-      ],
-      "username": [
-        "test@test.com"
-      ]
-    },
-    "generated_parameters": {}
-  }
 }
 ```

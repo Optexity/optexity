@@ -8,10 +8,8 @@ You will build an automation that logs into the website [stockanalysis.com](http
 And it will extract the stock price for that stock symbol.
 
 <Info>
-**What you'll learn:**
-- How to record browser interactions with the Optexity Recorder
-- How to understand and edit automation JSON/Python
-- How to run your automation via the API
+    **What you'll learn:** - How to record browser interactions with the Optexity Recorder - How to
+    understand and edit automation JSON/Python - How to run your automation via the API
 </Info>
 
 ## Prerequisites
@@ -26,21 +24,18 @@ Once logged in, navigate to the **API Keys** section in your dashboard and creat
 
 ![Get API key from dashboard](/images/gen_api_key.png)
 
-
 ### Install the Recorder Extension
 
 Install the **Optexity Recorder** extension from the [Chrome Web Store](https://chromewebstore.google.com/detail/optexity-recorder/pbaganbicadeoacahamnbgohafchgakp). This extension captures your browser interactions and converts them into automation workflows.
 
 <Steps>
-  <Step title="Install the extension">
-    Click "Add to Chrome" on the Chrome Web Store page
-  </Step>
-  <Step title="Pin the extension">
-    Click the puzzle icon in Chrome and pin Optexity Recorder for easy access
-  </Step>
-  <Step title="Add your API key">
-    Click the extension icon and enter your API key from the dashboard
-  </Step>
+    <Step title="Install the extension">Click "Add to Chrome" on the Chrome Web Store page</Step>
+    <Step title="Pin the extension">
+        Click the puzzle icon in Chrome and pin Optexity Recorder for easy access
+    </Step>
+    <Step title="Add your API key">
+        Click the extension icon and enter your API key from the dashboard
+    </Step>
 </Steps>
 
 ---
@@ -50,27 +45,26 @@ Install the **Optexity Recorder** extension from the [Chrome Web Store](https://
 The fastest way to create an automation is by recording your actions directly in the browser.
 
 <Steps>
-  <Step title="Navigate to the target website">
-    Open Chrome and go to the website you want to automate (e.g., `https://stockanalysis.com/`)
-  </Step>
-  <Step title="Start capturing">
-    Click the Optexity Recorder extension icon and hit **Start Capture**
-  </Step>
-  <Step title="Perform your actions">
-    - Click on the "Search" button
-    - Enter the stock symbol in the search bar
-    - Click on the first result in the search results
-  </Step>
-  <Step title="Stop and save">
-    When finished, click **Complete Capture**. The automation is automatically saved to your dashboard as a JSON file.
-  </Step>
+    <Step title="Navigate to the target website">
+        Open Chrome and go to the website you want to automate (e.g., `https://stockanalysis.com/`)
+    </Step>
+    <Step title="Start capturing">
+        Click the Optexity Recorder extension icon and hit **Start Capture**
+    </Step>
+    <Step title="Perform your actions">
+        - Click on the "Search" button - Enter the stock symbol in the search bar - Click on the
+        first result in the search results
+    </Step>
+    <Step title="Stop and save">
+        When finished, click **Complete Capture**. The automation is automatically saved to your
+        dashboard as a JSON file.
+    </Step>
 </Steps>
 
 <Tip>
-**Recording Tips:**
-- Perform actions slowly and deliberately for better accuracy
-- Avoid unnecessary scrolling or hovering
-- The recorder captures clicks, text input, and form selections
+    **Recording Tips:** - Perform actions slowly and deliberately for better accuracy - Avoid
+    unnecessary scrolling or hovering - The recorder captures clicks, text input, and form
+    selections
 </Tip>
 
 ---
@@ -85,9 +79,7 @@ captured to perform the automation. Here is the automation that will be saved af
     "url": "https://stockanalysis.com/",
     "parameters": {
         "input_parameters": {
-            "search_term": [
-                "test_search_query"
-            ]
+            "search_term": ["test_search_query"]
         },
         "generated_parameters": {}
     },
@@ -120,86 +112,82 @@ By default, the automation will only capture the interactions with the website. 
 We can add an extraction action to the automation to extract the stock price. Copy the following code block, go to dashboard.optexity.com, click on edit the automation, and paste the code block in the nodes section.
 
 This code block will extract the stock price, stock name, and stock symbol from the webpage using an LLM.
+
 ```json
 {
-  "extraction_action": {
-      "llm": {
-          "source": ["screenshot"],
-          "extraction_format": {
-              "stock_price": "str",
-              "stock_name": "str",
-              "stock_symbol": "str"
-          },
-          "extraction_instructions": "Extract the stock price, stock name, and stock symbol from the webpage."
-      }
-  }
+    "extraction_action": {
+        "llm": {
+            "source": ["screenshot"],
+            "extraction_format": {
+                "stock_price": "str",
+                "stock_name": "str",
+                "stock_symbol": "str"
+            },
+            "extraction_instructions": "Extract the stock price, stock name, and stock symbol from the webpage."
+        }
+    }
 }
 ```
 
 After pasting the code block, save the automation. The full automation should look like this:
+
 ```json
 {
-  "url": "https://stockanalysis.com/",
-  "parameters": {
-    "input_parameters": {
-      "search_term": [
-        "test_search_query"
-      ]
+    "url": "https://stockanalysis.com/",
+    "parameters": {
+        "input_parameters": {
+            "search_term": ["test_search_query"]
+        },
+        "generated_parameters": {}
     },
-    "generated_parameters": {}
-  },
-  "nodes": [
-    {
-      "interaction_action": {
-        "input_text": {
-          "command": "locator(\"#search-header\")",
-          "prompt_instructions": "Fill the input field with ID 'search-header' with the value of the 'search_term' variable.",
-          "input_text": "{search_term[0]}"
+    "nodes": [
+        {
+            "interaction_action": {
+                "input_text": {
+                    "command": "locator(\"#search-header\")",
+                    "prompt_instructions": "Fill the input field with ID 'search-header' with the value of the 'search_term' variable.",
+                    "input_text": "{search_term[0]}"
+                }
+            },
+            "end_sleep_time": 1
+        },
+        {
+            "interaction_action": {
+                "click_element": {
+                    "prompt_instructions": "Click on the link with the name of the stock equivalent for {search_term[0]}."
+                }
+            },
+            "end_sleep_time": 1
+        },
+        {
+            "extraction_action": {
+                "llm": {
+                    "source": ["screenshot"],
+                    "extraction_format": {
+                        "stock_name": "str",
+                        "stock_price": "str",
+                        "stock_symbol": "str"
+                    },
+                    "extraction_instructions": "Extract the stock price, stock name, and stock symbol from the webpage."
+                }
+            },
+            "before_sleep_time": 3,
+            "end_sleep_time": 0
         }
-      },
-      "end_sleep_time": 1
-    },
-    {
-      "interaction_action": {
-        "click_element": {
-          "prompt_instructions": "Click on the link with the name of the stock equivalent for {search_term[0]}."
-        }
-      },
-      "end_sleep_time": 1
-    },
-    {
-      "extraction_action": {
-        "llm": {
-          "source": [
-            "screenshot"
-          ],
-          "extraction_format": {
-            "stock_name": "str",
-            "stock_price": "str",
-            "stock_symbol": "str"
-          },
-          "extraction_instructions": "Extract the stock price, stock name, and stock symbol from the webpage."
-        }
-      },
-      "before_sleep_time": 3,
-      "end_sleep_time": 0
-    }
-  ]
+    ]
 }
 ```
 
 ## Video Tutorial
 
-
 <iframe
-  width="100%"
-  height="400"
-  src="https://www.youtube.com/embed/q51r3idYtxo"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowfullscreen
+    width="100%"
+    height="400"
+    src="https://www.youtube.com/embed/q51r3idYtxo"
+    frameborder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowfullscreen
 />
-
 
 ## Next Steps
 

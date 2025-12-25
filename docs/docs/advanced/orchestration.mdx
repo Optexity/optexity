@@ -9,10 +9,10 @@ Optexity provides callback URLs for each automation. You can use these URLs to r
 
 ## Dependencies
 
--   `asyncio`
--   `httpx`
--   `fastapi`
--   `uvicorn`
+- `asyncio`
+- `httpx`
+- `fastapi`
+- `uvicorn`
 
 Install the dependencies using `pip install fastapi uvicorn httpx asyncio`.
 
@@ -103,6 +103,7 @@ This orchestration pattern demonstrates how to coordinate multiple asynchronous 
 ### Architecture Overview
 
 The script creates a FastAPI server that serves two purposes:
+
 1. **Workflow execution**: Processes items sequentially by starting tasks via API calls
 2. **Callback receiver**: Receives completion notifications from Optexity APIs
 
@@ -111,12 +112,12 @@ The script creates a FastAPI server that serves two purposes:
 The `run_workflow` function processes items one at a time:
 
 1. **Start a task**: For each item, it makes a POST request to the Optexity API with:
-   - The item to process
-   - A `callback_url` pointing to your local server
+    - The item to process
+    - A `callback_url` pointing to your local server
 
 2. **Register the callback**: When the API returns a `task_id`, it creates an entry in the `callbacks` dictionary containing:
-   - An `asyncio.Event()` to signal when the callback is received
-   - A `data` field (initially `None`) to store the callback payload
+    - An `asyncio.Event()` to signal when the callback is received
+    - A `data` field (initially `None`) to store the callback payload
 
 3. **Wait for completion**: The workflow waits for the event to be set, with a timeout to prevent indefinite waiting. This is where the async coordination happens - the workflow pauses until Optexity sends a callback.
 
