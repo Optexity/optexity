@@ -24,7 +24,6 @@
                         "group": "Building Automations",
                         "pages": [
                             "/docs/building-automations/local-setup",
-                            "/docs/building-automations/quickstart",
                             "/docs/building-automations/automation-structure",
                             "/docs/building-automations/parameters",
                             "/docs/building-automations/action-node",
