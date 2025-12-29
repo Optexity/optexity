@@ -304,6 +304,8 @@ async def run_action_node(
 
 
 async def sleep_for_page_to_load(browser: Browser, sleep_time: float):
+    sleep_time = max(0.0, sleep_time - 0.1)
+    await asyncio.sleep(0.1)
     if float(sleep_time) == 0.0:
         return
 
