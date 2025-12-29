@@ -73,7 +73,9 @@ class Gemini(LLMModel):
                     parsed_response = response_schema.model_validate(response.parsed)
             else:
                 response = self.client.models.generate_content(
-                    model=self.model_name.value, contents=prompt
+                    model=self.model_name.value,
+                    contents=prompt,
+                    config={"system_instruction": system_instruction},
                 )
 
                 parsed_response: BaseModel = self.parse_from_completion(
