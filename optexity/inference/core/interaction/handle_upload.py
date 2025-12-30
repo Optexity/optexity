@@ -1,9 +1,9 @@
 import logging
 
-from optexity.inference.core.interaction.utils import (
+from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
-    get_index_from_prompt,
 )
+from optexity.inference.core.interaction.utils import get_index_from_prompt
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import UploadFileAction
 from optexity.schema.memory import Memory
@@ -22,23 +22,18 @@ async def handle_upload_file(
 ):
     if upload_file_action.command:
         last_error = await command_based_action_with_retry(
-            lambda: upload_file(upload_file_action, browser),
-            upload_file_action.command,
+            upload_file_action,
+            browser,
+            memory,
+            task,
             max_tries,
             max_timeout_seconds_per_try,
-            upload_file_action.assert_locator_presence,
         )
         if last_error is None:
             return
 
     if not upload_file_action.skip_prompt:
         await upload_file_index(upload_file_action, browser, memory)
-
-
-async def upload_file(upload_file_action: UploadFileAction, browser: Browser):
-    locator = await browser.get_locator_from_command(upload_file_action.command)
-
-    await locator.set_input_files(upload_file_action.file_path)
 
 
 async def upload_file_index(

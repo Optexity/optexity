@@ -245,17 +245,18 @@ async def run_action_node(
     await action_node.replace_variables(task.secure_parameters)
     await action_node.replace_variables(memory.variables.generated_variables)
 
-    ## TODO: optimize this by taking screenshot and axtree only if needed
-    browser_state_summary = await browser.get_browser_state_summary()
+    # ## TODO: optimize this by taking screenshot and axtree only if needed
+    # browser_state_summary = await browser.get_browser_state_summary()
 
     memory.browser_states.append(
         BrowserState(
-            url=browser_state_summary.url,
-            screenshot=browser_state_summary.screenshot,
-            title=browser_state_summary.title,
-            axtree=browser_state_summary.dom_state.llm_representation(),
+            url=await browser.get_current_page_url(),
+            screenshot=None,
+            title=await browser.get_current_page_title(),
+            axtree=None,
         )
     )
+
     logger.debug(f"-----Running node {memory.automation_state.step_index}-----")
 
     try:
@@ -304,8 +305,10 @@ async def run_action_node(
 
 
 async def sleep_for_page_to_load(browser: Browser, sleep_time: float):
-    sleep_time = max(0.0, sleep_time - 0.1)
     await asyncio.sleep(0.1)
+
+    sleep_time = max(0.0, sleep_time - 0.1)
+
     if float(sleep_time) == 0.0:
         return
 

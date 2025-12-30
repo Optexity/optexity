@@ -1,11 +1,9 @@
-import asyncio
 import logging
 from pathlib import Path
 from typing import Callable
 
 import aiofiles
 
-from optexity.exceptions import AssertLocatorPresenceException
 from optexity.inference.agents.index_prediction.action_prediction_locator_axtree import (
     ActionPredictionLocatorAxtree,
 )
@@ -17,40 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 index_prediction_agent = ActionPredictionLocatorAxtree()
-
-
-async def command_based_action_with_retry(
-    func: Callable,
-    command: str | None,
-    max_tries: int,
-    max_timeout_seconds_per_try: float,
-    assert_locator_presence: bool,
-):
-    if command is None:
-        return
-    last_error = None
-    for try_index in range(max_tries):
-        last_error = None
-        try:
-            await func()
-            logger.debug(f"{func.__name__} successful on try {try_index + 1}")
-            return
-        except Exception as e:
-            last_error = e
-            await asyncio.sleep(max_timeout_seconds_per_try)
-
-    logger.debug(f"{func.__name__} failed after {max_tries} tries: {last_error}")
-
-    if last_error and assert_locator_presence:
-        logger.debug(
-            f"Error in {func.__name__} with assert_locator_presence: {func.__name__}: {last_error}"
-        )
-        raise AssertLocatorPresenceException(
-            message=f"Error in {func.__name__} with assert_locator_presence: {func.__name__}",
-            original_error=last_error,
-            command=command,
-        )
-    return last_error
 
 
 async def get_index_from_prompt(

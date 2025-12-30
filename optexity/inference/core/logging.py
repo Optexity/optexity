@@ -353,7 +353,12 @@ async def save_latest_memory_state_locally(
 
         if node:
             async with aiofiles.open(step_directory / "action_node.json", "w") as f:
-                await f.write(json.dumps(node.model_dump(), indent=4))
+                await f.write(
+                    json.dumps(
+                        node.model_dump(exclude_none=True, exclude_defaults=True),
+                        indent=4,
+                    )
+                )
 
         async with aiofiles.open(step_directory / "input_parameters.json", "w") as f:
             await f.write(json.dumps(task.input_parameters, indent=4))
@@ -369,7 +374,9 @@ async def save_latest_memory_state_locally(
                 json.dumps(
                     [
                         output_data.model_dump(
-                            exclude_none=True, exclude={"screenshot"}
+                            exclude_none=True,
+                            exclude={"screenshot"},
+                            exclude_defaults=True,
                         )
                         for output_data in memory.variables.output_data
                     ],

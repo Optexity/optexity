@@ -10,7 +10,7 @@ from browser_use import Agent, BrowserSession, ChatGoogle
 from browser_use.browser.views import BrowserStateSummary
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import Download, Locator, Request, Response
+from playwright.async_api import Download, Locator, Page, Request, Response
 
 from optexity.schema.memory import Memory, NetworkRequest, NetworkResponse
 from optexity.utils.settings import settings
@@ -190,7 +190,7 @@ class Browser:
             self.playwright = None
         logger.debug("Full system stopped")
 
-    async def get_current_page(self):
+    async def get_current_page(self) -> Page | None:
         if self.context is None:
             return None
         pages = self.context.pages
@@ -305,6 +305,12 @@ class Browser:
         if page is None:
             return None
         return page.url
+
+    async def get_current_page_title(self) -> str:
+        page = await self.get_current_page()
+        if page is None:
+            return None
+        return await page.title()
 
     async def handle_random_download(self, download: Download):
         self.active_downloads += 1

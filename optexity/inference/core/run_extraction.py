@@ -14,6 +14,7 @@ from optexity.schema.actions.extraction_action import (
     StateExtraction,
 )
 from optexity.schema.memory import (
+    BrowserState,
     Memory,
     NetworkRequest,
     NetworkResponse,
@@ -109,6 +110,14 @@ async def handle_llm_extraction(
     browser: Browser,
     unique_identifier: str | None = None,
 ):
+    browser_state_summary = await browser.get_browser_state_summary()
+    memory.browser_states[-1] = BrowserState(
+        url=browser_state_summary.url,
+        screenshot=browser_state_summary.screenshot,
+        title=browser_state_summary.title,
+        axtree=browser_state_summary.dom_state.llm_representation(),
+    )
+
     # TODO: fix this double calling of screenshot and axtree
     if "axtree" in llm_extraction.source:
         axtree = memory.browser_states[-1].axtree

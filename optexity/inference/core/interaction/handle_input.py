@@ -1,19 +1,21 @@
 import logging
 import re
 
-from optexity.inference.core.interaction.utils import (
+from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
-    get_index_from_prompt,
 )
+from optexity.inference.core.interaction.utils import get_index_from_prompt
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import InputTextAction
 from optexity.schema.memory import Memory
+from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
 
 
 async def handle_input_text(
     input_text_action: InputTextAction,
+    task: Task,
     memory: Memory,
     browser: Browser,
     max_timeout_seconds_per_try: float,
@@ -31,13 +33,12 @@ async def handle_input_text(
 
     if input_text_action.command:
         last_error = await command_based_action_with_retry(
-            lambda: input_text_locator(
-                input_text_action, browser, max_timeout_seconds_per_try
-            ),
-            input_text_action.command,
+            input_text_action,
+            browser,
+            memory,
+            task,
             max_tries,
             max_timeout_seconds_per_try,
-            input_text_action.assert_locator_presence,
         )
 
         if last_error is None:
@@ -45,30 +46,6 @@ async def handle_input_text(
 
     if not input_text_action.skip_prompt:
         await input_text_index(input_text_action, browser, memory)
-
-
-async def input_text_locator(
-    input_text_action: InputTextAction,
-    browser: Browser,
-    max_timeout_seconds_per_try: float,
-):
-
-    locator = await browser.get_locator_from_command(input_text_action.command)
-    if input_text_action.fill_or_type == "fill":
-        await locator.fill(
-            input_text_action.input_text,
-            no_wait_after=True,
-            timeout=max_timeout_seconds_per_try * 1000,
-        )
-    else:
-        await locator.type(
-            input_text_action.input_text,
-            no_wait_after=True,
-            timeout=max_timeout_seconds_per_try * 1000,
-        )
-
-    if input_text_action.press_enter:
-        await locator.press("Enter")
 
 
 async def input_text_index(

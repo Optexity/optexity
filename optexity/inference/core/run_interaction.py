@@ -22,7 +22,7 @@ from optexity.schema.actions.interaction_action import (
     GoToUrlAction,
     InteractionAction,
 )
-from optexity.schema.memory import Memory, OutputData
+from optexity.schema.memory import BrowserState, Memory, OutputData
 from optexity.schema.task import Task
 
 error_handler_agent = ErrorHandlerAgent()
@@ -60,6 +60,7 @@ async def run_interaction_action(
         elif interaction_action.input_text:
             await handle_input_text(
                 interaction_action.input_text,
+                task,
                 memory,
                 browser,
                 interaction_action.max_timeout_seconds_per_try,
@@ -202,6 +203,13 @@ async def handle_assert_locator_presence_error(
 ):
     logger.debug(f"Handling assert locator presence error: {error.command}")
     if retries_left > 1:
+        browser_state_summary = await browser.get_browser_state_summary()
+        memory.browser_states[-1] = BrowserState(
+            url=browser_state_summary.url,
+            screenshot=browser_state_summary.screenshot,
+            title=browser_state_summary.title,
+            axtree=browser_state_summary.dom_state.llm_representation(),
+        )
         final_prompt, response, token_usage = error_handler_agent.classify_error(
             error.command, memory.browser_states[-1].screenshot
         )
