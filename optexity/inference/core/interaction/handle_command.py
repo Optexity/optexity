@@ -168,6 +168,10 @@ async def input_text_locator(
 
 
 async def check_locator(locator: Locator, max_timeout_seconds_per_try: float):
+    await locator.uncheck(
+        no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000
+    )
+    await asyncio.sleep(1)
     await locator.check(no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000)
 
 
