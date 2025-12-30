@@ -88,7 +88,9 @@ async def command_based_action_with_retry(
                         max_timeout_seconds_per_try,
                     )
                 elif isinstance(action, CheckAction):
-                    await check_locator(locator, max_timeout_seconds_per_try)
+                    await check_locator(
+                        locator, max_timeout_seconds_per_try, browser, action
+                    )
                 elif isinstance(action, UploadFileAction):
                     await upload_file_locator(action, locator)
                 logger.debug(
@@ -167,11 +169,17 @@ async def input_text_locator(
         await locator.press("Enter")
 
 
-async def check_locator(locator: Locator, max_timeout_seconds_per_try: float):
+async def check_locator(
+    locator: Locator,
+    max_timeout_seconds_per_try: float,
+    browser: Browser,
+    action: CheckAction,
+):
     await locator.uncheck(
         no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000
     )
     await asyncio.sleep(1)
+    locator = await browser.get_locator_from_command(action.command)
     await locator.check(no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000)
 
 
