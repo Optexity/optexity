@@ -38,6 +38,9 @@ async def handle_click_element(
             return
 
     if not click_element_action.skip_prompt:
+        logger.debug(
+            f"Executing prompt-based action: {click_element_action.__class__.__name__}"
+        )
         await click_element_index(click_element_action, browser, memory, task)
 
 

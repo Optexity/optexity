@@ -33,6 +33,9 @@ async def handle_upload_file(
             return
 
     if not upload_file_action.skip_prompt:
+        logger.debug(
+            f"Executing prompt-based action: {upload_file_action.__class__.__name__}"
+        )
         await upload_file_index(upload_file_action, browser, memory)
 
 

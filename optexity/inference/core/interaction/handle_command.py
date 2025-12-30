@@ -14,6 +14,7 @@ from optexity.schema.actions.interaction_action import (
     ClickElementAction,
     InputTextAction,
     SelectOptionAction,
+    UncheckAction,
     UploadFileAction,
 )
 from optexity.schema.memory import BrowserState, Memory
@@ -29,6 +30,7 @@ async def command_based_action_with_retry(
         | SelectOptionAction
         | CheckAction
         | UploadFileAction
+        | UncheckAction
     ),
     browser: Browser,
     memory: Memory,
@@ -41,6 +43,8 @@ async def command_based_action_with_retry(
         return
 
     last_error = None
+
+    logger.debug(f"Executing command-based action: {action.__class__.__name__}")
 
     for try_index in range(max_tries):
         last_error = None
@@ -89,7 +93,11 @@ async def command_based_action_with_retry(
                     )
                 elif isinstance(action, CheckAction):
                     await check_locator(
-                        locator, max_timeout_seconds_per_try, browser, action
+                        action, locator, max_timeout_seconds_per_try, browser
+                    )
+                elif isinstance(action, UncheckAction):
+                    await uncheck_locator(
+                        action, locator, max_timeout_seconds_per_try, browser
                     )
                 elif isinstance(action, UploadFileAction):
                     await upload_file_locator(action, locator)
@@ -181,6 +189,20 @@ async def check_locator(
     await asyncio.sleep(1)
     locator = await browser.get_locator_from_command(action.command)
     await locator.check(no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000)
+
+
+async def uncheck_locator(
+    locator: Locator,
+    max_timeout_seconds_per_try: float,
+    browser: Browser,
+    action: UncheckAction,
+):
+    await locator.check(no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000)
+    await asyncio.sleep(1)
+    locator = await browser.get_locator_from_command(action.command)
+    await locator.uncheck(
+        no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000
+    )
 
 
 async def upload_file_locator(upload_file_action: UploadFileAction, locator: Locator):

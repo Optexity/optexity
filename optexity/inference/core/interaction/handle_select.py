@@ -38,6 +38,9 @@ async def handle_select_option(
             return
 
     if not select_option_action.skip_prompt:
+        logger.debug(
+            f"Executing prompt-based action: {select_option_action.__class__.__name__}"
+        )
         await select_option_index(select_option_action, browser, memory, task)
 
 

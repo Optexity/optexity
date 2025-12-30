@@ -7,7 +7,10 @@ import aiofiles
 from optexity.exceptions import AssertLocatorPresenceException
 from optexity.inference.agents.error_handler.error_handler import ErrorHandlerAgent
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
-from optexity.inference.core.interaction.handle_check import handle_check_element
+from optexity.inference.core.interaction.handle_check import (
+    handle_check_element,
+    handle_uncheck_element,
+)
 from optexity.inference.core.interaction.handle_click import handle_click_element
 from optexity.inference.core.interaction.handle_input import handle_input_text
 from optexity.inference.core.interaction.handle_keypress import handle_key_press
@@ -78,6 +81,15 @@ async def run_interaction_action(
         elif interaction_action.check:
             await handle_check_element(
                 interaction_action.check,
+                task,
+                memory,
+                browser,
+                interaction_action.max_timeout_seconds_per_try,
+                interaction_action.max_tries,
+            )
+        elif interaction_action.uncheck:
+            await handle_uncheck_element(
+                interaction_action.uncheck,
                 task,
                 memory,
                 browser,
