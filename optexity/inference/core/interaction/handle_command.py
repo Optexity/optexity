@@ -100,9 +100,11 @@ async def command_based_action_with_retry(
             else:
                 await asyncio.sleep(max_timeout_seconds_per_try)
         except Exception as e:
-            last_error = e
+            last_error = f"error: {e}"
             await asyncio.sleep(max_timeout_seconds_per_try)
 
+    if last_error is None:
+        last_error = "error in executing command"
     logger.debug(
         f"{action.__class__.__name__} failed after {max_tries} tries: {last_error}"
     )
