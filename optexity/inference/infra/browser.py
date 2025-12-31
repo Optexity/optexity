@@ -301,16 +301,24 @@ class Browser:
         return browser_state_summary
 
     async def get_current_page_url(self) -> str:
-        page = await self.get_current_page()
-        if page is None:
+        try:
+            page = await self.get_current_page()
+            if page is None:
+                return None
+            return page.url
+        except Exception as e:
+            logger.error(f"Error getting current page URL: {e}")
             return None
-        return page.url
 
     async def get_current_page_title(self) -> str:
-        page = await self.get_current_page()
-        if page is None:
+        try:
+            page = await self.get_current_page()
+            if page is None:
+                return None
+            return await page.title()
+        except Exception as e:
+            logger.error(f"Error getting current page title: {e}")
             return None
-        return await page.title()
 
     async def handle_random_download(self, download: Download):
         self.active_downloads += 1
