@@ -21,3 +21,4 @@ class TwoFAAction(BaseModel):
     instructions: str | None = None
     output_variable_name: str
     max_wait_time: float = 300.0
+    check_interval: float = 10.0

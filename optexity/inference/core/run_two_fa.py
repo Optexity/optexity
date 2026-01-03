@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import timedelta
 from urllib.parse import urljoin
@@ -13,6 +14,7 @@ from optexity.schema.inference import (
     FetchEmailMessagesRequest,
     FetchMessagesResponse,
     FetchSlackMessagesRequest,
+    Message,
 )
 from optexity.schema.memory import Memory
 from optexity.utils.settings import settings
@@ -25,65 +27,70 @@ async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory):
         f"---------Running 2fa action {two_fa_action.model_dump_json()}---------"
     )
 
-    if isinstance(two_fa_action.action, EmailTwoFAAction):
-        code = await handle_email_two_fa(
+    elapsed = 0
+    messages = None
+
+    while elapsed < two_fa_action.max_wait_time:
+        messages = await fetch_messages(
             two_fa_action.action, memory, two_fa_action.max_wait_time
         )
-    elif isinstance(two_fa_action.action, SlackTwoFAAction):
-        code = await handle_slack_two_fa(
-            two_fa_action.action, memory, two_fa_action.max_wait_time
-        )
+        if messages and len(messages) > 0:
+            code = extract_code(two_fa_action.instructions, messages)
+            if code is not None:
+                break
+        await asyncio.sleep(two_fa_action.check_interval)
+        elapsed += two_fa_action.check_interval
 
     memory.automation_state.start_2fa_time = None
     if code is None:
-        raise ValueError("No 2FA code found")
+        raise ValueError("2FA code not found")
 
     memory.variables.generated_variables[two_fa_action.output_variable_name] = code
 
     return code
 
 
-async def handle_email_two_fa(
-    email_two_fa_action: EmailTwoFAAction,
+async def fetch_messages(
+    action: EmailTwoFAAction | SlackTwoFAAction,
     memory: Memory,
     max_wait_time: float,
 ):
 
-    async with httpx.AsyncClient() as client:
+    start_2fa_time = memory.automation_state.start_2fa_time
+    end_2fa_time = memory.automation_state.start_2fa_time + timedelta(
+        seconds=max_wait_time
+    )
+
+    if isinstance(action, EmailTwoFAAction):
         url = urljoin(settings.SERVER_URL, settings.FETCH_EMAIL_MESSAGES_ENDPOINT)
-
         body = FetchEmailMessagesRequest(
-            receiver_email_address=email_two_fa_action.receiver_email_address,
-            sender_email_address=email_two_fa_action.sender_email_address,
-            start_2fa_time=memory.automation_state.start_2fa_time,
-            end_2fa_time=memory.automation_state.start_2fa_time
-            + timedelta(seconds=max_wait_time),
+            receiver_email_address=action.receiver_email_address,
+            sender_email_address=action.sender_email_address,
+            start_2fa_time=start_2fa_time,
+            end_2fa_time=end_2fa_time,
         )
-        response = await client.post(url, json=body.model_dump())
-        response.raise_for_status()
-        response_data = FetchMessagesResponse.model_validate_json(response.json())
-
-        return response_data.messages
-
-
-async def handle_slack_two_fa(
-    slack_two_fa_action: SlackTwoFAAction,
-    memory: Memory,
-    max_wait_time: float,
-):
-    async with httpx.AsyncClient() as client:
+    elif isinstance(action, SlackTwoFAAction):
         url = urljoin(settings.SERVER_URL, settings.FETCH_SLACK_MESSAGES_ENDPOINT)
-
         body = FetchSlackMessagesRequest(
-            slack_workspace_domain=slack_two_fa_action.slack_workspace_domain,
-            channel_name=slack_two_fa_action.channel_name,
-            sender_name=slack_two_fa_action.sender_name,
-            start_2fa_time=memory.automation_state.start_2fa_time,
-            end_2fa_time=memory.automation_state.start_2fa_time
-            + timedelta(seconds=max_wait_time),
+            slack_workspace_domain=action.slack_workspace_domain,
+            channel_name=action.channel_name,
+            sender_name=action.sender_name,
+            start_2fa_time=start_2fa_time,
+            end_2fa_time=end_2fa_time,
         )
+
+    async with httpx.AsyncClient() as client:
+
         response = await client.post(url, json=body.model_dump())
         response.raise_for_status()
         response_data = FetchMessagesResponse.model_validate_json(response.json())
 
         return response_data.messages
+
+
+def extract_code(instructions: str | None, messages: list[Message]):
+
+    for message in messages:
+        if "code" in message.message_text:
+            return message.message_text.split("code: ")[1]
+    return None
