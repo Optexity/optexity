@@ -3,18 +3,17 @@ from typing import Literal
 from pydantic import BaseModel
 
 
-class BaseTwoFactorAuthAction(BaseModel):
-    integration_id: str
-
-
-class EmailTwoFactorAuthAction(BaseTwoFactorAuthAction):
+class EmailTwoFactorAuthAction(BaseModel):
     type: Literal["email_two_factor_auth"] = "email_two_factor_auth"
-    email_address: str
+    receiver_email_address: str
+    sender_email_address: str
 
 
-class SlackTwoFactorAuthAction(BaseTwoFactorAuthAction):
+class SlackTwoFactorAuthAction(BaseModel):
     type: Literal["slack_two_factor_auth"] = "slack_two_factor_auth"
-    channel_id: str
+    slack_workspace_domain: str
+    channel_name: str
+    sender_name: str
 
 
 class TwoFactorAuthAction(BaseModel):

@@ -10,7 +10,11 @@ from optexity.schema.actions.two_factor_auth_action import (
     SlackTwoFactorAuthAction,
     TwoFactorAuthAction,
 )
-from optexity.schema.inference import FetchOTPFromEmailRequest, FetchOTPResponse
+from optexity.schema.inference import (
+    FetchOTPFromEmailRequest,
+    FetchOTPFromSlackRequest,
+    FetchOTPResponse,
+)
 from optexity.schema.memory import Memory
 from optexity.utils.settings import settings
 
@@ -54,8 +58,8 @@ async def handle_email_two_factor_auth(
         url = urljoin(settings.SERVER_URL, settings.FETCH_OTP_FROM_EMAIL_ENDPOINT)
 
         body = FetchOTPFromEmailRequest(
-            integration_id=email_two_factor_auth_action.integration_id,
-            sender_email_address=email_two_factor_auth_action.email_address,
+            receiver_email_address=email_two_factor_auth_action.receiver_email_address,
+            sender_email_address=email_two_factor_auth_action.sender_email_address,
             start_2fa_time=memory.automation_state.start_2fa_time,
             end_2fa_time=memory.automation_state.start_2fa_time
             + timedelta(seconds=max_wait_time),
@@ -72,4 +76,19 @@ async def handle_slack_two_factor_auth(
     memory: Memory,
     max_wait_time: float,
 ):
-    raise NotImplementedError("Slack 2FA is not implemented")
+    async with httpx.AsyncClient() as client:
+        url = urljoin(settings.SERVER_URL, settings.FETCH_OTP_FROM_SLACK_ENDPOINT)
+
+        body = FetchOTPFromSlackRequest(
+            slack_workspace_domain=slack_two_factor_auth_action.slack_workspace_domain,
+            channel_name=slack_two_factor_auth_action.channel_name,
+            sender_name=slack_two_factor_auth_action.sender_name,
+            start_2fa_time=memory.automation_state.start_2fa_time,
+            end_2fa_time=memory.automation_state.start_2fa_time
+            + timedelta(seconds=max_wait_time),
+        )
+        response = await client.post(url, json=body.model_dump())
+        response.raise_for_status()
+        response_data = FetchOTPResponse.model_validate_json(response.json())
+
+        return response_data.otp
