@@ -108,6 +108,7 @@ async def command_based_action_with_retry(
                 return
             else:
                 await asyncio.sleep(max_timeout_seconds_per_try)
+                last_error = f"error: locator not visible"
         except Exception as e:
             last_error = f"error: {e}"
             await asyncio.sleep(max_timeout_seconds_per_try)
