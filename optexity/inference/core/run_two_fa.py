@@ -5,6 +5,9 @@ from urllib.parse import urljoin
 
 import httpx
 
+from optexity.inference.agents.two_fa_extraction.two_fa_extraction import (
+    TwoFAExtraction,
+)
 from optexity.schema.actions.two_fa_action import (
     EmailTwoFAAction,
     SlackTwoFAAction,
@@ -14,12 +17,13 @@ from optexity.schema.inference import (
     FetchEmailMessagesRequest,
     FetchMessagesResponse,
     FetchSlackMessagesRequest,
-    Message,
 )
 from optexity.schema.memory import Memory
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
+
+two_fa_extraction_agent = TwoFAExtraction()
 
 
 async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory):
@@ -35,9 +39,23 @@ async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory):
             two_fa_action.action, memory, two_fa_action.max_wait_time
         )
         if messages and len(messages) > 0:
-            code = extract_code(two_fa_action.instructions, messages)
+            final_prompt, response, token_usage = two_fa_extraction_agent.extract_code(
+                two_fa_action.instructions, messages
+            )
+            memory.token_usage += token_usage
+            code = None
+            if response.code is not None:
+                if isinstance(response.code, str):
+                    code = response.code
+                elif isinstance(response.code, list):
+                    if len(response.code) > 0:
+                        raise ValueError(f"Multiple 2FA codes found, {response.code}")
+                    else:
+                        code = response.code[0]
+
             if code is not None:
                 break
+
         await asyncio.sleep(two_fa_action.check_interval)
         elapsed += two_fa_action.check_interval
 
@@ -45,7 +63,7 @@ async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory):
     if code is None:
         raise ValueError("2FA code not found")
 
-    memory.variables.generated_variables[two_fa_action.output_variable_name] = code
+    memory.variables.generated_variables[two_fa_action.output_variable_name] = [code]
 
     return code
 
@@ -86,11 +104,3 @@ async def fetch_messages(
         response_data = FetchMessagesResponse.model_validate_json(response.json())
 
         return response_data.messages
-
-
-def extract_code(instructions: str | None, messages: list[Message]):
-
-    for message in messages:
-        if "code" in message.message_text:
-            return message.message_text.split("code: ")[1]
-    return None
