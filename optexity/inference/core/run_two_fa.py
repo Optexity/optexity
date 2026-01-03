@@ -10,9 +10,9 @@ from optexity.schema.actions.two_fa_action import (
     TwoFAAction,
 )
 from optexity.schema.inference import (
-    FetchEmailTwoFARequest,
-    FetchSlackTwoFARequest,
-    FetchTwoFAResponse,
+    FetchEmailMessagesRequest,
+    FetchMessagesResponse,
+    FetchSlackMessagesRequest,
 )
 from optexity.schema.memory import Memory
 from optexity.utils.settings import settings
@@ -50,9 +50,9 @@ async def handle_email_two_fa(
 ):
 
     async with httpx.AsyncClient() as client:
-        url = urljoin(settings.SERVER_URL, settings.FETCH_EMAIL_TWO_FA_ENDPOINT)
+        url = urljoin(settings.SERVER_URL, settings.FETCH_EMAIL_MESSAGES_ENDPOINT)
 
-        body = FetchEmailTwoFARequest(
+        body = FetchEmailMessagesRequest(
             receiver_email_address=email_two_fa_action.receiver_email_address,
             sender_email_address=email_two_fa_action.sender_email_address,
             start_2fa_time=memory.automation_state.start_2fa_time,
@@ -61,9 +61,9 @@ async def handle_email_two_fa(
         )
         response = await client.post(url, json=body.model_dump())
         response.raise_for_status()
-        response_data = FetchTwoFAResponse.model_validate_json(response.json())
+        response_data = FetchMessagesResponse.model_validate_json(response.json())
 
-        return response_data.otp
+        return response_data.messages
 
 
 async def handle_slack_two_fa(
@@ -72,9 +72,9 @@ async def handle_slack_two_fa(
     max_wait_time: float,
 ):
     async with httpx.AsyncClient() as client:
-        url = urljoin(settings.SERVER_URL, settings.FETCH_SLACK_TWO_FA_ENDPOINT)
+        url = urljoin(settings.SERVER_URL, settings.FETCH_SLACK_MESSAGES_ENDPOINT)
 
-        body = FetchSlackTwoFARequest(
+        body = FetchSlackMessagesRequest(
             slack_workspace_domain=slack_two_fa_action.slack_workspace_domain,
             channel_name=slack_two_fa_action.channel_name,
             sender_name=slack_two_fa_action.sender_name,
@@ -84,6 +84,6 @@ async def handle_slack_two_fa(
         )
         response = await client.post(url, json=body.model_dump())
         response.raise_for_status()
-        response_data = FetchTwoFAResponse.model_validate_json(response.json())
+        response_data = FetchMessagesResponse.model_validate_json(response.json())
 
-        return response_data.otp
+        return response_data.messages

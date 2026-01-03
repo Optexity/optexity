@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -26,7 +25,7 @@ class InferenceRequest(BaseModel):
         return self
 
 
-class FetchEmailTwoFARequest(BaseModel):
+class FetchEmailMessagesRequest(BaseModel):
     receiver_email_address: str  # receiver's email address
     sender_email_address: str  # sender's email address
     start_2fa_time: datetime
@@ -46,7 +45,7 @@ class FetchEmailTwoFARequest(BaseModel):
         return self
 
 
-class FetchSlackTwoFARequest(BaseModel):
+class FetchSlackMessagesRequest(BaseModel):
     slack_workspace_domain: str
     channel_name: str
     sender_name: str
@@ -67,7 +66,16 @@ class FetchSlackTwoFARequest(BaseModel):
         return self
 
 
-class FetchTwoFAResponse(BaseModel):
-    message_id: str
+class Message(BaseModel):
+    message_id: str | None = None
     message_text: str
-    otp: str
+    timestamp: datetime
+
+    @model_validator(mode="after")
+    def validate_timestamp(self):
+        assert self.timestamp.tzinfo is not None, "timestamp must be timezone-aware"
+        return self
+
+
+class FetchMessagesResponse(BaseModel):
+    messages: list[Message]

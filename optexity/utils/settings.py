@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     SAVE_TRAJECTORY_ENDPOINT: str = "api/v1/save_trajectory"
     INITIATE_CALLBACK_ENDPOINT: str = "api/v1/initiate_callback"
     GET_CALLBACK_DATA_ENDPOINT: str = "api/v1/get_callback_data"
-    FETCH_EMAIL_TWO_FA_ENDPOINT: str = "api/v1/fetch_email_two_fa"
-    FETCH_SLACK_TWO_FA_ENDPOINT: str = "api/v1/fetch_slack_two_fa"
+    FETCH_EMAIL_MESSAGES_ENDPOINT: str = "api/v1/fetch_email_messages"
+    FETCH_SLACK_MESSAGES_ENDPOINT: str = "api/v1/fetch_slack_messages"
 
     API_KEY: str
 

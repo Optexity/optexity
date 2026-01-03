@@ -18,5 +18,6 @@ class SlackTwoFAAction(BaseModel):
 
 class TwoFAAction(BaseModel):
     action: EmailTwoFAAction | SlackTwoFAAction
+    instructions: str | None = None
     output_variable_name: str
     max_wait_time: float = 300.0
