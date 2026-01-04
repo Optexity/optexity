@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,21 +9,39 @@ readme = "README.md"
 description = "Optexity is a platform for building and running browser and computer agents."
 authors = [{ name = "Optexity", email = "support@optexity.com" }]
 requires-python = ">=3.11"
+
 dependencies = [
-    "pydantic_settings",
-    "pydantic",
+    # core
+    "pydantic>=2",
+    "pydantic-settings",
+
+    # optexity forked dependency
+    "optexity-browser-use>=0.9.5",
+
+    # web / infra
+    "fastapi",
+    "httpx",
+    "aiofiles",
+    "async-lru",
+
+    # browser tooling (runtime)
     "playwright",
     "patchright",
+
+    # misc runtime deps
     "tokencost",
-    "pre-commit",
+    "onepassword-sdk",
+]
+
+[project.optional-dependencies]
+dev = [
     "black",
     "isort",
-    "aiofiles",
-    "onepassword-sdk",
-    "async_lru",
-    "fastapi",
-    "httpx"
+    "pre-commit",
 ]
+
+[project.scripts]
+optexity = "optexity.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -32,13 +50,7 @@ include = ["optexity"]
 [tool.black]
 line-length = 88
 target-version = ["py311"]
-skip-string-normalization = false
 
 [tool.isort]
 profile = "black"
 line_length = 88
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
