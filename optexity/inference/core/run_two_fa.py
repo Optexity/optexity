@@ -54,7 +54,17 @@ async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory):
                         code = response.code[0]
 
             if code is not None:
+                logger.debug(
+                    f"2FA code {code} found after {elapsed} seconds from {messages}"
+                )
                 break
+            logger.debug(
+                f"No 2FA code found in messages, {messages}, waiting for {two_fa_action.check_interval} seconds"
+            )
+        else:
+            logger.debug(
+                f"No messages found for 2FA code after {elapsed} seconds, waiting for {two_fa_action.check_interval} seconds"
+            )
 
         await asyncio.sleep(two_fa_action.check_interval)
         elapsed += two_fa_action.check_interval
@@ -79,6 +89,8 @@ async def fetch_messages(
         seconds=max_wait_time
     )
 
+    headers = {"x-api-key": settings.API_KEY}
+
     if isinstance(action, EmailTwoFAAction):
         url = urljoin(settings.SERVER_URL, settings.FETCH_EMAIL_MESSAGES_ENDPOINT)
         body = FetchEmailMessagesRequest(
@@ -97,10 +109,12 @@ async def fetch_messages(
             end_2fa_time=end_2fa_time,
         )
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
 
-        response = await client.post(url, json=body.model_dump())
+        response = await client.post(
+            url, json=body.model_dump(mode="json"), headers=headers
+        )
         response.raise_for_status()
-        response_data = FetchMessagesResponse.model_validate_json(response.json())
+        response_data = FetchMessagesResponse.model_validate(response.json())
 
         return response_data.messages

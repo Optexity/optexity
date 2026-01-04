@@ -44,6 +44,9 @@ class FetchEmailMessagesRequest(BaseModel):
         ), "start_2fa_time must be before end_2fa_time"
         return self
 
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}
+
 
 class FetchSlackMessagesRequest(BaseModel):
     slack_workspace_domain: str
@@ -64,6 +67,9 @@ class FetchSlackMessagesRequest(BaseModel):
             self.start_2fa_time < self.end_2fa_time
         ), "start_2fa_time must be before end_2fa_time"
         return self
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}
 
 
 class Message(BaseModel):
