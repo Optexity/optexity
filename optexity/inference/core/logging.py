@@ -196,7 +196,7 @@ async def save_downloads_in_server(task: Task, memory: Memory):
         if len(files) == 0:
             return
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
 
             response = await client.post(
                 url, headers=headers, data=payload, files=files
@@ -229,7 +229,7 @@ async def save_trajectory_in_server(task: Task, memory: Memory):
                 "application/gzip",
             )
         }
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
 
             response = await client.post(url, headers=headers, data=data, files=files)
 
@@ -255,7 +255,7 @@ async def initiate_callback(task: Task):
                 "task_id": task.task_id,
                 "endpoint_name": task.endpoint_name,
             }
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(url, headers=headers, json=data)
                 response.raise_for_status()
                 callback_data = response.json()["data"]
@@ -267,7 +267,7 @@ async def initiate_callback(task: Task):
             return
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     settings.LOCAL_CALLBACK_URL, json=callback_data
                 )
@@ -292,7 +292,7 @@ async def initiate_callback(task: Task):
             "callback_url": task.callback_url.model_dump(),
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
 
             response = await client.post(url, headers=headers, json=data)
 

@@ -7,7 +7,7 @@ from optexity.schema.actions.assertion_action import AssertionAction
 from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
 from optexity.schema.actions.misc_action import PythonScriptAction
-from optexity.schema.actions.two_factor_auth_action import Fetch2faAction
+from optexity.schema.actions.two_fa_action import TwoFAAction
 from optexity.utils.utils import get_onepassword_value, get_totp_code
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ class ActionNode(BaseModel):
     assertion_action: AssertionAction | None = None
     extraction_action: ExtractionAction | None = None
     python_script_action: PythonScriptAction | None = None
-    fetch_2fa_action: Fetch2faAction | None = None
+    two_fa_action: TwoFAAction | None = None
     before_sleep_time: float = 0.0
     end_sleep_time: float = 5.0
     expect_new_tab: bool = False
@@ -83,13 +83,13 @@ class ActionNode(BaseModel):
             "assertion_action": model.assertion_action,
             "extraction_action": model.extraction_action,
             "python_script_action": model.python_script_action,
-            "fetch_2fa_action": model.fetch_2fa_action,
+            "two_fa_action": model.two_fa_action,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, or fetch_2fa_action must be provided"
+                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, or two_fa_action must be provided"
             )
 
         assert (
@@ -104,11 +104,7 @@ class ActionNode(BaseModel):
         user_set = model.__pydantic_fields_set__
 
         if "end_sleep_time" not in user_set:
-            if (
-                model.assertion_action
-                or model.extraction_action
-                or model.fetch_2fa_action
-            ):
+            if model.assertion_action or model.extraction_action or model.two_fa_action:
                 model.end_sleep_time = 0.0
 
         if "before_sleep_time" not in user_set:
@@ -134,7 +130,7 @@ class ActionNode(BaseModel):
             self.extraction_action.replace(pattern, replacement)
         if self.python_script_action:
             pass
-        if self.fetch_2fa_action:
+        if self.two_fa_action:
             pass
 
         return self

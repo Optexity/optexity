@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import time
+from datetime import datetime, timezone
 
 import aiofiles
 
@@ -49,9 +49,8 @@ async def run_interaction_action(
     )
 
     try:
+        memory.automation_state.start_2fa_time = datetime.now(timezone.utc)
         if interaction_action.click_element:
-            if interaction_action.start_2fa_timer:
-                memory.automation_state.start_2fa_time = time.time()
             await handle_click_element(
                 interaction_action.click_element,
                 task,

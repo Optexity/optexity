@@ -1,9 +1,10 @@
 import asyncio
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
 from playwright.async_api import Download
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from optexity.schema.token_usage import TokenUsage
 
@@ -33,7 +34,15 @@ class NetworkResponse(BaseModel):
 class AutomationState(BaseModel):
     step_index: int = Field(default_factory=lambda: -1)
     try_index: int = Field(default_factory=lambda: -1)
-    start_2fa_time: float | None = Field(default=None)
+    start_2fa_time: datetime | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def validate_start_2fa_time(self):
+        if self.start_2fa_time is not None:
+            assert (
+                self.start_2fa_time.tzinfo is not None
+            ), "start_2fa_time must be timezone-aware"
+        return self
 
 
 class BrowserState(BaseModel):
