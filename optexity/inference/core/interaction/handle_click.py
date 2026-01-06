@@ -53,7 +53,7 @@ async def click_element_index(
 
     try:
         index = await get_index_from_prompt(
-            memory, click_element_action.prompt_instructions, browser
+            memory, click_element_action.prompt_instructions, browser, task
         )
         if index is None:
             return
