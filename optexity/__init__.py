@@ -1,6 +1,12 @@
 import logging
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+try:
+    __version__ = version("optexity")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
 
 logging.basicConfig(
     level=logging.WARNING,  # Default level for root logger
