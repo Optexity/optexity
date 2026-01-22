@@ -54,6 +54,9 @@ class LLMExtraction(BaseModel):
         return self
 
     def replace(self, pattern: str, replacement: str):
+        self.extraction_instructions = self.extraction_instructions.replace(
+            pattern, replacement
+        )
         return self
 
 
