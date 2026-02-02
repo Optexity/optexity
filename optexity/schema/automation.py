@@ -1,3 +1,4 @@
+
 import logging
 from typing import Annotated, Any, ForwardRef, Literal
 
@@ -7,7 +8,7 @@ from optexity.schema.actions.assertion_action import AssertionAction
 from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
 from optexity.schema.actions.misc_action import PythonScriptAction
-from optexity.utils.utils import get_onepassword_value, get_totp_code
+from optexity.utils.utils import get_onepassword_value, get_totp_code, get_aws_secrets_manager_value
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +31,21 @@ class OnePasswordParameter(BaseModel):
             assert self.digits is None, "digits must not be provided for raw"
         return self
 
-
+# taking OnePassowrkmanger as reference
 class AmazonSecretsManagerParameter(BaseModel):
-    pass
+    secret_id: str 
+    secret_key: str | None = None 
+    region: str | None = None  
+    type: Literal["raw", "totp_secret"] = "raw"
+    digits: int | None = None
 
     @model_validator(mode="after")
-    def validate_amazon_secrets_manager_parameter(
-        cls, model: "AmazonSecretsManagerParameter"
-    ):
-        raise NotImplementedError("Amazon Secrets Manager is not implemented yet")
-
+    def validate_amazon_secrets_manager_parameter(self):
+        if self.type == "totp_secret":
+            assert self.digits is not None, "digits must be provided for totp_secret"
+        else:
+            assert self.digits is None, "digits must not be provided for raw"
+        return self
 
 class TOTPParameter(BaseModel):
     totp_secret: str
@@ -149,11 +155,17 @@ class ActionNode(BaseModel):
                             str_value = get_totp_code(
                                 str_value, value.onepassword.digits
                             )
-
+                    # getting actual values insteaf of raising errrors
                     elif value.amazon_secrets_manager:
-                        raise NotImplementedError(
-                            "Amazon Secrets Manager is not implemented yet"
+                        str_value = await get_aws_secrets_manager_value(
+                            value.amazon_secrets_manager.secret_id,
+                            value.amazon_secrets_manager.secret_key,
+                            value.amazon_secrets_manager.region,
                         )
+                        if value.amazon_secrets_manager.type == "totp_secret":
+                            str_value = get_totp_code(
+                                str_value, value.amazon_secrets_manager.digits
+                            )
                     elif value.totp:
                         str_value = get_totp_code(
                             value.totp.totp_secret, value.totp.digits
