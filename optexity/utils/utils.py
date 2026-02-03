@@ -3,7 +3,10 @@ import logging
 import os
 from pathlib import Path
 from typing import List, Optional
-
+import asyncio
+import json
+import boto3
+from botocore.exceptions import ClientError
 import aiofiles
 import pyotp
 from async_lru import alru_cache
@@ -74,3 +77,36 @@ async def get_onepassword_value(vault_name: str, item_name: str, field_name: str
     )
 
     return str_value
+
+# adding a get aws secrets function
+@alru_cache(maxsize=1000)
+async def get_aws_secrets_manager_value(secret_id: str, secret_key: str | None = None, region: str | None = None):
+
+    def _get_secret():
+        region_name = region or os.getenv("AWS_REGION", "us-east-1")
+        client = boto3.client("secretsmanager", region_name=region_name)
+        
+        try:
+            response = client.get_secret_value(SecretId=secret_id)
+        except ClientError as e:
+            logger.error(f"Failed to retrieve secret {secret_id}: {e}")
+            raise
+        
+        if "SecretString" in response:
+            secret_value = response["SecretString"]
+        else:
+            secret_value = base64.b64decode(response["SecretBinary"]).decode("utf-8")
+        
+        # parsing json to get the key
+        if secret_key:
+            try:
+                secret_dict = json.loads(secret_value)
+                return secret_dict.get(secret_key)
+            except json.JSONDecodeError:
+                logger.error(f"Secret {secret_id} is not valid JSON but secret_key was provided")
+                raise ValueError(f"Secret {secret_id} is not valid JSON")
+        
+        return secret_value
+
+    # Run boto3 sync call in thread pool to avoid blocking
+    return await asyncio.to_thread(_get_secret)

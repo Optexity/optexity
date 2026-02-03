@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import string
 import uuid
@@ -98,12 +99,32 @@ class Task(BaseModel):
 
     @model_validator(mode="after")
     def validate_unique_parameters(self):
-        ## TODO: we do not do dedup using secure parameters yet, need to add support for that
+        # taking reference from existing InferenceRequest in schema/inference.py
         if len(self.unique_parameter_names) > 0:
-            self.unique_parameters = {
-                unique_parameter_name: self.input_parameters[unique_parameter_name]
-                for unique_parameter_name in self.unique_parameter_names
-            }
+            self.unique_parameters = {}
+            
+            for unique_parameter_name in self.unique_parameter_names:
+                if unique_parameter_name in self.input_parameters:
+                    self.unique_parameters[unique_parameter_name] = self.input_parameters[unique_parameter_name]
+                elif unique_parameter_name in self.secure_parameters:
+
+                    secure_param_list = self.secure_parameters[unique_parameter_name]
+                    # taking hashing reference from Secure Parameter.
+                    hashed_values = []
+                    for sp in secure_param_list:
+                        if sp.onepassword:
+                            hashed_values.append(f"op:{sp.onepassword.vault_name}/{sp.onepassword.item_name}/{sp.onepassword.field_name}")
+                        elif sp.amazon_secrets_manager:
+                            hashed_values.append(f"aws:{sp.amazon_secrets_manager.secret_id}/{sp.amazon_secrets_manager.secret_key or 'raw'}")
+                        elif sp.totp:
+                            totp_hash = hashlib.sha256(sp.totp.totp_secret.encode()).hexdigest()[:16]
+                            hashed_values.append(f"totp:{totp_hash}")
+                    self.unique_parameters[unique_parameter_name] = hashed_values
+                else:
+                    raise ValueError(
+                        f"unique_parameter_name {unique_parameter_name} not found in input_parameters or secure_parameters"
+                    )
+            
             self.dedup_key = (
                 json.dumps(self.unique_parameters, sort_keys=True) + self.user_id
             )
@@ -120,6 +141,7 @@ class Task(BaseModel):
                 )
 
         return self
+
 
     @model_validator(mode="after")
     def set_dependent_paths(self):
