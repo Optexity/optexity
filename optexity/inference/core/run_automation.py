@@ -42,8 +42,11 @@ logger = logging.getLogger(__name__)
 
 # TODO: give a warning where any variable of type {variable_name[index]} is used but variable_name is not in the memory in generated variables or in input variables
 
+browser = None
+
 
 async def run_automation(task: Task, child_process_id: int):
+    global browser
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
 
@@ -53,21 +56,24 @@ async def run_automation(task: Task, child_process_id: int):
 
     logger.info(f"Task {task.task_id} started running")
     memory = None
-    browser = None
+
     try:
         await start_task_in_server(task)
         memory = Memory()
-        browser = Browser(
-            memory=memory,
-            headless=False,
-            channel=task.automation.browser_channel,
-            debug_port=9222 + child_process_id,
-            use_proxy=task.use_proxy,
-            proxy_session_id=task.proxy_session_id(
-                settings.PROXY_PROVIDER if task.use_proxy else None
-            ),
-        )
-        await browser.start()
+        if browser is None or not task.is_dedicated:
+            browser = Browser(
+                memory=memory,
+                headless=False,
+                channel=task.automation.browser_channel,
+                debug_port=9222 + child_process_id,
+                use_proxy=task.use_proxy,
+                proxy_session_id=task.proxy_session_id(
+                    settings.PROXY_PROVIDER if task.use_proxy else None
+                ),
+            )
+            await browser.start()
+
+        browser.memory = memory
 
         automation = task.automation
 
@@ -135,7 +141,7 @@ async def run_automation(task: Task, child_process_id: int):
             await run_final_downloads_check(task, memory, browser)
         if memory and browser:
             await run_final_logging(task, memory, browser, child_process_id)
-        if browser:
+        if browser and not task.is_dedicated:
             await browser.stop()
 
     logger.info(f"Task {task.task_id} completed with status {task.status}")

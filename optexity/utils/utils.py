@@ -3,6 +3,7 @@ import logging
 import os
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urlparse
 
 import aiofiles
 import pyotp
@@ -74,3 +75,16 @@ async def get_onepassword_value(vault_name: str, item_name: str, field_name: str
     )
 
     return str_value
+
+
+def clean_url(url: str) -> str:
+    if not url.startswith(("http://", "https://")):
+        url = "http://" + url  # needed for urlparse
+
+    parsed = urlparse(url)
+    domain = parsed.netloc.lower()
+
+    if domain.startswith("www."):
+        domain = domain[4:]
+
+    return domain
