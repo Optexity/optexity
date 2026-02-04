@@ -103,117 +103,134 @@ class Browser:
             },
         ]
 
+        if not self.is_dedicated:
+            global _global_playwright, _global_context
+            _global_playwright = None
+            _global_context = None
+
+    def get_extension_paths(self) -> list[str]:
+        cache_dir = pathlib.Path("/tmp/extensions")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        extension_paths = []
+        loaded_extension_names = []
+        for ext in self.extensions:
+            ext_dir = cache_dir / ext["id"]
+            crx_file = cache_dir / f'{ext["id"]}.crx'
+
+            # Check if extension is already extracted
+            if ext_dir.exists() and (ext_dir / "manifest.json").exists():
+                logger.info(f'✅ Using cached {ext["name"]} extension from {ext_dir}')
+                extension_paths.append(str(ext_dir))
+                loaded_extension_names.append(ext["name"])
+                continue
+
+            try:
+                # Download extension if not cached
+                if not crx_file.exists():
+                    logger.info(f'📦 Downloading {ext["name"]} extension...')
+                    _download_extension(ext["url"], crx_file)
+                else:
+                    logger.info(f'📦 Found cached {ext["name"]} .crx file')
+
+                # Extract extension
+                logger.info(f'📂 Extracting {ext["name"]} extension...')
+                _extract_extension(crx_file, ext_dir)
+
+                extension_paths.append(str(ext_dir))
+                loaded_extension_names.append(ext["name"])
+                logger.info(f'✅ Successfully loaded {ext["name"]}')
+
+            except Exception as e:
+                logger.error(
+                    f'❌ Failed to setup {ext["name"]} extension: {e}',
+                    exc_info=True,
+                )
+                continue
+
+        if not extension_paths:
+            logger.error("⚠️ No extensions were loaded successfully!")
+
+        logger.info(f"Loaded extensions: {', '.join(loaded_extension_names)}")
+
+        return extension_paths
+
+    def get_proxy(self):
+        proxy = None
+        if self.use_proxy:
+            if settings.PROXY_URL is None:
+                raise ValueError("PROXY_URL is not set")
+            proxy = {"server": settings.PROXY_URL}
+            if settings.PROXY_USERNAME is not None:
+                if settings.PROXY_PROVIDER == "oxylabs":
+                    assert settings.PROXY_COUNTRY, "PROXY_COUNTRY is not set"
+                    assert settings.PROXY_USERNAME, "PROXY_USERNAME is not set"
+                    assert settings.PROXY_PASSWORD, "PROXY_PASSWORD is not set"
+
+                    proxy["username"] = (
+                        f"customer-{settings.PROXY_USERNAME}-cc-{settings.PROXY_COUNTRY}-sessid-{self.proxy_session_id}-sesstime-20"
+                    )
+                elif settings.PROXY_PROVIDER == "brightdata":
+
+                    proxy["username"] = (
+                        f"{settings.PROXY_USERNAME}-session-{self.proxy_session_id}"
+                    )
+
+                else:
+                    proxy["username"] = settings.PROXY_USERNAME
+
+            if settings.PROXY_PASSWORD is not None:
+                proxy["password"] = settings.PROXY_PASSWORD
+        return proxy
+
     async def start(self):
         global _global_playwright, _global_context
         logger.debug("Starting browser")
         try:
-            cache_dir = pathlib.Path("/tmp/extensions")
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            extension_paths = []
-            loaded_extension_names = []
-            for ext in self.extensions:
-                ext_dir = cache_dir / ext["id"]
-                crx_file = cache_dir / f'{ext["id"]}.crx'
-
-                # Check if extension is already extracted
-                if ext_dir.exists() and (ext_dir / "manifest.json").exists():
-                    logger.info(
-                        f'✅ Using cached {ext["name"]} extension from {ext_dir}'
-                    )
-                    extension_paths.append(str(ext_dir))
-                    loaded_extension_names.append(ext["name"])
-                    continue
-
-                try:
-                    # Download extension if not cached
-                    if not crx_file.exists():
-                        logger.info(f'📦 Downloading {ext["name"]} extension...')
-                        _download_extension(ext["url"], crx_file)
-                    else:
-                        logger.info(f'📦 Found cached {ext["name"]} .crx file')
-
-                    # Extract extension
-                    logger.info(f'📂 Extracting {ext["name"]} extension...')
-                    _extract_extension(crx_file, ext_dir)
-
-                    extension_paths.append(str(ext_dir))
-                    loaded_extension_names.append(ext["name"])
-                    logger.info(f'✅ Successfully loaded {ext["name"]}')
-
-                except Exception as e:
-                    logger.error(
-                        f'❌ Failed to setup {ext["name"]} extension: {e}',
-                        exc_info=True,
-                    )
-                    continue
-
-            if not extension_paths:
-                logger.error("⚠️ No extensions were loaded successfully!")
-
-            logger.info(f"Loaded extensions: {', '.join(loaded_extension_names)}")
-
-            args = [
-                "--disable-site-isolation-trials",
-                "--disable-web-security",
-                "--disable-features=IsolateOrigins,site-per-process",
-                "--allow-running-insecure-content",
-                "--ignore-certificate-errors",
-                "--ignore-ssl-errors",
-                "--ignore-certificate-errors-spki-list",
-                "--enable-extensions",
-                "--disable-extensions-file-access-check",
-                "--disable-extensions-http-throttling",
-            ]
-
-            if extension_paths:
-                disable_except = (
-                    f'--disable-extensions-except={",".join(extension_paths)}'
-                )
-                load_extension = f'--load-extension={",".join(extension_paths)}'
-                args.append(disable_except)
-                args.append(load_extension)
-                logger.info(f"Extension args: {disable_except}")
-                logger.info(f"Extension args: {load_extension}")
-
-            if self.playwright is not None:
-                await self.playwright.stop()
-
-            if self.stealth:
-                from patchright.async_api import async_playwright
-            else:
-                from playwright.async_api import async_playwright
-
-            proxy = None
-            if self.use_proxy:
-                if settings.PROXY_URL is None:
-                    raise ValueError("PROXY_URL is not set")
-                proxy = {"server": settings.PROXY_URL}
-                if settings.PROXY_USERNAME is not None:
-                    if settings.PROXY_PROVIDER == "oxylabs":
-                        assert settings.PROXY_COUNTRY, "PROXY_COUNTRY is not set"
-                        assert settings.PROXY_USERNAME, "PROXY_USERNAME is not set"
-                        assert settings.PROXY_PASSWORD, "PROXY_PASSWORD is not set"
-
-                        proxy["username"] = (
-                            f"customer-{settings.PROXY_USERNAME}-cc-{settings.PROXY_COUNTRY}-sessid-{self.proxy_session_id}-sesstime-20"
-                        )
-                    elif settings.PROXY_PROVIDER == "brightdata":
-
-                        proxy["username"] = (
-                            f"{settings.PROXY_USERNAME}-session-{self.proxy_session_id}"
-                        )
-
-                    else:
-                        proxy["username"] = settings.PROXY_USERNAME
-
-                if settings.PROXY_PASSWORD is not None:
-                    proxy["password"] = settings.PROXY_PASSWORD
-
             if (
                 _global_playwright is None
                 or _global_context is None
                 or not self.is_dedicated
             ):
+                if _global_context is not None:
+                    await _global_context.close()
+                    _global_context = None
+                    self.context = None
+                if _global_playwright is not None:
+                    await _global_playwright.stop()
+                    _global_playwright = None
+                    self.playwright = None
+
+                if self.stealth:
+                    from patchright.async_api import async_playwright
+                else:
+                    from playwright.async_api import async_playwright
+
+                extension_paths = self.get_extension_paths()
+                proxy = self.get_proxy()
+
+                args = [
+                    "--disable-site-isolation-trials",
+                    "--disable-web-security",
+                    "--disable-features=IsolateOrigins,site-per-process",
+                    "--allow-running-insecure-content",
+                    "--ignore-certificate-errors",
+                    "--ignore-ssl-errors",
+                    "--ignore-certificate-errors-spki-list",
+                    "--enable-extensions",
+                    "--disable-extensions-file-access-check",
+                    "--disable-extensions-http-throttling",
+                ]
+
+                if extension_paths:
+                    disable_except = (
+                        f'--disable-extensions-except={",".join(extension_paths)}'
+                    )
+                    load_extension = f'--load-extension={",".join(extension_paths)}'
+                    args.append(disable_except)
+                    args.append(load_extension)
+                    logger.info(f"Extension args: {disable_except}")
+                    logger.info(f"Extension args: {load_extension}")
+
                 self.playwright = await async_playwright().start()
                 self.context = await self.playwright.chromium.launch_persistent_context(
                     channel=self.channel,
@@ -266,6 +283,9 @@ class Browser:
             # )
 
             # self.page = await self.context.new_page()
+            if len(self.context.pages) == 0:
+                await self.context.new_page()
+
             self.page = self.context.pages[0]
 
             browser_session = BrowserSession(cdp_url=self.cdp_url, keep_alive=True)
@@ -292,7 +312,7 @@ class Browser:
             logger.error(f"Error starting playwright: {e}")
             raise e
 
-    async def stop(self):
+    async def stop(self, force: bool = False):
         logger.debug("Stopping backend agent")
         if self.backend_agent is not None:
             logger.debug("Stopping backend agent")
@@ -305,7 +325,7 @@ class Browser:
                 logger.debug("Browser session reset")
             self.backend_agent = None
 
-        if not self.is_dedicated:
+        if not self.is_dedicated or force:
             logger.debug("Stopping context and playwright and browser as not dedicated")
             if self.context is not None:
                 logger.debug("Stopping context")
@@ -322,6 +342,14 @@ class Browser:
                 await self.playwright.stop()
                 self.playwright = None
             shutil.rmtree(self.user_data_dir, ignore_errors=True)
+
+            global _global_playwright, _global_context
+            _global_playwright = None
+            _global_context = None
+            self.context = None
+            self.playwright = None
+            logger.debug("Global playwright and context reset")
+
         else:
             logger.debug("browser not stopped as dedicated")
 

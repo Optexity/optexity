@@ -58,10 +58,14 @@ async def run_automation(task: Task, child_process_id: int):
     try:
         await start_task_in_server(task)
         memory = Memory()
-
+        user_data_dir = (
+            f"/tmp/userdata_{task.task_id}"
+            if settings.DEPLOYMENT == "dev"
+            else f"/tmp/userdata"
+        )
         browser = Browser(
             memory=memory,
-            user_data_dir=f"/tmp/userdata_{task.task_id}",
+            user_data_dir=user_data_dir,
             headless=False,
             channel=task.automation.browser_channel,
             debug_port=9222 + child_process_id,
@@ -73,14 +77,32 @@ async def run_automation(task: Task, child_process_id: int):
         )
         await browser.start()
 
-        browser.memory = memory
-
         automation = task.automation
 
         memory.automation_state.step_index = -1
         memory.automation_state.try_index = 0
 
-        await browser.go_to_url("about:blank")
+        try:
+            await browser.go_to_url("about:blank")
+        except Exception as e:
+            logger.error(
+                f"Error going to about:blank on start: {e}, stopping browser and restarting"
+            )
+            await browser.stop(force=True)
+            browser = Browser(
+                memory=memory,
+                user_data_dir=user_data_dir,
+                headless=False,
+                channel=task.automation.browser_channel,
+                debug_port=9222 + child_process_id,
+                use_proxy=task.use_proxy,
+                proxy_session_id=task.proxy_session_id(
+                    settings.PROXY_PROVIDER if task.use_proxy else None
+                ),
+                is_dedicated=task.is_dedicated,
+            )
+            await browser.start()
+            await browser.go_to_url("about:blank")
 
         if task.use_proxy:
 
