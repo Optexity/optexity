@@ -48,6 +48,7 @@ DRIVER_CLOSED_MARKERS = (
     "Browser closed",
     "no close frame",
     "has been closed",
+    "Target crashed",
 )
 
 
