@@ -1,5 +1,6 @@
 import ast
 import logging
+import random
 import re
 import time
 from enum import Enum, unique
@@ -65,14 +66,16 @@ class LLMModel:
     ) -> tuple[str, TokenUsage]:
 
         max_retries = 3
+        base_delay = 2
         for i in range(max_retries):
             try:
                 return self._get_model_response(prompt, system_instruction)
             except Exception as e:
                 logger.error(f"LLM Error during inference: {e}")
                 if i < max_retries - 1:
-                    logger.info(f"Retrying... {i + 1}/{max_retries}")
-                    time.sleep(5)
+                    delay = base_delay * (2 ** i) + random.uniform(0, 1)
+                    logger.info(f"Retrying in {delay:.1f}s... {i + 1}/{max_retries}")
+                    time.sleep(delay)
                 continue
         raise Exception("Max retries exceeded for LLM")
 
@@ -87,10 +90,10 @@ class LLMModel:
 
         total_token_usage = TokenUsage()
         max_retries = 3
+        base_delay = 5
         last_exception = ""
         for i in range(max_retries):
             try:
-                # raise Exception("Test error")
                 parsed_response, token_usage = (
                     self._get_model_response_with_structured_output(
                         prompt=prompt,
@@ -106,8 +109,9 @@ class LLMModel:
             except Exception as e:
                 logger.error(f"LLM with structured output Error during inference: {e}")
                 if i < max_retries - 1:
-                    logger.info(f"Retrying... {i + 1}/{max_retries}")
-                    time.sleep(20)
+                    delay = base_delay * (2 ** i) + random.uniform(0, 2)
+                    logger.info(f"Retrying in {delay:.1f}s... {i + 1}/{max_retries}")
+                    time.sleep(delay)
                 last_exception = str(e)
 
         raise Exception(
