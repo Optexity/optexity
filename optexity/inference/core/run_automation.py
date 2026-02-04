@@ -282,7 +282,7 @@ async def run_action_node(
     memory.browser_states.append(
         BrowserState(
             url=await browser.get_current_page_url(),
-            screenshot=None,
+            screenshot=await browser.get_screenshot(),
             title=await browser.get_current_page_title(),
             axtree=None,
         )
