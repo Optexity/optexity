@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
@@ -24,7 +25,8 @@ class ChildProcessIdRequest(BaseModel):
     new_child_process_id: str
 
 
-child_process_id = None
+child_process_id = -1
+unique_child_arn: str = str(uuid.uuid4())
 task_running = False
 last_task_start_time = None
 task_queue: asyncio.Queue[Task] = asyncio.Queue()
@@ -42,7 +44,7 @@ async def task_processor():
             task = await task_queue.get()
             task_running = True
             last_task_start_time = datetime.now()
-            await run_automation(task, child_process_id)
+            await run_automation(task, unique_child_arn, child_process_id)
 
         except asyncio.CancelledError:
             logger.info("Task processor cancelled")
@@ -55,6 +57,7 @@ async def task_processor():
 
 
 async def register_with_master():
+    global unique_child_arn
     """Register with master on startup (handles restarts automatically)."""
     # Get my task metadata from ECS
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -63,6 +66,7 @@ async def register_with_master():
         metadata = response.json()
 
     my_task_arn = metadata["TaskARN"]
+    unique_child_arn = str(my_task_arn)
     my_ip = metadata["Containers"][0]["Networks"][0]["IPv4Addresses"][0]
 
     my_port = None

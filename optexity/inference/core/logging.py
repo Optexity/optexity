@@ -112,6 +112,11 @@ async def save_output_data_in_server(task: Task, memory: Memory):
             "task_id": task.task_id,
             "output_data": output_data,
             "final_screenshot": memory.final_screenshot,
+            "unique_child_arn": memory.unique_child_arn,
+            "system_info": [
+                system_info.model_dump(mode="json")
+                for system_info in memory.system_info_tracking
+            ],
         }
 
         for_loop_status = []
@@ -334,6 +339,8 @@ async def save_latest_memory_state_locally(
                 downloaded_file.name for downloaded_file in memory.downloads
             ],
             "token_usage": memory.token_usage.model_dump(),
+            "unique_child_arn": memory.unique_child_arn,
+            "system_info": browser_state.system_info.model_dump(mode="json"),
         }
 
         async with aiofiles.open(step_directory / "state.json", "w") as f:

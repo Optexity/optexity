@@ -1,8 +1,10 @@
 import asyncio
-from datetime import datetime
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+import psutil
 from playwright.async_api import Download
 from pydantic import BaseModel, Field, model_validator
 
@@ -45,6 +47,28 @@ class AutomationState(BaseModel):
         return self
 
 
+class SystemInfo(BaseModel):
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    process_memory_usage_mb: float = Field(
+        default_factory=lambda: SystemInfo.get_memory_usage_mb()
+    )
+    total_system_memory: float = Field(
+        default_factory=lambda: psutil.virtual_memory().total / (1024**2)
+    )  # convert to MB
+    total_system_memory_used: float = Field(
+        default_factory=lambda: psutil.virtual_memory().used / (1024**2)
+    )  # convert to MB
+
+    @staticmethod
+    def get_memory_usage_mb() -> float:
+        process = psutil.Process(os.getpid())
+        mem = process.memory_info().rss  # bytes
+        return mem / (1024**2)  # convert to MB
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}
+
+
 class BrowserState(BaseModel):
     url: str = Field(...)
     title: str | None = Field(default=None)
@@ -53,6 +77,7 @@ class BrowserState(BaseModel):
     axtree: str | None = Field(default=None)
     final_prompt: str | None = Field(default=None)
     llm_response: str | dict | None = Field(default=None)
+    system_info: SystemInfo = Field(default_factory=SystemInfo)
 
 
 class ScreenshotData(BaseModel):
@@ -93,8 +118,13 @@ class Memory(BaseModel):
     urls_to_downloads: list[tuple[str, str]] = Field(default_factory=list)
     downloads: list[Path] = Field(default_factory=list)
     final_screenshot: str | None = Field(default=None)
+    system_info_tracking: list[SystemInfo] = Field(default_factory=list)
+    unique_child_arn: str
 
     model_config = {
         "arbitrary_types_allowed": True,
         "exclude": {"download_lock"},
     }
+
+    def update_system_info(self):
+        self.system_info_tracking.append(SystemInfo())

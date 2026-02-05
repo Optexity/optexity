@@ -57,7 +57,9 @@ def is_driver_closed_error(e: Exception) -> bool:
     return any(m in msg for m in DRIVER_CLOSED_MARKERS)
 
 
-async def run_automation(task: Task, child_process_id: int, max_retries: int = 1):
+async def run_automation(
+    task: Task, unique_child_arn: str, child_process_id: int, max_retries: int = 1
+):
     if max_retries <= 0:
         return
     file_handler = logging.FileHandler(str(task.log_file_path))
@@ -73,12 +75,13 @@ async def run_automation(task: Task, child_process_id: int, max_retries: int = 1
 
     try:
         await start_task_in_server(task)
-        memory = Memory()
+        memory = Memory(unique_child_arn=unique_child_arn)
         user_data_dir = (
             f"/tmp/userdata_{task.task_id}"
             if settings.DEPLOYMENT == "dev"
             else f"/tmp/userdata"
         )
+        memory.update_system_info()
         browser = Browser(
             memory=memory,
             user_data_dir=user_data_dir,
@@ -91,6 +94,7 @@ async def run_automation(task: Task, child_process_id: int, max_retries: int = 1
             ),
             is_dedicated=task.is_dedicated,
         )
+        memory.update_system_info()
 
         automation = task.automation
 
@@ -100,6 +104,7 @@ async def run_automation(task: Task, child_process_id: int, max_retries: int = 1
         try:
             await browser.start()
             await browser.go_to_url("about:blank")
+            memory.update_system_info()
         except Exception as e:
             logger.error(
                 f"Error going to about:blank on start: {e}, stopping browser and restarting"
@@ -119,6 +124,7 @@ async def run_automation(task: Task, child_process_id: int, max_retries: int = 1
             )
             await browser.start()
             await browser.go_to_url("about:blank")
+            memory.update_system_info()
 
         if task.use_proxy:
 
@@ -150,6 +156,7 @@ async def run_automation(task: Task, child_process_id: int, max_retries: int = 1
                     logger.error(f"Error getting IP info: {e}")
 
         await browser.go_to_url(task.automation.url)
+        memory.update_system_info()
 
         full_automation = []
 
@@ -292,7 +299,7 @@ async def run_action_node(
     memory: Memory,
     browser: Browser,
 ):
-
+    memory.update_system_info()
     await asyncio.sleep(action_node.before_sleep_time)
     await browser.handle_new_tabs(0)
 
@@ -344,6 +351,8 @@ async def run_action_node(
         raise e
     finally:
         await save_latest_memory_state_locally(task, memory, action_node)
+        if memory.automation_state.step_index % 5 == 0:
+            await save_trajectory_in_server(task, memory)
 
     if action_node.expect_new_tab:
         found_new_tab, total_time = await browser.handle_new_tabs(
@@ -360,6 +369,7 @@ async def run_action_node(
         await sleep_for_page_to_load(browser, action_node.end_sleep_time)
 
     logger.debug(f"-----Finished node {memory.automation_state.step_index}-----")
+    memory.update_system_info()
 
 
 async def sleep_for_page_to_load(browser: Browser, sleep_time: float):
@@ -398,6 +408,7 @@ async def handle_if_else_node(
     browser: Browser,
     full_automation: list[ActionNode],
 ):
+    memory.update_system_info()
     logger.debug(
         f"Handling if else node {if_else_node.condition} with if nodes {if_else_node.if_nodes} and else nodes {if_else_node.else_nodes}"
     )
@@ -422,6 +433,7 @@ async def handle_if_else_node(
             await handle_for_loop_node(node, memory, task, browser, full_automation)
 
     logger.debug(f"Finished handling if else node {if_else_node.condition}")
+    memory.update_system_info()
 
 
 async def handle_for_loop_node(
@@ -431,6 +443,7 @@ async def handle_for_loop_node(
     browser: Browser,
     full_automation: list[ActionNode],
 ):
+    memory.update_system_info()
     if for_loop_node.variable_name in task.input_parameters:
         values = task.input_parameters[for_loop_node.variable_name]
     elif for_loop_node.variable_name in memory.variables.generated_variables:
@@ -519,3 +532,4 @@ async def handle_for_loop_node(
                         memory,
                         browser,
                     )
+    memory.update_system_info()
