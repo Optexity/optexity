@@ -149,6 +149,7 @@ class Browser:
             if self.backend_agent.browser_session:
                 logger.debug("Resetting browser session")
                 await self.backend_agent.browser_session.stop()
+                await self.backend_agent.close()
                 logger.debug("Browser session reset")
             self.backend_agent = None
 
