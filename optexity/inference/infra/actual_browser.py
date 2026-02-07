@@ -139,6 +139,14 @@ class ActualBrowser:
                 f"--user-data-dir={self.user_data_dir}",
                 "--no-first-run",
                 "--no-default-browser-check",
+                "--no-sandbox",
+                # ---- privacy / security
+                "--disable-save-password-bubble",
+                "--disable-autofill-keyboard-accessory-view",
+                "--disable-autofill",
+                "--password-store=basic",
+                "--disable-notifications",
+                "--disable-credential-manager-api",
             ]
 
             if self.headless:
