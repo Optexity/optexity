@@ -76,28 +76,25 @@ async def run_automation(
     try:
         await start_task_in_server(task)
         memory = Memory(unique_child_arn=unique_child_arn)
-        user_data_dir = (
-            f"/tmp/userdata_{task.task_id}"
-            if settings.DEPLOYMENT == "dev"
-            else f"/tmp/userdata"
-        )
         memory.update_system_info()
-        browser = Browser(
-            memory=memory,
-            user_data_dir=user_data_dir,
-            headless=False,
-            channel=task.automation.browser_channel,
-            debug_port=9222 + child_process_id,
-            use_proxy=task.use_proxy,
-            proxy_session_id=task.proxy_session_id(
-                settings.PROXY_PROVIDER if task.use_proxy else None
-            ),
-            is_dedicated=task.is_dedicated,
-        )
+
+        def _get_browser():
+            return Browser(
+                memory=memory,
+                headless=False,
+                channel=task.automation.browser_channel,
+                debug_port=9222 + child_process_id,
+                use_proxy=task.use_proxy,
+                proxy_session_id=task.proxy_session_id(
+                    settings.PROXY_PROVIDER if task.use_proxy else None
+                ),
+                is_dedicated=task.is_dedicated,
+            )
+
+        browser = _get_browser()
         memory.update_system_info()
 
         automation = task.automation
-
         memory.automation_state.step_index = -1
         memory.automation_state.try_index = 0
 
@@ -110,18 +107,7 @@ async def run_automation(
                 f"Error going to about:blank on start: {e}, stopping browser and restarting"
             )
             await browser.stop(force=True)
-            browser = Browser(
-                memory=memory,
-                user_data_dir=user_data_dir,
-                headless=False,
-                channel=task.automation.browser_channel,
-                debug_port=9222 + child_process_id,
-                use_proxy=task.use_proxy,
-                proxy_session_id=task.proxy_session_id(
-                    settings.PROXY_PROVIDER if task.use_proxy else None
-                ),
-                is_dedicated=task.is_dedicated,
-            )
+            browser = _get_browser()
             await browser.start()
             await browser.go_to_url("about:blank")
             memory.update_system_info()
@@ -188,18 +174,20 @@ async def run_automation(
             logger.info(
                 f"Running automations again with {max_retries - 1} retries left"
             )
-            return await run_automation(task, child_process_id, max_retries - 1)
+            return await run_automation(
+                task, unique_child_arn, child_process_id, max_retries - 1
+            )
         else:
             logger.error(f"Error running automation: {traceback.format_exc()}")
             task.error = str(e)
             task.status = "failed"
 
     finally:
-        if task and memory:
+        if task and memory and browser:
             await run_final_downloads_check(task, memory, browser)
         if memory and browser:
             await run_final_logging(task, memory, browser, child_process_id)
-        if browser:
+        if browser is not None:
             await browser.stop()
 
     logger.info(f"Task {task.task_id} completed with status {task.status}")
@@ -221,7 +209,7 @@ async def run_final_downloads_check(task: Task, memory: Memory, browser: Browser
             is_downloaded,
             download,
         ) in memory.raw_downloads.items():
-            if is_downloaded:
+            if is_downloaded or download is None:
                 continue
 
             download_path = task.downloads_directory / download.suggested_filename
@@ -328,7 +316,6 @@ async def run_action_node(
         if action_node.interaction_action:
             ## Assuming network calls are only made during interaction actions and not during extraction actions
             await browser.clear_network_calls()
-            await browser.attach_network_listeners()
 
             await run_interaction_action(
                 action_node.interaction_action, task, memory, browser, 2
@@ -385,11 +372,7 @@ async def sleep_for_page_to_load(browser: Browser, sleep_time: float):
         return
     try:
         await page.wait_for_load_state("load", timeout=sleep_time * 1000)
-    except TimeoutError as e:
-        pass
-    except PatchrightTimeoutError as e:
-        pass
-    except PlaywrightTimeoutError as e:
+    except (TimeoutError, PatchrightTimeoutError, PlaywrightTimeoutError):
         pass
 
 

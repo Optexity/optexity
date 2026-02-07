@@ -29,7 +29,7 @@ class NetworkResponse(BaseModel):
     status: int = Field(...)
     headers: dict = Field(...)
     body: dict | str | None | bytes | Any = Field(default=None)
-    method: str = Field(...)
+    method: str | None = Field(default=None)
     content_length: int = Field(...)
 
 

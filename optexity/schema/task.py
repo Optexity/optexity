@@ -132,7 +132,7 @@ class Task(BaseModel):
         return self
 
     def proxy_session_id(
-        self, proxy_provider: Literal["oxylabs", "other"] | None
+        self, proxy_provider: Literal["oxylabs", "brightdata", "other"] | None
     ) -> str | None:
         if not self.use_proxy:
             return None
