@@ -457,12 +457,18 @@ class Browser:
             pass
 
     async def get_browser_state_summary(self) -> BrowserStateSummary:
+        summary_id = str(uuid4())
+        logger.info(f"🔍 get_browser_state_summary: summary_id: {summary_id}")
         browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
+            summary_id=summary_id,
             include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
             include_recent_events=self.backend_agent.include_recent_events,
             cached=False,
         )
 
+        logger.info(
+            f"🔍 get_browser_state_summary: returning browser state summary for summary_id: {summary_id}"
+        )
         return browser_state_summary
 
     async def get_current_page_url(self) -> str:
