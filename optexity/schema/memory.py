@@ -49,21 +49,55 @@ class AutomationState(BaseModel):
 
 class SystemInfo(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    process_memory_usage_mb: float = Field(
-        default_factory=lambda: SystemInfo.get_memory_usage_mb()
-    )
     total_system_memory: float = Field(
-        default_factory=lambda: psutil.virtual_memory().total / (1024**2)
+        default_factory=lambda: SystemInfo.get_effective_memory_mb()[1]
     )  # convert to MB
     total_system_memory_used: float = Field(
-        default_factory=lambda: psutil.virtual_memory().used / (1024**2)
+        default_factory=lambda: SystemInfo.get_effective_memory_mb()[0]
     )  # convert to MB
 
     @staticmethod
-    def get_memory_usage_mb() -> float:
-        process = psutil.Process(os.getpid())
-        mem = process.memory_info().rss  # bytes
-        return mem / (1024**2)  # convert to MB
+    def get_effective_memory_mb():
+        """
+        Returns (used_mb, total_mb)
+        - If running inside Docker → container memory
+        - Else → system memory
+        Works on Linux (Ubuntu) and macOS.
+        """
+
+        # ---------- Linux: try cgroups (Docker / K8s) ----------
+        if Path("/sys/fs/cgroup").exists():
+            # cgroup v2
+            mem_current = Path("/sys/fs/cgroup/memory.current")
+            mem_max = Path("/sys/fs/cgroup/memory.max")
+
+            if mem_current.exists() and mem_max.exists():
+                try:
+                    used = int(mem_current.read_text().strip())
+                    limit_raw = mem_max.read_text().strip()
+                    if limit_raw != "max":
+                        limit = int(limit_raw)
+                        return used / (1024**2), limit / (1024**2)
+                except Exception:
+                    pass
+
+            # cgroup v1
+            mem_used = Path("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+            mem_limit = Path("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+
+            if mem_used.exists() and mem_limit.exists():
+                try:
+                    used = int(mem_used.read_text().strip())
+                    limit = int(mem_limit.read_text().strip())
+                    # very large limit means "no limit"
+                    if limit < (1 << 60):
+                        return used / (1024**2), limit / (1024**2)
+                except Exception:
+                    pass
+
+        # ---------- Fallback: system memory (macOS or non-docker) ----------
+        vm = psutil.virtual_memory()
+        return vm.used / (1024**2), vm.total / (1024**2)
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}

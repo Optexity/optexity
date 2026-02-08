@@ -150,6 +150,8 @@ class Browser:
                 logger.debug("Resetting browser session")
                 await self.backend_agent.browser_session.stop()
                 await self.backend_agent.close()
+                # await self.backend_agent.browser_session._storage_state_watchdog._stop_monitoring()
+                # await self.backend_agent.browser_session.reset()
                 logger.debug("Browser session reset")
             self.backend_agent = None
 

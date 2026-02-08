@@ -70,7 +70,6 @@ async def command_based_action_with_retry(
                     timeout=max_timeout_seconds_per_try * 1000
                 )
                 await asyncio.sleep(0.05)
-
                 # browser_state_summary = await browser.get_browser_state_summary()
                 memory.browser_states[-1] = BrowserState(
                     url=await browser.get_current_page_url(),
