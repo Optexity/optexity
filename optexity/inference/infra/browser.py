@@ -256,19 +256,19 @@ class Browser:
                 _global_playwright = self.playwright
                 _global_context = self.context
 
-                self.context.on("request", lambda req: self.log_request(req))
-                self.context.on("response", lambda resp: self.log_response(resp))
+                async def log_request(req: Request):
+                    await self.log_request(req)
+
+                async def handle_random_download(download: Download):
+                    await self.handle_random_download(download)
+
+                async def handle_random_url_downloads(resp: Response):
+                    await self.handle_random_url_downloads(resp)
+
+                self.context.on("request", log_request)
+                self.context.on("response", handle_random_url_downloads)
                 self.context.on(
-                    "response", lambda resp: self.handle_random_url_downloads(resp)
-                )
-                self.context.on(
-                    "page",
-                    lambda p: (
-                        p.on(
-                            "download",
-                            lambda download: self.handle_random_download(download),
-                        )
-                    ),
+                    "page", lambda p: (p.on("download", handle_random_download))
                 )
 
             elif self.is_dedicated:
@@ -323,7 +323,7 @@ class Browser:
             if self.backend_agent.browser_session:
                 logger.debug("Resetting browser session")
                 await self.backend_agent.browser_session.stop()
-                await self.backend_agent.close()
+                # await self.backend_agent.close()
                 # await self.backend_agent.browser_session._storage_state_watchdog._stop_monitoring()
                 # await self.backend_agent.browser_session.reset()
                 logger.debug("Browser session reset")
@@ -551,7 +551,25 @@ class Browser:
             # logger.error(f"Could not get body: {e}")
             pass
 
-    async def log_response(self, response: Response):
+    async def attach_network_listeners(self):
+        page = await self.get_current_page()
+
+        # remove old listeners first
+        try:
+            page.remove_listener("response", self._on_response)
+        except Exception:
+            pass
+
+        page.on("response", self._on_response)
+
+    async def detach_network_listeners(self):
+        page = await self.get_current_page()
+        try:
+            page.remove_listener("response", self._on_response)
+        except Exception:
+            pass
+
+    async def _on_response(self, response: Response):
         try:
             body = await response.json()
         except Exception:

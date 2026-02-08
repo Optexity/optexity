@@ -328,6 +328,7 @@ async def run_action_node(
         if action_node.interaction_action:
             ## Assuming network calls are only made during interaction actions and not during extraction actions
             await browser.clear_network_calls()
+            await browser.attach_network_listeners()
 
             await run_interaction_action(
                 action_node.interaction_action, task, memory, browser, 2
