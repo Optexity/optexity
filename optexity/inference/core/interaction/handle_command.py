@@ -64,14 +64,12 @@ async def command_based_action_with_retry(
             is_visible = await locator.is_visible()
 
             if is_visible:
-                browser_state_summary = await browser.get_browser_state_summary()
+                # browser_state_summary = await browser.get_browser_state_summary()
                 memory.browser_states[-1] = BrowserState(
-                    url=browser_state_summary.url,
-                    screenshot=browser_state_summary.screenshot,
-                    title=browser_state_summary.title,
-                    axtree=browser_state_summary.dom_state.llm_representation(
-                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-                    ),
+                    url=await browser.get_current_page_url(),
+                    screenshot=await browser.get_screenshot(),
+                    title=await browser.get_current_page_title(),
+                    axtree=None,
                 )
 
                 if isinstance(action, ClickElementAction):

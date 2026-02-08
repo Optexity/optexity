@@ -357,9 +357,11 @@ class Browser:
         else:
             logger.debug("browser not stopped as dedicated")
 
-    async def get_current_page(self) -> Page | None:
+    async def get_current_page(
+        self,
+    ) -> playwright.async_api.Page | patchright.async_api.Page:
         if self.context is None:
-            return None
+            raise ValueError("Context is not set")
         pages = self.context.pages
         if len(pages) == 0:
             self.page = await self.context.new_page()
@@ -459,7 +461,7 @@ class Browser:
     async def get_browser_state_summary(self) -> BrowserStateSummary:
         browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
             include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
-            include_recent_events=self.backend_agent.include_recent_events,
+            include_recent_events=False,
             cached=False,
         )
 
@@ -468,22 +470,18 @@ class Browser:
     async def get_current_page_url(self) -> str:
         try:
             page = await self.get_current_page()
-            if page is None:
-                return None
             return page.url
         except Exception as e:
             logger.error(f"Error getting current page URL: {e}")
-            return None
+            return ""
 
     async def get_current_page_title(self) -> str:
         try:
             page = await self.get_current_page()
-            if page is None:
-                return None
             return await page.title()
         except Exception as e:
             logger.error(f"Error getting current page title: {e}")
-            return None
+            return ""
 
     async def handle_random_download(self, download: Download):
         self.active_downloads += 1
