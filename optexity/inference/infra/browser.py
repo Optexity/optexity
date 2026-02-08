@@ -463,7 +463,7 @@ class Browser:
             summary_id=summary_id,
             include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
             include_recent_events=self.backend_agent.include_recent_events,
-            cached=True,
+            cached=False,
         )
 
         logger.info(
