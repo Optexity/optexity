@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from uvicorn import run
 
+from optexity.inference.core.logging import save_trajectory_in_server
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import SystemInfo
@@ -42,63 +43,81 @@ task_queue: asyncio.Queue[Task] = asyncio.Queue()
 _global_actual_browser: ActualBrowser | None = None
 
 
-def log_system_info(f: TextIO):
-    f.write(
+def log_system_info(comment: str):
+    logger.info("=" * 100 + "\n")
+    logger.info(comment)
+    system_info = SystemInfo()
+    logger.info(
         json.dumps(
             {
-                "container_memory_total": SystemInfo().total_system_memory / 1024,
-                "container_memory_used": SystemInfo().total_system_memory_used / 1024,
+                "container_memory_total": system_info.total_system_memory / 1024,
+                "container_memory_used": system_info.total_system_memory_used / 1024,
                 "percent_container_memory_used": round(
-                    SystemInfo().total_system_memory_used
-                    / SystemInfo().total_system_memory,
+                    system_info.total_system_memory_used
+                    / system_info.total_system_memory,
                     2,
                 ),
             }
         )
         + "\n"
     )
-    f.write(
+    vm = psutil.virtual_memory()
+    logger.info(
         json.dumps(
             {
-                "host_memory_total": psutil.virtual_memory().total / (1024**3),
-                "host_memory_used": psutil.virtual_memory().used / (1024**3),
-                "percent_host_memory_used": round(
-                    psutil.virtual_memory().used / psutil.virtual_memory().total, 2
-                ),
+                "host_memory_total": vm.total / (1024**3),
+                "host_memory_used": vm.used / (1024**3),
+                "percent_host_memory_used": round(vm.used / vm.total, 2),
             }
         )
         + "\n",
     )
+    logger.info("=" * 100 + "\n")
 
 
 async def run_automation_in_process(
     task: Task, unique_child_arn: str, child_process_id: int
 ):
-    with open("/tmp/system_info.json", "a") as f:
-        f.write("=" * 100 + "\n")
-        f.write("----- System info for Task " + task.task_id + ": -------\n")
-        f.write("Before starting browser\n")
-        log_system_info(f)
+
+    file_handler = logging.FileHandler(str(task.log_file_path))
+    file_handler.setLevel(logging.DEBUG)
+
+    current_module = __name__.split(".")[0]  # top-level module/package
+    logging.getLogger(current_module).addHandler(file_handler)
+    logger.info(
+        f"---------- Starting to run automation for task {task.task_id} ----------\n"
+    )
+    log_system_info("Memory info before starting browser")
 
     global _global_actual_browser
 
-    if not task.is_dedicated and _global_actual_browser is not None:
-        await _global_actual_browser.stop(graceful=False)
+    system_info = SystemInfo()
+    memory_exceeded = (
+        system_info.total_system_memory_used / system_info.total_system_memory > 0.6
+    )
+    if _global_actual_browser is not None and (
+        memory_exceeded or not task.is_dedicated
+    ):
+        if memory_exceeded:
+            logger.info("Memory exceeded, restarting browser")
+        else:
+            logger.info("Previous browser was not dedicated, restarting browser")
+
+        await _global_actual_browser.stop(graceful=True)
         _global_actual_browser = None
 
     if _global_actual_browser is None:
+        logger.info("Starting new actual browser")
         _global_actual_browser = ActualBrowser(
             channel="chrome",
             unique_child_arn=unique_child_arn,
             port=9222 + child_process_id,
             headless=False,
-            is_dedicated=True,
+            is_dedicated=task.is_dedicated,
         )
         await _global_actual_browser.start()
 
-    with open("/tmp/system_info.json", "a") as f:
-        f.write("After starting browser\n")
-        log_system_info(f)
+    log_system_info("Memory info after starting browser")
 
     logger.debug("Running automation in process")
     worker_path = pathlib.Path(__file__).parent / "worker.py"
@@ -124,9 +143,10 @@ async def run_automation_in_process(
         logger.debug("Automation killed in process")
         return -1
     finally:
-        with open("/tmp/system_info.json", "a") as f:
-            f.write("After automation finished in process\n")
-            log_system_info(f)
+        logger.info(
+            f"---------- Automation for task {task.task_id} finished ----------\n"
+        )
+        log_system_info("Memory info after automation finished in process")
 
         if _global_actual_browser is not None and not task.is_dedicated:
             logger.debug("Stopping actual browser as not dedicated")
@@ -136,9 +156,13 @@ async def run_automation_in_process(
             except Exception as e:
                 logger.error(f"Error stopping actual browser: {e}")
 
-        with open("/tmp/system_info.json", "a") as f:
-            f.write("After stopping actual browser\n")
-            log_system_info(f)
+        log_system_info("Memory info after stopping actual browser")
+
+        file_handler.flush()
+        file_handler.close()
+        logging.getLogger(current_module).removeHandler(file_handler)
+
+        await save_trajectory_in_server(task)
 
 
 async def task_processor():

@@ -217,7 +217,7 @@ async def save_downloads_in_server(task: Task, memory: Memory):
         logger.error(f"Failed to save downloads in server: {e}")
 
 
-async def save_trajectory_in_server(task: Task, memory: Memory):
+async def save_trajectory_in_server(task: Task):
     try:
         url = urljoin(settings.SERVER_URL, settings.SAVE_TRAJECTORY_ENDPOINT)
         headers = {"x-api-key": task.api_key}
