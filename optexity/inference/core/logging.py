@@ -324,7 +324,9 @@ async def save_latest_memory_state_locally(
         step_directory.mkdir(parents=True, exist_ok=True)
 
         if browser_state.screenshot:
-            save_screenshot(browser_state.screenshot, step_directory / "screenshot.png")
+            await save_screenshot(
+                browser_state.screenshot, step_directory / "screenshot.png"
+            )
         else:
             logger.warning(
                 "No screenshot found for step %s", automation_state.step_index

@@ -46,9 +46,11 @@ def build_model(schema: dict, model_name="AutoModel"):
     return create_model(model_name, **fields)
 
 
-def save_screenshot(screenshot: str, path: str):
-    with open(path, "wb") as f:
-        f.write(base64.b64decode(screenshot))
+async def save_screenshot(screenshot: str, path: Path | str):
+    """Asynchronously save a base64-encoded screenshot to disk."""
+    # Ensure we write bytes and use aiofiles for non-blocking I/O
+    async with aiofiles.open(path, "wb") as f:
+        await f.write(base64.b64decode(screenshot))
 
 
 async def save_and_clear_downloaded_files(content: bytes | str, filename: Path):
