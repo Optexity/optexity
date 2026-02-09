@@ -50,8 +50,8 @@ def log_system_info(comment: str):
     logger.info(
         json.dumps(
             {
-                "container_memory_total": system_info.total_system_memory / 1024,
-                "container_memory_used": system_info.total_system_memory_used / 1024,
+                "container_memory_total": round(system_info.total_system_memory, 2),
+                "container_memory_used": round(system_info.total_system_memory_used, 2),
                 "percent_container_memory_used": round(
                     system_info.total_system_memory_used
                     / system_info.total_system_memory,
@@ -65,8 +65,8 @@ def log_system_info(comment: str):
     logger.info(
         json.dumps(
             {
-                "host_memory_total": vm.total / (1024**3),
-                "host_memory_used": vm.used / (1024**3),
+                "host_memory_total": round(vm.total / (1024**2), 2),
+                "host_memory_used": round(vm.used / (1024**2), 2),
                 "percent_host_memory_used": round(vm.used / vm.total, 2),
             }
         )
