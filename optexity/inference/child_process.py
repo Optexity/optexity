@@ -46,11 +46,13 @@ def log_system_info(f: TextIO):
     f.write(
         json.dumps(
             {
-                "container_memory_total": SystemInfo().total_system_memory,
-                "container_memory_used": SystemInfo().total_system_memory_used,
-                "percent_container_memory_used": SystemInfo().total_system_memory_used
-                / SystemInfo().total_system_memory
-                * 100,
+                "container_memory_total": SystemInfo().total_system_memory / 1024,
+                "container_memory_used": SystemInfo().total_system_memory_used / 1024,
+                "percent_container_memory_used": round(
+                    SystemInfo().total_system_memory_used
+                    / SystemInfo().total_system_memory,
+                    2,
+                ),
             }
         )
         + "\n"
@@ -58,11 +60,11 @@ def log_system_info(f: TextIO):
     f.write(
         json.dumps(
             {
-                "host_memory_total": psutil.virtual_memory().total / (1024**2),
-                "host_memory_used": psutil.virtual_memory().used / (1024**2),
-                "percent_host_memory_used": psutil.virtual_memory().used
-                / psutil.virtual_memory().total
-                * 100,
+                "host_memory_total": psutil.virtual_memory().total / (1024**3),
+                "host_memory_used": psutil.virtual_memory().used / (1024**3),
+                "percent_host_memory_used": round(
+                    psutil.virtual_memory().used / psutil.virtual_memory().total, 2
+                ),
             }
         )
         + "\n",
