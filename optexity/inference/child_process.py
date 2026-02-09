@@ -1,6 +1,11 @@
 import argparse
 import asyncio
 import logging
+import os
+import pathlib
+import signal
+import subprocess
+import sys
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -12,7 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from uvicorn import run
 
-from optexity.inference.core.run_automation import run_automation
+from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.task import Task
 from optexity.utils.settings import settings
@@ -30,6 +35,51 @@ unique_child_arn: str = str(uuid.uuid4())
 task_running = False
 last_task_start_time = None
 task_queue: asyncio.Queue[Task] = asyncio.Queue()
+_global_actual_browser: ActualBrowser | None = None
+
+
+async def run_automation_in_process(
+    task: Task, unique_child_arn: str, child_process_id: int
+):
+    global _global_actual_browser
+
+    if not task.is_dedicated and _global_actual_browser is not None:
+        await _global_actual_browser.stop(graceful=False)
+        _global_actual_browser = None
+
+    if _global_actual_browser is None:
+        _global_actual_browser = ActualBrowser(
+            channel="chrome",
+            unique_child_arn=unique_child_arn,
+            port=9222 + child_process_id,
+            headless=False,
+            is_dedicated=True,
+        )
+        await _global_actual_browser.start()
+
+    logger.debug("Running automation in process")
+    worker_path = pathlib.Path(__file__).parent / "worker.py"
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            worker_path,
+            task.model_dump_json(),
+            unique_child_arn,
+            str(child_process_id),
+        ],
+        preexec_fn=os.setsid,  # isolate process group
+    )
+
+    try:
+        logger.debug("Waiting for automation to finish")
+        returncode = proc.wait(timeout=600)  # seconds
+        logger.debug("Automation finished in process")
+        return returncode
+    except subprocess.TimeoutExpired:
+        logger.debug("Automation timed out in process")
+        os.killpg(proc.pid, signal.SIGKILL)
+        logger.debug("Automation killed in process")
+        return -1
 
 
 async def task_processor():
@@ -44,7 +94,7 @@ async def task_processor():
             task = await task_queue.get()
             task_running = True
             last_task_start_time = datetime.now()
-            await run_automation(task, unique_child_arn, child_process_id)
+            await run_automation_in_process(task, unique_child_arn, child_process_id)
 
         except asyncio.CancelledError:
             logger.info("Task processor cancelled")
@@ -96,6 +146,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        global _global_actual_browser
         """Lifespan context manager for startup and shutdown."""
         # Startup
 
@@ -108,6 +159,14 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
         yield
         # Shutdown (if needed in the future)
         logger.info("Shutting down task processor")
+
+        if _global_actual_browser is not None:
+            logger.debug("Stopping actual browser on lifecycle end")
+            await _global_actual_browser.stop(graceful=False)
+            _global_actual_browser = None
+            logger.debug("Actual browser stopped on lifecycle end")
+
+        logger.info("Lifecycle ended")
 
     app = FastAPI(title="Optexity Inference", lifespan=lifespan)
 

@@ -20,8 +20,6 @@ from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
-_global_actual_browser: ActualBrowser | None = None
-
 
 class Browser:
     def __init__(
@@ -66,23 +64,9 @@ class Browser:
         self.network_calls: list[NetworkResponse | NetworkRequest] = []
 
     async def start(self):
-        global _global_actual_browser
         logger.debug("Starting browser")
         try:
             await self.stop()
-            if _global_actual_browser is None or not self.is_dedicated:
-                if _global_actual_browser is not None:
-                    await _global_actual_browser.stop()
-                    _global_actual_browser = None
-
-                _global_actual_browser = ActualBrowser(
-                    channel=self.channel,
-                    unique_child_arn=self.memory.unique_child_arn,
-                    port=self.debug_port,
-                    headless=self.headless,
-                    is_dedicated=self.is_dedicated,
-                )
-                await _global_actual_browser.start()
 
             if self.stealth:
                 from patchright.async_api import async_playwright
@@ -140,7 +124,6 @@ class Browser:
             raise e
 
     async def stop(self, force: bool = False):
-        global _global_actual_browser
 
         logger.debug("Stopping backend agent")
         if self.backend_agent is not None:
@@ -164,12 +147,6 @@ class Browser:
             logger.debug("Stopping playwright")
             await self.playwright.stop()
             self.playwright = None
-
-        if not self.is_dedicated or force:
-            logger.debug("Stopping actual browser as not dedicated")
-            if _global_actual_browser is not None:
-                await _global_actual_browser.stop()
-                _global_actual_browser = None
 
         self.context = None
 
