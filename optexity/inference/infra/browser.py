@@ -298,7 +298,9 @@ class Browser:
     async def handle_random_url_downloads(self, resp: Response):
         try:
             content_type = (resp.headers.get("content-type") or "").lower()
-            content_disposition = (resp.headers.get("content-disposition") or "").lower()
+            content_disposition = (
+                resp.headers.get("content-disposition") or ""
+            ).lower()
 
             # PDF: either content-type is application/pdf, or attachment with .pdf filename
             # (many servers use application/octet-stream + content-disposition for PDFs)

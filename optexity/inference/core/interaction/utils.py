@@ -62,7 +62,9 @@ async def handle_download(
 
             # If caller passed a filename with no extension (e.g. UUID only), use
             # Playwright's suggested_filename so the saved file has the correct type.
-            if not download_path.suffix and getattr(download, "suggested_filename", None):
+            if not download_path.suffix and getattr(
+                download, "suggested_filename", None
+            ):
                 suggested = Path(download.suggested_filename)
                 if suggested.suffix:
                     download_path = download_path.with_suffix(suggested.suffix)
