@@ -84,7 +84,7 @@ async def run_automation_in_process(
         if _global_actual_browser is not None and not task.is_dedicated:
             logger.debug("Stopping actual browser as not dedicated")
             try:
-                await _global_actual_browser.stop(graceful=False)
+                await _global_actual_browser.stop(graceful=True)
                 _global_actual_browser = None
             except Exception as e:
                 logger.error(f"Error stopping actual browser: {e}")
@@ -170,7 +170,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
 
         if _global_actual_browser is not None:
             logger.debug("Stopping actual browser on lifecycle end")
-            await _global_actual_browser.stop(graceful=False)
+            await _global_actual_browser.stop(graceful=True)
             _global_actual_browser = None
             logger.debug("Actual browser stopped on lifecycle end")
 
