@@ -80,6 +80,14 @@ async def run_automation_in_process(
         os.killpg(proc.pid, signal.SIGKILL)
         logger.debug("Automation killed in process")
         return -1
+    finally:
+        if _global_actual_browser is not None and not task.is_dedicated:
+            logger.debug("Stopping actual browser as not dedicated")
+            try:
+                await _global_actual_browser.stop(graceful=False)
+                _global_actual_browser = None
+            except Exception as e:
+                logger.error(f"Error stopping actual browser: {e}")
 
 
 async def task_processor():
@@ -252,6 +260,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
                     raise ValueError(
                         "PROXY_URL is not set and is required when use_proxy is True"
                     )
+                task.is_dedicated = inference_request.is_dedicated
                 task.allocated_at = datetime.now(timezone.utc)
                 await task_queue.put(task)
 
