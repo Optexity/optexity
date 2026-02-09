@@ -59,7 +59,6 @@ def log_system_info(comment: str):
                 ),
             }
         )
-        + "\n"
     )
     vm = psutil.virtual_memory()
     logger.info(
@@ -70,7 +69,6 @@ def log_system_info(comment: str):
                 "percent_host_memory_used": round(vm.used / vm.total, 2),
             }
         )
-        + "\n",
     )
     logger.info("=" * 100 + "\n")
 
