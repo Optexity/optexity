@@ -53,6 +53,7 @@ def log_system_info(f: TextIO):
                 * 100,
             }
         )
+        + "\n"
     )
     f.write(
         json.dumps(
@@ -63,7 +64,8 @@ def log_system_info(f: TextIO):
                 / psutil.virtual_memory().total
                 * 100,
             }
-        ),
+        )
+        + "\n",
     )
 
 
@@ -71,7 +73,7 @@ async def run_automation_in_process(
     task: Task, unique_child_arn: str, child_process_id: int
 ):
     with open("/tmp/system_info.json", "a") as f:
-        f.write("=" * 100)
+        f.write("=" * 100 + "\n")
         f.write("----- System info for Task " + task.task_id + ": -------\n")
         f.write("Before starting browser\n")
         log_system_info(f)
