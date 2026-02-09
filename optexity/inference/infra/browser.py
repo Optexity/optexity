@@ -297,27 +297,36 @@ class Browser:
 
     async def handle_random_url_downloads(self, resp: Response):
         try:
+            content_type = (resp.headers.get("content-type") or "").lower()
+            content_disposition = (resp.headers.get("content-disposition") or "").lower()
 
-            if "application/pdf" in resp.headers.get("content-type", ""):
-                self.active_downloads += 1
-                self.all_active_downloads_done.clear()
+            # PDF: either content-type is application/pdf, or attachment with .pdf filename
+            # (many servers use application/octet-stream + content-disposition for PDFs)
+            is_pdf_content = "application/pdf" in content_type
+            is_pdf_attachment = (
+                "attachment" in content_disposition and ".pdf" in content_disposition
+            )
+            if not (is_pdf_content or is_pdf_attachment):
+                if self.active_downloads == 0:
+                    self.all_active_downloads_done.set()
+                return
 
-                # Default filename fallback
-                filename = f"{uuid4()}.pdf"
+            self.active_downloads += 1
+            self.all_active_downloads_done.clear()
 
-                # Try to get suggested filename from headers
-                content_disposition = resp.headers.get("content-disposition")
-                if content_disposition:
-                    match = re.search(
-                        r'filename\*?=(?:UTF-8\'\')?"?([^";]+)"?',
-                        content_disposition,
-                    )
-                    if match:
-                        filename = match.group(1)
+            filename = f"{uuid4()}.pdf"
+            if content_disposition:
+                match = re.search(
+                    r'filename\*?=(?:utf-8\'\')?"?([^";]+)"?',
+                    content_disposition,
+                    re.IGNORECASE,
+                )
+                if match:
+                    filename = match.group(1).strip()
 
-                self.memory.urls_to_downloads.append((resp.url, filename))
-                logger.info(f"Added URL to downloads: {resp.url}, {filename}")
-                self.active_downloads -= 1
+            self.memory.urls_to_downloads.append((resp.url, filename))
+            logger.info(f"Added URL to downloads: {resp.url}, {filename}")
+            self.active_downloads -= 1
         except Exception as e:
             logger.error(f"Error handling random responses: {e}")
 
