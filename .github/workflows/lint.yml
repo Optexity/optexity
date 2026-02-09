@@ -16,12 +16,8 @@ jobs:
               with:
                   python-version: "3.11"
 
-            - name: Install dependencies
-              run: |
-                  pip install black isort
+            - name: Install pre-commit
+              run: pip install pre-commit
 
-            - name: Check formatting with black
-              run: black --check .
-
-            - name: Check imports with isort
-              run: isort --check-only --profile black .
+            - name: Run pre-commit
+              run: pre-commit run --all-files
