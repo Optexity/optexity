@@ -449,14 +449,24 @@ class Browser:
         try:
             page = await self.get_current_page()
             if page is None:
+                logger.error(f"Cannot navigate to {url}: No page available")
                 return None
             await page.goto(url, timeout=10000)
-        except TimeoutError as e:
-            pass
-        except PatchrightTimeoutError as e:
-            pass
-        except PlaywrightTimeoutError as e:
-            pass
+        except (TimeoutError, PatchrightTimeoutError, PlaywrightTimeoutError) as e:
+            logger.warning(
+                f"Navigation timeout for {url}: {type(e).__name__}",
+                extra={"url": url, "timeout_ms": 10000, "error_type": type(e).__name__},
+            )
+
+            # For non-critical navigation, continue with warning
+            return None
+        except Exception as e:
+            logger.error(
+                f"Unexpected error navigating to {url}: {e}",
+                exc_info=True,
+                extra={"url": url},
+            )
+            return None
 
     async def get_browser_state_summary(self) -> BrowserStateSummary:
         browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
