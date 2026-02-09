@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 import logging
 import os
 import pathlib
@@ -9,9 +10,11 @@ import sys
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from typing import TextIO
 from urllib.parse import urljoin
 
 import httpx
+import psutil
 from fastapi import Body, FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -19,6 +22,7 @@ from uvicorn import run
 
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.schema.inference import InferenceRequest
+from optexity.schema.memory import SystemInfo
 from optexity.schema.task import Task
 from optexity.utils.settings import settings
 
@@ -38,9 +42,40 @@ task_queue: asyncio.Queue[Task] = asyncio.Queue()
 _global_actual_browser: ActualBrowser | None = None
 
 
+def log_system_info(f: TextIO):
+    f.write(
+        json.dumps(
+            {
+                "container_memory_total": SystemInfo().total_system_memory,
+                "container_memory_used": SystemInfo().total_system_memory_used,
+                "percent_container_memory_used": SystemInfo().total_system_memory_used
+                / SystemInfo().total_system_memory
+                * 100,
+            }
+        )
+    )
+    f.write(
+        json.dumps(
+            {
+                "host_memory_total": psutil.virtual_memory().total / (1024**2),
+                "host_memory_used": psutil.virtual_memory().used / (1024**2),
+                "percent_host_memory_used": psutil.virtual_memory().used
+                / psutil.virtual_memory().total
+                * 100,
+            }
+        ),
+    )
+
+
 async def run_automation_in_process(
     task: Task, unique_child_arn: str, child_process_id: int
 ):
+    with open("/tmp/system_info.json", "a") as f:
+        f.write("=" * 100)
+        f.write("----- System info for Task " + task.task_id + ": -------\n")
+        f.write("Before starting browser\n")
+        log_system_info(f)
+
     global _global_actual_browser
 
     if not task.is_dedicated and _global_actual_browser is not None:
@@ -56,6 +91,10 @@ async def run_automation_in_process(
             is_dedicated=True,
         )
         await _global_actual_browser.start()
+
+    with open("/tmp/system_info.json", "a") as f:
+        f.write("After starting browser\n")
+        log_system_info(f)
 
     logger.debug("Running automation in process")
     worker_path = pathlib.Path(__file__).parent / "worker.py"
@@ -81,6 +120,10 @@ async def run_automation_in_process(
         logger.debug("Automation killed in process")
         return -1
     finally:
+        with open("/tmp/system_info.json", "a") as f:
+            f.write("After automation finished in process\n")
+            log_system_info(f)
+
         if _global_actual_browser is not None and not task.is_dedicated:
             logger.debug("Stopping actual browser as not dedicated")
             try:
@@ -88,6 +131,10 @@ async def run_automation_in_process(
                 _global_actual_browser = None
             except Exception as e:
                 logger.error(f"Error stopping actual browser: {e}")
+
+        with open("/tmp/system_info.json", "a") as f:
+            f.write("After stopping actual browser\n")
+            log_system_info(f)
 
 
 async def task_processor():

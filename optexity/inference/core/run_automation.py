@@ -88,7 +88,6 @@ async def run_automation(
                 proxy_session_id=task.proxy_session_id(
                     settings.PROXY_PROVIDER if task.use_proxy else None
                 ),
-                is_dedicated=task.is_dedicated,
             )
 
         browser = _get_browser()
@@ -191,6 +190,7 @@ async def run_automation(
             await browser.stop()
 
     logger.info(f"Task {task.task_id} completed with status {task.status}")
+    file_handler.flush()
     logging.getLogger(current_module).removeHandler(file_handler)
 
 

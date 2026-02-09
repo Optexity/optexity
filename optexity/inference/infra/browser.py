@@ -29,7 +29,6 @@ class Browser:
         backend: Literal["browser-use", "browserbase"] = "browser-use",
         debug_port: int = 9222,
         channel: Literal["chromium", "chrome"] = "chromium",
-        is_dedicated: bool = False,
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
     ):
@@ -55,7 +54,6 @@ class Browser:
         self.memory = memory
         self.page_to_target_id = []
         self.previous_total_pages = 0
-        self.is_dedicated = is_dedicated
         self.active_downloads = 0
         self.all_active_downloads_done = asyncio.Event()
         self.all_active_downloads_done.set()
