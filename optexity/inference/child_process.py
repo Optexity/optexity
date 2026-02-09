@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from uvicorn import run
 
-from optexity.inference.core.logging import save_trajectory_in_server
+from optexity.inference.core.logging import delete_local_data, save_trajectory_in_server
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import SystemInfo
@@ -161,6 +161,7 @@ async def run_automation_in_process(
         logging.getLogger(current_module).removeHandler(file_handler)
 
         await save_trajectory_in_server(task)
+        await delete_local_data(task)
 
 
 async def task_processor():

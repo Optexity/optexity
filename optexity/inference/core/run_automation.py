@@ -10,7 +10,6 @@ from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from optexity.inference.core.interaction.utils import clean_download
 from optexity.inference.core.logging import (
     complete_task_in_server,
-    delete_local_data,
     initiate_callback,
     save_downloads_in_server,
     save_latest_memory_state_locally,
@@ -276,7 +275,6 @@ async def run_final_logging(
         await save_latest_memory_state_locally(task, memory, None)
         await save_trajectory_in_server(task)
         await initiate_callback(task)
-        await delete_local_data(task)
 
     except Exception as e:
         logger.error(f"Error running final logging: {e}")
