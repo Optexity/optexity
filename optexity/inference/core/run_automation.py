@@ -115,14 +115,12 @@ async def run_automation(
             await browser.go_to_url("https://ipinfo.io/json")
             page = await browser.get_current_page()
 
-            ip_info = await page.evaluate(
-                """
+            ip_info = await page.evaluate("""
                 async () => {
                 const res = await fetch("https://ipinfo.io/json");
                 return await res.json();
                 }
-                """
-            )
+                """)
             if isinstance(ip_info, dict):
                 memory.variables.output_data.append(
                     OutputData(unique_identifier="ip_info", json_data=ip_info)

@@ -249,14 +249,12 @@ async def select_option_locator(
     max_timeout_seconds_per_try: float,
 ):
     async def _actual_select_option():
-        options: list[dict[str, str]] = await locator.evaluate(
-            """
+        options: list[dict[str, str]] = await locator.evaluate("""
         sel => Array.from(sel.options).map(o => ({
             value: o.value,
             label: o.label || o.textContent
         }))
-    """
-        )
+    """)
 
         select_option_values = [
             SelectOptionValue(value=o["value"], label=o["label"]) for o in options
