@@ -307,7 +307,7 @@ async def run_action_node(
         )
     )
 
-    logger.debug(f"-----Running node {memory.automation_state.step_index}-----")
+    logger.debug(f"-----Running node new {memory.automation_state.step_index}-----")
 
     try:
         if action_node.interaction_action:
