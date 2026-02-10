@@ -119,20 +119,30 @@ async def run_automation_in_process(
 
     logger.debug("Running automation in process")
     worker_path = pathlib.Path(__file__).parent / "worker.py"
-    proc = subprocess.Popen(
-        [
-            sys.executable,
-            worker_path,
-            task.model_dump_json(),
-            unique_child_arn,
-            str(child_process_id),
-        ],
-        preexec_fn=os.setsid,  # isolate process group
+    # proc = subprocess.Popen(
+    #     [
+    #         sys.executable,
+    #         worker_path,
+    #         task.model_dump_json(),
+    #         unique_child_arn,
+    #         str(child_process_id),
+    #     ],
+    #     preexec_fn=os.setsid,  # isolate process group
+    # )
+
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable,
+        worker_path,
+        task.model_dump_json(),
+        unique_child_arn,
+        str(child_process_id),
+        preexec_fn=os.setsid,
     )
 
     try:
         logger.debug("Waiting for automation to finish")
-        returncode = proc.wait(timeout=600)  # seconds
+        # returncode = proc.wait(timeout=600)  # seconds
+        returncode = await asyncio.wait_for(proc.wait(), timeout=600)
         logger.debug("Automation finished in process")
         return returncode
     except subprocess.TimeoutExpired:
