@@ -16,54 +16,6 @@ from optexity.utils.settings import settings
 logger = logging.getLogger(__name__)
 
 
-def find_chrome_binary(channel: Literal["chrome", "chromium"]) -> str:
-    system = platform.system()
-
-    # ---- macOS
-    if system == "Darwin":
-        chrome_paths = [
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
-            "/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta",
-            "/Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev",
-        ]
-
-        chromium_paths = ["/Applications/Chromium.app/Contents/MacOS/Chromium"]
-
-        paths = (
-            chrome_paths + chromium_paths
-            if channel == "chrome"
-            else chromium_paths + chrome_paths
-        )
-
-        for path in paths:
-            if os.path.exists(path):
-                return path
-
-        raise RuntimeError("Chrome/Chromium not found on macOS")
-
-    # ---- Linux
-    if system == "Linux":
-        chrome_bins = ["google-chrome", "google-chrome-stable"]
-
-        chromium_bins = ["chromium", "chromium-browser"]
-
-        bins = (
-            chrome_bins + chromium_bins
-            if channel == "chrome"
-            else chromium_bins + chrome_bins
-        )
-
-        for name in bins:
-            path = shutil.which(name)
-            if path:
-                return path
-
-        raise RuntimeError("Chrome/Chromium not found on Linux")
-
-    raise RuntimeError(f"Unsupported OS: {system}")
-
-
 class ActualBrowser:
     def __init__(
         self,
@@ -75,14 +27,15 @@ class ActualBrowser:
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
     ):
-        self.chrome_path = find_chrome_binary(channel)
+        # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
         self.port = port
         self.headless = headless
         self.is_dedicated = is_dedicated
-        self.proc: asyncio.subprocess.Process | None = None
         self.use_proxy = use_proxy
         self.proxy_session_id = proxy_session_id
+        self.playwright = None
+        self.context = None
 
         self.extensions = [
             # {
@@ -110,11 +63,11 @@ class ActualBrowser:
     async def start(self):
         try:
             logger.debug("Starting actual browser")
-            if self.proc and self.proc.returncode is None:
-                return
 
+            from patchright.async_api import async_playwright
+
+            extension_paths = self.get_extension_paths()
             args = [
-                # ---- security / isolation (Playwright parity)
                 "--disable-site-isolation-trials",
                 "--disable-web-security",
                 "--disable-features=IsolateOrigins,site-per-process",
@@ -122,54 +75,47 @@ class ActualBrowser:
                 "--ignore-certificate-errors",
                 "--ignore-ssl-errors",
                 "--ignore-certificate-errors-spki-list",
-                # ---- extensions
                 "--enable-extensions",
                 "--disable-extensions-file-access-check",
                 "--disable-extensions-http-throttling",
-                # ---- window / ui
-                "--disable-popup-blocking",
-                "--window-size=1920,1080",
-                # ---- performance / stability
-                "--disable-gpu",
-                "--disable-background-networking",
-                "--disable-sync",
-                "--disable-translate",
-                # ---- automation hygiene
-                f"--remote-debugging-port={self.port}",
-                f"--user-data-dir={self.user_data_dir}",
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--no-sandbox",
-                # ---- privacy / security
-                "--disable-save-password-bubble",
-                "--disable-autofill-keyboard-accessory-view",
-                "--disable-autofill",
-                "--password-store=basic",
-                "--disable-notifications",
-                "--disable-credential-manager-api",
             ]
 
-            if self.headless:
-                args.append("--headless=new")
-
-            extension_paths = self.get_extension_paths()
             if extension_paths:
-                args.append(f"--disable-extensions-except={','.join(extension_paths)}")
-                args.append(f"--load-extension={','.join(extension_paths)}")
+                disable_except = (
+                    f'--disable-extensions-except={",".join(extension_paths)}'
+                )
+                load_extension = f'--load-extension={",".join(extension_paths)}'
+                args.append(disable_except)
+                args.append(load_extension)
+                logger.info(f"Extension args: {disable_except}")
+                logger.info(f"Extension args: {load_extension}")
+
+            self.playwright = await async_playwright().start()
+            self.context = await self.playwright.chromium.launch_persistent_context(
+                channel="chromium",
+                user_data_dir=self.user_data_dir,
+                headless=self.headless,
+                args=[
+                    # "--start-fullscreen",
+                    "--disable-popup-blocking",
+                    "--window-size=1920,1080",
+                    f"--remote-debugging-port={self.port}",
+                    "--disable-gpu",
+                    "--disable-background-networking",
+                    "--disable-sync",
+                    "--disable-translate",
+                    "--disable-features=site-per-process",
+                ]
+                + args,
+                chromium_sandbox=False,
+                no_viewport=True,
+            )
 
             # # 👇 ADD PROXY FLAGS
             # args += self.get_proxy_args()
 
             if not self.is_dedicated:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
-
-            self.proc = await asyncio.create_subprocess_exec(
-                self.chrome_path,
-                *args,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-                preexec_fn=os.setsid,  # critical: isolate process group
-            )
 
             await self._wait_for_cdp()
             logger.debug("CDP ready")
@@ -195,21 +141,13 @@ class ActualBrowser:
         raise RuntimeError("Chrome CDP not reachable")
 
     async def stop(self, graceful=True):
-        if not self.proc or self.proc.returncode is not None:
-            return
+        if self.context is not None:
+            await self.context.close()
+            self.context = None
 
-        pgid = os.getpgid(self.proc.pid)
-
-        if graceful:
-            os.killpg(pgid, signal.SIGTERM)
-            try:
-                await asyncio.wait_for(self.proc.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                os.killpg(pgid, signal.SIGKILL)
-        else:
-            os.killpg(pgid, signal.SIGKILL)
-
-        self.proc = None
+        if self.playwright is not None:
+            await self.playwright.stop()
+            self.playwright = None
 
         if not self.is_dedicated:
             shutil.rmtree(self.user_data_dir, ignore_errors=True)
