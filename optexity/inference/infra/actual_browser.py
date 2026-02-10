@@ -92,7 +92,7 @@ class ActualBrowser:
 
             self.playwright = await async_playwright().start()
             self.context = await self.playwright.chromium.launch_persistent_context(
-                channel="chromium",
+                channel="chrome",
                 user_data_dir=self.user_data_dir,
                 headless=self.headless,
                 args=[
