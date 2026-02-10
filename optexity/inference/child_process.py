@@ -107,7 +107,7 @@ async def run_automation_in_process(
     if _global_actual_browser is None:
         logger.info("Starting new actual browser")
         _global_actual_browser = ActualBrowser(
-            channel="chrome",
+            channel=task.automation.browser_channel,
             unique_child_arn=unique_child_arn,
             port=9222 + child_process_id,
             headless=False,
