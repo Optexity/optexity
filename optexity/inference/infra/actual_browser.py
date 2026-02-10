@@ -110,6 +110,66 @@ class ActualBrowser:
             },
         ]
 
+    def get_args(self) -> list[str]:
+        args = [
+            # ---- security / isolation (Playwright parity)
+            "--disable-site-isolation-trials",
+            "--disable-web-security",
+            "--disable-features=IsolateOrigins,site-per-process",
+            "--allow-running-insecure-content",
+            "--ignore-certificate-errors",
+            "--ignore-ssl-errors",
+            "--ignore-certificate-errors-spki-list",
+            # ---- extensions
+            "--enable-extensions",
+            "--disable-extensions-file-access-check",
+            "--disable-extensions-http-throttling",
+            # ---- window / ui
+            "--disable-popup-blocking",
+            "--window-size=1920,1080",
+            # "--start-fullscreen",
+            # ---- performance / stability
+            "--disable-gpu",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--disable-translate",
+            # ---- automation hygiene
+            f"--remote-debugging-port={self.port}",
+        ]
+
+        if not self.use_playwright_browser:
+
+            args += [
+                f"--user-data-dir={self.user_data_dir}",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--no-sandbox",
+                # ---- privacy / security
+                "--disable-save-password-bubble",
+                "--use-mock-keychain",
+                "--disable-features=PasswordManagerEnabled,PasswordManagerOnboarding",
+                "--disable-save-password-bubble",
+                "--disable-autofill-keyboard-accessory-view",
+                "--disable-autofill",
+                "--password-store=basic",
+                "--disable-notifications",
+                "--disable-credential-manager-api",
+            ]
+
+            if self.headless:
+                args.append("--headless=new")
+
+        extension_paths = self.get_extension_paths()
+
+        if extension_paths:
+            disable_except = f'--disable-extensions-except={",".join(extension_paths)}'
+            load_extension = f'--load-extension={",".join(extension_paths)}'
+            args.append(disable_except)
+            args.append(load_extension)
+            logger.info(f"Extension args: {load_extension}")
+
+        return args
+
     async def start(self):
         if self.use_playwright_browser:
             await self.start_playwright_browser()
@@ -122,50 +182,6 @@ class ActualBrowser:
             if self.proc and self.proc.returncode is None:
                 return
 
-            args = [
-                # ---- security / isolation (Playwright parity)
-                "--disable-site-isolation-trials",
-                "--disable-web-security",
-                "--disable-features=IsolateOrigins,site-per-process",
-                "--allow-running-insecure-content",
-                "--ignore-certificate-errors",
-                "--ignore-ssl-errors",
-                "--ignore-certificate-errors-spki-list",
-                # ---- extensions
-                "--enable-extensions",
-                "--disable-extensions-file-access-check",
-                "--disable-extensions-http-throttling",
-                # ---- window / ui
-                "--disable-popup-blocking",
-                "--window-size=1920,1080",
-                # ---- performance / stability
-                "--disable-gpu",
-                "--disable-background-networking",
-                "--disable-sync",
-                "--disable-translate",
-                # ---- automation hygiene
-                f"--remote-debugging-port={self.port}",
-                f"--user-data-dir={self.user_data_dir}",
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--no-sandbox",
-                # ---- privacy / security
-                "--disable-save-password-bubble",
-                "--disable-autofill-keyboard-accessory-view",
-                "--disable-autofill",
-                "--password-store=basic",
-                "--disable-notifications",
-                "--disable-credential-manager-api",
-            ]
-
-            if self.headless:
-                args.append("--headless=new")
-
-            extension_paths = self.get_extension_paths()
-            if extension_paths:
-                args.append(f"--disable-extensions-except={','.join(extension_paths)}")
-                args.append(f"--load-extension={','.join(extension_paths)}")
-
             # # 👇 ADD PROXY FLAGS
             # args += self.get_proxy_args()
 
@@ -176,7 +192,7 @@ class ActualBrowser:
 
             self.proc = await asyncio.create_subprocess_exec(
                 self.chrome_path,
-                *args,
+                *self.get_args(),
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
                 preexec_fn=os.setsid,  # critical: isolate process group
@@ -194,47 +210,12 @@ class ActualBrowser:
 
             from patchright.async_api import async_playwright
 
-            extension_paths = self.get_extension_paths()
-            args = [
-                "--disable-site-isolation-trials",
-                "--disable-web-security",
-                "--disable-features=IsolateOrigins,site-per-process",
-                "--allow-running-insecure-content",
-                "--ignore-certificate-errors",
-                "--ignore-ssl-errors",
-                "--ignore-certificate-errors-spki-list",
-                "--enable-extensions",
-                "--disable-extensions-file-access-check",
-                "--disable-extensions-http-throttling",
-            ]
-
-            if extension_paths:
-                disable_except = (
-                    f'--disable-extensions-except={",".join(extension_paths)}'
-                )
-                load_extension = f'--load-extension={",".join(extension_paths)}'
-                args.append(disable_except)
-                args.append(load_extension)
-                logger.info(f"Extension args: {disable_except}")
-                logger.info(f"Extension args: {load_extension}")
-
             self.playwright = await async_playwright().start()
             self.context = await self.playwright.chromium.launch_persistent_context(
                 channel=self.channel,
                 user_data_dir=self.user_data_dir,
                 headless=self.headless,
-                args=[
-                    # "--start-fullscreen",
-                    "--disable-popup-blocking",
-                    "--window-size=1920,1080",
-                    f"--remote-debugging-port={self.port}",
-                    "--disable-gpu",
-                    "--disable-background-networking",
-                    "--disable-sync",
-                    "--disable-translate",
-                    "--disable-features=site-per-process",
-                ]
-                + args,
+                args=self.get_args(),
                 chromium_sandbox=False,
                 no_viewport=True,
             )
