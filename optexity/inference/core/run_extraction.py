@@ -11,6 +11,7 @@ from optexity.schema.actions.extraction_action import (
     ExtractionAction,
     LLMExtraction,
     NetworkCallExtraction,
+    PDFExtraction,
     PythonScriptExtraction,
     ScreenshotExtraction,
     StateExtraction,
@@ -77,6 +78,8 @@ async def run_extraction_action(
         )
     elif extraction_action.two_fa_action:
         await run_two_fa_action(extraction_action.two_fa_action, memory)
+    elif extraction_action.pdf:
+        await handle_pdf_extraction(extraction_action.pdf, memory)
 
 
 async def handle_state_extraction(
@@ -284,3 +287,46 @@ async def download_request(
         memory.downloads.append(download_path)
     except Exception as e:
         logger.error(f"Failed to download request: {e}, {traceback.format_exc()}")
+
+
+async def handle_pdf_extraction(pdf_extraction: PDFExtraction, memory: Memory):
+    pdf_file = None
+    for path in memory.downloads:
+        if pdf_extraction.filename in path.name:
+            pdf_file = path
+            break
+    if pdf_file is None:
+        if len(memory.downloads) == 1:
+            pdf_file = memory.downloads[0]
+        else:
+            logger.error(
+                f"No matching PDF file found in downloads with filename {pdf_extraction.filename}. Total downloads: {len(memory.downloads)}"
+            )
+            return
+
+    if pdf_extraction.llm_provider == "gemini":
+        model_name = GeminiModels(pdf_extraction.llm_model_name)
+        llm_model.model_name = model_name
+    else:
+        raise ValueError(f"Invalid LLM provider: {pdf_extraction.llm_provider}")
+
+    system_instruction = "Extract the information from the PDF file and return it in the format specified by the instructions."
+    response, token_usage = llm_model.get_model_response_with_structured_output(
+        prompt=pdf_extraction.extraction_instructions,
+        response_schema=pdf_extraction.build_model(),
+        pdf_url=pdf_file,
+        system_instruction=system_instruction,
+    )
+    response_dict = response.model_dump()
+    output_data = OutputData(unique_identifier=str(pdf_file), json_data=response_dict)
+
+    logger.debug(f"Response: {response_dict}")
+
+    memory.token_usage += token_usage
+    memory.variables.output_data.append(output_data)
+
+    memory.browser_states[-1].final_prompt = (
+        f"{system_instruction}\n{pdf_extraction.extraction_instructions}"
+    )
+
+    return output_data

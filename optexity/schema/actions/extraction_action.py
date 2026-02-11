@@ -106,6 +106,33 @@ class StateExtraction(BaseModel):
     pass
 
 
+class PDFExtraction(BaseModel):
+    filename: str
+    extraction_format: dict
+    extraction_instructions: str
+    llm_provider: Literal["gemini"] = "gemini"
+    llm_model_name: str = "gemini-2.5-flash"
+
+    def build_model(self):
+        return build_model(self.extraction_format)
+
+    @field_validator("extraction_format")
+    def validate_extraction_format(cls, v):
+        if isinstance(v, dict):
+            try:
+                build_model(v)
+            except Exception as e:
+                raise ValueError(f"Invalid extraction_format dict: {e}")
+            return v
+        raise ValueError("extraction_format must be either a string or a dict")
+
+    def replace(self, pattern: str, replacement: str):
+        self.extraction_instructions = self.extraction_instructions.replace(
+            pattern, replacement
+        )
+        return self
+
+
 class ExtractionAction(BaseModel):
     unique_identifier: str | None = None
     network_call: Optional[NetworkCallExtraction] = None
@@ -114,17 +141,19 @@ class ExtractionAction(BaseModel):
     screenshot: Optional[ScreenshotExtraction] = None
     state: Optional[StateExtraction] = None
     two_fa_action: TwoFAAction | None = None
+    pdf: Optional[PDFExtraction] = None
 
     @model_validator(mode="after")
-    def validate_one_extraction(cls, model: "ExtractionAction"):
+    def validate_one_extraction(self):
         """Ensure exactly one of the extraction types is set and matches the type."""
         provided = {
-            "llm": model.llm,
-            "network_call": model.network_call,
-            "python_script": model.python_script,
-            "screenshot": model.screenshot,
-            "state": model.state,
-            "two_fa_action": model.two_fa_action,
+            "llm": self.llm,
+            "network_call": self.network_call,
+            "python_script": self.python_script,
+            "screenshot": self.screenshot,
+            "state": self.state,
+            "two_fa_action": self.two_fa_action,
+            "pdf": self.pdf,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
@@ -133,7 +162,7 @@ class ExtractionAction(BaseModel):
                 "Exactly one of llm, networkcall, python_script, screenshot, state, or two_fa_action must be provided"
             )
 
-        return model
+        return self
 
     def replace(self, pattern: str, replacement: str):
         if self.network_call:
