@@ -85,6 +85,7 @@ class ActualBrowser:
         self.proxy_session_id = proxy_session_id
         self.playwright = None
         self.context = None
+        self.proc = None
         self.channel: Literal["chrome", "chromium"] = channel
         self.extensions = [
             # {
