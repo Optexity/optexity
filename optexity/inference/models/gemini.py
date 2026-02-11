@@ -69,7 +69,7 @@ class Gemini(LLMModel):
                     prompt,
                 ]
         response = None
-        parsed_response = BaseModel()
+        parsed_response = None
         token_usage = TokenUsage()
 
         try:

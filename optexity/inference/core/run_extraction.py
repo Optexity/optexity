@@ -318,7 +318,9 @@ async def handle_pdf_extraction(pdf_extraction: PDFExtraction, memory: Memory):
         system_instruction=system_instruction,
     )
     response_dict = response.model_dump()
-    output_data = OutputData(unique_identifier=str(pdf_file), json_data=response_dict)
+    output_data = OutputData(
+        unique_identifier=str(pdf_file.name), json_data=response_dict
+    )
 
     logger.debug(f"Response: {response_dict}")
 
