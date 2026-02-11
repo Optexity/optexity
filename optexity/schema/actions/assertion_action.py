@@ -40,12 +40,12 @@ class AssertionAction(BaseModel):
     python_script: Optional[PythonScriptAssertion] = None
 
     @model_validator(mode="after")
-    def validate_one_assertion(cls, model: "AssertionAction"):
+    def validate_one_assertion(self):
         """Ensure exactly one of the extraction types is set and matches the type."""
         provided = {
-            "llm": model.llm,
-            "network_call": model.network_call,
-            "python_script": model.python_script,
+            "llm": self.llm,
+            "network_call": self.network_call,
+            "python_script": self.python_script,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
@@ -54,7 +54,7 @@ class AssertionAction(BaseModel):
                 "Exactly one of llm, networkcall, or python must be provided"
             )
 
-        return model
+        return self
 
     def replace(self, pattern: str, replacement: str):
         if self.network_call:

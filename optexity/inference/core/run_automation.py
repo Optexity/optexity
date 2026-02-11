@@ -181,6 +181,7 @@ async def run_automation(
     finally:
         if task and memory and browser:
             await run_final_downloads_check(task, memory, browser)
+            await run_post_processing_nodes(task, memory, browser)
         if memory and browser:
             await run_final_logging(task, memory, browser, child_process_id)
         if browser is not None:
@@ -513,3 +514,8 @@ async def handle_for_loop_node(
                         browser,
                     )
     memory.update_system_info()
+
+
+async def run_post_processing_nodes(task: Task, memory: Memory, browser: Browser):
+    for node in task.automation.post_processing_nodes:
+        await run_action_node(node, task, memory, browser)

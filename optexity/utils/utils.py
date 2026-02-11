@@ -19,8 +19,11 @@ _onepassword_client = None
 async def get_onepassword_client():
     global _onepassword_client
     if _onepassword_client is None:
+        token = os.getenv("OP_SERVICE_ACCOUNT_TOKEN")
+        if token is None:
+            raise ValueError("OP_SERVICE_ACCOUNT_TOKEN is not set")
         _onepassword_client = await OnePasswordClient.authenticate(
-            auth=os.getenv("OP_SERVICE_ACCOUNT_TOKEN"),
+            auth=token,
             integration_name="Optexity 1Password Integration",
             integration_version="v1.0.0",
         )
@@ -88,3 +91,18 @@ def clean_url(url: str) -> str:
         domain = domain[4:]
 
     return domain
+
+
+def is_url(value: str | Path) -> bool:
+    try:
+        result = urlparse(str(value))
+        return result.scheme in {"http", "https"} and bool(result.netloc)
+    except Exception:
+        return False
+
+
+def is_local_path(value: str | Path) -> bool:
+    try:
+        return Path(str(value)).expanduser().exists()
+    except Exception:
+        return False

@@ -314,6 +314,7 @@ class Automation(BaseModel):
     ]
     automation_description: str | None = None
     automation_endpoint: str | None = None
+    post_processing_nodes: list[ActionNode] = []
 
     @model_validator(mode="before")
     def migrate_old_nodes(cls, data: dict[str, Any]):
@@ -358,9 +359,19 @@ class Automation(BaseModel):
         return data
 
     @model_validator(mode="after")
-    def validate_parameters_with_examples(cls, model: "Automation"):
+    def validate_parameters_with_examples(self):
         ## TODO: static check that all parameters with examples are used in the nodes
-        return model
+        return self
+
+    @model_validator(mode="after")
+    def validate_post_processing_nodes_extraction_only(self):
+        for node in self.post_processing_nodes:
+            if node.extraction_action is None:
+                raise ValueError(
+                    "post_processing_nodes may only contain action nodes with extraction_action; "
+                    "interaction, assertion, and python_script actions are not allowed"
+                )
+        return self
 
     def model_dump(self, *, sort_params_by_nodes: bool = False, **kwargs):
         """
