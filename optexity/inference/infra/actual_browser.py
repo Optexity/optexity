@@ -9,6 +9,7 @@ import time
 from typing import Literal
 
 import aiohttp
+from playwright.async_api import ProxySettings
 
 from optexity.inference.infra.utils import _download_extension, _extract_extension
 from optexity.utils.settings import settings
@@ -74,7 +75,6 @@ class ActualBrowser:
         is_dedicated: bool = False,
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
-        use_playwright_browser: bool = True,
     ):
         # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
@@ -86,7 +86,6 @@ class ActualBrowser:
         self.playwright = None
         self.context = None
         self.channel: Literal["chrome", "chromium"] = channel
-        self.use_playwright_browser = use_playwright_browser
         self.extensions = [
             # {
             #     "name": "optexity recorder",
@@ -135,14 +134,15 @@ class ActualBrowser:
             "--disable-translate",
             # ---- automation hygiene
             f"--remote-debugging-port={self.port}",
+            "--disable-blink-features=AutomationControlled",
+            "--no-first-run",
+            "--no-default-browser-check",
         ]
 
-        if not self.use_playwright_browser:
+        if not settings.USE_PLAYWRIGHT_BROWSER:
 
             args += [
                 f"--user-data-dir={self.user_data_dir}",
-                "--no-first-run",
-                "--no-default-browser-check",
                 "--no-sandbox",
                 # ---- privacy / security
                 "--disable-save-password-bubble",
@@ -159,6 +159,8 @@ class ActualBrowser:
             if self.headless:
                 args.append("--headless=new")
 
+            args += self.get_proxy_args_native()
+
         extension_paths = self.get_extension_paths()
 
         if extension_paths:
@@ -171,7 +173,7 @@ class ActualBrowser:
         return args
 
     async def start(self):
-        if self.use_playwright_browser:
+        if settings.USE_PLAYWRIGHT_BROWSER:
             await self.start_playwright_browser()
         else:
             await self.start_native_browser()
@@ -182,8 +184,8 @@ class ActualBrowser:
             if self.proc and self.proc.returncode is None:
                 return
 
-            # # 👇 ADD PROXY FLAGS
-            # args += self.get_proxy_args()
+            if self.use_proxy:
+                raise NotImplementedError("Proxy is not supported for native browser")
 
             if not self.is_dedicated:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
@@ -218,13 +220,8 @@ class ActualBrowser:
                 args=self.get_args(),
                 chromium_sandbox=False,
                 no_viewport=True,
+                proxy=self.get_proxy_playwright(),
             )
-
-            # # 👇 ADD PROXY FLAGS
-            # args += self.get_proxy_args()
-
-            if not self.is_dedicated:
-                shutil.rmtree(self.user_data_dir, ignore_errors=True)
 
             await self._wait_for_cdp()
             logger.debug("CDP ready")
@@ -250,7 +247,7 @@ class ActualBrowser:
         raise RuntimeError("Chrome CDP not reachable")
 
     async def stop(self, graceful=True):
-        if self.use_playwright_browser:
+        if settings.USE_PLAYWRIGHT_BROWSER:
             await self.stop_playwright_browser(graceful)
         else:
             await self.stop_native_browser(graceful)
@@ -330,29 +327,21 @@ class ActualBrowser:
 
         return extension_paths
 
-    def _proxy_args(self) -> list[str]:
-        if not self.use_proxy:
+    def get_proxy_args_native(self) -> list[str]:
+
+        proxy = self.get_proxy_playwright()
+        if proxy is None:
             return []
 
-        if settings.PROXY_URL is None:
-            raise ValueError("PROXY_URL is not set")
-
-        server = self.proxy["server"]  # e.g. http://host:port
-        parsed = urlparse(settings.PROXY_URL)
-
-        if "username" in self.proxy and "password" in self.proxy:
-            proxy_url = (
-                f"{parsed.scheme}://"
-                f"{self.proxy['username']}:{self.proxy['password']}@"
-                f"{parsed.hostname}:{parsed.port}"
+        if proxy.get("username") is not None or proxy.get("password") is not None:
+            raise ValueError(
+                "Proxy with username and password is not supported for native browser"
             )
-        else:
-            proxy_url = settings.PROXY_URL
 
-        return [f"--proxy-server={proxy_url}"]
+        return [f"--proxy-server={proxy.get('server')}]"]
 
-    def get_proxy(self):
-        proxy = None
+    def get_proxy_playwright(self) -> ProxySettings | None:
+
         if self.use_proxy:
             if settings.PROXY_URL is None:
                 raise ValueError("PROXY_URL is not set")
@@ -377,4 +366,4 @@ class ActualBrowser:
 
             if settings.PROXY_PASSWORD is not None:
                 proxy["password"] = settings.PROXY_PASSWORD
-        return proxy
+            return ProxySettings(**proxy)
