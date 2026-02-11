@@ -290,6 +290,12 @@ async def download_request(
 
 
 async def handle_pdf_extraction(pdf_extraction: PDFExtraction, memory: Memory):
+    """
+    Expects the PDF file to be in the downloads directory and the filename to be the same as the one specified in the PDFExtraction schema.
+    If the PDF file is not found, it will use the first PDF file in the downloads directory.
+    If there are multiple PDF files in the downloads directory, it will raise an error.
+    TODO: handle multiple PDF files in the downloads directory.
+    """
     pdf_file = None
     for path in memory.downloads:
         if pdf_extraction.filename in path.name:
