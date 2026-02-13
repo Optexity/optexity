@@ -108,7 +108,14 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             headless=False,
             is_dedicated=task.is_dedicated,
         )
-        await _global_actual_browser.start()
+        try:
+            await _global_actual_browser.start()
+        except Exception:
+            logger.exception(
+                "Failed to start actual browser; resetting browser instance"
+            )
+            _global_actual_browser = None
+            raise
 
 
 async def run_automation_in_process(
