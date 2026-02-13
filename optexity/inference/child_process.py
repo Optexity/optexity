@@ -73,36 +73,31 @@ def log_system_info(comment: str):
     logger.info("=" * 100 + "\n")
 
 
-async def run_automation_in_process(
-    task: Task, unique_child_arn: str, child_process_id: int
-):
-
-    file_handler = logging.FileHandler(str(task.log_file_path))
-    file_handler.setLevel(logging.DEBUG)
-
-    current_module = __name__.split(".")[0]  # top-level module/package
-    logging.getLogger(current_module).addHandler(file_handler)
-    logger.info(
-        f"---------- Starting to run automation for task {task.task_id} ----------\n"
-    )
-    log_system_info("Memory info before starting browser")
-
+async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int):
     global _global_actual_browser
-
     system_info = SystemInfo()
     memory_exceeded = (
         system_info.total_system_memory_used / system_info.total_system_memory > 0.6
     )
-    if _global_actual_browser is not None and (
-        memory_exceeded or not task.is_dedicated
-    ):
+
+    if _global_actual_browser is not None:
+
+        restart_browser = False
+        if not await _global_actual_browser.check_browser_alive():
+            logger.info("CDP is not alive, restarting browser")
+            restart_browser = True
+
         if memory_exceeded:
             logger.info("Memory exceeded, restarting browser")
-        else:
-            logger.info("Previous browser was not dedicated, restarting browser")
+            restart_browser = True
 
-        await _global_actual_browser.stop(graceful=True)
-        _global_actual_browser = None
+        if not task.is_dedicated:
+            logger.info("Previous browser was not dedicated, restarting browser")
+            restart_browser = True
+
+        if restart_browser:
+            await _global_actual_browser.stop(graceful=True)
+            _global_actual_browser = None
 
     if _global_actual_browser is None:
         logger.info("Starting new actual browser")
@@ -115,20 +110,29 @@ async def run_automation_in_process(
         )
         await _global_actual_browser.start()
 
+
+async def run_automation_in_process(
+    task: Task, unique_child_arn: str, child_process_id: int
+):
+
+    global _global_actual_browser
+
+    file_handler = logging.FileHandler(str(task.log_file_path))
+    file_handler.setLevel(logging.DEBUG)
+
+    current_module = __name__.split(".")[0]  # top-level module/package
+    logging.getLogger(current_module).addHandler(file_handler)
+    logger.info(
+        f"---------- Starting to run automation for task {task.task_id} ----------\n"
+    )
+    log_system_info("Memory info before starting browser")
+
+    await setup_browser(task, unique_child_arn, child_process_id)
+
     log_system_info("Memory info after starting browser")
 
     logger.debug("Running automation in process")
     worker_path = pathlib.Path(__file__).parent / "worker.py"
-    # proc = subprocess.Popen(
-    #     [
-    #         sys.executable,
-    #         worker_path,
-    #         task.model_dump_json(),
-    #         unique_child_arn,
-    #         str(child_process_id),
-    #     ],
-    #     preexec_fn=os.setsid,  # isolate process group
-    # )
 
     proc = await asyncio.create_subprocess_exec(
         sys.executable,
