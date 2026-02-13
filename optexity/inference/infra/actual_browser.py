@@ -247,6 +247,18 @@ class ActualBrowser:
 
         raise RuntimeError("Chrome CDP not reachable")
 
+    async def check_browser_alive(self, timeout=10):
+        if settings.USE_PLAYWRIGHT_BROWSER:
+            try:
+                if self.context is None:
+                    return False
+                await self.context.pages[0].goto("about:blank")
+            except Exception:
+                return False
+            return True
+        else:
+            raise NotImplementedError("CDP check is not supported for native browser")
+
     async def stop(self, graceful=True):
         if settings.USE_PLAYWRIGHT_BROWSER:
             await self.stop_playwright_browser(graceful)

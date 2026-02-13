@@ -104,11 +104,7 @@ async def run_automation(
             logger.error(
                 f"Error going to about:blank on start: {e}, stopping browser and restarting"
             )
-            await browser.stop(force=True)
-            browser = _get_browser()
-            await browser.start()
-            await browser.go_to_url("about:blank")
-            memory.update_system_info()
+            raise e
 
         if task.use_proxy:
 
