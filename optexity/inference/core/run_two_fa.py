@@ -19,6 +19,7 @@ from optexity.schema.inference import (
     FetchSlackMessagesRequest,
 )
 from optexity.schema.memory import Memory
+from optexity.schema.task import Task
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 two_fa_extraction_agent = TwoFAExtraction()
 
 
-async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory):
+async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory, task: Task):
     logger.debug(
         f"---------Running 2fa action {two_fa_action.model_dump_json()}---------"
     )
@@ -37,7 +38,7 @@ async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory):
 
     while elapsed < two_fa_action.max_wait_time:
         messages = await fetch_messages(
-            two_fa_action.action, memory, two_fa_action.max_wait_time
+            two_fa_action.action, memory, two_fa_action.max_wait_time, task
         )
         if messages and len(messages) > 0:
             final_prompt, response, token_usage = two_fa_extraction_agent.extract_code(
@@ -83,6 +84,7 @@ async def fetch_messages(
     action: EmailTwoFAAction | SlackTwoFAAction,
     memory: Memory,
     max_wait_time: float,
+    task: Task,
 ):
 
     start_2fa_time = memory.automation_state.start_2fa_time
@@ -90,7 +92,7 @@ async def fetch_messages(
         seconds=max_wait_time
     )
 
-    headers = {"x-api-key": settings.API_KEY}
+    headers = {"x-api-key": task.api_key}
 
     if isinstance(action, EmailTwoFAAction):
         url = urljoin(settings.SERVER_URL, settings.FETCH_EMAIL_MESSAGES_ENDPOINT)

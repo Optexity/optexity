@@ -1,0 +1,86 @@
+name: Auto label issues
+
+on:
+    issues:
+        types: [opened]
+
+permissions:
+    issues: write
+    contents: read
+
+jobs:
+    label:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/github-script@v7
+              with:
+                  script: |
+                      const owner = context.repo.owner
+                      const repo = context.repo.repo
+                      const issue = context.payload.issue
+                      const username = issue.user.login
+
+                      // ---- CONFIG ----
+                      // Teams whose members are considered internal
+                      const INTERNAL_TEAMS = [
+                        "core",        // team slug
+                        "maintainers", // team slug
+                      ]
+
+                      // -----------------
+
+                      let isInternal = false
+
+                      // 1. Check repo permission level (covers collaborators + teams)
+                      try {
+                        const perm = await github.rest.repos.getCollaboratorPermissionLevel({
+                          owner,
+                          repo,
+                          username,
+                        })
+
+                        if (["admin", "write", "maintain"].includes(perm.data.permission)) {
+                          isInternal = true
+                        }
+                      } catch (e) {
+                        // ignore (user may not be collaborator)
+                      }
+
+                      // 2. If not internal yet, check team membership
+                      if (!isInternal) {
+                        for (const team of INTERNAL_TEAMS) {
+                          try {
+                            const res = await github.rest.teams.getMembershipForUserInOrg({
+                              org: owner,
+                              team_slug: team,
+                              username,
+                            })
+
+                            if (res.data.state === "active") {
+                              isInternal = true
+                              break
+                            }
+                          } catch (e) {
+                            // user not in this team, continue
+                          }
+                        }
+                      }
+
+                      const label = isInternal ? "internal" : "external"
+
+                      await github.rest.issues.addLabels({
+                        owner,
+                        repo,
+                        issue_number: issue.number,
+                        labels: [label],
+                      })
+
+                      // Optional: auto-assign internal issues
+                      if (isInternal) {
+                        await github.rest.issues.addAssignees({
+                          owner,
+                          repo,
+                          issue_number: issue.number,
+                          assignees: [username],
+                        })
+                      }

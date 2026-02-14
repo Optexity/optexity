@@ -3,6 +3,7 @@ import logging
 import re
 import time
 from enum import Enum, unique
+from pathlib import Path
 from typing import Optional
 
 import tokencost.costs
@@ -53,9 +54,9 @@ class LLMModel:
     def _get_model_response_with_structured_output(
         self,
         prompt: str,
-        response_schema: BaseModel,
+        response_schema: type[BaseModel],
         screenshot: Optional[str] = None,
-        pdf_url: Optional[str] = None,
+        pdf_url: Optional[str | Path] = None,
         system_instruction: Optional[str] = None,
     ) -> tuple[BaseModel, TokenUsage]:
         raise NotImplementedError("This method should be implemented by subclasses.")
@@ -79,9 +80,9 @@ class LLMModel:
     def get_model_response_with_structured_output(
         self,
         prompt: str,
-        response_schema: BaseModel,
+        response_schema: type[BaseModel],
         screenshot: Optional[str] = None,
-        pdf_url: Optional[str] = None,
+        pdf_url: Optional[str | Path] = None,
         system_instruction: Optional[str] = None,
     ) -> tuple[BaseModel, TokenUsage]:
 
@@ -131,7 +132,7 @@ class LLMModel:
         return json_candidates
 
     def parse_from_completion(
-        self, content: str, response_schema: BaseModel
+        self, content: str, response_schema: type[BaseModel]
     ) -> BaseModel:
         patterns = [r"```json\n(.*?)\n```"]
         json_blocks = []

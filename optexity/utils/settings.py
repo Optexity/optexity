@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     DEPLOYMENT: Literal["dev", "prod"]
     LOCAL_CALLBACK_URL: str | None = None
 
+    USE_PLAYWRIGHT_BROWSER: bool = True
+
     PROXY_URL: str | None = None
     PROXY_USERNAME: str | None = None
     PROXY_PASSWORD: str | None = None

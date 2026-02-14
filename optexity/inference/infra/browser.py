@@ -2,9 +2,7 @@ import asyncio
 import base64
 import json
 import logging
-import pathlib
 import re
-import shutil
 from typing import Literal
 from uuid import uuid4
 
@@ -16,47 +14,30 @@ from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import Download, Locator, Page, Request, Response
 
-from optexity.inference.infra.utils import _download_extension, _extract_extension
 from optexity.schema.memory import Memory, NetworkRequest, NetworkResponse
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
-
-_global_playwright: (
-    playwright.async_api.Playwright | patchright.async_api.Playwright | None
-) = None
-_global_context: (
-    playwright.async_api.BrowserContext | patchright.async_api.BrowserContext | None
-) = None
 
 
 class Browser:
     def __init__(
         self,
         memory: Memory,
-        user_data_dir: str,
         headless: bool = False,
-        proxy: str | None = None,
         stealth: bool = True,
         backend: Literal["browser-use", "browserbase"] = "browser-use",
         debug_port: int = 9222,
         channel: Literal["chromium", "chrome"] = "chromium",
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
-        is_dedicated: bool = False,
     ):
-
-        if proxy:
-            proxy = proxy.removeprefix("http://").removeprefix("https://")
-            self.proxy = "http://" + proxy
 
         self.headless = headless
         self.stealth = stealth
-        self.user_data_dir = user_data_dir
         self.backend = backend
         self.debug_port = debug_port
-        self.use_proxy = use_proxy
-        self.proxy_session_id = proxy_session_id
+
         self.playwright: (
             playwright.async_api.Playwright | patchright.async_api.Playwright | None
         ) = None
@@ -69,227 +50,51 @@ class Browser:
         self.page = None
         self.cdp_url = f"http://localhost:{self.debug_port}"
         self.backend_agent = None
-        self.channel = channel
+        self.channel: Literal["chrome", "chromium"] = channel
         self.memory = memory
         self.page_to_target_id = []
         self.previous_total_pages = 0
-        self.is_dedicated = is_dedicated
         self.active_downloads = 0
         self.all_active_downloads_done = asyncio.Event()
         self.all_active_downloads_done.set()
 
         self.network_calls: list[NetworkResponse | NetworkRequest] = []
 
-        self.extensions = [
-            # {
-            #     "name": "optexity recorder",
-            #     "id": "pbaganbicadeoacahamnbgohafchgakp",
-            #     "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dpbaganbicadeoacahamnbgohafchgakp%26uc",
-            # },
-            {
-                "name": "I still don't care about cookies",
-                "id": "edibdbjcniadpccecjdfdjjppcpchdlm",
-                "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dedibdbjcniadpccecjdfdjjppcpchdlm%26uc",
-            },
-            # {
-            #     "name": "popupoff",
-            #     "id": "kiodaajmphnkcajieajajinghpejdjai",
-            #     "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dkiodaajmphnkcajieajajinghpejdjai%26uc",
-            # },
-            {
-                "name": "ublock origin",
-                "id": "ddkjiahejlhfcafbddmgiahcphecmpfh",
-                "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dddkjiahejlhfcafbddmgiahcphecmpfh%26uc",
-            },
-        ]
-
-        if not self.is_dedicated:
-            global _global_playwright, _global_context
-            _global_playwright = None
-            _global_context = None
-
-    def get_extension_paths(self) -> list[str]:
-        cache_dir = pathlib.Path("/tmp/extensions")
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        extension_paths = []
-        loaded_extension_names = []
-        for ext in self.extensions:
-            ext_dir = cache_dir / ext["id"]
-            crx_file = cache_dir / f'{ext["id"]}.crx'
-
-            # Check if extension is already extracted
-            if ext_dir.exists() and (ext_dir / "manifest.json").exists():
-                logger.info(f'✅ Using cached {ext["name"]} extension from {ext_dir}')
-                extension_paths.append(str(ext_dir))
-                loaded_extension_names.append(ext["name"])
-                continue
-
-            try:
-                # Download extension if not cached
-                if not crx_file.exists():
-                    logger.info(f'📦 Downloading {ext["name"]} extension...')
-                    _download_extension(ext["url"], crx_file)
-                else:
-                    logger.info(f'📦 Found cached {ext["name"]} .crx file')
-
-                # Extract extension
-                logger.info(f'📂 Extracting {ext["name"]} extension...')
-                _extract_extension(crx_file, ext_dir)
-
-                extension_paths.append(str(ext_dir))
-                loaded_extension_names.append(ext["name"])
-                logger.info(f'✅ Successfully loaded {ext["name"]}')
-
-            except Exception as e:
-                logger.error(
-                    f'❌ Failed to setup {ext["name"]} extension: {e}',
-                    exc_info=True,
-                )
-                continue
-
-        if not extension_paths:
-            logger.error("⚠️ No extensions were loaded successfully!")
-
-        logger.info(f"Loaded extensions: {', '.join(loaded_extension_names)}")
-
-        return extension_paths
-
-    def get_proxy(self):
-        proxy = None
-        if self.use_proxy:
-            if settings.PROXY_URL is None:
-                raise ValueError("PROXY_URL is not set")
-            proxy = {"server": settings.PROXY_URL}
-            if settings.PROXY_USERNAME is not None:
-                if settings.PROXY_PROVIDER == "oxylabs":
-                    assert settings.PROXY_COUNTRY, "PROXY_COUNTRY is not set"
-                    assert settings.PROXY_USERNAME, "PROXY_USERNAME is not set"
-                    assert settings.PROXY_PASSWORD, "PROXY_PASSWORD is not set"
-
-                    proxy["username"] = (
-                        f"customer-{settings.PROXY_USERNAME}-cc-{settings.PROXY_COUNTRY}-sessid-{self.proxy_session_id}-sesstime-20"
-                    )
-                elif settings.PROXY_PROVIDER == "brightdata":
-
-                    proxy["username"] = (
-                        f"{settings.PROXY_USERNAME}-session-{self.proxy_session_id}"
-                    )
-
-                else:
-                    proxy["username"] = settings.PROXY_USERNAME
-
-            if settings.PROXY_PASSWORD is not None:
-                proxy["password"] = settings.PROXY_PASSWORD
-        return proxy
-
     async def start(self):
-        global _global_playwright, _global_context
         logger.debug("Starting browser")
         try:
-            if (
-                _global_playwright is None
-                or _global_context is None
-                or not self.is_dedicated
-            ):
-                if _global_context is not None:
-                    await _global_context.close()
-                    _global_context = None
-                    self.context = None
-                if _global_playwright is not None:
-                    await _global_playwright.stop()
-                    _global_playwright = None
-                    self.playwright = None
+            await self.stop()
 
-                if self.stealth:
-                    from patchright.async_api import async_playwright
-                else:
-                    from playwright.async_api import async_playwright
+            if self.stealth:
+                from patchright.async_api import async_playwright
+            else:
+                from playwright.async_api import async_playwright
 
-                extension_paths = self.get_extension_paths()
-                proxy = self.get_proxy()
-
-                args = [
-                    "--disable-site-isolation-trials",
-                    "--disable-web-security",
-                    "--disable-features=IsolateOrigins,site-per-process",
-                    "--allow-running-insecure-content",
-                    "--ignore-certificate-errors",
-                    "--ignore-ssl-errors",
-                    "--ignore-certificate-errors-spki-list",
-                    "--enable-extensions",
-                    "--disable-extensions-file-access-check",
-                    "--disable-extensions-http-throttling",
-                ]
-
-                if extension_paths:
-                    disable_except = (
-                        f'--disable-extensions-except={",".join(extension_paths)}'
-                    )
-                    load_extension = f'--load-extension={",".join(extension_paths)}'
-                    args.append(disable_except)
-                    args.append(load_extension)
-                    logger.info(f"Extension args: {disable_except}")
-                    logger.info(f"Extension args: {load_extension}")
-
-                self.playwright = await async_playwright().start()
-                self.context = await self.playwright.chromium.launch_persistent_context(
-                    channel=self.channel,
-                    user_data_dir=self.user_data_dir,
-                    headless=self.headless,
-                    proxy=proxy,
-                    args=[
-                        # "--start-fullscreen",
-                        "--disable-popup-blocking",
-                        "--window-size=1920,1080",
-                        f"--remote-debugging-port={self.debug_port}",
-                        "--disable-gpu",
-                        "--disable-background-networking",
-                        "--disable-sync",
-                        "--disable-translate",
-                        "--disable-features=site-per-process",
-                    ]
-                    + args,
-                    chromium_sandbox=False,
-                    no_viewport=True,
-                )
-
-                _global_playwright = self.playwright
-                _global_context = self.context
-
-                self.context.on("request", lambda req: self.log_request(req))
-                self.context.on("response", lambda resp: self.log_response(resp))
-                self.context.on(
-                    "response", lambda resp: self.handle_random_url_downloads(resp)
-                )
-                self.context.on(
-                    "page",
-                    lambda p: (
-                        p.on(
-                            "download",
-                            lambda download: self.handle_random_download(download),
-                        )
-                    ),
-                )
-
-            elif self.is_dedicated:
-                self.context = _global_context
-                self.playwright = _global_playwright
+            self.playwright = await async_playwright().start()
+            self.browser = await self.playwright.chromium.connect_over_cdp(self.cdp_url)
+            self.context = self.browser.contexts[0]
+            if self.context is None:
+                raise ValueError("Context is not set")
+            if len(self.context.pages) == 0:
+                self.page = await self.context.new_page()
+            else:
                 for i in range(len(self.context.pages) - 1, 0, -1):
                     await self.context.pages[i].close()
-            else:
-                raise ValueError(
-                    "Browser is not dedicated and global playwright and context are not set"
-                )
 
-            # self.context = await self.browser.new_context(
-            #     no_viewport=True, ignore_https_errors=True
-            # )
-
-            # self.page = await self.context.new_page()
-            if len(self.context.pages) == 0:
-                await self.context.new_page()
-
-            self.page = self.context.pages[0]
+            self.context.on("request", lambda req: self.log_request(req))
+            self.context.on("response", lambda resp: self.log_response(resp))
+            self.context.on(
+                "response", lambda resp: self.handle_random_url_downloads(resp)
+            )
+            self.context.on(
+                "page",
+                lambda p: (
+                    p.on(
+                        "download",
+                        lambda download: self.handle_random_download(download),
+                    )
+                ),
+            )
 
             browser_session = BrowserSession(cdp_url=self.cdp_url, keep_alive=True)
 
@@ -316,6 +121,7 @@ class Browser:
             raise e
 
     async def stop(self, force: bool = False):
+
         logger.debug("Stopping backend agent")
         if self.backend_agent is not None:
             logger.debug("Stopping backend agent")
@@ -329,39 +135,24 @@ class Browser:
                 logger.debug("Browser session reset")
             self.backend_agent = None
 
-        if not self.is_dedicated or force:
-            logger.debug("Stopping context and playwright and browser as not dedicated")
-            if self.context is not None:
-                logger.debug("Stopping context")
-                await self.context.close()
-                self.context = None
+        if self.browser is not None:
+            logger.debug("Stopping browser")
+            await self.browser.close()
+            self.browser = None
 
-            if self.browser is not None:
-                logger.debug("Stopping browser")
-                await self.browser.close()
-                self.browser = None
-
-            if self.playwright is not None:
-                logger.debug("Stopping playwright")
-                await self.playwright.stop()
-                self.playwright = None
-            shutil.rmtree(self.user_data_dir, ignore_errors=True)
-
-            global _global_playwright, _global_context
-            _global_playwright = None
-            _global_context = None
-            self.context = None
+        if self.playwright is not None:
+            logger.debug("Stopping playwright")
+            await self.playwright.stop()
             self.playwright = None
-            logger.debug("Global playwright and context reset")
 
-        else:
-            logger.debug("browser not stopped as dedicated")
+        self.context = None
 
     async def get_current_page(
         self,
     ) -> playwright.async_api.Page | patchright.async_api.Page:
         if self.context is None:
             raise ValueError("Context is not set")
+
         pages = self.context.pages
         if len(pages) == 0:
             self.page = await self.context.new_page()
@@ -370,7 +161,10 @@ class Browser:
 
         return self.page
 
-    async def handle_new_tabs(self, max_wait_time: float) -> bool:
+    async def handle_new_tabs(self, max_wait_time: float) -> tuple[bool, float]:
+
+        if self.context is None or self.backend_agent is None:
+            return False, 0
 
         total_time = 0
         while total_time < max_wait_time:
@@ -397,7 +191,7 @@ class Browser:
         return True, total_time
 
     async def close_current_tab(self):
-        if self.context is None:
+        if self.context is None or self.backend_agent is None:
             return None
 
         pages = self.context.pages
@@ -418,7 +212,7 @@ class Browser:
         await last_page.close()
 
     async def switch_tab(self, tab_index: int):
-        if self.context is None:
+        if self.context is None or self.backend_agent is None:
             return None
 
         pages = self.context.pages
@@ -435,7 +229,9 @@ class Browser:
         action_model = self.backend_agent.ActionModel(**{"switch": {"tab_id": tab_id}})
         await self.backend_agent.multi_act([action_model])
 
-    async def get_locator_from_command(self, command: str) -> Locator:
+    async def get_locator_from_command(self, command: str) -> Locator | None:
+        if self.context is None or self.backend_agent is None:
+            return None
         page = await self.get_current_page()
         if page is None:
             return None
@@ -469,6 +265,9 @@ class Browser:
             return None
 
     async def get_browser_state_summary(self) -> BrowserStateSummary:
+        if self.backend_agent is None:
+            raise ValueError("Backend agent is not set")
+
         browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
             include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
             include_recent_events=False,
@@ -480,18 +279,22 @@ class Browser:
     async def get_current_page_url(self) -> str:
         try:
             page = await self.get_current_page()
+            if page is None:
+                return "about:blank"
             return page.url
         except Exception as e:
             logger.error(f"Error getting current page URL: {e}")
-            return ""
+            return "about:blank"
 
     async def get_current_page_title(self) -> str:
         try:
             page = await self.get_current_page()
+            if page is None:
+                return "Unknown page title"
             return await page.title()
         except Exception as e:
             logger.error(f"Error getting current page title: {e}")
-            return ""
+            return "Unknown page title"
 
     async def handle_random_download(self, download: Download):
         self.active_downloads += 1
@@ -508,27 +311,38 @@ class Browser:
 
     async def handle_random_url_downloads(self, resp: Response):
         try:
+            content_type = (resp.headers.get("content-type") or "").lower()
+            content_disposition = (
+                resp.headers.get("content-disposition") or ""
+            ).lower()
 
-            if "application/pdf" in resp.headers.get("content-type", ""):
-                self.active_downloads += 1
-                self.all_active_downloads_done.clear()
+            # PDF: either content-type is application/pdf, or attachment with .pdf filename
+            # (many servers use application/octet-stream + content-disposition for PDFs)
+            is_pdf_content = "application/pdf" in content_type
+            is_pdf_attachment = (
+                "attachment" in content_disposition and ".pdf" in content_disposition
+            )
+            if not (is_pdf_content or is_pdf_attachment):
+                if self.active_downloads == 0:
+                    self.all_active_downloads_done.set()
+                return
 
-                # Default filename fallback
-                filename = f"{uuid4()}.pdf"
+            self.active_downloads += 1
+            self.all_active_downloads_done.clear()
 
-                # Try to get suggested filename from headers
-                content_disposition = resp.headers.get("content-disposition")
-                if content_disposition:
-                    match = re.search(
-                        r'filename\*?=(?:UTF-8\'\')?"?([^";]+)"?',
-                        content_disposition,
-                    )
-                    if match:
-                        filename = match.group(1)
+            filename = f"{uuid4()}.pdf"
+            if content_disposition:
+                match = re.search(
+                    r'filename\*?=(?:utf-8\'\')?"?([^";]+)"?',
+                    content_disposition,
+                    re.IGNORECASE,
+                )
+                if match:
+                    filename = match.group(1).strip()
 
-                self.memory.urls_to_downloads.append((resp.url, filename))
-                logger.info(f"Added URL to downloads: {resp.url}, {filename}")
-                self.active_downloads -= 1
+            self.memory.urls_to_downloads.append((resp.url, filename))
+            logger.info(f"Added URL to downloads: {resp.url}, {filename}")
+            self.active_downloads -= 1
         except Exception as e:
             logger.error(f"Error handling random responses: {e}")
 

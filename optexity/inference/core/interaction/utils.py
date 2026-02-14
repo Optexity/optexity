@@ -60,9 +60,39 @@ async def handle_download(
             async with memory.download_lock:
                 memory.raw_downloads[temp_path] = (True, None)
 
+            # If caller passed a filename with no extension (e.g. UUID only), use
+            # Playwright's suggested_filename so the saved file has the correct type.
+            if not download_path.suffix and getattr(
+                download, "suggested_filename", None
+            ):
+                suggested = Path(download.suggested_filename)
+                if suggested.suffix:
+                    download_path = download_path.with_suffix(suggested.suffix)
             await download.save_as(download_path)
-            memory.downloads.append(download_path)
             await clean_download(download_path)
+
+            # Detect wrong content: Playwright sometimes captures the wrong response (e.g. HTML
+            # page or 0 bytes). Reject so we don't keep a corrupted file. The real PDF response
+            # is captured by the response listener (content-disposition attachment + .pdf) and
+            # will be fetched in run_final_downloads_check via handle_download_url_as_pdf.
+            def _saved_file_is_invalid() -> bool:
+                if not download_path.exists():
+                    return True
+                size = download_path.stat().st_size
+                if size == 0:
+                    return True
+                return False
+
+            if _saved_file_is_invalid():
+                try:
+                    download_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                logger.info(
+                    "Discarded invalid download (wrong or empty content); real PDF will be fetched from captured URL"
+                )
+            else:
+                memory.downloads.append(download_path)
         else:
             logger.error("No download found")
 

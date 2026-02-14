@@ -1,19 +1,29 @@
 import argparse
 import asyncio
+import json
 import logging
+import os
+import pathlib
+import signal
+import subprocess
+import sys
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from typing import TextIO
 from urllib.parse import urljoin
 
 import httpx
+import psutil
 from fastapi import Body, FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from uvicorn import run
 
-from optexity.inference.core.run_automation import run_automation
+from optexity.inference.core.logging import delete_local_data, save_trajectory_in_server
+from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.schema.inference import InferenceRequest
+from optexity.schema.memory import SystemInfo
 from optexity.schema.task import Task
 from optexity.utils.settings import settings
 
@@ -30,6 +40,149 @@ unique_child_arn: str = str(uuid.uuid4())
 task_running = False
 last_task_start_time = None
 task_queue: asyncio.Queue[Task] = asyncio.Queue()
+_global_actual_browser: ActualBrowser | None = None
+
+
+def log_system_info(comment: str):
+    logger.info("=" * 100 + "\n")
+    logger.info(comment)
+    system_info = SystemInfo()
+    logger.info(
+        json.dumps(
+            {
+                "container_memory_total": round(system_info.total_system_memory, 2),
+                "container_memory_used": round(system_info.total_system_memory_used, 2),
+                "percent_container_memory_used": round(
+                    system_info.total_system_memory_used
+                    / system_info.total_system_memory,
+                    2,
+                ),
+            }
+        )
+    )
+    vm = psutil.virtual_memory()
+    logger.info(
+        json.dumps(
+            {
+                "host_memory_total": round(vm.total / (1024**2), 2),
+                "host_memory_used": round(vm.used / (1024**2), 2),
+                "percent_host_memory_used": round(vm.used / vm.total, 2),
+            }
+        )
+    )
+    logger.info("=" * 100 + "\n")
+
+
+async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int):
+    global _global_actual_browser
+    system_info = SystemInfo()
+    memory_exceeded = (
+        system_info.total_system_memory_used / system_info.total_system_memory > 0.6
+    )
+
+    if _global_actual_browser is not None:
+
+        restart_browser = False
+        if not await _global_actual_browser.check_browser_alive():
+            logger.info("CDP is not alive, restarting browser")
+            restart_browser = True
+
+        if memory_exceeded:
+            logger.info("Memory exceeded, restarting browser")
+            restart_browser = True
+
+        if not task.is_dedicated:
+            logger.info("Previous browser was not dedicated, restarting browser")
+            restart_browser = True
+
+        if restart_browser:
+            await _global_actual_browser.stop(graceful=True)
+            _global_actual_browser = None
+
+    if _global_actual_browser is None:
+        logger.info("Starting new actual browser")
+        _global_actual_browser = ActualBrowser(
+            channel=task.automation.browser_channel,
+            unique_child_arn=unique_child_arn,
+            port=9222 + child_process_id,
+            headless=False,
+            is_dedicated=task.is_dedicated,
+        )
+        try:
+            await _global_actual_browser.start()
+        except Exception:
+            logger.exception(
+                "Failed to start actual browser; resetting browser instance"
+            )
+            _global_actual_browser = None
+            raise
+
+
+async def run_automation_in_process(
+    task: Task, unique_child_arn: str, child_process_id: int
+):
+
+    global _global_actual_browser
+
+    file_handler = logging.FileHandler(str(task.log_file_path))
+    file_handler.setLevel(logging.DEBUG)
+
+    current_module = __name__.split(".")[0]  # top-level module/package
+    logging.getLogger(current_module).addHandler(file_handler)
+    logger.info(
+        f"---------- Starting to run automation for task {task.task_id} ----------\n"
+    )
+    log_system_info("Memory info before starting browser")
+
+    await setup_browser(task, unique_child_arn, child_process_id)
+
+    log_system_info("Memory info after starting browser")
+
+    logger.debug("Running automation in process")
+    worker_path = pathlib.Path(__file__).parent / "worker.py"
+
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable,
+        worker_path,
+        task.model_dump_json(),
+        unique_child_arn,
+        str(child_process_id),
+        preexec_fn=os.setsid,
+    )
+
+    try:
+        logger.debug("Waiting for automation to finish")
+        # returncode = proc.wait(timeout=600)  # seconds
+        returncode = await asyncio.wait_for(proc.wait(), timeout=600)
+        logger.debug("Automation finished in process")
+        return returncode
+    except subprocess.TimeoutExpired:
+        logger.debug("Automation timed out in process")
+        os.killpg(proc.pid, signal.SIGKILL)
+        logger.debug("Automation killed in process")
+        return -1
+    finally:
+        logger.info(
+            f"---------- Automation for task {task.task_id} finished ----------\n"
+        )
+        log_system_info("Memory info after automation finished in process")
+
+        if _global_actual_browser is not None and not task.is_dedicated:
+            logger.debug("Stopping actual browser as not dedicated")
+            try:
+                await _global_actual_browser.stop(graceful=True)
+                _global_actual_browser = None
+            except Exception as e:
+                logger.error(f"Error stopping actual browser: {e}")
+
+        log_system_info("Memory info after stopping actual browser")
+
+        file_handler.flush()
+        file_handler.close()
+        logging.getLogger(current_module).removeHandler(file_handler)
+
+        await save_trajectory_in_server(task)
+        await delete_local_data(task)
 
 
 async def task_processor():
@@ -44,7 +197,7 @@ async def task_processor():
             task = await task_queue.get()
             task_running = True
             last_task_start_time = datetime.now()
-            await run_automation(task, unique_child_arn, child_process_id)
+            await run_automation_in_process(task, unique_child_arn, child_process_id)
 
         except asyncio.CancelledError:
             logger.info("Task processor cancelled")
@@ -96,6 +249,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        global _global_actual_browser
         """Lifespan context manager for startup and shutdown."""
         # Startup
 
@@ -108,6 +262,14 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
         yield
         # Shutdown (if needed in the future)
         logger.info("Shutting down task processor")
+
+        if _global_actual_browser is not None:
+            logger.debug("Stopping actual browser on lifecycle end")
+            await _global_actual_browser.stop(graceful=True)
+            _global_actual_browser = None
+            logger.debug("Actual browser stopped on lifecycle end")
+
+        logger.info("Lifecycle ended")
 
     app = FastAPI(title="Optexity Inference", lifespan=lifespan)
 
@@ -193,6 +355,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
                     raise ValueError(
                         "PROXY_URL is not set and is required when use_proxy is True"
                     )
+                task.is_dedicated = inference_request.is_dedicated
                 task.allocated_at = datetime.now(timezone.utc)
                 await task_queue.put(task)
 

@@ -54,6 +54,8 @@ async def command_based_action_with_retry(
         try:
             # https://playwright.dev/docs/actionability
             locator = await browser.get_locator_from_command(action.command)
+            if locator is None:
+                continue
             if try_index == 0:
                 try:
                     await locator.wait_for(
@@ -64,6 +66,10 @@ async def command_based_action_with_retry(
             is_visible = await locator.is_visible()
 
             if is_visible:
+                await locator.scroll_into_view_if_needed(
+                    timeout=max_timeout_seconds_per_try * 1000
+                )
+                await asyncio.sleep(0.05)
                 # browser_state_summary = await browser.get_browser_state_summary()
                 memory.browser_states[-1] = BrowserState(
                     url=await browser.get_current_page_url(),
@@ -243,14 +249,12 @@ async def select_option_locator(
     max_timeout_seconds_per_try: float,
 ):
     async def _actual_select_option():
-        options: list[dict[str, str]] = await locator.evaluate(
-            """
+        options: list[dict[str, str]] = await locator.evaluate("""
         sel => Array.from(sel.options).map(o => ({
             value: o.value,
             label: o.label || o.textContent
         }))
-    """
-        )
+    """)
 
         select_option_values = [
             SelectOptionValue(value=o["value"], label=o["label"]) for o in options

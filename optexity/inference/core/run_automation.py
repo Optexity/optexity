@@ -10,7 +10,6 @@ from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from optexity.inference.core.interaction.utils import clean_download
 from optexity.inference.core.logging import (
     complete_task_in_server,
-    delete_local_data,
     initiate_callback,
     save_downloads_in_server,
     save_latest_memory_state_locally,
@@ -76,28 +75,24 @@ async def run_automation(
     try:
         await start_task_in_server(task)
         memory = Memory(unique_child_arn=unique_child_arn)
-        user_data_dir = (
-            f"/tmp/userdata_{task.task_id}"
-            if settings.DEPLOYMENT == "dev"
-            else f"/tmp/userdata"
-        )
         memory.update_system_info()
-        browser = Browser(
-            memory=memory,
-            user_data_dir=user_data_dir,
-            headless=False,
-            channel=task.automation.browser_channel,
-            debug_port=9222 + child_process_id,
-            use_proxy=task.use_proxy,
-            proxy_session_id=task.proxy_session_id(
-                settings.PROXY_PROVIDER if task.use_proxy else None
-            ),
-            is_dedicated=task.is_dedicated,
-        )
+
+        def _get_browser():
+            return Browser(
+                memory=memory,
+                headless=False,
+                channel=task.automation.browser_channel,
+                debug_port=9222 + child_process_id,
+                use_proxy=task.use_proxy,
+                proxy_session_id=task.proxy_session_id(
+                    settings.PROXY_PROVIDER if task.use_proxy else None
+                ),
+            )
+
+        browser = _get_browser()
         memory.update_system_info()
 
         automation = task.automation
-
         memory.automation_state.step_index = -1
         memory.automation_state.try_index = 0
 
@@ -109,36 +104,19 @@ async def run_automation(
             logger.error(
                 f"Error going to about:blank on start: {e}, stopping browser and restarting"
             )
-            await browser.stop(force=True)
-            browser = Browser(
-                memory=memory,
-                user_data_dir=user_data_dir,
-                headless=False,
-                channel=task.automation.browser_channel,
-                debug_port=9222 + child_process_id,
-                use_proxy=task.use_proxy,
-                proxy_session_id=task.proxy_session_id(
-                    settings.PROXY_PROVIDER if task.use_proxy else None
-                ),
-                is_dedicated=task.is_dedicated,
-            )
-            await browser.start()
-            await browser.go_to_url("about:blank")
-            memory.update_system_info()
+            raise e
 
         if task.use_proxy:
 
             await browser.go_to_url("https://ipinfo.io/json")
             page = await browser.get_current_page()
 
-            ip_info = await page.evaluate(
-                """
+            ip_info = await page.evaluate("""
                 async () => {
                 const res = await fetch("https://ipinfo.io/json");
                 return await res.json();
                 }
-                """
-            )
+                """)
             if isinstance(ip_info, dict):
                 memory.variables.output_data.append(
                     OutputData(unique_identifier="ip_info", json_data=ip_info)
@@ -188,21 +166,26 @@ async def run_automation(
             logger.info(
                 f"Running automations again with {max_retries - 1} retries left"
             )
-            return await run_automation(task, child_process_id, max_retries - 1)
+            return await run_automation(
+                task, unique_child_arn, child_process_id, max_retries - 1
+            )
         else:
             logger.error(f"Error running automation: {traceback.format_exc()}")
             task.error = str(e)
             task.status = "failed"
 
     finally:
-        if task and memory:
+        if task and memory and browser:
             await run_final_downloads_check(task, memory, browser)
+            await run_post_processing_nodes(task, memory, browser)
         if memory and browser:
             await run_final_logging(task, memory, browser, child_process_id)
-        if browser:
+        if browser is not None:
             await browser.stop()
 
     logger.info(f"Task {task.task_id} completed with status {task.status}")
+    file_handler.flush()
+    file_handler.close()
     logging.getLogger(current_module).removeHandler(file_handler)
 
 
@@ -221,7 +204,7 @@ async def run_final_downloads_check(task: Task, memory: Memory, browser: Browser
             is_downloaded,
             download,
         ) in memory.raw_downloads.items():
-            if is_downloaded:
+            if is_downloaded or download is None:
                 continue
 
             download_path = task.downloads_directory / download.suggested_filename
@@ -285,9 +268,8 @@ async def run_final_logging(
         await save_output_data_in_server(task, memory)
         await save_downloads_in_server(task, memory)
         await save_latest_memory_state_locally(task, memory, None)
-        await save_trajectory_in_server(task, memory)
+        await save_trajectory_in_server(task)
         await initiate_callback(task)
-        await delete_local_data(task)
 
     except Exception as e:
         logger.error(f"Error running final logging: {e}")
@@ -322,7 +304,7 @@ async def run_action_node(
         )
     )
 
-    logger.debug(f"-----Running node {memory.automation_state.step_index}-----")
+    logger.debug(f"-----Running node new {memory.automation_state.step_index}-----")
 
     try:
         if action_node.interaction_action:
@@ -351,7 +333,7 @@ async def run_action_node(
     finally:
         await save_latest_memory_state_locally(task, memory, action_node)
         if memory.automation_state.step_index % 5 == 0:
-            await save_trajectory_in_server(task, memory)
+            await save_trajectory_in_server(task)
 
     if action_node.expect_new_tab:
         found_new_tab, total_time = await browser.handle_new_tabs(
@@ -384,11 +366,7 @@ async def sleep_for_page_to_load(browser: Browser, sleep_time: float):
         return
     try:
         await page.wait_for_load_state("load", timeout=sleep_time * 1000)
-    except TimeoutError as e:
-        pass
-    except PatchrightTimeoutError as e:
-        pass
-    except PlaywrightTimeoutError as e:
+    except (TimeoutError, PatchrightTimeoutError, PlaywrightTimeoutError):
         pass
 
 
@@ -532,3 +510,8 @@ async def handle_for_loop_node(
                         browser,
                     )
     memory.update_system_info()
+
+
+async def run_post_processing_nodes(task: Task, memory: Memory, browser: Browser):
+    for node in task.automation.post_processing_nodes:
+        await run_action_node(node, task, memory, browser)
