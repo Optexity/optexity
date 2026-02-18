@@ -13,6 +13,19 @@ from optexity.schema.token_usage import TokenUsage
 
 logger = logging.getLogger(__name__)
 
+# Registry mapping enum class → LLMModel subclass
+MODEL_REGISTRY: dict[type[Enum], type] = {}
+
+
+def register_model(enum_cls: type[Enum]):
+    """Decorator to register an LLMModel subclass for a given model enum."""
+
+    def decorator(llm_cls):
+        MODEL_REGISTRY[enum_cls] = llm_cls
+        return llm_cls
+
+    return decorator
+
 
 @unique
 class HumanModels(Enum):

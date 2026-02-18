@@ -10,6 +10,7 @@ import patchright.async_api
 import playwright.async_api
 from browser_use import Agent, BrowserSession, ChatGoogle
 from browser_use.browser.views import BrowserStateSummary
+from browser_use.llm.openai.chat import ChatOpenAI
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import Download, Locator, Page, Request, Response
@@ -98,9 +99,14 @@ class Browser:
 
             browser_session = BrowserSession(cdp_url=self.cdp_url, keep_alive=True)
 
+            if settings.AGENT_LLM_PROVIDER == "openai":
+                llm = ChatOpenAI(model=settings.AGENT_LLM_MODEL)
+            else:
+                llm = ChatGoogle(model=settings.AGENT_LLM_MODEL)
+
             self.backend_agent = Agent(
                 task="",
-                llm=ChatGoogle(model="gemini-flash-latest"),
+                llm=llm,
                 browser_session=browser_session,
                 use_vision=False,
             )
