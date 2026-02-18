@@ -101,6 +101,7 @@ async def fetch_messages(
             sender_email_address=action.sender_email_address,
             start_2fa_time=start_2fa_time,
             end_2fa_time=end_2fa_time,
+            endpoint_name=task.endpoint_name,
         )
     elif isinstance(action, SlackTwoFAAction):
         url = urljoin(settings.SERVER_URL, settings.FETCH_SLACK_MESSAGES_ENDPOINT)
@@ -110,6 +111,7 @@ async def fetch_messages(
             sender_name=action.sender_name,
             start_2fa_time=start_2fa_time,
             end_2fa_time=end_2fa_time,
+            endpoint_name=task.endpoint_name,
         )
 
     try:
