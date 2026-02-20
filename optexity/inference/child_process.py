@@ -40,6 +40,7 @@ unique_child_arn: str = str(uuid.uuid4())
 task_running = False
 last_task_start_time = None
 task_queue: asyncio.Queue[Task] = asyncio.Queue()
+tasks_to_kill: set[str] = set()
 _global_actual_browser: ActualBrowser | None = None
 
 
@@ -199,6 +200,10 @@ async def task_processor():
         try:
             # Get next task from queue (blocks until one is available)
             task = await task_queue.get()
+            if task.task_id in tasks_to_kill:
+                logger.info(f"Task {task.task_id} has been killed")
+                tasks_to_kill.remove(task.task_id)
+                continue
             task_running = True
             last_task_start_time = datetime.now()
             await run_automation_in_process(task, unique_child_arn, child_process_id)
@@ -281,6 +286,15 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
     async def is_task_running():
         """Is task running endpoint."""
         return task_running
+
+    @app.post("/kill_task")
+    async def kill_task(task_id: str = Body(...)):
+        """Kill task endpoint."""
+        tasks_to_kill.add(task_id)
+        return JSONResponse(
+            content={"success": True, "message": "Task has been killed"},
+            status_code=200,
+        )
 
     @app.get("/health", tags=["info"])
     async def health():
