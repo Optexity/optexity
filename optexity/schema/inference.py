@@ -16,6 +16,12 @@ class InferenceRequest(BaseModel):
     )
 
     @model_validator(mode="after")
+    def validate_use_proxy(self):
+        if self.use_proxy and self.is_dedicated:
+            raise ValueError("use_proxy is not allowed when is_dedicated is true")
+        return self
+
+    @model_validator(mode="after")
     def validate_unique_parameter_names(self):
         for unique_parameter_name in self.unique_parameter_names:
             if unique_parameter_name not in self.input_parameters and (

@@ -361,12 +361,11 @@ class ActualBrowser:
             proxy = {"server": settings.PROXY_URL}
             if settings.PROXY_USERNAME is not None:
                 if settings.PROXY_PROVIDER == "oxylabs":
-                    assert settings.PROXY_COUNTRY, "PROXY_COUNTRY is not set"
                     assert settings.PROXY_USERNAME, "PROXY_USERNAME is not set"
                     assert settings.PROXY_PASSWORD, "PROXY_PASSWORD is not set"
 
                     proxy["username"] = (
-                        f"customer-{settings.PROXY_USERNAME}-cc-{settings.PROXY_COUNTRY}-sessid-{self.proxy_session_id}-sesstime-20"
+                        f"customer-{settings.PROXY_USERNAME}-cc-{settings.PROXY_COUNTRY}-sessid-{self.proxy_session_id}-sesstime-10"
                     )
                 elif settings.PROXY_PROVIDER == "brightdata":
 

@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     def validate_local_callback_url(self):
         if self.DEPLOYMENT == "prod" and self.LOCAL_CALLBACK_URL is not None:
             raise ValueError("LOCAL_CALLBACK_URL is not allowed in prod mode")
+
+        if self.PROXY_PROVIDER == "oxylabs":
+            if self.PROXY_COUNTRY is None:
+                self.PROXY_COUNTRY = "US"
         return self
 
     class Config:
@@ -53,4 +57,4 @@ class Settings(BaseSettings):
         extra = "allow"
 
 
-settings = Settings()
+settings = Settings()  # pyright: ignore[reportCallIssue]
