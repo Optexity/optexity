@@ -73,6 +73,7 @@ class Task(BaseModel):
     api_key: str
     callback_url: CallbackUrl | None = None
     is_dedicated: bool = False
+    company_id: str
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}

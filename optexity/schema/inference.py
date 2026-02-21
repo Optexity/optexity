@@ -39,6 +39,7 @@ class FetchEmailMessagesRequest(BaseModel):
     sender_email_address: str  # sender's email address
     start_2fa_time: datetime
     end_2fa_time: datetime
+    endpoint_name: str
 
     @model_validator(mode="after")
     def validate_time_parameters(self):
@@ -63,6 +64,7 @@ class FetchSlackMessagesRequest(BaseModel):
     sender_name: str
     start_2fa_time: datetime
     end_2fa_time: datetime
+    endpoint_name: str
 
     @model_validator(mode="after")
     def validate_time_parameters(self):
