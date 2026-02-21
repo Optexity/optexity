@@ -3,15 +3,11 @@ from copy import deepcopy
 
 from optexity.inference.core.run_extraction import handle_llm_extraction
 from optexity.inference.infra.browser import Browser
-from optexity.inference.models import GeminiModels, get_llm_model
 from optexity.schema.actions.assertion_action import AssertionAction, LLMAssertion
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
-
-llm_model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
-
 
 async def run_assertion_action(
     assertion_action: AssertionAction,
