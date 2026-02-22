@@ -2,7 +2,9 @@ import asyncio
 import base64
 import json
 import logging
+import os
 import re
+import shutil
 from typing import Literal
 from uuid import uuid4
 
@@ -59,6 +61,8 @@ class Browser:
         self.all_active_downloads_done.set()
 
         self.network_calls: list[NetworkResponse | NetworkRequest] = []
+        self.temp_downloads_dir = f"/tmp/temp_downloads"
+        self._download_cdp_session = None
 
     async def start(self):
         logger.debug("Starting browser")
@@ -86,17 +90,20 @@ class Browser:
             self.context.on(
                 "response", lambda resp: self.handle_random_url_downloads(resp)
             )
-            self.context.on(
-                "page",
-                lambda p: (
-                    p.on(
-                        "download",
-                        lambda download: self.handle_random_download(download),
-                    )
-                ),
-            )
+            ## TODO: confirm this: Commenting this out to avoid duplicate downloads as now we are using persistent session for downloads
+            # self.context.on(
+            #     "page",
+            #     lambda p: (
+            #         p.on(
+            #             "download",
+            #             lambda download: self.handle_random_download(download),
+            #         )
+            #     ),
+            # )
 
-            browser_session = BrowserSession(cdp_url=self.cdp_url, keep_alive=True)
+            browser_session = BrowserSession(
+                cdp_url=self.cdp_url, keep_alive=True, auto_download_pdfs=False
+            )
 
             self.backend_agent = Agent(
                 task="",
@@ -106,6 +113,19 @@ class Browser:
             )
 
             await self.backend_agent.browser_session.start()
+
+            shutil.rmtree(self.temp_downloads_dir, ignore_errors=True)
+            os.makedirs(self.temp_downloads_dir, exist_ok=True)
+
+            self._download_cdp_session = await self.browser.new_browser_cdp_session()
+            await self._download_cdp_session.send(
+                "Browser.setDownloadBehavior",
+                {
+                    "behavior": "allow",
+                    "downloadPath": self.temp_downloads_dir,
+                },
+            )
+            logger.info(f"CDP download behavior set to: {self.temp_downloads_dir}")
 
             tabs = await self.backend_agent.browser_session.get_tabs()
 
@@ -121,6 +141,13 @@ class Browser:
             raise e
 
     async def stop(self, force: bool = False):
+
+        if self._download_cdp_session is not None:
+            try:
+                await self._download_cdp_session.detach()
+            except Exception:
+                pass
+            self._download_cdp_session = None
 
         logger.debug("Stopping backend agent")
         if self.backend_agent is not None:

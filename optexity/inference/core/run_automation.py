@@ -1,13 +1,19 @@
 import asyncio
 import logging
+import os
+import shutil
 import time
 import traceback
 from copy import deepcopy
+from pathlib import Path
 
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
-from optexity.inference.core.interaction.utils import clean_download
+from optexity.inference.core.interaction.utils import (
+    _wait_for_file_stable,
+    clean_download,
+)
 from optexity.inference.core.logging import (
     complete_task_in_server,
     initiate_callback,
@@ -231,6 +237,41 @@ async def run_final_downloads_check(task: Task, memory: Memory, browser: Browser
                 memory,
                 browser,
             )
+
+        already_moved = {p.name for p in memory.downloads}
+        temp_dir = browser.temp_downloads_dir
+        if os.path.isdir(temp_dir):
+            crdownload_timeout = 30.0
+            crdownload_poll = 1.0
+            crdownload_elapsed = 0.0
+            while crdownload_elapsed < crdownload_timeout:
+                pending = [
+                    e.name
+                    for e in os.scandir(temp_dir)
+                    if e.is_file() and e.name.endswith(".crdownload")
+                ]
+                if not pending:
+                    break
+                logger.debug(f"Waiting for {len(pending)} .crdownload files to finish")
+                await asyncio.sleep(crdownload_poll)
+                crdownload_elapsed += crdownload_poll
+
+            for entry in os.scandir(temp_dir):
+                if not entry.is_file():
+                    continue
+                if entry.name in already_moved:
+                    continue
+                if entry.name.endswith((".crdownload", ".tmp")):
+                    logger.warning(f"Skipping incomplete download: {entry.name}")
+                    continue
+                src = Path(entry.path)
+                if not await _wait_for_file_stable(src):
+                    logger.warning(f"Skipping unstable temp download: {src}")
+                    continue
+                dest = task.downloads_directory / entry.name
+                shutil.move(str(src), str(dest))
+                memory.downloads.append(dest)
+                logger.info(f"Recovered leftover download: {src} -> {dest}")
 
     except Exception as e:
         logger.error(f"Error running final downloads check: {e}")
