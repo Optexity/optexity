@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, computed_field, model_validator
 from optexity.schema.automation import Automation, SecureParameter
 from optexity.schema.memory import ForLoopStatus, SystemInfo
 from optexity.schema.token_usage import TokenUsage
-from optexity.schema.types import CompanyID, RecordingID, TaskID, UserID
+from optexity.schema.types import CompanyID, DedupKey, RecordingID, TaskID, UserID
 
 BASE62 = string.digits + string.ascii_lowercase + string.ascii_uppercase
 
@@ -68,7 +68,7 @@ class Task(BaseModel):
     save_directory: Path = Field(default=Path("/tmp/optexity"))
     use_proxy: bool = False
 
-    dedup_key: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    dedup_key: DedupKey = Field(default_factory=lambda: DedupKey(str(uuid.uuid4())))
     retry_count: int = 0
     max_retries: int = 1
     api_key: str
@@ -107,7 +107,7 @@ class Task(BaseModel):
                 unique_parameter_name: self.input_parameters[unique_parameter_name]
                 for unique_parameter_name in self.unique_parameter_names
             }
-            self.dedup_key = (
+            self.dedup_key = DedupKey(
                 json.dumps(self.unique_parameters, sort_keys=True) + self.user_id
             )
 
