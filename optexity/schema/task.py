@@ -182,7 +182,7 @@ class TaskCompleteRequest(BaseModel):
     task_id: str
     child_process_id: int
 
-    status: Literal["success", "failed", "cancelled"]
+    status: Literal["success", "failed", "cancelled", "killed"]
     error: str | None
     completed_at: datetime
     token_usage: TokenUsage
