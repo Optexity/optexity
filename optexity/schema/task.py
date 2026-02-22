@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, computed_field, model_validator
 from optexity.schema.automation import Automation, SecureParameter
 from optexity.schema.memory import ForLoopStatus, SystemInfo
 from optexity.schema.token_usage import TokenUsage
+from optexity.schema.types import CompanyID, RecordingID, TaskID, UserID
 
 BASE62 = string.digits + string.ascii_lowercase + string.ascii_uppercase
 
@@ -46,9 +47,9 @@ class CallbackUrl(BaseModel):
 
 
 class Task(BaseModel):
-    task_id: str
-    user_id: str
-    recording_id: str
+    task_id: TaskID
+    user_id: UserID
+    recording_id: RecordingID
     endpoint_name: str
     automation: Automation
     input_parameters: dict[str, list[str | int | float | bool]]
@@ -73,7 +74,7 @@ class Task(BaseModel):
     api_key: str
     callback_url: CallbackUrl | None = None
     is_dedicated: bool = False
-    company_id: str
+    company_id: CompanyID
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}
