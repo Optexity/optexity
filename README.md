@@ -241,6 +241,18 @@ Join our Discord community to:
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
 
+### Releasing to PyPI and GitHub (maintainers)
+
+Releases are automated via GitHub Actions:
+
+- **When**: Every push/merge to `main` bumps the **4th version component** in `pyproject.toml` (e.g. `0.1.5.5` → `0.1.5.6`), commits that change, creates a **GitHub Release** (tag + release notes), and publishes the new version to **PyPI**.
+- **Setup** (one-time):
+    1. In PyPI: [Account settings → API tokens](https://pypi.org/manage/account/token/) — create a token with scope **Entire account** (or limit to project `optexity`).
+    2. In GitHub: **Repository** or **Organization** → **Settings → Secrets and variables → Actions** — add a secret:
+        - **Name**: `PYPI_API_TOKEN`
+        - **Value**: your PyPI API token (starts with `pypi-`).
+- **Flow**: Merge a PR to `main` → workflow runs → version bump commit is pushed → GitHub Release (e.g. `v0.1.5.6`) is created with generated release notes → package is built and uploaded to PyPI. The workflow skips when the last commit is the automated bump, so it does not loop.
+
 ## Examples
 
 Check out our examples directory for sample automations:

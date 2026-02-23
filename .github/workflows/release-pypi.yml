@@ -1,0 +1,83 @@
+# Bump the 4th version component on every merge to main, publish to PyPI, and create a GitHub Release.
+# Setup: Add PyPI API token as repository or organization secret PYPI_API_TOKEN.
+# To avoid loops, the workflow skips when the last commit is the automated version bump.
+
+name: Release to PyPI and GitHub
+
+on:
+    push:
+        branches: [main]
+
+permissions:
+    contents: write # needed to push version bump commit
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Skip if this run was triggered by our version-bump commit
+              id: skip
+              run: |
+                  MSG=$(git log -1 --pretty=%s)
+                  if echo "$MSG" | grep -q "chore(release): bump version to "; then
+                    echo "skip=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "skip=false" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Bump 4th version component in pyproject.toml
+              if: steps.skip.outputs.skip != 'true'
+              run: |
+                  VERSION_LINE=$(grep '^version = ' pyproject.toml)
+                  CURRENT=$(echo "$VERSION_LINE" | sed -n 's/^version = *"\(.*\)".*/\1/p')
+                  IFS=. read -r a b c d <<< "$CURRENT"
+                  NEW="${a}.${b}.${c}.$((d + 1))"
+                  sed -i "s/^version = .*/version = \"$NEW\"/" pyproject.toml
+                  echo "NEW_VERSION=$NEW" >> $GITHUB_ENV
+                  echo "Bumped version: $CURRENT -> $NEW"
+
+            - name: Commit and push version bump
+              if: steps.skip.outputs.skip != 'true'
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git add pyproject.toml
+                  git diff --staged --quiet || git commit -m "chore(release): bump version to ${{ env.NEW_VERSION }}"
+                  git push
+
+            - name: Create GitHub Release
+              if: steps.skip.outputs.skip != 'true'
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: v${{ env.NEW_VERSION }}
+                  name: v${{ env.NEW_VERSION }}
+                  generate_release_notes: true
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install build and twine
+              if: steps.skip.outputs.skip != 'true'
+              run: pip install build twine
+
+            - name: Build package
+              if: steps.skip.outputs.skip != 'true'
+              run: python -m build
+              env:
+                  SOURCE_DATE_EPOCH: 0
+
+            - name: Publish to PyPI
+              if: steps.skip.outputs.skip != 'true' && secrets.PYPI_API_TOKEN != ''
+              env:
+                  TWINE_USERNAME: __token__
+                  TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+              run: twine upload dist/*
