@@ -28,7 +28,7 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
               with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
+                  token: ${{ secrets.RELEASE_PAT }}
 
             - name: Skip if this run was triggered by our version-bump commit
               id: skip
@@ -73,7 +73,7 @@ jobs:
                   name: v${{ env.NEW_VERSION }}
                   generate_release_notes: true
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
 
             - name: Set up Python
               uses: actions/setup-python@v5
