@@ -157,15 +157,18 @@ async def run_automation_in_process(
     try:
         logger.debug("Waiting for automation to finish")
         # returncode = proc.wait(timeout=600)  # seconds
-        returncode = await asyncio.wait_for(proc.wait(), timeout=600)
+        returncode = await asyncio.wait_for(
+            proc.wait(), timeout=task.max_timeout_in_minutes * 60
+        )
         logger.debug("Automation finished in process")
         return returncode
     except subprocess.TimeoutExpired:
-        logger.debug("Automation timed out in process")
+        logger.info(
+            f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
+        )
         os.killpg(proc.pid, signal.SIGKILL)
-        logger.debug("Automation killed in process")
         task.status = "killed"
-        task.error = "Automation timed out in process"
+        task.error = f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
         task.completed_at = datetime.now(timezone.utc)
         await complete_task_in_server(task, None, child_process_id)
         return -1
