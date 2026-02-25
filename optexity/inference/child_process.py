@@ -212,22 +212,13 @@ async def task_processor():
 async def register_with_master():
     global unique_child_arn
     """Register with master on startup (handles restarts automatically)."""
-    # Get my task metadata from ECS via the container metadata endpoint
-    metadata_uri = os.environ.get("ECS_CONTAINER_METADATA_URI_V4") or os.environ.get(
-        "ECS_CONTAINER_METADATA_URI"
-    )
-    if not metadata_uri:
-        raise RuntimeError(
-            "Neither ECS_CONTAINER_METADATA_URI_V4 nor ECS_CONTAINER_METADATA_URI is set"
-        )
-
+    # Get my task metadata from ECS
     async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.get(f"{metadata_uri}/task")
+        response = await client.get("http://169.254.170.2/v3/task")
         response.raise_for_status()
         metadata = response.json()
 
     logger.info(f"Metadata from ECS: {metadata}")
-
     my_task_arn = metadata["TaskARN"]
     unique_child_arn = str(my_task_arn)
     my_ip = metadata["Containers"][0]["Networks"][0]["IPv4Addresses"][0]
