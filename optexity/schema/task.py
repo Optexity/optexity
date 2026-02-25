@@ -184,7 +184,7 @@ class TaskCompleteRequest(BaseModel):
     status: Literal["success", "failed", "cancelled"]
     error: str | None
     completed_at: datetime
-    token_usage: TokenUsage
+    token_usage: TokenUsage | None = None
 
     @model_validator(mode="after")
     def must_have_timezone(self):

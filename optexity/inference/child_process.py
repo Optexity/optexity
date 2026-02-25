@@ -10,7 +10,6 @@ import sys
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import TextIO
 from urllib.parse import urljoin
 
 import httpx
@@ -20,7 +19,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from uvicorn import run
 
-from optexity.inference.core.logging import delete_local_data, save_trajectory_in_server
+from optexity.inference.core.logging import (
+    complete_task_in_server,
+    delete_local_data,
+    save_trajectory_in_server,
+)
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import SystemInfo
@@ -161,6 +164,10 @@ async def run_automation_in_process(
         logger.debug("Automation timed out in process")
         os.killpg(proc.pid, signal.SIGKILL)
         logger.debug("Automation killed in process")
+        task.status = "killed"
+        task.error = "Automation timed out in process"
+        task.completed_at = datetime.now(timezone.utc)
+        await complete_task_in_server(task, None, child_process_id)
         return -1
     finally:
         logger.info(
@@ -358,6 +365,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
                     response_data = response.json()
                     response.raise_for_status()
 
+                assert response_data is not None
                 task_data = response_data["task"]
 
                 task = Task.model_validate_json(task_data)
