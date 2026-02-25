@@ -1,6 +1,5 @@
-from .registry import MODEL_REGISTRY
 from .llm_model import GeminiModels, ModelEnum
-
+from .registry import MODEL_REGISTRY
 
 __all__ = ["GeminiModels"]
 
