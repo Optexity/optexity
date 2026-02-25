@@ -11,11 +11,12 @@ from pydantic import BaseModel, ValidationError
 
 from optexity.utils.utils import is_local_path, is_url
 
-from .llm_model import GeminiModels, LLMModel, TokenUsage
+from .llm_model import GeminiModels, LLMModel, TokenUsage, register_model
 
 logger = logging.getLogger(__name__)
 
 
+@register_model(GeminiModels)
 class Gemini(LLMModel):
 
     def __init__(self, model_name: GeminiModels, use_structured_output: bool):

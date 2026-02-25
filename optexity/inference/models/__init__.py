@@ -9,10 +9,10 @@ def get_llm_model(
 
         return Gemini(model_name, use_structured_output)
 
-    # if isinstance(model_name, OpenAIModels):
-    #     from .openai import OpenAI
+    if isinstance(model_name, OpenAIModels):
+        from .openai import OpenAI
 
-    #     return OpenAI(model_name, use_structured_output)
+        return OpenAI(model_name, use_structured_output)
 
     # if isinstance(model_name, HumanModels):
     #     from .human import HumanModel

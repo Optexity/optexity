@@ -6,7 +6,8 @@ import httpx
 
 from optexity.inference.core.run_two_fa import run_two_fa_action
 from optexity.inference.infra.browser import Browser
-from optexity.inference.models import GeminiModels, get_llm_model
+from optexity.inference.models import GeminiModels, OpenAIModels, get_llm_model  # noqa: F401
+from optexity.utils.settings import settings
 from optexity.schema.actions.extraction_action import (
     ExtractionAction,
     LLMExtraction,
@@ -27,8 +28,6 @@ from optexity.schema.memory import (
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
-
-llm_model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
 
 
 async def run_extraction_action(
@@ -163,11 +162,15 @@ async def handle_llm_extraction(
     [/INPUT]
     """
 
-    if llm_extraction.llm_provider == "gemini":
-        model_name = GeminiModels(llm_extraction.llm_model_name)
-        llm_model.model_name = model_name
+    llm_provider = settings.AGENT_LLM_PROVIDER
+    llm_model_name = settings.AGENT_LLM_MODEL
+
+    if llm_provider == "gemini":
+        llm_model = get_llm_model(GeminiModels(llm_model_name), True)
+    elif llm_provider == "openai":
+        llm_model = get_llm_model(OpenAIModels(llm_model_name), True)
     else:
-        raise ValueError(f"Invalid LLM provider: {llm_extraction.llm_provider}")
+        raise ValueError(f"Invalid LLM provider: {llm_provider}")
 
     response, token_usage = llm_model.get_model_response_with_structured_output(
         prompt=prompt,
@@ -310,11 +313,15 @@ async def handle_pdf_extraction(pdf_extraction: PDFExtraction, memory: Memory):
             )
             return
 
-    if pdf_extraction.llm_provider == "gemini":
-        model_name = GeminiModels(pdf_extraction.llm_model_name)
-        llm_model.model_name = model_name
+    llm_provider = settings.AGENT_LLM_PROVIDER
+    llm_model_name = settings.AGENT_LLM_MODEL
+    
+    if llm_provider == "gemini":
+        llm_model = get_llm_model(GeminiModels(llm_model_name), True)
+    elif llm_provider == "openai":
+        llm_model = get_llm_model(OpenAIModels(llm_model_name), True)
     else:
-        raise ValueError(f"Invalid LLM provider: {pdf_extraction.llm_provider}")
+        raise ValueError(f"Invalid LLM provider: {llm_provider}")
 
     system_instruction = "Extract the information from the PDF file and return it in the format specified by the instructions."
     response, token_usage = llm_model.get_model_response_with_structured_output(

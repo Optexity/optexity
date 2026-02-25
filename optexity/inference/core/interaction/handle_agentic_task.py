@@ -1,6 +1,7 @@
 import logging
 
 from browser_use import Agent, BrowserSession, ChatGoogle, Tools
+from browser_use.llm.openai.chat import ChatOpenAI
 
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import (
@@ -9,6 +10,7 @@ from optexity.schema.actions.interaction_action import (
 )
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
+from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +47,10 @@ async def handle_agentic_task(
             )
         else:
             tools = Tools()
-        llm = ChatGoogle(model="gemini-flash-latest")
+        if settings.AGENT_LLM_PROVIDER == "openai":
+            llm = ChatOpenAI(model=settings.AGENT_LLM_MODEL)
+        else:
+            llm = ChatGoogle(model=settings.AGENT_LLM_MODEL)
         browser_session = BrowserSession(
             cdp_url=browser.cdp_url, keep_alive=agentic_task_action.keep_alive
         )

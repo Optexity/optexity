@@ -36,6 +36,9 @@ class Settings(BaseSettings):
 
     USE_PLAYWRIGHT_BROWSER: bool = True
 
+    AGENT_LLM_PROVIDER: Literal["gemini", "openai"] = "gemini"
+    AGENT_LLM_MODEL: str = "gemini-2.5-flash"
+
     PROXY_URL: str | None = None
     PROXY_USERNAME: str | None = None
     PROXY_PASSWORD: str | None = None
