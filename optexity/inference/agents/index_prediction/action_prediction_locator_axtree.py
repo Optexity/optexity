@@ -18,7 +18,7 @@ class IndexPredictionOutput(BaseModel):
 
 class ActionPredictionLocatorAxtree:
     def __init__(self):
-        self.model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
+        self.model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH)
 
     def predict_action(
         self, goal: str, axtree: str, screenshot: Optional[str] = None

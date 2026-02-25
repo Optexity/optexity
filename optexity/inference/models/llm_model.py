@@ -1,13 +1,9 @@
-import ast
 import logging
-import re
 import time
 from enum import Enum, unique
-from pathlib import Path
-from typing import Optional
 
-import tokencost.costs
-from pydantic import BaseModel, ValidationError
+from tokencost.costs import calculate_cost_by_tokens
+from pydantic import BaseModel
 
 from optexity.schema.token_usage import TokenUsage
 
@@ -37,32 +33,35 @@ class OpenAIModels(Enum):
 
 
 class LLMModel:
-    def __init__(
-        self,
-        model_name: GeminiModels | HumanModels | OpenAIModels,
-        use_structured_output: bool,
-    ):
+    model_name: GeminiModels | HumanModels | OpenAIModels
 
+    def __init__(self, model_name: GeminiModels | HumanModels | OpenAIModels):
         self.model_name = model_name
-        self.use_structured_output = use_structured_output
 
     def _get_model_response(
-        self, prompt: str, system_instruction: Optional[str] = None
+        self, prompt: str, system_instruction: str | None = None
     ) -> tuple[str, TokenUsage]:
+        _ = prompt
+        _ = system_instruction
         raise NotImplementedError("This method should be implemented by subclasses.")
 
     def _get_model_response_with_structured_output(
         self,
         prompt: str,
         response_schema: type[BaseModel],
-        screenshot: Optional[str] = None,
-        pdf_url: Optional[str | Path] = None,
-        system_instruction: Optional[str] = None,
-    ) -> tuple[BaseModel, TokenUsage]:
+        screenshot: str | None = None,
+        pdf_url: str | None = None,
+        system_instruction: str | None = None,
+    ) -> tuple[BaseModel | None, TokenUsage]:
+        _ = prompt
+        _ = system_instruction
+        _ = response_schema
+        _ = screenshot
+        _ = pdf_url
         raise NotImplementedError("This method should be implemented by subclasses.")
 
     def get_model_response(
-        self, prompt: str, system_instruction: Optional[str] = None
+        self, prompt: str, system_instruction: str | None = None
     ) -> tuple[str, TokenUsage]:
 
         max_retries = 3
@@ -81,14 +80,15 @@ class LLMModel:
         self,
         prompt: str,
         response_schema: type[BaseModel],
-        screenshot: Optional[str] = None,
-        pdf_url: Optional[str | Path] = None,
-        system_instruction: Optional[str] = None,
+        screenshot: str | None = None,
+        pdf_url: str | None = None,
+        system_instruction: str | None = None,
     ) -> tuple[BaseModel, TokenUsage]:
 
         total_token_usage = TokenUsage()
         max_retries = 3
         last_exception = ""
+
         for i in range(max_retries):
             try:
                 # raise Exception("Test error")
@@ -104,6 +104,7 @@ class LLMModel:
                 total_token_usage += token_usage
                 if parsed_response is not None:
                     return parsed_response, total_token_usage
+
             except Exception as e:
                 logger.error(f"LLM with structured output Error during inference: {e}")
                 if i < max_retries - 1:
@@ -117,50 +118,13 @@ class LLMModel:
             + last_exception
         )
 
-    def extract_json_objects(self, text):
-        stack = []  # Stack to track `{` positions
-        json_candidates = []  # Potential JSON substrings
-
-        # Iterate through the text to find balanced { }
-        for i, char in enumerate(text):
-            if char == "{":
-                stack.append(i)  # Store index of '{'
-            elif char == "}" and stack:
-                start = stack.pop()  # Get the last unmatched '{'
-                json_candidates.append(text[start : i + 1])  # Extract substring
-
-        return json_candidates
-
-    def parse_from_completion(
-        self, content: str, response_schema: type[BaseModel]
-    ) -> BaseModel:
-        patterns = [r"```json\n(.*?)\n```"]
-        json_blocks = []
-        for pattern in patterns:
-            json_blocks += re.findall(pattern, content, re.DOTALL)
-        json_blocks += self.extract_json_objects(content)
-        for block in json_blocks:
-            block = block.strip()
-            try:
-                response = response_schema.model_validate_json(block)
-                return response
-            except Exception as e:
-                try:
-                    block_dict = ast.literal_eval(block)
-                    response = response_schema.model_validate(block_dict)
-                    return response
-                except Exception as e:
-                    continue
-
-        raise ValidationError("Could not parse response from completion.")
-
     def get_token_usage(
         self,
         input_tokens: int | None = None,
         output_tokens: int | None = None,
         tool_use_tokens: int | None = None,
         thoughts_tokens: int | None = None,
-        total_tokens: Optional[int] = None,
+        total_tokens: int | None = None,
     ) -> TokenUsage:
         if input_tokens is None:
             input_tokens = 0
@@ -172,22 +136,22 @@ class LLMModel:
             thoughts_tokens = 0
         if total_tokens is None:
             total_tokens = 0
-        input_cost = tokencost.costs.calculate_cost_by_tokens(
+        input_cost = calculate_cost_by_tokens(
             model=self.model_name.value,
             num_tokens=input_tokens,
             token_type="input",
         )
-        output_cost = tokencost.costs.calculate_cost_by_tokens(
+        output_cost = calculate_cost_by_tokens(
             model=self.model_name.value,
             num_tokens=output_tokens,
             token_type="output",
         )
-        tool_use_cost = tokencost.costs.calculate_cost_by_tokens(
+        tool_use_cost = calculate_cost_by_tokens(
             model=self.model_name.value,
             num_tokens=tool_use_tokens,
             token_type="output",
         )
-        thoughts_cost = tokencost.costs.calculate_cost_by_tokens(
+        thoughts_cost = calculate_cost_by_tokens(
             model=self.model_name.value,
             num_tokens=thoughts_tokens,
             token_type="output",
@@ -196,6 +160,7 @@ class LLMModel:
             input_tokens + output_tokens + tool_use_tokens + thoughts_tokens
         )
         total_cost = input_cost + output_cost + tool_use_cost + thoughts_cost
+
         return TokenUsage(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -203,9 +168,9 @@ class LLMModel:
             thoughts_tokens=thoughts_tokens,
             total_tokens=total_tokens,
             calculated_total_tokens=calculated_total_tokens,
-            input_cost=input_cost,
-            output_cost=output_cost,
-            tool_use_cost=tool_use_cost,
-            thoughts_cost=thoughts_cost,
-            total_cost=total_cost,
+            input_cost=float(input_cost),
+            output_cost=float(output_cost),
+            tool_use_cost=float(tool_use_cost),
+            thoughts_cost=float(thoughts_cost),
+            total_cost=float(total_cost),
         )
