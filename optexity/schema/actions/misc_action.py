@@ -5,6 +5,10 @@ class PythonScriptAction(BaseModel):
     execution_code: str
 
 
+class SleepAction(BaseModel):
+    sleep_time: float
+
+
 ## State Jump Actions
 class StateJumpAction(BaseModel):
     next_state_index: int
