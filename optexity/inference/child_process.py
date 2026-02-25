@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 class ChildProcessIdRequest(BaseModel):
     new_child_process_id: str
+    new_unique_child_arn: str
 
 
 child_process_id = -1
@@ -314,8 +315,9 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
     @app.post("/set_child_process_id", tags=["info"])
     async def set_child_process_id(request: ChildProcessIdRequest):
         """Set child process id endpoint."""
-        global child_process_id
+        global child_process_id, unique_child_arn
         child_process_id = int(request.new_child_process_id)
+        unique_child_arn = request.new_unique_child_arn
         return JSONResponse(
             content={"success": True, "message": "Child process id has been set"},
             status_code=200,
