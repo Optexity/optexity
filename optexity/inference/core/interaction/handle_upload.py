@@ -1,5 +1,6 @@
 import logging
 
+from optexity.exceptions import ElementNotFoundInAxtreeException
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
@@ -54,6 +55,8 @@ async def upload_file_index(
             **{"upload_file": {"index": index, "path": upload_file_action.file_path}}
         )
         await browser.backend_agent.multi_act([action_model])
+    except ElementNotFoundInAxtreeException as e:
+        raise e
     except Exception as e:
         logger.error(f"Error in upload_file_index: {e}")
         return

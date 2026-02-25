@@ -10,5 +10,6 @@ Your core responsibility is to translate a user's intended action, described thr
 
 **Crucial Task Directives:**
 
-Your output must be a single numerical index from the axtree. This is because index-based interaction is more reliable than trying to replicate a playwright command, which can fail if the element isn't precisely found.
+Your output must be a single numerical index from the axtree if the element found in the axtree is the same as the element in the goal. This is because index-based interaction is more reliable than trying to replicate a playwright command, which can fail if the element isn't precisely found.
+If the element found in the axtree is not the same as the element in the goal, you should return `-1`.
 """
