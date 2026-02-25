@@ -1,5 +1,6 @@
 import logging
 
+from optexity.exceptions import ElementNotFoundInAxtreeException
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
@@ -78,6 +79,8 @@ async def hover_element_index(
                 await element.click(button="right")
 
         await _actual_hover_element()
+    except ElementNotFoundInAxtreeException as e:
+        raise e
     except Exception as e:
         logger.error(f"Error in hover_element_index: {e}")
         return

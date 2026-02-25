@@ -2,6 +2,7 @@ import logging
 
 from browser_use.dom.serializer.serializer import DOMTreeSerializer
 
+from optexity.exceptions import ElementNotFoundInAxtreeException
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
@@ -104,6 +105,8 @@ async def select_option_index(
             )
         else:
             await _actual_select_option()
+    except ElementNotFoundInAxtreeException as e:
+        raise e
     except Exception as e:
         logger.error(f"Error in select_option_index: {e}")
         return
