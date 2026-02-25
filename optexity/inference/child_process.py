@@ -218,6 +218,8 @@ async def register_with_master():
         response.raise_for_status()
         metadata = response.json()
 
+    logger.info(f"Metadata from ECS: {metadata}")
+
     my_task_arn = metadata["TaskARN"]
     unique_child_arn = str(my_task_arn)
     my_ip = metadata["Containers"][0]["Networks"][0]["IPv4Addresses"][0]
@@ -254,9 +256,16 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
         # Startup
 
         if is_aws:
-            asyncio.create_task(register_with_master())
+            try:
+                await register_with_master()
+                logger.info("Registered with master")
+            except Exception:
+                logger.exception(
+                    "Failed to register with master, using fallback UUID as child ARN"
+                )
+        else:
+            logger.info("Not running on AWS, skipping master registration")
 
-        logger.info("Registered with master")
         asyncio.create_task(task_processor())
         logger.info("Task processor background task started")
         yield
