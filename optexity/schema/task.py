@@ -70,7 +70,7 @@ class Task(BaseModel):
     dedup_key: str = Field(default_factory=lambda: str(uuid.uuid4()))
     retry_count: int = 0
     max_retries: int = 1
-    max_timeout_in_minutes: int = 5
+    max_timeout_in_minutes: int = 10
     api_key: str
     callback_url: CallbackUrl | None = None
     is_dedicated: bool = False
