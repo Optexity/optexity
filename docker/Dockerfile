@@ -1,6 +1,8 @@
 # Base image
 FROM python:3.11-slim
 
+LABEL org.opencontainers.image.source=https://github.com/Optexity/optexity
+
 ARG OPTEXITY_VERSION=dev
 
 ENV DEBIAN_FRONTEND=noninteractive \
