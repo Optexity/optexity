@@ -75,6 +75,7 @@ async def run_automation(
     logging.getLogger("browser_use").setLevel(logging.INFO)
 
     logger.info(f"Task {task.task_id} started running")
+    logger.info(f"unique_child_arn: {unique_child_arn}")
     memory = None
     browser = None
 

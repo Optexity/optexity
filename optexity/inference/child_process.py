@@ -136,6 +136,7 @@ async def run_automation_in_process(
     logger.info(
         f"---------- Starting to run automation for task {task.task_id} ----------\n"
     )
+    logger.info(f"unique_child_arn in run_automation_in_process: {unique_child_arn}")
     log_system_info("Memory info before starting browser")
 
     await setup_browser(task, unique_child_arn, child_process_id)
