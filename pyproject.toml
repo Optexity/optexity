@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "optexity"
-version = "0.1.5.7"
+version = "0.1.5.8"
 readme = "README.md"
 description = "Optexity is a platform for building and running browser and computer agents."
 authors = [{ name = "Optexity", email = "founders@optexity.com" }]
