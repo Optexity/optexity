@@ -215,7 +215,7 @@ class ActualBrowser:
 
             self.playwright = await async_playwright().start()
             # set display to :100 so that xpra can connect to it
-            os.environ["DISPLAY"] = ":100"
+            # os.environ["DISPLAY"] = ":100"
 
             self.context = await self.playwright.chromium.launch_persistent_context(
                 channel=self.channel,
