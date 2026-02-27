@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 
 import httpx
 import psutil
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from uvicorn import run
@@ -32,6 +32,11 @@ from optexity.utils.settings import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class HumanInLoopCompletedRequest(BaseModel):
+    unique_child_arn: str
+    task_id: str
 
 
 class ChildProcessIdRequest(BaseModel):
@@ -259,6 +264,7 @@ async def register_with_master():
 def get_app_with_endpoints(is_aws: bool, child_id: int):
     global child_process_id
     child_process_id = child_id
+    human_in_loop_status: dict[str, bool] = {}
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -352,6 +358,30 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
             return JSONResponse(
                 content={"success": False, "message": str(e)}, status_code=500
             )
+
+    @app.post("/human_in_loop_completed")
+    async def human_in_loop_completed(request: HumanInLoopCompletedRequest = Body(...)):
+        try:
+            human_in_loop_status[request.task_id] = True
+            return JSONResponse(
+                content={"success": True, "message": "Human-in-loop completed"},
+                status_code=200,
+            )
+        except Exception as e:
+            logger.error(f"Error completing human-in-loop: {e}")
+            return JSONResponse(
+                content={"success": False, "message": str(e)}, status_code=500
+            )
+
+    @app.get("/human_in_loop_status")
+    async def get_human_in_loop_status(task_id: str = Query(...)):
+        completed = human_in_loop_status.get(task_id, False)
+        if completed:
+            del human_in_loop_status[task_id]
+        return JSONResponse(
+            content={"success": True, "completed": completed},
+            status_code=200,
+        )
 
     if not is_aws:
 
