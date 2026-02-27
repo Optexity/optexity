@@ -1,0 +1,35 @@
+---
+title: Sleep Action
+description: Insert pure wait steps into your automations
+---
+
+The `sleep_action` lets you pause execution without performing any browser interaction.
+
+## Overview
+
+- **Use when**: You want a fixed delay that doesn't depend on page load or element state.
+- **Execution**: The runner simply waits for the specified duration, then proceeds to the next node.
+
+## Properties
+
+| Property     | Type    | Description                          |
+| ------------ | ------- | ------------------------------------ |
+| `sleep_time` | `float` | Duration to sleep, in seconds        |
+
+## JSON Example
+
+```json
+{
+  "type": "action_node",
+  "sleep_action": {
+    "sleep_time": 5.0
+  }
+}
+```
+
+## When to Use `sleep_action` vs `end_sleep_time`
+
+Use `sleep_action` when you want a **standalone timing node** in your flow (for example, to wait between two unrelated actions).
+
+Use `end_sleep_time` on an existing node when you just need a short buffer **after** a specific action runs.
+
