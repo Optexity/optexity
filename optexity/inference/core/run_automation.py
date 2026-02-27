@@ -29,6 +29,7 @@ from optexity.inference.core.run_interaction import (
     handle_download_url_as_pdf,
     run_interaction_action,
 )
+from optexity.inference.core.run_misc import run_sleep_action
 from optexity.inference.core.run_python_script import run_python_script_action
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
@@ -363,6 +364,8 @@ async def run_action_node(
             await run_python_script_action(
                 action_node.python_script_action, memory, browser
             )
+        elif action_node.sleep_action:
+            await run_sleep_action(action_node.sleep_action)
         elif action_node.assertion_action:
             await run_assertion_action(
                 action_node.assertion_action, memory, browser, task

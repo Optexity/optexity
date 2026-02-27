@@ -31,6 +31,7 @@ Each action node contains exactly one of:
 | `extraction_action` | Extract data, screenshots | [Extraction Actions](/docs/action-types/extraction-action) |
 | `assertion_action` | Verify page conditions | [Assertion Actions](/docs/action-types/assertion-action) |
 | `python_script_action` | Custom Python code | [Python Scripts](/docs/action-types/python-script-action) |
+| `sleep_action` | Pure wait / timing step | [Sleep Action](/docs/action-types/sleep-action) |
 {/* | `fetch_2fa_action` | Handle 2FA codes | [2FA Actions](/docs/action-types/two-factor-auth) | */}
 
 ## Timing Properties
@@ -79,6 +80,19 @@ Each action node contains exactly one of:
   },
   "before_sleep_time": 2.0,
   "end_sleep_time": 3.0
+}
+```
+
+### Sleep-Only Node
+
+Use a `sleep_action` when you want to pause without performing any browser interaction. `sleep_time` is specified in seconds:
+
+```json
+{
+  "type": "action_node",
+  "sleep_action": {
+    "sleep_time": 5.0
+  }
 }
 ```
 
