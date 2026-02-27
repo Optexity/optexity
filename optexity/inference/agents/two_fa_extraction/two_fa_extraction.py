@@ -19,7 +19,7 @@ class TwoFAExtractionOutput(BaseModel):
 
 class TwoFAExtraction:
     def __init__(self):
-        self.model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
+        self.model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH)
 
     def extract_code(
         self, instructions: str | None, messages: list[Message]

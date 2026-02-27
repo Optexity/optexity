@@ -28,7 +28,7 @@ from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
 
-llm_model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
+llm_model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH)
 
 
 async def run_extraction_action(
@@ -333,8 +333,8 @@ async def handle_pdf_extraction(pdf_extraction: PDFExtraction, memory: Memory):
     memory.token_usage += token_usage
     memory.variables.output_data.append(output_data)
 
-    memory.browser_states[-1].final_prompt = (
-        f"{system_instruction}\n{pdf_extraction.extraction_instructions}"
-    )
+    memory.browser_states[
+        -1
+    ].final_prompt = f"{system_instruction}\n{pdf_extraction.extraction_instructions}"
 
     return output_data
