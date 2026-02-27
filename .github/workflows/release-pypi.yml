@@ -118,7 +118,7 @@ jobs:
               run: |
                   OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
                   VERSION="${{ needs.release.outputs.new_version }}"
-                  echo "tags=ghcr.io/${OWNER}/opinference:latest,ghcr.io/${OWNER}/opinference:v${VERSION}" >> $GITHUB_OUTPUT
+                  echo "tags=ghcr.io/${OWNER}/opinference:latest,ghcr.io/${OWNER}/opinference:v${VERSION},ghcr.io/${OWNER}/opinference-dev:latest,ghcr.io/${OWNER}/opinference-dev:v${VERSION}" >> $GITHUB_OUTPUT
                   echo "cache_ref=ghcr.io/${OWNER}/opinference-cache:buildcache" >> $GITHUB_OUTPUT
 
             - name: Set up Docker Buildx
