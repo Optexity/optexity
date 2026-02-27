@@ -4,7 +4,10 @@ from datetime import datetime, timezone
 
 import aiofiles
 
-from optexity.exceptions import AssertLocatorPresenceException
+from optexity.exceptions import (
+    AssertLocatorPresenceException,
+    ElementNotFoundInAxtreeException,
+)
 from optexity.inference.agents.error_handler.error_handler import ErrorHandlerAgent
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
 from optexity.inference.core.interaction.handle_check import (
@@ -140,7 +143,7 @@ async def run_interaction_action(
             )
         elif interaction_action.key_press:
             await handle_key_press(interaction_action.key_press, memory, browser)
-    except AssertLocatorPresenceException as e:
+    except (AssertLocatorPresenceException, ElementNotFoundInAxtreeException) as e:
         await handle_assert_locator_presence_error(
             e, interaction_action, task, memory, browser, retries_left
         )
@@ -215,14 +218,19 @@ async def handle_download_url_as_pdf(
 
 
 async def handle_assert_locator_presence_error(
-    error: AssertLocatorPresenceException,
+    error: AssertLocatorPresenceException | ElementNotFoundInAxtreeException,
     interaction_action: InteractionAction,
     task: Task,
     memory: Memory,
     browser: Browser,
     retries_left: int,
 ):
-    logger.debug(f"Handling assert locator presence error: {error.command}")
+    error_type = (
+        "assert_locator_presence"
+        if isinstance(error, AssertLocatorPresenceException)
+        else "element_not_found_in_axtree_exception"
+    )
+    logger.debug(f"Handling {error_type} error: {error.command}")
     if retries_left > 1:
         browser_state_summary = await browser.get_browser_state_summary()
         memory.browser_states[-1] = BrowserState(

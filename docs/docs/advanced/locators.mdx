@@ -195,6 +195,6 @@ Verify element exists before acting (for optional steps):
 
 When `true`:
 - Checks if locator finds element
-- Skips action if not found (instead of failing)
-- Useful for dismiss dialogs, optional popups
+- Acts only if the element is present
+- Fails the automation with a clear error reason if the element is not found
 
