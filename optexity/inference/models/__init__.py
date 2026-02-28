@@ -1,7 +1,13 @@
 import logging
 import time
 
-from .llm_model import GeminiModels, HumanModels, LLMModel, OpenAIModels
+from .llm_model import (
+    AnthropicModels,
+    GeminiModels,
+    HumanModels,
+    LLMModel,
+    OpenAIModels,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +37,11 @@ def _create_model_with_backoff(
         from .gemini import Gemini
 
         factory = lambda: Gemini(model_name, use_structured_output)
+
+    if isinstance(model_name, AnthropicModels):
+        from .anthropic import Anthropic
+
+        factory = lambda: Anthropic(model_name, use_structured_output)
 
     # elif isinstance(model_name, OpenAIModels):
     #     from .openai import OpenAI
