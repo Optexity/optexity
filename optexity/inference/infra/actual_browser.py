@@ -125,8 +125,9 @@ class ActualBrowser:
             "--disable-extensions-file-access-check",
             "--disable-extensions-http-throttling",
             # ---- window / ui
+            "--kiosk",
             "--disable-popup-blocking",
-            "--window-size=1920,1080",
+            # "--window-size=1920,1080",
             # "--start-fullscreen",
             # ---- performance / stability
             "--disable-gpu",
