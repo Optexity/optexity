@@ -37,19 +37,36 @@ class LLMExtraction(BaseModel):
                     raise ValueError(
                         f"Output variable {key} not found in extraction_format"
                     )
-                ## TODO: fix this
-                # if eval(self.extraction_format[key]) not in [
-                #     int,
-                #     float,
-                #     bool,
-                #     str,
-                #     None,
-                #     list[str | int | float | bool | None],
-                #     List[str | int | float | bool | None],
-                # ]:
-                #     raise ValueError(
-                #         f"Output variable {key} must be a string, int, float, bool, or a list of strings, ints, floats, or bools"
-                #     )
+
+                val = self.extraction_format[key]
+                if isinstance(val, dict):
+                    raise ValueError(
+                        f"Output variable {key} cannot be a nested object. Must be a primitive or list of primitives."
+                    )
+                
+                if isinstance(val, list):
+                    if len(val) > 0 and (isinstance(val[0], dict) or isinstance(val[0], str) and eval(val[0]) not in [int, float, bool, str, None]):
+                        raise ValueError(f"Output variable {key} cannot be a list of objects or non-primitives.")
+                
+                elif isinstance(val, str):
+                    try:
+                        eval_type = eval(val)
+                    except Exception:
+                        raise ValueError(f"Invalid type definition for {key}: {val}")
+
+                    is_primitive = eval_type in [int, float, bool, str, None]
+                    is_list_of_primitive = False
+                    
+                    origin = getattr(eval_type, "__origin__", None)
+                    if origin in [list, List]:
+                        args = getattr(eval_type, "__args__", [])
+                        if args and args[0] in [int, float, bool, str, None]:
+                            is_list_of_primitive = True
+                            
+                    if not is_primitive and not is_list_of_primitive:
+                         raise ValueError(
+                            f"Output variable {key} must be a string, int, float, bool, or a list of these."
+                        )
 
         return self
 
