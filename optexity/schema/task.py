@@ -71,6 +71,7 @@ class Task(BaseModel):
     dedup_key: DedupKey = Field(default_factory=lambda: DedupKey(str(uuid.uuid4())))
     retry_count: int = 0
     max_retries: int = 1
+    max_timeout_in_minutes: int = 10
     api_key: str
     callback_url: CallbackUrl | None = None
     is_dedicated: bool = False
@@ -185,7 +186,7 @@ class TaskCompleteRequest(BaseModel):
     status: Literal["success", "failed", "cancelled", "killed"]
     error: str | None
     completed_at: datetime
-    token_usage: TokenUsage
+    token_usage: TokenUsage | None = None
 
     @model_validator(mode="after")
     def must_have_timezone(self):

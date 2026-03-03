@@ -46,7 +46,7 @@ async def run_interaction_action(
         return
 
     logger.debug(
-        f"---------Running interaction action {interaction_action.model_dump_json(exclude_none=True)}---------"
+        f"---------Running interaction action {interaction_action.model_dump_json(exclude_none=True, exclude_defaults=True)}---------"
     )
 
     try:

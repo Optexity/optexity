@@ -62,8 +62,8 @@ async def start_task_in_server(task: Task):
 
 
 async def complete_task_in_server(
-    task: Task, token_usage: TokenUsage, child_process_id: int
-):
+    task: Task, token_usage: TokenUsage | None, child_process_id: int
+) -> dict | None:
     try:
         task.completed_at = datetime.now(timezone.utc)
 
@@ -75,8 +75,10 @@ async def complete_task_in_server(
             "completed_at": task.completed_at.isoformat(),
             "status": task.status,
             "error": task.error,
-            "token_usage": token_usage.model_dump(),
         }
+        if token_usage:
+            body["token_usage"] = token_usage.model_dump()
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 url,

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 from optexity.schema.actions.assertion_action import AssertionAction
 from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
-from optexity.schema.actions.misc_action import PythonScriptAction
+from optexity.schema.actions.misc_action import PythonScriptAction, SleepAction
 from optexity.utils.utils import get_onepassword_value, get_totp_code
 
 logger = logging.getLogger(__name__)
@@ -67,6 +67,7 @@ class ActionNode(BaseModel):
     assertion_action: AssertionAction | None = None
     extraction_action: ExtractionAction | None = None
     python_script_action: PythonScriptAction | None = None
+    sleep_action: SleepAction | None = None
     before_sleep_time: float = 0.0
     end_sleep_time: float = 5.0
     expect_new_tab: bool = False
@@ -81,12 +82,13 @@ class ActionNode(BaseModel):
             "assertion_action": model.assertion_action,
             "extraction_action": model.extraction_action,
             "python_script_action": model.python_script_action,
+            "sleep_action": model.sleep_action,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action must be provided"
+                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, sleep_action must be provided"
             )
 
         assert (
@@ -126,6 +128,8 @@ class ActionNode(BaseModel):
         if self.extraction_action:
             self.extraction_action.replace(pattern, replacement)
         if self.python_script_action:
+            pass
+        if self.sleep_action:
             pass
 
         return self
