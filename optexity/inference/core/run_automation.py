@@ -116,6 +116,7 @@ async def run_automation(
         if task.use_proxy:
 
             page = await browser.get_current_page()
+            await browser.go_to_url("https://ip.oxylabs.io/location")
 
             ip_info = await page.evaluate("""
                 async () => {

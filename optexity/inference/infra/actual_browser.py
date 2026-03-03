@@ -159,8 +159,9 @@ class ActualBrowser:
 
             if self.headless:
                 args.append("--headless=new")
-
-            args += self.get_proxy_args_native()
+            proxy = self.get_proxy_args_native()
+            print(f"Proxy args: {proxy}")
+            args += proxy
 
         extension_paths = self.get_extension_paths()
 
@@ -185,8 +186,8 @@ class ActualBrowser:
             if self.proc and self.proc.returncode is None:
                 return
 
-            if self.use_proxy:
-                raise NotImplementedError("Proxy is not supported for native browser")
+            # if self.use_proxy:
+            #     raise NotImplementedError("Proxy is not supported for native browser")
 
             if not self.is_dedicated:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
@@ -351,7 +352,7 @@ class ActualBrowser:
                 "Proxy with username and password is not supported for native browser"
             )
 
-        return [f"--proxy-server={proxy.get('server')}]"]
+        return [f"--proxy-server={proxy.get('server')}"]
 
     def get_proxy_playwright(self) -> ProxySettings | None:
 
