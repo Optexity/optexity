@@ -113,13 +113,13 @@ class ActualBrowser:
     def get_args(self) -> list[str]:
         args = [
             # ---- security / isolation (Playwright parity)
-            "--disable-site-isolation-trials",
-            "--disable-web-security",
+            # "--disable-site-isolation-trials",
+            # "--disable-web-security",
             "--disable-features=IsolateOrigins,site-per-process",
             "--allow-running-insecure-content",
-            "--ignore-certificate-errors",
+            # "--ignore-certificate-errors",
             "--ignore-ssl-errors",
-            "--ignore-certificate-errors-spki-list",
+            # "--ignore-certificate-errors-spki-list",
             # ---- extensions
             "--enable-extensions",
             "--disable-extensions-file-access-check",
@@ -135,7 +135,7 @@ class ActualBrowser:
             "--disable-translate",
             # ---- automation hygiene
             f"--remote-debugging-port={self.port}",
-            "--disable-blink-features=AutomationControlled",
+            # "--disable-blink-features=AutomationControlled",
             "--no-first-run",
             "--no-default-browser-check",
         ]
@@ -144,7 +144,7 @@ class ActualBrowser:
 
             args += [
                 f"--user-data-dir={self.user_data_dir}",
-                "--no-sandbox",
+                # "--no-sandbox",
                 # ---- privacy / security
                 "--disable-save-password-bubble",
                 "--use-mock-keychain",
