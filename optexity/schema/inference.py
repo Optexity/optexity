@@ -10,10 +10,17 @@ class InferenceRequest(BaseModel):
     input_parameters: dict[str, list[str | int | float | bool]]
     unique_parameter_names: list[str] = Field(default_factory=list)
     secure_parameters: dict[str, list[SecureParameter]] = Field(default_factory=dict)
+    max_timeout_in_minutes: int = 10
     use_proxy: bool = False
     is_dedicated: bool = (
         False  ## Only used in local mode. For cloud mode, the task is dedicated is defined on dashboard.
     )
+
+    @model_validator(mode="after")
+    def validate_use_proxy(self):
+        if self.use_proxy and self.is_dedicated:
+            raise ValueError("use_proxy is not allowed when is_dedicated is true")
+        return self
 
     @model_validator(mode="after")
     def validate_unique_parameter_names(self):

@@ -10,7 +10,6 @@ import sys
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import TextIO
 from urllib.parse import urljoin
 
 import httpx
@@ -20,7 +19,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from uvicorn import run
 
-from optexity.inference.core.logging import delete_local_data, save_trajectory_in_server
+from optexity.inference.core.logging import (
+    complete_task_in_server,
+    delete_local_data,
+    save_trajectory_in_server,
+)
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import SystemInfo
@@ -33,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 class ChildProcessIdRequest(BaseModel):
     new_child_process_id: str
+    new_unique_child_arn: str
 
 
 child_process_id = -1
@@ -40,6 +44,7 @@ unique_child_arn: str = str(uuid.uuid4())
 task_running = False
 last_task_start_time = None
 task_queue: asyncio.Queue[Task] = asyncio.Queue()
+tasks_to_kill: set[str] = set()
 _global_actual_browser: ActualBrowser | None = None
 
 
@@ -107,6 +112,10 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             port=9222 + child_process_id,
             headless=False,
             is_dedicated=task.is_dedicated,
+            use_proxy=task.use_proxy,
+            proxy_session_id=task.proxy_session_id(
+                settings.PROXY_PROVIDER if task.use_proxy else None
+            ),
         )
         try:
             await _global_actual_browser.start()
@@ -153,13 +162,20 @@ async def run_automation_in_process(
     try:
         logger.debug("Waiting for automation to finish")
         # returncode = proc.wait(timeout=600)  # seconds
-        returncode = await asyncio.wait_for(proc.wait(), timeout=600)
+        returncode = await asyncio.wait_for(
+            proc.wait(), timeout=task.max_timeout_in_minutes * 60
+        )
         logger.debug("Automation finished in process")
         return returncode
     except subprocess.TimeoutExpired:
-        logger.debug("Automation timed out in process")
+        logger.info(
+            f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
+        )
         os.killpg(proc.pid, signal.SIGKILL)
-        logger.debug("Automation killed in process")
+        task.status = "killed"
+        task.error = f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
+        task.completed_at = datetime.now(timezone.utc)
+        await complete_task_in_server(task, None, child_process_id)
         return -1
     finally:
         logger.info(
@@ -195,6 +211,10 @@ async def task_processor():
         try:
             # Get next task from queue (blocks until one is available)
             task = await task_queue.get()
+            if task.task_id in tasks_to_kill:
+                logger.info(f"Task {task.task_id} has been killed")
+                tasks_to_kill.remove(task.task_id)
+                continue
             task_running = True
             last_task_start_time = datetime.now()
             await run_automation_in_process(task, unique_child_arn, child_process_id)
@@ -218,6 +238,7 @@ async def register_with_master():
         response.raise_for_status()
         metadata = response.json()
 
+    logger.info(f"Metadata from ECS: {metadata}")
     my_task_arn = metadata["TaskARN"]
     unique_child_arn = str(my_task_arn)
     my_ip = metadata["Containers"][0]["Networks"][0]["IPv4Addresses"][0]
@@ -254,9 +275,16 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
         # Startup
 
         if is_aws:
-            asyncio.create_task(register_with_master())
+            try:
+                await register_with_master()
+                logger.info("Registered with master")
+            except Exception:
+                logger.exception(
+                    "Failed to register with master, using fallback UUID as child ARN"
+                )
+        else:
+            logger.info("Not running on AWS, skipping master registration")
 
-        logger.info("Registered with master")
         asyncio.create_task(task_processor())
         logger.info("Task processor background task started")
         yield
@@ -277,6 +305,15 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
     async def is_task_running():
         """Is task running endpoint."""
         return task_running
+
+    @app.post("/kill_task")
+    async def kill_task(task_id: str = Body(...)):
+        """Kill task endpoint."""
+        tasks_to_kill.add(task_id)
+        return JSONResponse(
+            content={"success": True, "message": "Task has been killed"},
+            status_code=200,
+        )
 
     @app.get("/health", tags=["info"])
     async def health():
@@ -306,8 +343,9 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
     @app.post("/set_child_process_id", tags=["info"])
     async def set_child_process_id(request: ChildProcessIdRequest):
         """Set child process id endpoint."""
-        global child_process_id
+        global child_process_id, unique_child_arn
         child_process_id = int(request.new_child_process_id)
+        unique_child_arn = request.new_unique_child_arn
         return JSONResponse(
             content={"success": True, "message": "Child process id has been set"},
             status_code=200,
@@ -348,6 +386,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
                     response_data = response.json()
                     response.raise_for_status()
 
+                assert response_data is not None
                 task_data = response_data["task"]
 
                 task = Task.model_validate_json(task_data)

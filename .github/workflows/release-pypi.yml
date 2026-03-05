@@ -1,9 +1,11 @@
-# Bump the 4th version component on every merge to main, publish to PyPI, and create a GitHub Release.
+# Bump the 4th version component on every merge to main, publish to PyPI, create
+# a GitHub Release, and push a Docker image to GHCR.
+#
 # Setup: Add PyPI API token as repository or organization secret PYPI_API_TOKEN.
 # To avoid loops, the workflow skips when the last commit is the automated version bump.
 #
 # Testing: Actions → "Release to PyPI and GitHub" → "Run workflow" with "Dry run" checked.
-# Dry run: runs version bump + build only (no commit, push, GitHub Release, or PyPI upload).
+# Dry run: runs version bump + build only (no commit, push, GitHub Release, PyPI upload, or Docker push).
 
 name: Release to PyPI and GitHub
 
@@ -19,11 +21,15 @@ on:
                 type: boolean
 
 permissions:
-    contents: write # needed to push version bump commit
+    contents: write
+    packages: write
 
 jobs:
     release:
         runs-on: ubuntu-latest
+        outputs:
+            new_version: ${{ steps.bump.outputs.new_version }}
+            skipped: ${{ steps.skip.outputs.skip }}
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -41,6 +47,7 @@ jobs:
                   fi
 
             - name: Bump 4th version component in pyproject.toml
+              id: bump
               if: steps.skip.outputs.skip != 'true'
               run: |
                   VERSION_LINE=$(grep '^version = ' pyproject.toml)
@@ -49,6 +56,7 @@ jobs:
                   NEW="${a}.${b}.${c}.$((d + 1))"
                   sed -i "s/^version = .*/version = \"$NEW\"/" pyproject.toml
                   echo "NEW_VERSION=$NEW" >> $GITHUB_ENV
+                  echo "new_version=$NEW" >> $GITHUB_OUTPUT
                   echo "Bumped version: $CURRENT -> $NEW"
 
             - name: Dry run summary
@@ -96,3 +104,43 @@ jobs:
                   TWINE_USERNAME: __token__
                   TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
               run: twine upload dist/*
+
+    docker:
+        runs-on: ubuntu-latest
+        needs: release
+        if: needs.release.outputs.skipped != 'true' && github.event.inputs.dry_run != 'true'
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Compute image tags
+              id: meta
+              run: |
+                  OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+                  VERSION="${{ needs.release.outputs.new_version }}"
+                  echo "tags=ghcr.io/${OWNER}/opinference:latest,ghcr.io/${OWNER}/opinference:v${VERSION},ghcr.io/${OWNER}/opinference-dev:latest,ghcr.io/${OWNER}/opinference-dev:v${VERSION}" >> $GITHUB_OUTPUT
+                  echo "cache_ref=ghcr.io/${OWNER}/opinference-cache:buildcache" >> $GITHUB_OUTPUT
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Login to GitHub Container Registry
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build and push
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: docker/Dockerfile
+                  push: true
+                  platforms: linux/amd64
+                  tags: ${{ steps.meta.outputs.tags }}
+                  cache-from: type=registry,ref=${{ steps.meta.outputs.cache_ref }}
+                  cache-to: type=registry,ref=${{ steps.meta.outputs.cache_ref }},mode=max
+                  build-args: |
+                      OPTEXITY_VERSION=${{ needs.release.outputs.new_version }}
+                      CACHE_BREAK=${{ github.sha }}
