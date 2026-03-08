@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, computed_field, model_validator
 from optexity.schema.automation import Automation, SecureParameter
 from optexity.schema.memory import ForLoopStatus, SystemInfo
 from optexity.schema.token_usage import TokenUsage
+from optexity.schema.types import CompanyID, DedupKey, RecordingID, TaskID, UserID
 
 BASE62 = string.digits + string.ascii_lowercase + string.ascii_uppercase
 
@@ -87,9 +88,9 @@ class CallbackUrl(BaseModel):
 
 
 class Task(BaseModel):
-    task_id: str
-    user_id: str
-    recording_id: str
+    task_id: TaskID
+    user_id: UserID
+    recording_id: RecordingID
     endpoint_name: str
     automation: Automation
     input_parameters: dict[str, list[str | int | float | bool]]
@@ -108,14 +109,14 @@ class Task(BaseModel):
     save_directory: Path = Field(default=Path("/tmp/optexity"))
     use_proxy: bool = False
 
-    dedup_key: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    dedup_key: DedupKey = Field(default_factory=lambda: DedupKey(str(uuid.uuid4())))
     retry_count: int = 0
     max_retries: int = 1
-    max_timeout_in_minutes: int = 5
+    max_timeout_in_minutes: int = 10
     api_key: str
     callback_url: CallbackUrl | None = None
     is_dedicated: bool = False
-    company_id: str
+    company_id: CompanyID
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}
@@ -148,7 +149,7 @@ class Task(BaseModel):
                 unique_parameter_name: self.input_parameters[unique_parameter_name]
                 for unique_parameter_name in self.unique_parameter_names
             }
-            self.dedup_key = (
+            self.dedup_key = DedupKey(
                 json.dumps(self.unique_parameters, sort_keys=True) + self.user_id
             )
 
@@ -223,7 +224,7 @@ class TaskCompleteRequest(BaseModel):
     task_id: str
     child_process_id: int
 
-    status: Literal["success", "failed", "cancelled"]
+    status: Literal["success", "failed", "cancelled", "killed"]
     error: str | None
     completed_at: datetime
     token_usage: TokenUsage | None = None

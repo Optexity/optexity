@@ -113,13 +113,13 @@ class ActualBrowser:
     def get_args(self) -> list[str]:
         args = [
             # ---- security / isolation (Playwright parity)
-            "--disable-site-isolation-trials",
-            "--disable-web-security",
+            # "--disable-site-isolation-trials",
+            # "--disable-web-security",
             "--disable-features=IsolateOrigins,site-per-process",
             "--allow-running-insecure-content",
-            "--ignore-certificate-errors",
+            # "--ignore-certificate-errors",
             "--ignore-ssl-errors",
-            "--ignore-certificate-errors-spki-list",
+            # "--ignore-certificate-errors-spki-list",
             # ---- extensions
             "--enable-extensions",
             "--disable-extensions-file-access-check",
@@ -135,7 +135,7 @@ class ActualBrowser:
             "--disable-translate",
             # ---- automation hygiene
             f"--remote-debugging-port={self.port}",
-            "--disable-blink-features=AutomationControlled",
+            # "--disable-blink-features=AutomationControlled",
             "--no-first-run",
             "--no-default-browser-check",
         ]
@@ -144,7 +144,7 @@ class ActualBrowser:
 
             args += [
                 f"--user-data-dir={self.user_data_dir}",
-                "--no-sandbox",
+                # "--no-sandbox",
                 # ---- privacy / security
                 "--disable-save-password-bubble",
                 "--use-mock-keychain",
@@ -159,8 +159,9 @@ class ActualBrowser:
 
             if self.headless:
                 args.append("--headless=new")
-
-            args += self.get_proxy_args_native()
+            proxy = self.get_proxy_args_native()
+            print(f"Proxy args: {proxy}")
+            args += proxy
 
         extension_paths = self.get_extension_paths()
 
@@ -185,8 +186,8 @@ class ActualBrowser:
             if self.proc and self.proc.returncode is None:
                 return
 
-            if self.use_proxy:
-                raise NotImplementedError("Proxy is not supported for native browser")
+            # if self.use_proxy:
+            #     raise NotImplementedError("Proxy is not supported for native browser")
 
             if not self.is_dedicated:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
@@ -351,7 +352,7 @@ class ActualBrowser:
                 "Proxy with username and password is not supported for native browser"
             )
 
-        return [f"--proxy-server={proxy.get('server')}]"]
+        return [f"--proxy-server={proxy.get('server')}"]
 
     def get_proxy_playwright(self) -> ProxySettings | None:
 
@@ -361,12 +362,11 @@ class ActualBrowser:
             proxy = {"server": settings.PROXY_URL}
             if settings.PROXY_USERNAME is not None:
                 if settings.PROXY_PROVIDER == "oxylabs":
-                    assert settings.PROXY_COUNTRY, "PROXY_COUNTRY is not set"
                     assert settings.PROXY_USERNAME, "PROXY_USERNAME is not set"
                     assert settings.PROXY_PASSWORD, "PROXY_PASSWORD is not set"
 
                     proxy["username"] = (
-                        f"customer-{settings.PROXY_USERNAME}-cc-{settings.PROXY_COUNTRY}-sessid-{self.proxy_session_id}-sesstime-20"
+                        f"customer-{settings.PROXY_USERNAME}-cc-{settings.PROXY_COUNTRY}-sessid-{self.proxy_session_id}-sesstime-10"
                     )
                 elif settings.PROXY_PROVIDER == "brightdata":
 
