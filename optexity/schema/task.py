@@ -26,6 +26,45 @@ def uuid_str_to_base62(uuid_str: str) -> str:
     return "".join(reversed(out))
 
 
+_BLOCKED_HOSTNAMES = {"localhost", "metadata.google.internal"}
+
+
+def _is_private_ip(hostname: str) -> bool:
+    """Check if a hostname is a private/internal IP address."""
+    import ipaddress
+
+    try:
+        addr = ipaddress.ip_address(hostname)
+        return (
+            addr.is_private
+            or addr.is_loopback
+            or addr.is_link_local
+            or addr.is_reserved
+        )
+    except ValueError:
+        return False
+
+
+def validate_callback_url_ssrf(url: str) -> None:
+    """Validate that a callback URL does not target private/internal networks."""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").lower().strip(".")
+
+    if not hostname:
+        raise ValueError("Callback URL must have a valid hostname.")
+
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("Callback URL must use http or https.")
+
+    if hostname in _BLOCKED_HOSTNAMES:
+        raise ValueError(f"Callback URL cannot target internal host '{hostname}'.")
+
+    if _is_private_ip(hostname):
+        raise ValueError("Callback URL cannot target private or internal IP addresses.")
+
+
 class CallbackUrl(BaseModel):
     url: str
     api_key: str | None = None
@@ -41,6 +80,8 @@ class CallbackUrl(BaseModel):
             raise ValueError(
                 "api_key and username/password cannot be used together. Please provide only one of them."
             )
+
+        validate_callback_url_ssrf(self.url)
 
         return self
 
