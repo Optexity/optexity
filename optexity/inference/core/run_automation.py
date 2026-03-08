@@ -115,12 +115,12 @@ async def run_automation(
 
         if task.use_proxy:
 
-            await browser.go_to_url("https://ipinfo.io/json")
             page = await browser.get_current_page()
+            await browser.go_to_url("https://ip.oxylabs.io/location")
 
             ip_info = await page.evaluate("""
                 async () => {
-                const res = await fetch("https://ipinfo.io/json");
+                const res = await fetch("https://ip.oxylabs.io/location");
                 return await res.json();
                 }
                 """)
