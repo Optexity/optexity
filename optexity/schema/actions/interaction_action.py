@@ -157,6 +157,7 @@ class DownloadUrlAsPdfAction(BaseModel):
 
 class ScrollAction(BaseModel):
     down: bool  # True to scroll down, False to scroll up
+    amount: int | None = None  ## -1 means scroll max amount
 
 
 class UploadFileAction(BaseAction):
