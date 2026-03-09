@@ -156,8 +156,14 @@ class DownloadUrlAsPdfAction(BaseModel):
 
 
 class ScrollAction(BaseModel):
-    down: bool  # True to scroll down, False to scroll up
-    amount: int | None = None  ## -1 means scroll max amount
+    down: bool = True  # True to scroll down, False to scroll up
+    amount: int = -1  ## -1 means scroll max amount
+
+    @model_validator(mode="after")
+    def validate_amount(self):
+        if self.amount is None or (self.amount < 0 and self.amount != -1):
+            raise ValueError("amount must be -1 or positive")
+        return self
 
 
 class UploadFileAction(BaseAction):
