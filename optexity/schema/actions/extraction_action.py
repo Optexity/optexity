@@ -14,6 +14,7 @@ class LLMExtraction(BaseModel):
     output_variable_names: list[str] | None = None
     llm_provider: Literal["gemini"] = "gemini"
     llm_model_name: str = "gemini-2.5-flash"
+    include_full_page: bool = False
 
     def build_model(self):
         return build_model(self.extraction_format)

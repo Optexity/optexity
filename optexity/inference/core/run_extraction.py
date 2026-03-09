@@ -130,7 +130,9 @@ async def handle_llm_extraction(
     task: Task,
     unique_identifier: str | None = None,
 ):
-    browser_state_summary = await browser.get_browser_state_summary()
+    browser_state_summary = await browser.get_browser_state_summary(
+        include_full_page=llm_extraction.include_full_page
+    )
     memory.browser_states[-1] = BrowserState(
         url=browser_state_summary.url,
         screenshot=browser_state_summary.screenshot,

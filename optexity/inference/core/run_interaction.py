@@ -25,6 +25,7 @@ from optexity.schema.actions.interaction_action import (
     GoBackAction,
     GoToUrlAction,
     InteractionAction,
+    ScrollAction,
 )
 from optexity.schema.memory import BrowserState, Memory, OutputData
 from optexity.schema.task import Task
@@ -140,10 +141,45 @@ async def run_interaction_action(
             )
         elif interaction_action.key_press:
             await handle_key_press(interaction_action.key_press, memory, browser)
+        elif interaction_action.scroll:
+            await handle_scroll(interaction_action.scroll, memory, browser)
     except AssertLocatorPresenceException as e:
         await handle_assert_locator_presence_error(
             e, interaction_action, task, memory, browser, retries_left
         )
+
+
+async def handle_scroll(
+    scroll_action: ScrollAction, memory: Memory, browser: Browser, max_idle: int = 3
+):
+    page = await browser.get_current_page()
+    if page is None:
+        return
+
+    # direction: down = positive, up = negative
+    direction = 1 if scroll_action.down else -1
+
+    # If amount is specified and not -1 → single scroll
+    if scroll_action.amount is not None and scroll_action.amount != -1:
+        await page.mouse.wheel(0, direction * scroll_action.amount)
+        return
+
+    # Otherwise scroll until max (or until idle)
+    previous = -1
+    idle_rounds = 0
+
+    while idle_rounds < max_idle:
+        current = await page.evaluate("window.scrollY")
+
+        if current == previous:
+            idle_rounds += 1
+        else:
+            idle_rounds = 0
+
+        previous = current
+
+        await page.mouse.wheel(0, direction * 2000)
+        await page.wait_for_timeout(300)
 
 
 async def handle_close_tabs_until(
@@ -161,7 +197,10 @@ async def handle_close_tabs_until(
         if close_tabs_until_action.matching_url is not None:
             if close_tabs_until_action.matching_url in page.url:
                 break
-        elif close_tabs_until_action.tab_index is not None:
+        elif (
+            close_tabs_until_action.tab_index is not None
+            and browser.context is not None
+        ):
             if len(browser.context.pages) == close_tabs_until_action.tab_index + 1:
                 break
 
