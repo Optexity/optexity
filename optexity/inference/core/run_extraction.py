@@ -131,7 +131,7 @@ async def handle_llm_extraction(
     unique_identifier: str | None = None,
 ):
     browser_state_summary = await browser.get_browser_state_summary(
-        include_invisible_elements=llm_extraction.include_invisible_elements
+        include_full_page=llm_extraction.include_full_page
     )
     memory.browser_states[-1] = BrowserState(
         url=browser_state_summary.url,
