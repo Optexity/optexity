@@ -197,7 +197,10 @@ async def handle_close_tabs_until(
         if close_tabs_until_action.matching_url is not None:
             if close_tabs_until_action.matching_url in page.url:
                 break
-        elif close_tabs_until_action.tab_index is not None:
+        elif (
+            close_tabs_until_action.tab_index is not None
+            and browser.context is not None
+        ):
             if len(browser.context.pages) == close_tabs_until_action.tab_index + 1:
                 break
 
