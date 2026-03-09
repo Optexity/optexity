@@ -291,7 +291,9 @@ class Browser:
             )
             return None
 
-    async def get_browser_state_summary(self) -> BrowserStateSummary:
+    async def get_browser_state_summary(
+        self, include_invisible_elements: bool = False
+    ) -> BrowserStateSummary:
         if self.backend_agent is None:
             raise ValueError("Backend agent is not set")
 
@@ -299,6 +301,7 @@ class Browser:
             include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
             include_recent_events=False,
             cached=False,
+            include_invisible_elements=include_invisible_elements,
         )
 
         return browser_state_summary
