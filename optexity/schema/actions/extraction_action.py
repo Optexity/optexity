@@ -176,4 +176,8 @@ class ExtractionAction(BaseModel):
             self.unique_identifier = self.unique_identifier.replace(
                 pattern, replacement
             )
+
+        if self.two_fa_action:
+            self.two_fa_action.replace(pattern, replacement)
+
         return self
