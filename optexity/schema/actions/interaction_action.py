@@ -324,7 +324,7 @@ class InteractionAction(BaseModel):
                 "Exactly one of click_element, input_text, select_option, check, uncheck, hover, download_url_as_pdf, scroll, upload_file, go_to_url, go_back, switch_tab, close_current_tab, close_all_but_last_tab, close_tabs_until, key_press, or agentic_task must be provided"
             )
 
-        if (
+        if not model.max_tries and (
             (model.click_element and model.click_element.skip_prompt)
             or (model.input_text and model.input_text.skip_prompt)
             or (model.select_option and model.select_option.skip_prompt)

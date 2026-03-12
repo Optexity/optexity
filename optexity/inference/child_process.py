@@ -88,9 +88,9 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
     if _global_actual_browser is not None:
 
         restart_browser = False
-        if not await _global_actual_browser.check_browser_alive():
-            logger.info("CDP is not alive, restarting browser")
-            restart_browser = True
+        # if not await _global_actual_browser.check_browser_alive():
+        #     logger.info("CDP is not alive, restarting browser")
+        #     restart_browser = True
 
         if memory_exceeded:
             logger.info("Memory exceeded, restarting browser")
@@ -105,7 +105,7 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             _global_actual_browser = None
 
     if _global_actual_browser is None:
-        logger.info("Starting new actual browser")
+        logger.info("🍅Starting new actual browser")
         _global_actual_browser = ActualBrowser(
             channel=task.automation.browser_channel,
             unique_child_arn=unique_child_arn,

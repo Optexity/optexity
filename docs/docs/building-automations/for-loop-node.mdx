@@ -48,6 +48,59 @@ Iteration 2: {order_ids[index]} → "ORD-002"
 Iteration 3: {order_ids[index]} → "ORD-003"
 ```
 
+### Using Multiple Variables in a Loop
+
+You can iterate over **multiple parameters in parallel** by passing a **comma-separated list** to `variable_name`.  
+
+**Important:** The **first** in `variable_name` is the **main loop variable** that controls:
+
+- How many iterations run (loop length)
+- Which index is used for each step
+
+All additional names in the list are **synced to the same index**. In other words:
+
+- `variable_name: "primary_var,secondary_var"` → loop length comes from `primary_var`
+- `{primary_var[index]}` and `{secondary_var[index]}` both use the **same** `index` on each iteration
+
+For each iteration, `{variable[index]}` is expanded for **every** name in the list:
+
+```json
+{
+  "type": "for_loop_node",
+  "variable_name": "primary_var,secondary_var",
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "get_by_role(\"textbox\", name=\"Primary Field\")",
+          "input_text": "{primary_var[index]}"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "get_by_role(\"textbox\", name=\"Secondary Field\")",
+          "input_text": "{secondary_var[index]}"
+        }
+      }
+    }
+  ]
+}
+```
+
+If your parameters are:
+
+- `primary_var = ["Value A1", "Value A2"]`
+- `secondary_var = ["Value B1", "Value B2"]`
+
+Then:
+
+- Iteration 1 uses `{primary_var[index]}` → `"Value A1"` and `{secondary_var[index]}` → `"Value B1"`
+- Iteration 2 uses `{primary_var[index]}` → `"Value A2"` and `{secondary_var[index]}` → `"Value B2"`
+
 ## Data Sources
 
 Loop variables can come from:
