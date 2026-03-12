@@ -253,7 +253,7 @@ async def handle_python_script_extraction(
     exec(python_script_extraction.script, {}, local_vars)
     code_fn = local_vars["code_fn"]
     axtree = memory.browser_states[-1].axtree
-    result = await code_fn(axtree)
+    result = await code_fn(axtree, browser)
     if result is not None:
         memory.variables.output_data.append(
             OutputData(
