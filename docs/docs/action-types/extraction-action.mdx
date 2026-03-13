@@ -12,7 +12,7 @@ Extraction actions capture data from web pages during automation—essential for
 | `llm` | AI-powered structured data extraction | Tables, forms, text content |
 | `network_call` | Capture API/AJAX responses | API data, JSON responses |
 | `screenshot` | Save visual snapshot | Receipts, proofs, visual records |
-| `state` | Capture page URL and title | Navigation validation |
+| `state` | Capture page state (URL, title, storage, cookies) | Debugging auth, navigation validation |
 | `two_fa_action` | Wait for and extract 2FA code | 2FA codes |
 
 ---
@@ -167,7 +167,7 @@ Save a screenshot for later analysis:
 
 ## State Extraction
 
-Capture current page URL and title:
+Capture page state, including URL/title plus browser storage and cookies:
 
 ```json
 {
@@ -176,6 +176,19 @@ Capture current page URL and title:
   }
 }
 ```
+
+### Output
+
+`state` extraction appends an `OutputData.json_data` object with the following shape:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `page_url` | `str` | Current page URL |
+| `page_title` | `str` | Current page title |
+| `local_storage` | `dict[str, str \| null]` | All `localStorage` key/value pairs |
+| `session_storage` | `dict[str, str \| null]` | All `sessionStorage` key/value pairs |
+| `cookies` | `list[dict]` | Cookies from the current browser context |
+| `document_cookie` | `str` | `document.cookie` string for the current page |
 
 ## Two-Factor Authentication Extraction
 

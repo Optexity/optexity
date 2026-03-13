@@ -445,10 +445,14 @@ class Browser:
         self.network_calls.clear()
 
     async def get_screenshot(self, full_page: bool = False) -> str | None:
-        page = await self.get_current_page()
-        if page is None:
-            return None
-        screenshot_bytes = await page.screenshot(full_page=full_page)
-        screenshot_base64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+        try:
+            page = await self.get_current_page()
+            if page is None:
+                return None
 
-        return screenshot_base64
+            screenshot_bytes = await page.screenshot(full_page=full_page)
+            screenshot_base64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+            return screenshot_base64
+        except Exception as e:
+            logger.error(f"Error taking screenshot: {e}", exc_info=True)
+            return None

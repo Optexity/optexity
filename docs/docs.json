@@ -97,6 +97,12 @@
                         "pages": ["/examples/data_extraction/i94"]
                     },
                     {
+                        "group": "Fetching Cookies & Storage",
+                        "pages": [
+                            "/examples/fetching_cookies/fetching-cookies-and-local-session-storage"
+                        ]
+                    },
+                    {
                         "group": "QA Testing",
                         "pages": ["/examples/qa_testing/supabase-login"]
                     },
