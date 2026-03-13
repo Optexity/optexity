@@ -1,0 +1,111 @@
+---
+title: Fetching cookies and local/session storage
+description: Extract cookies, localStorage, and sessionStorage after login using state extraction
+---
+
+Use this example to **capture browser state after login**—including **cookies**, **localStorage**, and **sessionStorage**—so you can debug authentication flows and reuse tokens in downstream steps.
+
+This page is intentionally keyword-rich so you can find it by searching for: **cookies**, **localStorage**, **sessionStorage**, **browser storage**, **auth token**, **state extraction**, **storage state**.
+
+## Overview
+
+This automation:
+
+- **Logs in** to a site (email + password)
+- Runs a **`state` extraction** to capture:
+  - `page_url`, `page_title`
+  - `local_storage`, `session_storage`
+  - `cookies`, `document_cookie`
+
+The full example automation lives at `optexity/examples/login_cookies.json`.
+
+## Minimal example
+
+After your login interaction steps, add a `state` extraction node:
+
+```json
+{
+  "type": "action_node",
+  "extraction_action": {
+    "state": {}
+  },
+  "before_sleep_time": 5,
+  "end_sleep_time": 0
+}
+```
+
+## Full automation (from `login_cookies.json`)
+
+```json
+{
+  "url": "https://dev.dashboard.optexity.com/login",
+  "parameters": {
+    "input_parameters": {
+      "email": ["test@gmail.com"],
+      "password": ["12345678"]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "get_by_role(\"textbox\", name=\"Email\")",
+          "prompt_instructions": "Enter the email address {email[0]} into the Email field.",
+          "input_text": "{email[0]}"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "get_by_role(\"textbox\", name=\"Password\")",
+          "prompt_instructions": "Enter the password into the Password field.",
+          "input_text": "{password[0]}"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"button\", name=\"Sign In\", exact=True)",
+          "prompt_instructions": "Click the 'Sign In' button to log into the dashboard."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "extraction_action": {
+        "state": {}
+      },
+      "before_sleep_time": 5,
+      "end_sleep_time": 0
+    }
+  ]
+}
+```
+
+## What you get back
+
+The `state` extraction appends an `OutputData.json_data` object with keys:
+
+| Key | Description |
+|-----|-------------|
+| `page_url` | Current page URL |
+| `page_title` | Current page title |
+| `local_storage` | All `localStorage` key/value pairs |
+| `session_storage` | All `sessionStorage` key/value pairs |
+| `cookies` | Cookies from the current browser context |
+| `document_cookie` | `document.cookie` for the current page |
+
+## When to use this
+
+| Goal | Why this helps |
+|------|----------------|
+| Debug login issues | Confirm if the app uses cookies vs localStorage/sessionStorage tokens |
+| Capture tokens for API calls | Many apps store auth tokens in localStorage/sessionStorage |
+| Validate you landed on the right page | `page_url` and `page_title` confirm navigation after login |
+
