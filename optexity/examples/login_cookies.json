@@ -1,5 +1,5 @@
 {
-    "url": "https://dashboard.optexity.com/login",
+    "url": "https://dev.dashboard.optexity.com/login",
     "parameters": {
         "input_parameters": {
             "email": ["test@gmail.com"],
@@ -40,11 +40,9 @@
         {
             "type": "action_node",
             "extraction_action": {
-                "python_script": {
-                    "script": "async def code_fn(axtree, browser):\n    page = await browser.get_current_page()\n    \n    local_storage = await page.evaluate('''() => {\n        const items = {};\n        for (let i = 0; i < localStorage.length; i++) {\n            const key = localStorage.key(i);\n            items[key] = localStorage.getItem(key);\n        }\n        return items;\n    }''')\n    \n    session_storage = await page.evaluate('''() => {\n        const items = {};\n        for (let i = 0; i < sessionStorage.length; i++) {\n            const key = sessionStorage.key(i);\n            items[key] = sessionStorage.getItem(key);\n        }\n        return items;\n    }''')\n    \n    cookies = await page.context.cookies()\n    \n    document_cookie = await page.evaluate('document.cookie')\n    \n    return {\n        'current_url': page.url,\n        'local_storage': local_storage,\n        'session_storage': session_storage,\n        'cookies': cookies,\n        'document_cookie': document_cookie,\n    }\n"
-                }
+                "state": {}
             },
-            "before_sleep_time": 10,
+            "before_sleep_time": 5,
             "end_sleep_time": 0
         }
     ]

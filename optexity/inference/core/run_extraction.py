@@ -92,10 +92,41 @@ async def handle_state_extraction(
     if page is None:
         return
 
+    # Get localStorage
+    local_storage = await page.evaluate("""() => {
+            const items = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                items[key] = localStorage.getItem(key);
+            }
+            return items;
+        }""")
+
+    # Get sessionStorage
+    session_storage = await page.evaluate("""() => {
+            const items = {};
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                items[key] = sessionStorage.getItem(key);
+            }
+            return items;
+        }""")
+
+    # Get cookies (both structured and document.cookie)
+    cookies = await page.context.cookies()
+    document_cookie = await page.evaluate("document.cookie")
+
     memory.variables.output_data.append(
         OutputData(
             unique_identifier=unique_identifier,
-            json_data={"page_url": page.url, "page_title": await page.title()},
+            json_data={
+                "page_url": page.url,
+                "page_title": await page.title(),
+                "local_storage": local_storage,
+                "session_storage": session_storage,
+                "cookies": cookies,
+                "document_cookie": document_cookie,
+            },
         )
     )
 
