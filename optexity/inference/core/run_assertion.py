@@ -10,7 +10,7 @@ from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
 
-llm_model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
+llm_model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH)
 
 
 async def run_assertion_action(
