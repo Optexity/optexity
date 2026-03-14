@@ -305,7 +305,7 @@ async def run_final_logging(
                 )
             )
 
-            memory.final_screenshot = await browser.get_screenshot(full_page=True)
+            # memory.final_screenshot = await browser.get_screenshot(full_page=True)
         except Exception as e:
             logger.error(f"Error getting final screenshot: {e}")
 
