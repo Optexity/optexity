@@ -135,6 +135,9 @@ class ActualBrowser:
             "--disable-translate",
             # ---- automation hygiene
             f"--remote-debugging-port={self.port}",
+            "--remote-debugging-address=127.0.0.1",
+            # "--user-data-dir=\"/tmp/optexity_chrome_cdp\"",
+            '--profile-directory="Default"'
             # "--disable-blink-features=AutomationControlled",
             "--no-first-run",
             "--no-default-browser-check",
@@ -153,8 +156,12 @@ class ActualBrowser:
                 "--disable-autofill-keyboard-accessory-view",
                 "--disable-autofill",
                 "--password-store=basic",
-                "--disable-notifications",
+                # "--disable-notifications",
                 "--disable-credential-manager-api",
+                "--disable-features=BeforeUnloadEventCancelByPreventDefault",
+                "--disable-infobars",
+                "--disable-popup-blocking",
+                "--disable-session-crashed-bubble",
             ]
 
             if self.headless:
@@ -258,7 +265,9 @@ class ActualBrowser:
                 return False
             return True
         else:
-            raise NotImplementedError("CDP check is not supported for native browser")
+            # TODO: handle goto url using cdp methods
+            await self._wait_for_cdp(timeout)
+            # raise NotImplementedError("CDP check is not supported for native browser")
 
     async def stop(self, graceful=True):
         if settings.USE_PLAYWRIGHT_BROWSER:

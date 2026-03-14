@@ -188,6 +188,24 @@ class ForLoopNode(BaseModel):
     ] = []
     on_error_in_loop: Literal["continue", "break", "raise"] = "raise"
 
+    def replace(self, pattern: str, replacement: str | int | float | bool | None):
+        """Recursively replace placeholders in loop body/reset nodes.
+
+        This mirrors ActionNode.replace() so ForLoopNode can be safely used anywhere
+        the runtime expects a `.replace()` method (e.g. loop expansion).
+        """
+        replacement_str = "" if replacement is None else str(replacement)
+
+        for node in self.nodes:
+            if hasattr(node, "replace"):
+                node.replace(pattern, replacement_str)
+
+        for node in self.reset_nodes:
+            if hasattr(node, "replace"):
+                node.replace(pattern, replacement_str)
+
+        return self
+
     @model_validator(mode="before")
     def migrate_old_nodes(cls, data: dict[str, Any]):
         for key in ["nodes"]:
@@ -237,6 +255,23 @@ class IfElseNode(BaseModel):
     condition: str
     if_nodes: list[ActionNode | IfElseNodeRef | ForLoopNodeRef]
     else_nodes: list[ActionNode | IfElseNodeRef | ForLoopNodeRef] = []
+
+    def replace(self, pattern: str, replacement: str | int | float | bool | None):
+        """Recursively replace placeholders in condition and branches."""
+        replacement_str = "" if replacement is None else str(replacement)
+
+        if self.condition:
+            self.condition = self.condition.replace(pattern, replacement_str)
+
+        for node in self.if_nodes:
+            if hasattr(node, "replace"):
+                node.replace(pattern, replacement_str)
+
+        for node in self.else_nodes:
+            if hasattr(node, "replace"):
+                node.replace(pattern, replacement_str)
+
+        return self
 
     @model_validator(mode="before")
     def migrate_old_nodes(cls, data: dict[str, Any]):

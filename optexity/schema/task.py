@@ -92,6 +92,7 @@ class Task(BaseModel):
     user_id: UserID
     recording_id: RecordingID
     endpoint_name: str
+    version: str | None = None
     automation: Automation
     input_parameters: dict[str, list[str | int | float | bool]]
     secure_parameters: dict[str, list[SecureParameter]]

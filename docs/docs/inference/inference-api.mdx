@@ -23,7 +23,7 @@ Configuration is defined in `optexity/utils/settings.py` via a `Settings` model:
 - **`SAVE_OUTPUT_DATA_ENDPOINT`** (default: `api/v1/save_output_data`)
 - **`SAVE_DOWNLOADS_ENDPOINT`** (default: `api/v1/save_downloads`)
 - **`SAVE_TRAJECTORY_ENDPOINT`** (default: `api/v1/save_trajectory`)
-- **`API_KEY`**: API key for authenticated server-to-server calls (required).
+- **`OPTEXITY_API_KEY`**: API key for authenticated server-to-server calls (required).
 - **`CHILD_PORT_OFFSET`** (default: `9000`): Port offset used when discovering child processes in AWS/ECS environments.
 - **`DEPLOYMENT`**: `"dev"` or `"prod"`.
 
@@ -99,7 +99,7 @@ When **`is_aws=False`** (local mode, recommended for development):
 - **`POST /inference`**
     - **Body**: `InferenceRequest` JSON.
     - **Behavior**:
-        1. Sends the request to `api.optexity.com` + `INFERENCE_ENDPOINT` with header `x-api-key: API_KEY`.
+        1. Sends the request to `api.optexity.com` + `INFERENCE_ENDPOINT` with header `x-api-key: OPTEXITY_API_KEY`.
         2. Expects a response containing a serialized `Task`.
         3. Enqueues that `Task` onto a local `asyncio.Queue`.
         4. Returns `202 Accepted` with:

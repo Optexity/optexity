@@ -85,6 +85,22 @@ class Browser:
                 for i in range(len(self.context.pages) - 1, 0, -1):
                     await self.context.pages[i].close()
 
+            # TODO: remove this handling from browseruse
+            async def _safe_handle_dialog(dialog):
+                try:
+                    await dialog.accept()
+                except Exception as e:
+                    msg = str(e)
+                    if "No dialog is showing" in msg:
+                        logger.debug("Dialog disappeared before handling; ignoring")
+                        return
+                    logger.error(f"Error handling dialog: {e}", exc_info=True)
+
+            self.context.on(
+                "dialog",
+                lambda dialog: asyncio.create_task(_safe_handle_dialog(dialog)),
+            )
+
             self.context.on("request", lambda req: self.log_request(req))
             self.context.on("response", lambda resp: self.log_response(resp))
             self.context.on(
@@ -268,7 +284,7 @@ class Browser:
     def get_xpath_from_index(self, index: int) -> str:
         raise NotImplementedError("Not implemented")
 
-    async def go_to_url(self, url: str):
+    async def go_to_url(self, url: str, retry_count: int = 0):
         try:
             page = await self.get_current_page()
             if page is None:
@@ -284,6 +300,17 @@ class Browser:
             # For non-critical navigation, continue with warning
             return None
         except Exception as e:
+            if retry_count > 0:
+                logger.warning(
+                    f"Navigation error for {url}: {e}, retrying {retry_count} times",
+                    extra={
+                        "url": url,
+                        "retry_count": retry_count,
+                        "error_type": type(e).__name__,
+                    },
+                )
+                await asyncio.sleep(retry_count)
+                return await self.go_to_url(url, retry_count - 1)
             logger.error(
                 f"Unexpected error navigating to {url}: {e}",
                 exc_info=True,

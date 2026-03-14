@@ -34,7 +34,7 @@ The inference endpoint is the primary way to submit automation tasks to an Optex
 
 - **`Authorization`** `string` _required_ (cloud endpoint only)
 
-    API key for authentication. Format: `x-api-key YOUR_API_KEY`
+    API key for authentication. Format: `x-api-key YOUR_OPTEXITY_API_KEY`
 
     Not required for local endpoint
 
@@ -274,7 +274,7 @@ The endpoint uses these settings from environment variables:
 
 | Setting              | Default            | Description                              |
 | -------------------- | ------------------ | ---------------------------------------- |
-| `API_KEY`            | Required           | API key for control plane authentication |
+| `OPTEXITY_API_KEY`            | Required           | API key for control plane authentication |
 | `INFERENCE_ENDPOINT` | `api/v1/inference` | Control plane endpoint path              |
 
 <AccordionGroup>
