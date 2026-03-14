@@ -159,7 +159,6 @@ class ActualBrowser:
                 # "--disable-notifications",
                 "--disable-credential-manager-api",
                 "--disable-features=BeforeUnloadEventCancelByPreventDefault",
-                "--disable-blink-features=AutomationControlled",
                 "--disable-infobars",
                 "--disable-popup-blocking",
                 "--disable-session-crashed-bubble",
