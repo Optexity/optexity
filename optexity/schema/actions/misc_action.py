@@ -9,6 +9,10 @@ class SleepAction(BaseModel):
     sleep_time: float
 
 
+class HumanInLoopAction(BaseModel):
+    max_wait_time: float
+
+
 ## State Jump Actions
 class StateJumpAction(BaseModel):
     next_state_index: int

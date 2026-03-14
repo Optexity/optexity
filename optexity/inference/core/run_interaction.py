@@ -7,6 +7,7 @@ import aiofiles
 from optexity.exceptions import (
     AssertLocatorPresenceException,
     ElementNotFoundInAxtreeException,
+    HumanInLoopTimeoutException,
 )
 from optexity.inference.agents.error_handler.error_handler import ErrorHandlerAgent
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
@@ -147,6 +148,8 @@ async def run_interaction_action(
         await handle_assert_locator_presence_error(
             e, interaction_action, task, memory, browser, retries_left
         )
+    except HumanInLoopTimeoutException as e:
+        raise e
 
 
 async def handle_close_tabs_until(

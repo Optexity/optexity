@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SERVER_URL: str = "https://api.optexity.com"
     HEALTH_ENDPOINT: str = "api/v1/health"
     INFERENCE_ENDPOINT: str = "api/v1/inference"
+    HUMAN_IN_LOOP_ENDPOINT: str = "api/v1/human_in_loop"
     ADD_EXAMPLE_ENDPOINT: str = "api/v1/add_example"
     UPDATE_EXAMPLE_ENDPOINT: str = "api/v1/update_example"
     START_TASK_ENDPOINT: str = "api/v1/start_task"

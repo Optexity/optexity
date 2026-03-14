@@ -25,6 +25,7 @@ from optexity.inference.core.logging import (
 )
 from optexity.inference.core.run_assertion import run_assertion_action
 from optexity.inference.core.run_extraction import run_extraction_action
+from optexity.inference.core.run_human_in_loop import run_human_in_loop_action
 from optexity.inference.core.run_interaction import (
     handle_download_url_as_pdf,
     run_interaction_action,
@@ -76,6 +77,7 @@ async def run_automation(
     logging.getLogger("browser_use").setLevel(logging.INFO)
 
     logger.info(f"Task {task.task_id} started running")
+    logger.info(f"unique_child_arn: {unique_child_arn}")
     memory = None
     browser = None
 
@@ -369,6 +371,10 @@ async def run_action_node(
         elif action_node.assertion_action:
             await run_assertion_action(
                 action_node.assertion_action, memory, browser, task
+            )
+        elif action_node.human_in_loop_action:
+            await run_human_in_loop_action(
+                action_node.human_in_loop_action, task, memory
             )
 
     except Exception as e:
