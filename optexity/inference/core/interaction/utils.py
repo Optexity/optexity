@@ -43,7 +43,9 @@ async def get_index_from_prompt(
             logger.error("Axtree is None, cannot predict action")
             return None
         final_prompt, response, token_usage = index_prediction_agent.predict_action(
-            prompt_instructions, memory.browser_states[-1].axtree
+            prompt_instructions,
+            memory.browser_states[-1].axtree,
+            can_return_negative_index=task.version == "v2",
         )
         memory.token_usage += token_usage
         memory.browser_states[-1].final_prompt = final_prompt

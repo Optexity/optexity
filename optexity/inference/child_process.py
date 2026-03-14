@@ -379,7 +379,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
 
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     url = urljoin(settings.SERVER_URL, settings.INFERENCE_ENDPOINT)
-                    headers = {"x-api-key": settings.API_KEY}
+                    headers = {"x-api-key": settings.OPTEXITY_API_KEY}
                     response = await client.post(
                         url, json=inference_request.model_dump(), headers=headers
                     )

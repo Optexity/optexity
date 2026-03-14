@@ -2,7 +2,7 @@ import logging
 import os
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,9 @@ class Settings(BaseSettings):
     FETCH_EMAIL_MESSAGES_ENDPOINT: str = "api/v1/fetch_email_messages"
     FETCH_SLACK_MESSAGES_ENDPOINT: str = "api/v1/fetch_slack_messages"
 
-    API_KEY: str
+    OPTEXITY_API_KEY: str = Field(
+        validation_alias=AliasChoices("OPTEXITY_API_KEY", "API_KEY")
+    )
 
     CHILD_PORT_OFFSET: int = 9000
     DEPLOYMENT: Literal["dev", "prod"]
