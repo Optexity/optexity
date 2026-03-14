@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class Gemini(LLMModel):
-
     def __init__(self, model_name: GeminiModels, use_structured_output: bool):
         super().__init__(model_name, use_structured_output)
 
