@@ -255,19 +255,19 @@ class ActualBrowser:
             if not self.is_dedicated:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
 
-            # env = os.environ.copy()
-            # env["IMAGE"] = "kernel-docker"
-            # env["ENABLE_WEBRTC"] = "true"
+            env = os.environ.copy()
+            env["IMAGE"] = "kernel-docker"
+            env["ENABLE_WEBRTC"] = "true"
 
-            # self.proc = await asyncio.create_subprocess_exec(
-            #     "sudo",
-            #     "-E",
-            #     "/home/ubuntu/kernel-images/images/chromium-headful/run-docker.sh",
-            #     stdout=asyncio.subprocess.DEVNULL,
-            #     stderr=asyncio.subprocess.DEVNULL,
-            #     preexec_fn=os.setsid,
-            #     env=env,
-            # )
+            self.proc = await asyncio.create_subprocess_exec(
+                "sudo",
+                "-E",
+                "/home/ubuntu/kernel-images/images/chromium-headful/run-docker.sh",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                preexec_fn=os.setsid,
+                env=env,
+            )
 
             await asyncio.to_thread(input, "Press Enter to continue...")
             logger.debug("Kernel browser started")
