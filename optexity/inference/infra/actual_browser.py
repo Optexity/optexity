@@ -144,7 +144,7 @@ class ActualBrowser:
             "--no-default-browser-check",
         ]
 
-        if not settings.USE_PLAYWRIGHT_BROWSER:
+        if settings.BROWSER_TYPE != "playwright":
 
             args += [
                 f"--user-data-dir={self.user_data_dir}",
@@ -183,10 +183,14 @@ class ActualBrowser:
         return args
 
     async def start(self):
-        if settings.USE_PLAYWRIGHT_BROWSER:
+        if settings.BROWSER_TYPE == "playwright":
             await self.start_playwright_browser()
-        else:
+        elif settings.BROWSER_TYPE == "native":
             await self.start_native_browser()
+        elif settings.BROWSER_TYPE == "kernel":
+            await self.start_kernel_browser()
+        else:
+            raise ValueError(f"Invalid browser type: {settings.BROWSER_TYPE}")
 
     async def start_native_browser(self):
         try:
@@ -242,6 +246,33 @@ class ActualBrowser:
             logger.error(f"Error starting actual browser: {e}")
             raise e
 
+    async def start_kernel_browser(self):
+        try:
+            logger.debug("Starting kernel browser")
+            if self.proc and self.proc.returncode is None:
+                return
+
+            if not self.is_dedicated:
+                shutil.rmtree(self.user_data_dir, ignore_errors=True)
+
+            env = os.environ.copy()
+            env["IMAGE"] = "kernel-docker"
+            env["ENABLE_WEBRTC"] = "true"
+
+            self.proc = await asyncio.create_subprocess_exec(
+                "/home/ubuntu/kernel-images/images/chromium-headful/run-docker.sh",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                preexec_fn=os.setsid,
+                env=env,
+            )
+
+            await asyncio.to_thread(input, "Press Enter to continue...")
+            logger.debug("Kernel browser started")
+        except Exception as e:
+            logger.error(f"Error starting kernel browser: {e}")
+            raise e
+
     async def _wait_for_cdp(self, timeout=10):
         logger.debug("Waiting for CDP")
         url = f"http://localhost:{self.port}/json/version"
@@ -260,7 +291,7 @@ class ActualBrowser:
         raise RuntimeError("Chrome CDP not reachable")
 
     async def check_browser_alive(self, timeout=10):
-        if settings.USE_PLAYWRIGHT_BROWSER:
+        if settings.BROWSER_TYPE == "playwright":
             try:
                 if self.context is None:
                     return False
@@ -272,7 +303,7 @@ class ActualBrowser:
             raise NotImplementedError("CDP check is not supported for native browser")
 
     async def stop(self, graceful=True):
-        if settings.USE_PLAYWRIGHT_BROWSER:
+        if settings.BROWSER_TYPE == "playwright":
             await self.stop_playwright_browser(graceful)
         else:
             await self.stop_native_browser(graceful)
