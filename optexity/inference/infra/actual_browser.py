@@ -77,6 +77,7 @@ class ActualBrowser:
         proxy_session_id: str | None = None,
     ):
         # self.chrome_path = find_chrome_binary(channel)
+        self.unique_child_arn = unique_child_arn
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
         self.port = port
         self.headless = headless
@@ -258,11 +259,21 @@ class ActualBrowser:
             env = os.environ.copy()
             env["IMAGE"] = "kernel-docker"
             env["ENABLE_WEBRTC"] = "true"
+            env["NAME"] = f"optexity-kernel-browser-{self.unique_child_arn}"
+
+            script_path = pathlib.Path(
+                "/home/ubuntu/kernel-images/images/chromium-headful/run-docker.sh"
+            )
+
+            if not script_path.exists():
+                raise FileNotFoundError(f"Script path does not exist: {script_path}")
+
+            script_path = script_path.as_posix()
 
             self.proc = await asyncio.create_subprocess_exec(
                 "sudo",
                 "-E",
-                "/home/ubuntu/kernel-images/images/chromium-headful/run-docker.sh",
+                script_path,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
                 preexec_fn=os.setsid,
@@ -270,6 +281,8 @@ class ActualBrowser:
             )
 
             await asyncio.to_thread(input, "Press Enter to continue...")
+            await self._wait_for_cdp()
+            logger.debug("CDP ready")
             logger.debug("Kernel browser started")
         except Exception as e:
             logger.error(f"Error starting kernel browser: {e}")
@@ -307,8 +320,12 @@ class ActualBrowser:
     async def stop(self, graceful=True):
         if settings.BROWSER_TYPE == "playwright":
             await self.stop_playwright_browser(graceful)
-        else:
+        elif settings.BROWSER_TYPE == "native":
             await self.stop_native_browser(graceful)
+        elif settings.BROWSER_TYPE == "kernel":
+            await self.stop_kernel_browser(graceful)
+        else:
+            raise ValueError(f"Invalid browser type: {settings.BROWSER_TYPE}")
 
         if not self.is_dedicated:
             shutil.rmtree(self.user_data_dir, ignore_errors=True)
@@ -338,6 +355,15 @@ class ActualBrowser:
         if self.playwright is not None:
             await self.playwright.stop()
             self.playwright = None
+
+    async def stop_kernel_browser(self, graceful=True):
+        await asyncio.create_subprocess_exec(
+            "sudo",
+            "docker",
+            "rm",
+            "-f",
+            f"optexity-kernel-browser-{self.unique_child_arn}",
+        )
 
     def get_extension_paths(self) -> list[str]:
         cache_dir = pathlib.Path("/tmp/extensions")
