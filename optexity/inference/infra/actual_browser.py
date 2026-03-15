@@ -260,6 +260,8 @@ class ActualBrowser:
             env["ENABLE_WEBRTC"] = "true"
 
             self.proc = await asyncio.create_subprocess_exec(
+                "sudo",
+                "-E",
                 "/home/ubuntu/kernel-images/images/chromium-headful/run-docker.sh",
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
