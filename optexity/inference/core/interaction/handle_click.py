@@ -1,7 +1,6 @@
 import logging
 
 from optexity.exceptions import (
-    AssertLocatorPresenceException,
     ElementNotFoundInAxtreeException,
 )
 from optexity.inference.core.interaction.handle_command import (

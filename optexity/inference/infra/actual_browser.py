@@ -16,6 +16,8 @@ from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
+OsEmulation = Literal["windows", "linux"] | None
+
 
 def find_chrome_binary(channel: Literal["chrome", "chromium"]) -> str:
     system = platform.system()
@@ -80,7 +82,7 @@ class ActualBrowser:
         is_dedicated: bool = False,
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
-        os_emulation: Literal["windows", "linux"] | None = None,
+        os_emulation: OsEmulation = None,
     ):
         # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
@@ -145,7 +147,7 @@ class ActualBrowser:
             "--remote-debugging-address=127.0.0.1",
             # "--user-data-dir=\"/tmp/optexity_chrome_cdp\"",
             '--profile-directory="Default"',
-            "--disable-blink-features=AutomationControlled",
+            # "--disable-blink-features=AutomationControlled",
             "--no-first-run",
             "--no-default-browser-check",
         ]
