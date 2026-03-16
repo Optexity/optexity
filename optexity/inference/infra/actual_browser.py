@@ -177,6 +177,7 @@ class ActualBrowser:
             print(f"Proxy args: {proxy}")
             args += proxy
 
+        logger.debug(f"os_emulation: {self.os_emulation}")
         if self.os_emulation:
             logger.info(f"Using user agent for {self.os_emulation} emulation")
             args.append(f"--user-agent={self._USER_AGENTS[self.os_emulation]}")
