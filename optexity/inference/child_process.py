@@ -110,7 +110,7 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             _global_actual_browser = None
 
     if _global_actual_browser is None:
-        logger.info("🍅Starting new actual browser")
+        logger.info("Starting new actual browser")
         _global_actual_browser = ActualBrowser(
             channel=task.automation.browser_channel,
             unique_child_arn=unique_child_arn,
@@ -121,7 +121,7 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             proxy_session_id=task.proxy_session_id(
                 settings.PROXY_PROVIDER if task.use_proxy else None
             ),
-            os_emulation=task.automation.os_emulation,
+            os_emulation="windows",
         )
         try:
             await _global_actual_browser.start()
