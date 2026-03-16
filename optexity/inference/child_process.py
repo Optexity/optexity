@@ -116,6 +116,7 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             proxy_session_id=task.proxy_session_id(
                 settings.PROXY_PROVIDER if task.use_proxy else None
             ),
+            os_emulation=task.automation.os_emulation,
         )
         try:
             await _global_actual_browser.start()

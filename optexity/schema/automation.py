@@ -344,6 +344,7 @@ class Parameters(BaseModel):
 ## TODO: fix expected downloads for ForLoop
 class Automation(BaseModel):
     browser_channel: Literal["chromium", "chrome"] = "chromium"
+    os_emulation: Literal["windows", "linux"] | None = None
     expected_downloads: int = 0
     remove_empty_nodes_in_axtree: bool = True
     url: str
