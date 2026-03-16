@@ -1,6 +1,7 @@
 import logging
 import re
 
+from optexity.exceptions import ElementNotFoundInAxtreeException
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
@@ -74,6 +75,8 @@ async def input_text_index(
             }
         )
         await browser.backend_agent.multi_act([action_model])
+    except ElementNotFoundInAxtreeException as e:
+        raise e
     except Exception as e:
         logger.error(f"Error in input_text_index: {e}")
         return

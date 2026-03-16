@@ -140,7 +140,7 @@ async def run_automation(
                 except Exception as e:
                     logger.error(f"Error getting IP info: {e}")
 
-        await browser.go_to_url(task.automation.url)
+        await browser.go_to_url(task.automation.url, retry_count=3)
         memory.update_system_info()
 
         full_automation = []
@@ -482,13 +482,21 @@ async def handle_for_loop_node(
         try:
             for node in for_loop_node.nodes:
                 new_node = deepcopy(node)
-                new_node.replace(
-                    f"{{{for_loop_node.variable_name}[index]}}",
-                    f"{{{for_loop_node.variable_name}[{index}]}}",
-                )
-                new_node.replace(
-                    f"{{index_of({for_loop_node.variable_name})}}", f"{index}"
-                )
+                # split variable names by comma
+                variable_names = for_loop_node.variable_name.split(",")
+                for variable_name in variable_names:
+                    try:
+                        new_node.replace(
+                            f"{{{variable_name}[index]}}",
+                            f"{{{variable_name}[{index}]}}",
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Error replacing variable {variable_name} in for loop node: {e}"
+                        )
+                        continue
+
+                new_node.replace(f"{{index_of({variable_names[0]})}}", f"{index}")
 
                 if isinstance(new_node, IfElseNode):
                     await handle_if_else_node(

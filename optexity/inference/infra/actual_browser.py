@@ -16,6 +16,8 @@ from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
+OsEmulation = Literal["windows", "linux"] | None
+
 
 def find_chrome_binary(channel: Literal["chrome", "chromium"]) -> str:
     system = platform.system()
@@ -66,6 +68,11 @@ def find_chrome_binary(channel: Literal["chrome", "chromium"]) -> str:
 
 
 class ActualBrowser:
+    _USER_AGENTS: dict[str, str] = {
+        "windows": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "linux": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+
     def __init__(
         self,
         channel: Literal["chrome", "chromium"],
@@ -75,6 +82,7 @@ class ActualBrowser:
         is_dedicated: bool = False,
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
+        os_emulation: OsEmulation = None,
     ):
         # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
@@ -83,6 +91,7 @@ class ActualBrowser:
         self.is_dedicated = is_dedicated
         self.use_proxy = use_proxy
         self.proxy_session_id = proxy_session_id
+        self.os_emulation = os_emulation
         self.playwright = None
         self.context = None
         self.proc = None
@@ -135,10 +144,17 @@ class ActualBrowser:
             "--disable-translate",
             # ---- automation hygiene
             f"--remote-debugging-port={self.port}",
+            "--remote-debugging-address=127.0.0.1",
+            # "--user-data-dir=\"/tmp/optexity_chrome_cdp\"",
+            '--profile-directory="Default"',
             # "--disable-blink-features=AutomationControlled",
             "--no-first-run",
             "--no-default-browser-check",
         ]
+
+        if self.os_emulation:
+            logger.info(f"Using user agent for {self.os_emulation} emulation")
+            args.append(f"--user-agent={self._USER_AGENTS[self.os_emulation]}")
 
         if not settings.USE_PLAYWRIGHT_BROWSER:
 
@@ -153,8 +169,12 @@ class ActualBrowser:
                 "--disable-autofill-keyboard-accessory-view",
                 "--disable-autofill",
                 "--password-store=basic",
-                "--disable-notifications",
+                # "--disable-notifications",
                 "--disable-credential-manager-api",
+                "--disable-features=BeforeUnloadEventCancelByPreventDefault",
+                "--disable-infobars",
+                "--disable-popup-blocking",
+                "--disable-session-crashed-bubble",
             ]
 
             if self.headless:
@@ -162,6 +182,10 @@ class ActualBrowser:
             proxy = self.get_proxy_args_native()
             print(f"Proxy args: {proxy}")
             args += proxy
+
+        if self.os_emulation:
+            logger.info(f"Using user agent for {self.os_emulation} emulation")
+            args.append(f"--user-agent={self._USER_AGENTS[self.os_emulation]}")
 
         extension_paths = self.get_extension_paths()
 
@@ -258,7 +282,9 @@ class ActualBrowser:
                 return False
             return True
         else:
-            raise NotImplementedError("CDP check is not supported for native browser")
+            # TODO: handle goto url using cdp methods
+            await self._wait_for_cdp(timeout)
+            # raise NotImplementedError("CDP check is not supported for native browser")
 
     async def stop(self, graceful=True):
         if settings.USE_PLAYWRIGHT_BROWSER:

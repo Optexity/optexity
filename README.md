@@ -77,7 +77,7 @@ optexity install-browsers
 ## Set required environment variables:
 
 ```bash
-API_KEY=YOUR_OPTEXITY_API_KEY           # API key used for authenticated requests
+OPTEXITY_API_KEY=YOUR_OPTEXITY_API_KEY           # API key used for authenticated requests
 GOOGLE_API_KEY=YOUR_GOOGLE_API_KEY      # API key used for Google Gemini
 DEPLOYMENT=dev                          # or "prod" in production
 ```

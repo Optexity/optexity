@@ -8,6 +8,9 @@ from typing import Callable
 
 import aiofiles
 
+from optexity.exceptions import (
+    ElementNotFoundInAxtreeException,
+)
 from optexity.inference.agents.index_prediction.action_prediction_locator_axtree import (
     ActionPredictionLocatorAxtree,
 )
@@ -39,13 +42,26 @@ async def get_index_from_prompt(
             logger.error("Axtree is None, cannot predict action")
             return None
         final_prompt, response, token_usage = index_prediction_agent.predict_action(
-            prompt_instructions, memory.browser_states[-1].axtree
+            prompt_instructions,
+            memory.browser_states[-1].axtree,
+            can_return_negative_index=task.version == "v2",
         )
         memory.token_usage += token_usage
         memory.browser_states[-1].final_prompt = final_prompt
         memory.browser_states[-1].llm_response = response.model_dump()
 
+        if response.index == -1:
+            raise ElementNotFoundInAxtreeException(
+                message=f"Element not found in the axtree: {prompt_instructions}",
+                original_error=Exception(
+                    f"Element not found in the axtree: {prompt_instructions}"
+                ),
+                command=prompt_instructions,
+            )
+
         return response.index
+    except ElementNotFoundInAxtreeException as e:
+        raise e
     except Exception as e:
         logger.error(f"Error in get_index_from_prompt: {e}")
 

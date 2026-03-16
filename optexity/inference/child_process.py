@@ -116,6 +116,7 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             proxy_session_id=task.proxy_session_id(
                 settings.PROXY_PROVIDER if task.use_proxy else None
             ),
+            os_emulation=task.automation.os_emulation,
         )
         try:
             await _global_actual_browser.start()
@@ -379,7 +380,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
 
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     url = urljoin(settings.SERVER_URL, settings.INFERENCE_ENDPOINT)
-                    headers = {"x-api-key": settings.API_KEY}
+                    headers = {"x-api-key": settings.OPTEXITY_API_KEY}
                     response = await client.post(
                         url, json=inference_request.model_dump(), headers=headers
                     )

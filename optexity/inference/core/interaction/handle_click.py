@@ -1,5 +1,8 @@
 import logging
 
+from optexity.exceptions import (
+    ElementNotFoundInAxtreeException,
+)
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
@@ -77,6 +80,8 @@ async def click_element_index(
             )
         else:
             await _actual_click_element()
+    except ElementNotFoundInAxtreeException as e:
+        raise e
     except Exception as e:
         logger.error(f"Error in click_element_index: {e}")
         return
