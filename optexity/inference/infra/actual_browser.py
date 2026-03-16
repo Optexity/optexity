@@ -181,6 +181,10 @@ class ActualBrowser:
             print(f"Proxy args: {proxy}")
             args += proxy
 
+        if self.os_emulation:
+            logger.info(f"Using user agent for {self.os_emulation} emulation")
+            args.append(f"--user-agent={self._USER_AGENTS[self.os_emulation]}")
+
         extension_paths = self.get_extension_paths()
 
         if extension_paths:
