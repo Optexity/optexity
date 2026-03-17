@@ -85,6 +85,7 @@ class Browser:
                 for i in range(len(self.context.pages) - 1, 0, -1):
                     await self.context.pages[i].close()
 
+            # TODO: remove this handling from browseruse
             async def _safe_handle_dialog(dialog):
                 try:
                     await dialog.accept()
@@ -317,7 +318,9 @@ class Browser:
             )
             return None
 
-    async def get_browser_state_summary(self) -> BrowserStateSummary:
+    async def get_browser_state_summary(
+        self, include_full_page: bool = False
+    ) -> BrowserStateSummary:
         if self.backend_agent is None:
             raise ValueError("Backend agent is not set")
 
@@ -325,6 +328,7 @@ class Browser:
             include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
             include_recent_events=False,
             cached=False,
+            include_full_page=include_full_page,
         )
 
         return browser_state_summary
@@ -472,10 +476,10 @@ class Browser:
             page = await self.get_current_page()
             if page is None:
                 return None
+
             screenshot_bytes = await page.screenshot(full_page=full_page)
             screenshot_base64 = base64.b64encode(screenshot_bytes).decode("utf-8")
-
             return screenshot_base64
         except Exception as e:
-            logger.error(f"Error getting screenshot: {e}")
+            logger.error(f"Error taking screenshot: {e}", exc_info=True)
             return None

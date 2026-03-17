@@ -184,6 +184,9 @@ async def run_automation(
             task.status = "failed"
 
     finally:
+        if task and task.status == "running":
+            task.status = "failed"
+            task.error = "Task could not catch browser exception"
         if task and memory and browser:
             await run_final_downloads_check(task, memory, browser)
             await run_post_processing_nodes(task, memory, browser)

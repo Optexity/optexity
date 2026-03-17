@@ -37,7 +37,7 @@ def main(args):
         raise ValueError(f"Invalid example: {args.example}")
     try:
         logger.info(f"➕ Adding example: {args.example}")
-        headers = {"x-api-key": settings.API_KEY}
+        headers = {"x-api-key": settings.OPTEXITY_API_KEY}
         with httpx.Client() as client:
             response = client.post(
                 urljoin(

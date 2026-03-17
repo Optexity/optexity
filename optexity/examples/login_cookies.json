@@ -1,0 +1,49 @@
+{
+    "url": "https://dev.dashboard.optexity.com/login",
+    "parameters": {
+        "input_parameters": {
+            "email": ["test@gmail.com"],
+            "password": ["12345678"]
+        },
+        "generated_parameters": {}
+    },
+    "nodes": [
+        {
+            "type": "action_node",
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_role(\"textbox\", name=\"Email\")",
+                    "prompt_instructions": "Enter the email address {email[0]} into the Email field.",
+                    "input_text": "{email[0]}"
+                }
+            }
+        },
+        {
+            "type": "action_node",
+            "interaction_action": {
+                "input_text": {
+                    "command": "get_by_role(\"textbox\", name=\"Password\")",
+                    "prompt_instructions": "Enter the password into the Password field.",
+                    "input_text": "{password[0]}"
+                }
+            }
+        },
+        {
+            "type": "action_node",
+            "interaction_action": {
+                "click_element": {
+                    "command": "get_by_role(\"button\", name=\"Sign In\", exact=True)",
+                    "prompt_instructions": "Click the 'Sign In' button to log into the dashboard."
+                }
+            }
+        },
+        {
+            "type": "action_node",
+            "extraction_action": {
+                "state": {}
+            },
+            "before_sleep_time": 5,
+            "end_sleep_time": 0
+        }
+    ]
+}

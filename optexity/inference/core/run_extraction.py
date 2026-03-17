@@ -92,10 +92,41 @@ async def handle_state_extraction(
     if page is None:
         return
 
+    # Get localStorage
+    local_storage = await page.evaluate("""() => {
+            const items = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                items[key] = localStorage.getItem(key);
+            }
+            return items;
+        }""")
+
+    # Get sessionStorage
+    session_storage = await page.evaluate("""() => {
+            const items = {};
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                items[key] = sessionStorage.getItem(key);
+            }
+            return items;
+        }""")
+
+    # Get cookies (both structured and document.cookie)
+    cookies = await page.context.cookies()
+    document_cookie = await page.evaluate("document.cookie")
+
     memory.variables.output_data.append(
         OutputData(
             unique_identifier=unique_identifier,
-            json_data={"page_url": page.url, "page_title": await page.title()},
+            json_data={
+                "page_url": page.url,
+                "page_title": await page.title(),
+                "local_storage": local_storage,
+                "session_storage": session_storage,
+                "cookies": cookies,
+                "document_cookie": document_cookie,
+            },
         )
     )
 
@@ -130,7 +161,9 @@ async def handle_llm_extraction(
     task: Task,
     unique_identifier: str | None = None,
 ):
-    browser_state_summary = await browser.get_browser_state_summary()
+    browser_state_summary = await browser.get_browser_state_summary(
+        include_full_page=llm_extraction.include_full_page
+    )
     memory.browser_states[-1] = BrowserState(
         url=browser_state_summary.url,
         screenshot=browser_state_summary.screenshot,
@@ -251,7 +284,7 @@ async def handle_python_script_extraction(
     exec(python_script_extraction.script, {}, local_vars)
     code_fn = local_vars["code_fn"]
     axtree = memory.browser_states[-1].axtree
-    result = await code_fn(axtree)
+    result = await code_fn(axtree, browser)
     if result is not None:
         memory.variables.output_data.append(
             OutputData(
