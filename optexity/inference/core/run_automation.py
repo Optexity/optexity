@@ -174,7 +174,7 @@ async def run_automation(
         task.status = "failed"
 
     finally:
-        if task.retry_count == task.automation.max_retries:
+        if task.retry_count == task.automation.max_retries or task.status == "success":
             if task and task.status == "running":
                 task.status = "failed"
                 task.error = "Task could not catch browser exception"
