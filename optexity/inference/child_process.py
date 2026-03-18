@@ -188,8 +188,9 @@ async def run_automation_in_process(
                 pass
             task.status = "killed"
             task.error = f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
-            task.completed_at = datetime.now(timezone.utc)
-            await complete_task_in_server(task, None, child_process_id)
+            if attempts_left <= 1:
+                task.completed_at = datetime.now(timezone.utc)
+                await complete_task_in_server(task, None, child_process_id)
             returncode = -1
 
         if returncode == ExitCodes.SUCCESS.value:
