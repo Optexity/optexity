@@ -58,7 +58,7 @@ Automation
 | `url` | `str` | — | Starting URL—use the URL closest to your target to reduce navigation steps |
 | `browser_channel` | `"chromium" \| "chrome"` | `"chromium"` | Browser to use |
 | `os_emulation` | `"windows" \| "linux" \| null` | `null` | OS user-agent to emulate; `null` uses the default system OS |
-| `max_retries` | `int` | `1` | Total number of run attempts. `1` = no retry, `2` = one retry, etc. |
+| `max_retries` | `int` | `0` | Total number of run attempts. `0` = no retry, `1` = one retry, etc. |
 | `expected_downloads` | `int` | `0` | Number of expected downloads (automation waits for completion) |
 | `parameters` | `Parameters` | — | Input, secure, and generated variables |
 | `nodes` | `list[action_node \| for_loop_node \| if_else_node]` | — | Ordered list of actions |
