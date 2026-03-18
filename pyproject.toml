@@ -16,7 +16,7 @@ dependencies = [
     "pydantic-settings",
 
     # optexity forked dependency
-    "optexity-browser-use>=0.9.5",
+    "optexity-browser-use>=0.9.5.4",
 
     # web / infra
     "fastapi",
