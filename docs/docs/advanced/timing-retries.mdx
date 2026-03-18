@@ -9,6 +9,7 @@ Web automation requires careful timing. Pages load at different speeds, elements
 
 | Level | Properties |
 |-------|------------|
+| **Automation** | `max_retries` |
 | **Action Node** | `before_sleep_time`, `end_sleep_time`, `expect_new_tab`, `max_new_tab_wait_time` |
 | **Interaction Action** | `max_tries`, `max_timeout_seconds_per_try` |
 
@@ -53,7 +54,29 @@ Sleep times must be between 0 and 10 seconds.
 
 ---
 
-## Retry Configuration
+## Automation-Level Retries
+
+`max_retries` on the automation reruns the **entire automation** when an unexpected error occurs (e.g. browser crash, network failure).
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `max_retries` | `int` | `0` | Total run attempts. `1` = no retry, `1` = one retry, etc. |
+
+```json
+{
+  "url": "https://example.com",
+  "max_retries": 3,
+  "nodes": [ ... ]
+}
+```
+
+<Info>
+`AssertionError` failures (e.g. failed assertions) are **never** retried regardless of `max_retries`. Retries only apply to unexpected runtime errors.
+</Info>
+
+---
+
+## Element-Level Retry Configuration
 
 Control how Optexity retries finding elements.
 

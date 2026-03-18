@@ -25,6 +25,7 @@ from optexity.inference.core.logging import (
     save_trajectory_in_server,
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
+from optexity.schema.enums import ExitCodes
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import SystemInfo
 from optexity.schema.task import Task
@@ -142,42 +143,81 @@ async def run_automation_in_process(
     logger.info(
         f"---------- Starting to run automation for task {task.task_id} ----------\n"
     )
-    log_system_info("Memory info before starting browser")
-
-    await setup_browser(task, unique_child_arn, child_process_id)
-
-    log_system_info("Memory info after starting browser")
-
-    logger.debug("Running automation in process")
     worker_path = pathlib.Path(__file__).parent / "worker.py"
+    total_attempts = max(1, int(task.automation.max_retries) + 1)
+    returncode: int | None = None
 
-    proc = await asyncio.create_subprocess_exec(
-        sys.executable,
-        worker_path,
-        task.model_dump_json(),
-        unique_child_arn,
-        str(child_process_id),
-        preexec_fn=os.setsid,
-    )
+    async def _run_attempt(attempt_index: int) -> int | None:
+        global _global_actual_browser
+        nonlocal returncode
+
+        attempts_left = total_attempts - attempt_index
+        task.retry_count = attempt_index
+
+        log_system_info("Memory info before starting browser")
+        await setup_browser(task, unique_child_arn, child_process_id)
+        log_system_info("Memory info after starting browser")
+
+        logger.info(
+            f"Starting worker attempt {attempt_index + 1}/{total_attempts} (attempts_left={attempts_left})"
+        )
+
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable,
+            worker_path,
+            task.model_dump_json(),
+            unique_child_arn,
+            str(child_process_id),
+            str(attempts_left),
+            preexec_fn=os.setsid,
+        )
+
+        try:
+            logger.debug("Waiting for automation to finish")
+            returncode = await asyncio.wait_for(
+                proc.wait(), timeout=task.max_timeout_in_minutes * 60
+            )
+            logger.info(f"Worker finished with return code {returncode}")
+        except asyncio.TimeoutError:
+            logger.info(
+                f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
+            )
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except Exception:
+                pass
+            task.status = "killed"
+            task.error = f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
+            if attempts_left <= 1:
+                task.completed_at = datetime.now(timezone.utc)
+                await complete_task_in_server(task, None, child_process_id)
+            returncode = -1
+
+        if returncode == ExitCodes.SUCCESS.value:
+            return returncode
+
+        if attempts_left <= 1:
+            return returncode
+
+        # Backoff before retrying.
+        sleep_time = 10 * 2**attempt_index
+        logger.info(
+            f"Retrying automation in process after {sleep_time} seconds (attempts_left={attempts_left - 1})"
+        )
+        await asyncio.sleep(sleep_time)
+
+        # Force a browser restart before the next attempt (helps with crashed/poisoned sessions).
+        if _global_actual_browser is not None:
+            try:
+                await _global_actual_browser.stop(graceful=True)
+            except Exception:
+                pass
+            _global_actual_browser = None
+
+        return await _run_attempt(attempt_index + 1)
 
     try:
-        logger.debug("Waiting for automation to finish")
-        # returncode = proc.wait(timeout=600)  # seconds
-        returncode = await asyncio.wait_for(
-            proc.wait(), timeout=task.max_timeout_in_minutes * 60
-        )
-        logger.debug("Automation finished in process")
-        return returncode
-    except subprocess.TimeoutExpired:
-        logger.info(
-            f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
-        )
-        os.killpg(proc.pid, signal.SIGKILL)
-        task.status = "killed"
-        task.error = f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
-        task.completed_at = datetime.now(timezone.utc)
-        await complete_task_in_server(task, None, child_process_id)
-        return -1
+        return await _run_attempt(0)
     finally:
         logger.info(
             f"---------- Automation for task {task.task_id} finished ----------\n"

@@ -64,10 +64,8 @@ def is_driver_closed_error(e: Exception) -> bool:
 
 
 async def run_automation(
-    task: Task, unique_child_arn: str, child_process_id: int, max_retries: int = 1
+    task: Task, unique_child_arn: str, child_process_id: int, max_tries: int = 1
 ):
-    if max_retries <= 0:
-        return
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
 
@@ -80,7 +78,9 @@ async def run_automation(
     browser = None
 
     try:
-        await start_task_in_server(task)
+        if task.retry_count == 0:
+            await start_task_in_server(task)
+
         memory = Memory(unique_child_arn=unique_child_arn)
         memory.update_system_info()
 
@@ -169,27 +169,20 @@ async def run_automation(
             logger.error(f"Driver closed error: {e}, restarting browser")
             if browser is not None:
                 await browser.stop(force=True)
-        if max_retries > 1:
-            logger.info(
-                f"Running automations again with {max_retries - 1} retries left"
-            )
-            return await run_automation(
-                task, unique_child_arn, child_process_id, max_retries - 1
-            )
-        else:
-            logger.error(f"Error running automation: {traceback.format_exc()}")
-            task.error = str(e)
-            task.status = "failed"
+        logger.error(f"Error running automation: {traceback.format_exc()}")
+        task.error = str(e)
+        task.status = "failed"
 
     finally:
-        if task and task.status == "running":
-            task.status = "failed"
-            task.error = "Task could not catch browser exception"
-        if task and memory and browser:
-            await run_final_downloads_check(task, memory, browser)
-            await run_post_processing_nodes(task, memory, browser)
-        if memory and browser:
-            await run_final_logging(task, memory, browser, child_process_id)
+        if task.retry_count == task.automation.max_retries:
+            if task and task.status == "running":
+                task.status = "failed"
+                task.error = "Task could not catch browser exception"
+            if task and memory and browser:
+                await run_final_downloads_check(task, memory, browser)
+                await run_post_processing_nodes(task, memory, browser)
+            if memory and browser:
+                await run_final_logging(task, memory, browser, child_process_id)
         if browser is not None:
             await browser.stop()
 
