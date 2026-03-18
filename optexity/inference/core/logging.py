@@ -75,6 +75,7 @@ async def complete_task_in_server(
             "completed_at": task.completed_at.isoformat(),
             "status": task.status,
             "error": task.error,
+            "retry_count": task.retry_count + 1,
         }
         if token_usage:
             body["token_usage"] = token_usage.model_dump()

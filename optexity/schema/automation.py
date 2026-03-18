@@ -345,6 +345,7 @@ class Parameters(BaseModel):
 class Automation(BaseModel):
     browser_channel: Literal["chromium", "chrome"] = "chromium"
     os_emulation: Literal["windows", "linux"] | None = None
+    max_retries: int = 0
     expected_downloads: int = 0
     remove_empty_nodes_in_axtree: bool = True
     url: str

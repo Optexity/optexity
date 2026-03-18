@@ -11,6 +11,8 @@ Optexity uses a declarative model for browser automation. Define **what** action
 Automation
 ├── url                  # Starting point
 ├── browser_channel      # "chromium" or "chrome"
+├── os_emulation         # OS to emulate: "windows", "linux", or null
+├── max_retries          # Total run attempts on failure (default: 1)
 ├── expected_downloads   # Number of files to download
 ├── parameters           # Input, secure, and generated variables
 └── nodes[]              # Sequence of actions
@@ -25,6 +27,8 @@ Automation
 {
   "url": "https://example.com/login",
   "browser_channel": "chromium",
+  "os_emulation": null,
+  "max_retries": 1,
   "expected_downloads": 0,
   "parameters": {
     "input_parameters": {
@@ -49,13 +53,15 @@ Automation
 
 ## Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `url` | `str` | Starting URL—use the URL closest to your target to reduce navigation steps |
-| `browser_channel` | `"chromium" \| "chrome"` | Browser to use (default: `"chromium"`) |
-| `expected_downloads` | `int` | Number of expected downloads (automation waits for completion) |
-| `parameters` | `Parameters` | Input, secure, and generated variables |
-| `nodes` | `list[action_node \| for_loop_node \| if_else_node]` | Ordered list of actions |
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `url` | `str` | — | Starting URL—use the URL closest to your target to reduce navigation steps |
+| `browser_channel` | `"chromium" \| "chrome"` | `"chromium"` | Browser to use |
+| `os_emulation` | `"windows" \| "linux" \| null` | `null` | OS user-agent to emulate; `null` uses the default system OS |
+| `max_retries` | `int` | `1` | Total number of run attempts. `1` = no retry, `2` = one retry, etc. |
+| `expected_downloads` | `int` | `0` | Number of expected downloads (automation waits for completion) |
+| `parameters` | `Parameters` | — | Input, secure, and generated variables |
+| `nodes` | `list[action_node \| for_loop_node \| if_else_node]` | — | Ordered list of actions |
 
 ## Parameters
 
@@ -125,3 +131,47 @@ Set this to wait for file downloads to complete:
 ```
 
 The automation waits until all expected files are downloaded before completing.
+
+## OS Emulation
+
+Override the OS reported in the browser's user-agent string:
+
+| Value | Use When |
+|-------|----------|
+| `null` | Default — uses the host system's OS (recommended for most sites) |
+| `"windows"` | Site behaves differently on Windows (e.g. Windows-only portals) |
+| `"linux"` | Site behaves differently on Linux |
+
+```json
+{
+  "os_emulation": "windows"
+}
+```
+
+<Tip>
+Only set `os_emulation` when a site serves different content or layouts based on the OS. Leave it as `null` otherwise.
+</Tip>
+
+## Max Retries
+
+Control how many times the full automation reruns when an unexpected error occurs:
+
+```json
+{
+  "max_retries": 3
+}
+```
+
+| Value | Behavior |
+|-------|----------|
+| `1` (default) | Runs once; fails immediately on error |
+| `2` | Runs up to twice (1 retry) |
+| `3` | Runs up to three times (2 retries) |
+
+<Info>
+`max_retries` is the **total number of attempts**, not the number of extra retries. `AssertionError` failures are never retried regardless of this value.
+</Info>
+
+<Tip>
+See [Timing & Retries](/docs/advanced/timing-retries) for controlling per-element retry behavior (`max_tries`) vs. full-automation retries (`max_retries`).
+</Tip>

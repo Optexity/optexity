@@ -229,6 +229,7 @@ class TaskCompleteRequest(BaseModel):
     error: str | None
     completed_at: datetime
     token_usage: TokenUsage | None = None
+    retry_count: int
 
     @model_validator(mode="after")
     def must_have_timezone(self):
