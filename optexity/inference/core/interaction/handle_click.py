@@ -7,6 +7,7 @@ from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
 from optexity.inference.core.interaction.utils import (
+    get_coordinates_from_prompt,
     get_index_from_prompt,
     handle_download,
 )
@@ -44,7 +45,10 @@ async def handle_click_element(
         logger.debug(
             f"Executing prompt-based action: {click_element_action.__class__.__name__}"
         )
-        await click_element_index(click_element_action, browser, memory, task)
+        if browser.backend == "computer-vision":
+            await click_element_coordinates(click_element_action, browser, memory, task)
+        else:
+            await click_element_index(click_element_action, browser, memory, task)
 
 
 async def click_element_index(
@@ -80,6 +84,31 @@ async def click_element_index(
             )
         else:
             await _actual_click_element()
+    except ElementNotFoundInAxtreeException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error in click_element_index: {e}")
+        return
+
+
+async def click_element_coordinates(
+    click_element_action: ClickElementAction,
+    browser: Browser,
+    memory: Memory,
+    task: Task,
+):
+
+    try:
+        data = await get_coordinates_from_prompt(
+            memory, click_element_action.prompt_instructions, browser, task
+        )
+        x = float(data.get("x"))
+        y = float(data.get("y"))
+
+        print(f"Clicking element at coordinates: {x}, {y}")
+
+        page = await browser.get_current_page()
+        await page.mouse.click(x, y)
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:

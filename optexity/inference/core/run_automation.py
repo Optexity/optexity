@@ -88,6 +88,7 @@ async def run_automation(
             return Browser(
                 memory=memory,
                 headless=False,
+                backend="computer-vision",
                 channel=task.automation.browser_channel,
                 debug_port=9222 + child_process_id,
                 use_proxy=task.use_proxy,
@@ -152,12 +153,7 @@ async def run_automation(
                 await handle_if_else_node(node, memory, task, browser, full_automation)
             else:
                 full_automation.append(node.model_dump())
-                await run_action_node(
-                    node,
-                    task,
-                    memory,
-                    browser,
-                )
+                await run_action_node(node, task, memory, browser)
 
         task.status = "success"
     except AssertionError as e:

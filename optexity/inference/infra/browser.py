@@ -28,7 +28,7 @@ class Browser:
         memory: Memory,
         headless: bool = False,
         stealth: bool = True,
-        backend: Literal["browser-use", "browserbase"] = "browser-use",
+        backend: Literal["browser-use", "computer-vision"] = "browser-use",
         debug_port: int = 9222,
         channel: Literal["chromium", "chrome"] = "chromium",
         use_proxy: bool = False,
@@ -121,14 +121,21 @@ class Browser:
                 cdp_url=self.cdp_url, keep_alive=True, auto_download_pdfs=False
             )
 
-            self.backend_agent = Agent(
-                task="",
-                llm=ChatGoogle(model="gemini-flash-latest"),
-                browser_session=browser_session,
-                use_vision=False,
-            )
+            if self.backend == "browser-use":
+                self.backend_agent = Agent(
+                    task="",
+                    llm=ChatGoogle(model="gemini-flash-latest"),
+                    browser_session=browser_session,
+                    use_vision=False,
+                )
 
-            await self.backend_agent.browser_session.start()
+                await self.backend_agent.browser_session.start()
+
+                tabs = await self.backend_agent.browser_session.get_tabs()
+
+                for tab in tabs[::-1]:
+                    if tab.target_id not in self.page_to_target_id:
+                        self.page_to_target_id.append(tab.target_id)
 
             shutil.rmtree(self.temp_downloads_dir, ignore_errors=True)
             os.makedirs(self.temp_downloads_dir, exist_ok=True)
@@ -143,11 +150,6 @@ class Browser:
             )
             logger.info(f"CDP download behavior set to: {self.temp_downloads_dir}")
 
-            tabs = await self.backend_agent.browser_session.get_tabs()
-
-            for tab in tabs[::-1]:
-                if tab.target_id not in self.page_to_target_id:
-                    self.page_to_target_id.append(tab.target_id)
             self.previous_total_pages = len(self.context.pages)
 
             logger.debug("Browser started successfully")
@@ -206,7 +208,9 @@ class Browser:
 
     async def handle_new_tabs(self, max_wait_time: float) -> tuple[bool, float]:
 
-        if self.context is None or self.backend_agent is None:
+        if self.context is None or (
+            self.backend == "browser-use" and self.backend_agent is None
+        ):
             return False, 0
 
         total_time = 0
@@ -221,20 +225,27 @@ class Browser:
         if len(pages) == self.previous_total_pages:
             return False, total_time
 
-        tabs = await self.backend_agent.browser_session.get_tabs()
+        if self.backend_agent is not None:
+            tabs = await self.backend_agent.browser_session.get_tabs()
 
-        for tab in tabs[::-1]:
-            if tab.target_id not in self.page_to_target_id:
-                self.page_to_target_id.append(tab.target_id)
+            for tab in tabs[::-1]:
+                if tab.target_id not in self.page_to_target_id:
+                    self.page_to_target_id.append(tab.target_id)
+
+            tab_id = self.page_to_target_id[-1][-4:]
+            action_model = self.backend_agent.ActionModel(
+                **{"switch": {"tab_id": tab_id}}
+            )
+            await self.backend_agent.multi_act([action_model])
+
         self.previous_total_pages = len(pages)
 
-        tab_id = self.page_to_target_id[-1][-4:]
-        action_model = self.backend_agent.ActionModel(**{"switch": {"tab_id": tab_id}})
-        await self.backend_agent.multi_act([action_model])
         return True, total_time
 
     async def close_current_tab(self):
-        if self.context is None or self.backend_agent is None:
+        if self.context is None or (
+            self.backend == "browser-use" and self.backend_agent is None
+        ):
             return None
 
         pages = self.context.pages
@@ -243,19 +254,22 @@ class Browser:
             logger.warning("Atleast one tab should be open, skipping close current tab")
             return False
 
-        if len(self.page_to_target_id) > 1:
-            tab_id_after_close = self.page_to_target_id[-2][-4:]
-            action_model = self.backend_agent.ActionModel(
-                **{"switch": {"tab_id": tab_id_after_close}}
-            )
-            await self.backend_agent.multi_act([action_model])
-            self.page_to_target_id.pop()
+        if self.backend_agent is not None:
+            if len(self.page_to_target_id) > 1:
+                tab_id_after_close = self.page_to_target_id[-2][-4:]
+                action_model = self.backend_agent.ActionModel(
+                    **{"switch": {"tab_id": tab_id_after_close}}
+                )
+                await self.backend_agent.multi_act([action_model])
+                self.page_to_target_id.pop()
 
         last_page = pages[-1]
         await last_page.close()
 
     async def switch_tab(self, tab_index: int):
-        if self.context is None or self.backend_agent is None:
+        if self.context is None or (
+            self.backend == "browser-use" and self.backend_agent is None
+        ):
             return None
 
         pages = self.context.pages
@@ -264,16 +278,22 @@ class Browser:
             logger.warning("Atleast one tab should be open, skipping close current tab")
             return False
 
-        tab_id = self.page_to_target_id[tab_index][-4:]
         page = pages[tab_index]
 
         await page.bring_to_front()
 
-        action_model = self.backend_agent.ActionModel(**{"switch": {"tab_id": tab_id}})
-        await self.backend_agent.multi_act([action_model])
+        if self.backend_agent is not None:
+            tab_id = self.page_to_target_id[tab_index][-4:]
+
+            action_model = self.backend_agent.ActionModel(
+                **{"switch": {"tab_id": tab_id}}
+            )
+            await self.backend_agent.multi_act([action_model])
 
     async def get_locator_from_command(self, command: str) -> Locator | None:
-        if self.context is None or self.backend_agent is None:
+        if self.context is None or (
+            self.backend == "browser-use" and self.backend_agent is None
+        ):
             return None
         page = await self.get_current_page()
         if page is None:
@@ -320,18 +340,20 @@ class Browser:
 
     async def get_browser_state_summary(
         self, include_full_page: bool = False
-    ) -> BrowserStateSummary:
-        if self.backend_agent is None:
+    ) -> BrowserStateSummary | None:
+        if self.backend == "browser-use" and self.backend_agent is None:
             raise ValueError("Backend agent is not set")
 
-        browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
-            include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
-            include_recent_events=False,
-            cached=False,
-            include_full_page=include_full_page,
-        )
+        if self.backend_agent is not None:
+            browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
+                include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
+                include_recent_events=False,
+                cached=False,
+                include_full_page=include_full_page,
+            )
 
-        return browser_state_summary
+            return browser_state_summary
+        return None
 
     async def get_current_page_url(self) -> str:
         try:

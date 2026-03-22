@@ -344,6 +344,7 @@ class Parameters(BaseModel):
 ## TODO: fix expected downloads for ForLoop
 class Automation(BaseModel):
     browser_channel: Literal["chromium", "chrome"] = "chromium"
+    backend: Literal["browser-use", "computer-vision"] = "browser-use"
     os_emulation: Literal["windows", "linux"] | None = None
     max_retries: int = 0
     expected_downloads: int = 0

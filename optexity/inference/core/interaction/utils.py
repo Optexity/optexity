@@ -5,8 +5,10 @@ import shutil
 import uuid
 from pathlib import Path
 from typing import Callable
+from urllib.parse import urljoin
 
 import aiofiles
+import httpx
 
 from optexity.exceptions import (
     ElementNotFoundInAxtreeException,
@@ -17,6 +19,7 @@ from optexity.inference.agents.index_prediction.action_prediction_locator_axtree
 from optexity.inference.infra.browser import Browser
 from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
+from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -182,3 +185,23 @@ async def clean_download(download_path: Path):
             # Write cleaned CSV back
             async with aiofiles.open(download_path, "w", encoding="utf-8") as f:
                 await f.write(clean_content)
+
+
+async def get_coordinates_from_prompt(
+    memory: Memory, prompt_instructions: str, browser: Browser, task: Task
+):
+    ## call optexity api to get coordinates from prompt
+    screenshot_base64 = await browser.get_screenshot()
+
+    url = urljoin(settings.SERVER_URL, settings.GET_COORDINATES_ENDPOINT)
+    headers = {"x-api-key": task.api_key}
+    body = {
+        "screenshot_base64": screenshot_base64,
+        "prompt_instructions": prompt_instructions,
+    }
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(url, headers=headers, json=body)
+        response.raise_for_status()
+        data = response.json()
+
+    return data.get("coordinates")
