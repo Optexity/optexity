@@ -105,10 +105,14 @@ async def click_element_coordinates(
         x = float(data.get("x"))
         y = float(data.get("y"))
 
-        print(f"Clicking element at coordinates: {x}, {y}")
-
         page = await browser.get_current_page()
-        await page.mouse.click(x, y)
+        dpr = await page.evaluate("window.devicePixelRatio")
+        css_x = x / dpr
+        css_y = y / dpr
+
+        print(f"Clicking element at coordinates: {css_x}, {css_y} (dpr={dpr})")
+
+        await page.mouse.click(css_x, css_y)
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:

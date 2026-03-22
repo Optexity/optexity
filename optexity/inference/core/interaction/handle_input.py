@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 
@@ -5,7 +6,10 @@ from optexity.exceptions import ElementNotFoundInAxtreeException
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
-from optexity.inference.core.interaction.utils import get_index_from_prompt
+from optexity.inference.core.interaction.utils import (
+    get_coordinates_from_prompt,
+    get_index_from_prompt,
+)
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import InputTextAction
 from optexity.schema.memory import Memory
@@ -49,7 +53,10 @@ async def handle_input_text(
         logger.debug(
             f"Executing prompt-based action: {input_text_action.__class__.__name__}"
         )
-        await input_text_index(input_text_action, browser, memory, task)
+        if browser.backend == "computer-vision":
+            await input_text_coordinates(input_text_action, browser, memory, task)
+        else:
+            await input_text_index(input_text_action, browser, memory, task)
 
 
 async def input_text_index(
@@ -79,4 +86,37 @@ async def input_text_index(
         raise e
     except Exception as e:
         logger.error(f"Error in input_text_index: {e}")
+        return
+
+
+async def input_text_coordinates(
+    input_text_action: InputTextAction,
+    browser: Browser,
+    memory: Memory,
+    task: Task,
+):
+
+    try:
+        if input_text_action.input_text is None:
+            return
+        data = await get_coordinates_from_prompt(
+            memory, input_text_action.prompt_instructions, browser, task
+        )
+        x = float(data.get("x"))
+        y = float(data.get("y"))
+
+        page = await browser.get_current_page()
+        dpr = await page.evaluate("window.devicePixelRatio")
+        css_x = x / dpr
+        css_y = y / dpr
+
+        print(f"Clicking element at coordinates: {css_x}, {css_y} (dpr={dpr})")
+
+        await page.mouse.click(css_x, css_y)
+        await asyncio.sleep(0.2)
+        await page.keyboard.type(input_text_action.input_text)
+    except ElementNotFoundInAxtreeException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error in input_text_coordinates: {e}")
         return
