@@ -88,7 +88,7 @@ async def run_automation(
             return Browser(
                 memory=memory,
                 headless=False,
-                backend="computer-vision",
+                backend=task.automation.backend,
                 channel=task.automation.browser_channel,
                 debug_port=9222 + child_process_id,
                 use_proxy=task.use_proxy,
