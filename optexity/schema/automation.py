@@ -75,14 +75,14 @@ class ActionNode(BaseModel):
     localized_axtree_string: str | None = None
 
     @model_validator(mode="after")
-    def validate_one_node(cls, model: "ActionNode"):
+    def validate_one_node(self):
         """Ensure exactly one of the node types is set and matches the type."""
         provided = {
-            "interaction_action": model.interaction_action,
-            "assertion_action": model.assertion_action,
-            "extraction_action": model.extraction_action,
-            "python_script_action": model.python_script_action,
-            "sleep_action": model.sleep_action,
+            "interaction_action": self.interaction_action,
+            "assertion_action": self.assertion_action,
+            "extraction_action": self.extraction_action,
+            "python_script_action": self.python_script_action,
+            "sleep_action": self.sleep_action,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
@@ -92,32 +92,32 @@ class ActionNode(BaseModel):
             )
 
         assert (
-            model.end_sleep_time >= 0 and model.end_sleep_time <= 30
+            self.end_sleep_time >= 0 and self.end_sleep_time <= 30
         ), "end_sleep_time must be greater than 0 and less than 30"
         assert (
-            model.max_new_tab_wait_time >= 0 and model.max_new_tab_wait_time <= 30
+            self.max_new_tab_wait_time >= 0 and self.max_new_tab_wait_time <= 30
         ), "max_new_tab_wait_time must be greater than 0 and less than 30"
 
         # --- Adjust defaults only if user didn't override them ---
         # We detect user-provided fields using model.__pydantic_fields_set__
-        user_set = model.__pydantic_fields_set__
+        user_set = self.__pydantic_fields_set__
 
         if "end_sleep_time" not in user_set:
-            if model.assertion_action or model.extraction_action:
-                model.end_sleep_time = 0.0
+            if self.assertion_action or self.extraction_action:
+                self.end_sleep_time = 0.0
 
         if "before_sleep_time" not in user_set:
-            model.before_sleep_time = 3.0 if model.extraction_action else 0.0
+            self.before_sleep_time = 3.0 if self.extraction_action else 0.0
 
-        if model.expect_new_tab:
+        if self.expect_new_tab:
             assert (
-                model.interaction_action is not None
+                self.interaction_action is not None
             ), "expect_new_tab is only allowed for interaction actions"
-            model.max_new_tab_wait_time = 10.0
+            self.max_new_tab_wait_time = 10.0
         else:
-            model.max_new_tab_wait_time = 0.0
+            self.max_new_tab_wait_time = 0.0
 
-        return model
+        return self
 
     def replace(self, pattern: str, replacement: str | int | float | bool | None):
         replacement = str(replacement)
@@ -344,6 +344,7 @@ class Parameters(BaseModel):
 ## TODO: fix expected downloads for ForLoop
 class Automation(BaseModel):
     browser_channel: Literal["chromium", "chrome"] = "chromium"
+    backend: Literal["browser-use", "computer-vision"] = "browser-use"
     os_emulation: Literal["windows", "linux"] | None = None
     max_retries: int = 0
     expected_downloads: int = 0
