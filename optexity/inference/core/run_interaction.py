@@ -54,6 +54,39 @@ async def run_interaction_action(
         f"---------Running interaction action {interaction_action.model_dump_json(exclude_none=True, exclude_defaults=True)}---------"
     )
 
+    await asyncio.sleep(10)
+
+    page = await browser.get_current_page()
+    print(f"🍅page: {page.url}")
+    box = page.locator("#captchaDiv")
+    print(f"🍅box: {box}")
+    if box is not None:
+        bounding_box = await box.bounding_box()
+        print(f"🍅bounding_box: {bounding_box}")
+
+        x = bounding_box["x"] + 14
+        y = bounding_box["y"] + 28
+        await page.evaluate(
+            """([x, y]) => {
+            const el = document.createElement('div');
+            el.id = '__optexity_click_marker';
+            el.style.position = 'fixed';
+            el.style.left = `${x - 8}px`;
+            el.style.top = `${y - 8}px`;
+            el.style.width = '16px';
+            el.style.height = '16px';
+            el.style.border = '2px solid red';
+            el.style.borderRadius = '50%';
+            el.style.background = 'rgba(255,0,0,0.25)';
+            el.style.zIndex = '2147483647';
+            el.style.pointerEvents = 'none';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 2000);
+        }""",
+            [x, y],
+        )
+        await page.mouse.click(x, y)
+
     try:
         memory.automation_state.start_2fa_time = datetime.now(timezone.utc)
         if interaction_action.click_element:
