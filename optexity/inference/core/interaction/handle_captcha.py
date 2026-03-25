@@ -23,11 +23,21 @@ CAPTCHA_PROMPT = (
     "Return rows, cols, and the boxes array."
 )
 
+CAPTCHA_REFRESH_PROMPT = (
+    "Look at this captcha image carefully. "
+    "Have any of the grid images been replaced with new/different images that need to be selected? "
+    "Return images_refreshed as true if new images appeared that need to be clicked, false if the grid looks complete or unchanged."
+)
+
 
 class CaptchaBoxes(BaseModel):
     rows: int
     cols: int
     boxes: list[int]
+
+
+class CaptchaRefreshCheck(BaseModel):
+    images_refreshed: bool
 
 
 async def _mouse_click(page, x: float, y: float):
@@ -53,34 +63,24 @@ async def _mouse_click(page, x: float, y: float):
     await page.mouse.click(x, y)
 
 
-async def _solve_and_click(
-    page,
-    captcha_locator,
-    captcha_bbox,
-    config: dict,
-    memory,
-    attempt: int,
-    llm_model_name: str = "gemini-2.5-flash",
+async def _solve_grid(
+    page, captcha_locator, captcha_bbox, config: dict, memory, llm_model, label: str
 ):
-    """Screenshot → LLM → draw grid → click boxes → click verify. Returns True if verify was clicked."""
+    """Screenshot → LLM → draw grid boundary → click boxes. Returns screenshot_b64 taken after clicking."""
 
-    # --- Read grid positioning values from config ---
-    # Pixels from the top of the secondary element where the image grid begins (skips header)
     grid_top_offset = float(config.get("grid_top_offset", 100))
-    # Pixels trimmed from the bottom of the secondary element (skips footer/verify row)
     grid_bottom_trim = float(config.get("grid_bottom_trim", 200))
 
-    # Screenshot the captcha element and save to logs
+    # Screenshot the captcha element
     screenshot_bytes = await captcha_locator.first.screenshot()
     screenshot_b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
 
     # LOGS_DIR.mkdir(exist_ok=True)
-    # screenshot_path = LOGS_DIR / f"captcha_{int(time.time())}_attempt{attempt}.png"
+    # screenshot_path = LOGS_DIR / f"captcha_{int(time.time())}_{label}.png"
     # screenshot_path.write_bytes(screenshot_bytes)
     # logger.debug(f"Captcha screenshot saved to {screenshot_path}")
 
-    # Send screenshot to LLM
-    llm_model = get_llm_model(GeminiModels(llm_model_name), True)
+    # Ask LLM to solve the grid
     response, token_usage = llm_model.get_model_response_with_structured_output(
         prompt=CAPTCHA_PROMPT,
         response_schema=CaptchaBoxes,
@@ -92,17 +92,15 @@ async def _solve_and_click(
     rows: int = response.rows
     cols: int = response.cols
     boxes: list[int] = response.boxes
-    logger.debug(f"Attempt {attempt} - grid={rows}x{cols}, boxes to click: {boxes}")
+    logger.debug(f"[{label}] grid={rows}x{cols}, boxes to click: {boxes}")
 
-    # Build effective grid area from secondary locator bbox
+    # Build effective grid area
     grid_x = captcha_bbox["x"]
-    grid_y = captcha_bbox["y"] + grid_top_offset  # shift down past header
+    grid_y = captcha_bbox["y"] + grid_top_offset
     grid_width = captcha_bbox["width"]
-    grid_height = (
-        captcha_bbox["height"] - grid_top_offset - grid_bottom_trim
-    )  # trim header + footer
+    grid_height = captcha_bbox["height"] - grid_top_offset - grid_bottom_trim
 
-    # Draw visual boundary of the effective grid area
+    # Draw visual boundary of the grid area
     await page.evaluate(
         """([x, y, w, h]) => {
             const el = document.createElement('div');
@@ -120,7 +118,7 @@ async def _solve_and_click(
         [grid_x, grid_y, grid_width, grid_height],
     )
     logger.debug(
-        f"Grid boundary: x={grid_x:.1f} y={grid_y:.1f} w={grid_width:.1f} h={grid_height:.1f}"
+        f"[{label}] Grid boundary: x={grid_x:.1f} y={grid_y:.1f} w={grid_width:.1f} h={grid_height:.1f}"
     )
 
     cell_width = grid_width / cols
@@ -130,7 +128,7 @@ async def _solve_and_click(
     for box_num in boxes:
         if box_num < 1 or box_num > rows * cols:
             logger.warning(
-                f"Invalid box number {box_num} for {rows}x{cols} grid, skipping"
+                f"[{label}] Invalid box number {box_num} for {rows}x{cols} grid, skipping"
             )
             continue
         row = (box_num - 1) // cols
@@ -138,11 +136,66 @@ async def _solve_and_click(
         cx = grid_x + col * cell_width + cell_width / 2
         cy = grid_y + row * cell_height + cell_height / 2
         await _mouse_click(page, cx, cy)
-        logger.debug(f"Clicked captcha box {box_num} at ({cx:.1f}, {cy:.1f})")
+        logger.debug(f"[{label}] Clicked box {box_num} at ({cx:.1f}, {cy:.1f})")
         await asyncio.sleep(0.3)
 
+    # Wait briefly then return screenshot for refresh check
+    await asyncio.sleep(1.0)
+    post_screenshot_bytes = await captcha_locator.first.screenshot()
+    return base64.b64encode(post_screenshot_bytes).decode("utf-8")
+
+
+async def _solve_and_click(
+    page,
+    captcha_locator,
+    captcha_bbox,
+    config: dict,
+    memory,
+    attempt: int,
+    llm_model_name: str = "gemini-2.5-pro",
+):
+    """Screenshot → LLM → click boxes → check for image refresh → repeat if refreshed → press verify."""
+
+    max_retries = int(config.get("max_captcha_retries", 3))
+    llm_model = get_llm_model(GeminiModels(llm_model_name), True)
+
+    refresh_count = 0
+    while refresh_count <= max_retries:
+        label = f"attempt={attempt} refresh={refresh_count}"
+
+        # Solve grid and get post-click screenshot
+        post_click_screenshot_b64 = await _solve_grid(
+            page, captcha_locator, captcha_bbox, config, memory, llm_model, label
+        )
+
+        # Ask LLM if new images appeared after clicking
+        refresh_response, token_usage = (
+            llm_model.get_model_response_with_structured_output(
+                prompt=CAPTCHA_REFRESH_PROMPT,
+                response_schema=CaptchaRefreshCheck,
+                screenshot=post_click_screenshot_b64,
+                system_instruction="You are a captcha checker.",
+            )
+        )
+        memory.token_usage += token_usage
+
+        if refresh_response.images_refreshed:
+            logger.debug(f"[{label}] New images detected — re-solving before verify")
+            refresh_count += 1
+
+            # Re-fetch bbox in case widget shifted after clicks
+            fresh_captcha_bbox = await captcha_locator.first.bounding_box()
+            if fresh_captcha_bbox is not None:
+                captcha_bbox = fresh_captcha_bbox
+        else:
+            logger.debug(f"[{label}] No new images — proceeding to verify")
+            break
+    else:
+        logger.warning(
+            f"Max refresh re-solves ({max_retries}) reached, pressing verify anyway"
+        )
+
     # Re-fetch bbox and click verify button (bottom-right, 10px inset)
-    # Re-fetched because widget may shift/resize after grid clicks
     fresh_bbox = await captcha_locator.first.bounding_box()
     if fresh_bbox is None:
         logger.error("Could not re-fetch bounding box for verify button click")
@@ -223,7 +276,7 @@ async def handle_captcha_action(
         logger.error("Could not get bounding box of secondary locator")
         return
 
-    # Steps 5-9: Solve and click — retry if captcha is still present after verify
+    # Steps 5+: Solve and click — retry if captcha is still present after verify
     max_retries = int(captcha_action.config.get("max_captcha_retries", 3))
     attempt = 1
     while attempt <= max_retries:
