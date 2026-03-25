@@ -10,6 +10,7 @@ readonly IMAGE_DEV="${GHCR_REGISTRY}/${GHCR_OWNER}/opinference-dev"
 readonly CACHE_REF="${GHCR_REGISTRY}/${GHCR_OWNER}/opinference-cache:buildcache"
 
 TAG_DEV=0
+LOCAL_MODE=0
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -24,13 +25,19 @@ log() {
 ensure_dependencies() {
 	local missing=()
 	if is_linux; then
-		for cmd in docker gh; do
+		for cmd in docker; do
 			command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
 		done
+		if [[ "$LOCAL_MODE" -ne 1 ]]; then
+			command -v gh >/dev/null 2>&1 || missing+=("gh")
+		fi
 	else
-		for cmd in colima docker gh; do
+		for cmd in colima docker; do
 			command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
 		done
+		if [[ "$LOCAL_MODE" -ne 1 ]]; then
+			command -v gh >/dev/null 2>&1 || missing+=("gh")
+		fi
 	fi
 	if ! docker buildx version >/dev/null 2>&1; then
 		missing+=("docker-buildx")
@@ -110,17 +117,29 @@ build() {
 		image_tag="${IMAGE_PROD}:${IMAGE_TAG}"
 	fi
 
-	docker buildx build \
-		--platform=linux/amd64 \
-		--cache-from=type=registry,ref="${CACHE_REF}" \
-		--cache-to=type=registry,ref="${CACHE_REF}",mode=max \
-		-t "${image_tag}" \
-		--push .
+	if [[ "$LOCAL_MODE" -eq 1 ]]; then
+		log "local mode: building image into Docker (no GHCR login or push)"
+		docker buildx build \
+			--platform=linux/amd64 \
+			-t "${image_tag}" \
+			--load .
+	else
+		docker buildx build \
+			--platform=linux/amd64 \
+			--cache-from=type=registry,ref="${CACHE_REF}" \
+			--cache-to=type=registry,ref="${CACHE_REF}",mode=max \
+			-t "${image_tag}" \
+			--push .
+	fi
 }
 
 main() {
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
+			--local)
+				LOCAL_MODE=1
+				shift
+				;;
 			--dev)
 				TAG_DEV=1
 				shift
@@ -134,7 +153,7 @@ main() {
 				shift 2
 				;;
 			*)
-				log "unknown argument: $1 (supported: --dev, --tag|-t <tag>)" >&2
+				log "unknown argument: $1 (supported: --local, --dev, --tag|-t <tag>)" >&2
 				exit 1
 				;;
 		esac
@@ -142,7 +161,9 @@ main() {
 
 	ensure_dependencies
 	start
-	login
+	if [[ "$LOCAL_MODE" -ne 1 ]]; then
+		login
+	fi
 	build
 }
 
