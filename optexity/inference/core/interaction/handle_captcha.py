@@ -140,7 +140,7 @@ async def _solve_grid(
         await asyncio.sleep(0.3)
 
     # Wait briefly then return screenshot for refresh check
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(5.0)
     post_screenshot_bytes = await captcha_locator.first.screenshot()
     return base64.b64encode(post_screenshot_bytes).decode("utf-8")
 
