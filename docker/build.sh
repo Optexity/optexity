@@ -13,15 +13,25 @@ TAG_DEV=0
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
+is_linux() {
+	[[ "$(uname -s)" == "Linux" ]]
+}
+
 log() {
 	printf "[build.sh] %s\n" "$*" >&2
 }
 
 ensure_dependencies() {
 	local missing=()
-	for cmd in colima docker gh; do
-		command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
-	done
+	if is_linux; then
+		for cmd in docker gh; do
+			command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+		done
+	else
+		for cmd in colima docker gh; do
+			command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+		done
+	fi
 	if ! docker buildx version >/dev/null 2>&1; then
 		missing+=("docker-buildx")
 	fi
@@ -59,8 +69,12 @@ ensure_ssh_agent_has_key() {
 }
 
 configure_docker_env() {
-	export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock"
 	export DOCKER_BUILDKIT=1
+	if is_linux; then
+		log "linux: using default docker socket (not colima)"
+		return 0
+	fi
+	export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock"
 }
 
 ensure_gh_authenticated() {
@@ -90,7 +104,9 @@ docker_ghcr_login() {
 
 start() {
 	cd_to_script_dir
-	ensure_colima_running
+	if ! is_linux; then
+		ensure_colima_running
+	fi
 	ensure_ssh_agent_has_key
 	configure_docker_env
 }
