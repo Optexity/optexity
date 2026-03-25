@@ -474,13 +474,15 @@ async def handle_for_loop_node(
     full_automation: list[ActionNode],
 ):
     memory.update_system_info()
-    if for_loop_node.variable_name in task.input_parameters:
-        values = task.input_parameters[for_loop_node.variable_name]
-    elif for_loop_node.variable_name in memory.variables.generated_variables:
-        values = memory.variables.generated_variables[for_loop_node.variable_name]
+    variable_names = for_loop_node.variable_name.split(",")
+    primary_variable_name = variable_names[0]
+    if primary_variable_name in task.input_parameters:
+        values = task.input_parameters[primary_variable_name]
+    elif primary_variable_name in memory.variables.generated_variables:
+        values = memory.variables.generated_variables[primary_variable_name]
     else:
         raise ValueError(
-            f"Variable name {for_loop_node.variable_name} not found in input variables or generated variables"
+            f"Variable name {primary_variable_name} not found in input variables or generated variables"
         )
     memory.variables.for_loop_status.append([])
     for index in range(len(values)):
@@ -489,7 +491,6 @@ async def handle_for_loop_node(
             for node in for_loop_node.nodes:
                 new_node = deepcopy(node)
                 # split variable names by comma
-                variable_names = for_loop_node.variable_name.split(",")
                 for variable_name in variable_names:
                     try:
                         new_node.replace(
