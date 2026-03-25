@@ -10,6 +10,7 @@ readonly IMAGE_DEV="${GHCR_REGISTRY}/${GHCR_OWNER}/opinference-dev"
 readonly CACHE_REF="${GHCR_REGISTRY}/${GHCR_OWNER}/opinference-cache:buildcache"
 
 TAG_DEV=0
+IMAGE_TAG="${IMAGE_TAG:-latest}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 log() {
@@ -101,9 +102,9 @@ login() {
 build() {
 	local image_tag=""
 	if [[ "$TAG_DEV" -eq 1 ]]; then
-		image_tag="${IMAGE_DEV}:latest"
+		image_tag="${IMAGE_DEV}:${IMAGE_TAG}"
 	else
-		image_tag="${IMAGE_PROD}:latest"
+		image_tag="${IMAGE_PROD}:${IMAGE_TAG}"
 	fi
 
 	docker buildx build \
@@ -116,13 +117,25 @@ build() {
 }
 
 main() {
-	local args=()
-	for arg in "$@"; do
-		if [[ "$arg" == "--dev" ]]; then
-			TAG_DEV=1
-		else
-			args+=("$arg")
-		fi
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--dev)
+				TAG_DEV=1
+				shift
+				;;
+			--tag|-t)
+				if [[ -z "${2:-}" ]]; then
+					log "error: $1 requires a tag value (e.g. $1 v1.2.3)" >&2
+					exit 1
+				fi
+				IMAGE_TAG="$2"
+				shift 2
+				;;
+			*)
+				log "unknown argument: $1 (supported: --dev, --tag|-t <tag>)" >&2
+				exit 1
+				;;
+		esac
 	done
 
 	ensure_dependencies
