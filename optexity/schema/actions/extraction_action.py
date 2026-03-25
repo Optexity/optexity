@@ -134,6 +134,27 @@ class PDFExtraction(BaseModel):
         return self
 
 
+class LocatorExtraction(BaseModel):
+    command: str
+    output_variable_name: str
+    extraction_format: dict
+    extraction_instructions: str | None = None
+    llm_provider: Literal["gemini"] = "gemini"
+    llm_model_name: str = "gemini-2.5-flash"
+
+    @model_validator(mode="after")
+    def validate_variable_in_format(self):
+        if self.output_variable_name not in self.extraction_format:
+            raise ValueError(
+                f"Variable {self.output_variable_name!r} not found in extraction_format"
+            )
+        return self
+
+    def replace(self, pattern: str, replacement: str):
+        self.command = self.command.replace(pattern, replacement)
+        return self
+
+
 class ExtractionAction(BaseModel):
     unique_identifier: str | None = None
     network_call: Optional[NetworkCallExtraction] = None
@@ -143,6 +164,7 @@ class ExtractionAction(BaseModel):
     state: Optional[StateExtraction] = None
     two_fa_action: TwoFAAction | None = None
     pdf: Optional[PDFExtraction] = None
+    locator: Optional[LocatorExtraction] = None
 
     @model_validator(mode="after")
     def validate_one_extraction(self):
@@ -155,12 +177,13 @@ class ExtractionAction(BaseModel):
             "state": self.state,
             "two_fa_action": self.two_fa_action,
             "pdf": self.pdf,
+            "locator": self.locator,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of llm, networkcall, python_script, screenshot, state, or two_fa_action must be provided"
+                "Exactly one of llm, network_call, python_script, screenshot, state, two_fa_action, pdf, or locator must be provided"
             )
 
         return self
@@ -176,8 +199,9 @@ class ExtractionAction(BaseModel):
             self.unique_identifier = self.unique_identifier.replace(
                 pattern, replacement
             )
-
         if self.two_fa_action:
             self.two_fa_action.replace(pattern, replacement)
+        if self.locator:
+            self.locator.replace(pattern, replacement)
 
         return self
