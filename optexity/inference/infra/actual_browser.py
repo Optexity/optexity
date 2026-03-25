@@ -17,6 +17,8 @@ from optexity.utils.settings import settings
 logger = logging.getLogger(__name__)
 
 OsEmulation = Literal["windows", "linux"] | None
+DISPLAY = os.environ.get("DISPLAY", ":99")
+IN_DOCKER = os.path.exists("/.dockerenv")
 
 
 def find_chrome_binary(channel: Literal["chrome", "chromium"]) -> str:
@@ -160,7 +162,7 @@ class ActualBrowser:
 
             args += [
                 f"--user-data-dir={self.user_data_dir}",
-                # "--no-sandbox",
+                *(["--no-sandbox"] if IN_DOCKER else []),
                 # ---- privacy / security
                 "--disable-save-password-bubble",
                 "--use-mock-keychain",
@@ -217,6 +219,7 @@ class ActualBrowser:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
 
             self.chrome_path = find_chrome_binary(self.channel)
+            env = {**os.environ, "DISPLAY": DISPLAY}
 
             self.proc = await asyncio.create_subprocess_exec(
                 self.chrome_path,
@@ -224,6 +227,7 @@ class ActualBrowser:
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
                 preexec_fn=os.setsid,  # critical: isolate process group
+                env=env,
             )
 
             await self._wait_for_cdp()
@@ -239,6 +243,7 @@ class ActualBrowser:
             from patchright.async_api import async_playwright
 
             self.playwright = await async_playwright().start()
+            env = {**os.environ, "DISPLAY": DISPLAY}
             self.context = await self.playwright.chromium.launch_persistent_context(
                 channel=self.channel,
                 user_data_dir=self.user_data_dir,
@@ -247,6 +252,7 @@ class ActualBrowser:
                 chromium_sandbox=False,
                 no_viewport=True,
                 proxy=self.get_proxy_playwright(),
+                env=env,
             )
 
             await self._wait_for_cdp()
@@ -284,7 +290,6 @@ class ActualBrowser:
         else:
             # TODO: handle goto url using cdp methods
             await self._wait_for_cdp(timeout)
-            # raise NotImplementedError("CDP check is not supported for native browser")
 
     async def stop(self, graceful=True):
         if settings.USE_PLAYWRIGHT_BROWSER:

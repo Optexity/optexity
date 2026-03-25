@@ -1,4 +1,39 @@
 #!/usr/bin/env bash
+#
+# Optexity Docker image build (use this `docker/` directory for all future container builds).
+#
+# VNC / browser-view work: latest flow lives on the `vnc` branch in optexity; build artifacts still
+# ship from here (`docker/Dockerfile`, this script, supervisord, etc.).
+#
+# --- build.sh usage ---
+#
+#   ./build.sh --dev -t vnc --local
+#
+#   --dev    Target dev registry image: ghcr.io/optexity/opinference-dev (default without --dev is
+#            ghcr.io/optexity/opinference).
+#   -t, --tag <name>   Image tag (default: latest). Example `-t vnc` -> .../opinference-dev:vnc
+#   --local  EC2 / air-gapped / no-GitHub: build and load into local Docker only — skips `gh` and
+#            GHCR login, does not push. On machines with GitHub, omit --local to push to GHCR with
+#            registry build cache.
+#
+# --- run (example: dev VNC image with tag `vnc`) ---
+#
+# Do not commit real secrets; pass keys via env or an env-file.
+#
+#   sudo docker run \
+#     -p 8080:8080 \
+#     -p 9000:9000 \
+#     --shm-size=2g \
+#     -e USE_PLAYWRIGHT_BROWSER="False" \
+#     -e GOOGLE_API_KEY="<set-me>" \
+#     -e API_KEY="<set-me>" \
+#     -e DEPLOYMENT=dev \
+#     ghcr.io/optexity/opinference-dev:vnc
+#
+# Exposed ports:
+#   8080 — noVNC: open http://localhost:8080/vnc_lite.html?autoconnect=true&scale=true to view browsers
+#   9000 — inference API: http://localhost:9000/inference (same as non-VNC deployments)
+#
 
 set -euo pipefail
 set -x
@@ -10,7 +45,13 @@ readonly IMAGE_DEV="${GHCR_REGISTRY}/${GHCR_OWNER}/opinference-dev"
 readonly CACHE_REF="${GHCR_REGISTRY}/${GHCR_OWNER}/opinference-cache:buildcache"
 
 TAG_DEV=0
+LOCAL_MODE=0
+IMAGE_TAG="${IMAGE_TAG:-latest}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+is_linux() {
+	[[ "$(uname -s)" == "Linux" ]]
+}
 
 log() {
 	printf "[build.sh] %s\n" "$*" >&2
@@ -18,9 +59,21 @@ log() {
 
 ensure_dependencies() {
 	local missing=()
-	for cmd in colima docker gh; do
-		command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
-	done
+	if is_linux; then
+		for cmd in docker; do
+			command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+		done
+		if [[ "$LOCAL_MODE" -ne 1 ]]; then
+			command -v gh >/dev/null 2>&1 || missing+=("gh")
+		fi
+	else
+		for cmd in colima docker; do
+			command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+		done
+		if [[ "$LOCAL_MODE" -ne 1 ]]; then
+			command -v gh >/dev/null 2>&1 || missing+=("gh")
+		fi
+	fi
 	if ! docker buildx version >/dev/null 2>&1; then
 		missing+=("docker-buildx")
 	fi
@@ -45,21 +98,13 @@ ensure_colima_running() {
 	colima start --cpu 4 --memory 8 --disk 100
 }
 
-ensure_ssh_agent_has_key() {
-	if ssh-add -l >/dev/null 2>&1; then
-		log "ssh-agent already has keys"
+configure_docker_env() {
+	export DOCKER_BUILDKIT=1
+	if is_linux; then
+		log "linux: using default docker socket (not colima)"
 		return 0
 	fi
-
-	log "starting ssh-agent and adding default key"
-	eval "$(ssh-agent -s)"
-	ssh-add "${HOME}/.ssh/id_rsa"
-	ssh-add -l
-}
-
-configure_docker_env() {
 	export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock"
-	export DOCKER_BUILDKIT=1
 }
 
 ensure_gh_authenticated() {
@@ -89,8 +134,9 @@ docker_ghcr_login() {
 
 start() {
 	cd_to_script_dir
-	ensure_colima_running
-	ensure_ssh_agent_has_key
+	if ! is_linux; then
+		ensure_colima_running
+	fi
 	configure_docker_env
 }
 
@@ -101,33 +147,58 @@ login() {
 build() {
 	local image_tag=""
 	if [[ "$TAG_DEV" -eq 1 ]]; then
-		image_tag="${IMAGE_DEV}:latest"
+		image_tag="${IMAGE_DEV}:${IMAGE_TAG}"
 	else
-		image_tag="${IMAGE_PROD}:latest"
+		image_tag="${IMAGE_PROD}:${IMAGE_TAG}"
 	fi
 
-	docker buildx build \
-		--platform=linux/amd64 \
-		--cache-from=type=registry,ref="${CACHE_REF}" \
-		--cache-to=type=registry,ref="${CACHE_REF}",mode=max \
-		--ssh default \
-		-t "${image_tag}" \
-		--push .
+	if [[ "$LOCAL_MODE" -eq 1 ]]; then
+		log "local mode: building image into Docker (no GHCR login or push)"
+		docker buildx build \
+			--platform=linux/amd64 \
+			-t "${image_tag}" \
+			--load .
+	else
+		docker buildx build \
+			--platform=linux/amd64 \
+			--cache-from=type=registry,ref="${CACHE_REF}" \
+			--cache-to=type=registry,ref="${CACHE_REF}",mode=max \
+			-t "${image_tag}" \
+			--push .
+	fi
 }
 
 main() {
-	local args=()
-	for arg in "$@"; do
-		if [[ "$arg" == "--dev" ]]; then
-			TAG_DEV=1
-		else
-			args+=("$arg")
-		fi
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--local)
+				LOCAL_MODE=1
+				shift
+				;;
+			--dev)
+				TAG_DEV=1
+				shift
+				;;
+			--tag|-t)
+				if [[ -z "${2:-}" ]]; then
+					log "error: $1 requires a tag value (e.g. $1 v1.2.3)" >&2
+					exit 1
+				fi
+				IMAGE_TAG="$2"
+				shift 2
+				;;
+			*)
+				log "unknown argument: $1 (supported: --local, --dev, --tag|-t <tag>)" >&2
+				exit 1
+				;;
+		esac
 	done
 
 	ensure_dependencies
 	start
-	login
+	if [[ "$LOCAL_MODE" -ne 1 ]]; then
+		login
+	fi
 	build
 }
 
