@@ -75,7 +75,7 @@ class ActualBrowser:
 
     def __init__(
         self,
-        channel: Literal["chrome", "chromium"],
+        channel: Literal["chrome", "chromium", "rdp"],
         unique_child_arn: str,
         port: int = 9222,
         headless: bool = False,
@@ -95,7 +95,7 @@ class ActualBrowser:
         self.playwright = None
         self.context = None
         self.proc = None
-        self.channel: Literal["chrome", "chromium"] = channel
+        self.channel: Literal["chrome", "chromium", "rdp"] = channel
         self.extensions = [
             # {
             #     "name": "optexity recorder",
