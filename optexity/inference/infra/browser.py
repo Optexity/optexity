@@ -30,7 +30,7 @@ class Browser:
         stealth: bool = True,
         backend: Literal["browser-use", "computer-vision"] = "browser-use",
         debug_port: int = 9222,
-        channel: Literal["chromium", "chrome"] = "chromium",
+        channel: Literal["chromium", "chrome", "rdp"] = "chromium",
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
     ):
