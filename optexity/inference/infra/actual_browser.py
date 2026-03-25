@@ -16,6 +16,7 @@ from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 DISPLAY = os.environ.get("DISPLAY", ":99")
+IN_DOCKER = os.path.exists("/.dockerenv")
 
 
 def find_chrome_binary(channel: Literal["chrome", "chromium"]) -> str:
@@ -149,7 +150,7 @@ class ActualBrowser:
 
             args += [
                 f"--user-data-dir={self.user_data_dir}",
-                # "--no-sandbox",
+                *(["--no-sandbox"] if IN_DOCKER else []),
                 # ---- privacy / security
                 "--disable-save-password-bubble",
                 "--use-mock-keychain",
