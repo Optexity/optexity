@@ -56,18 +56,6 @@ ensure_colima_running() {
 	colima start --cpu 4 --memory 8 --disk 100
 }
 
-ensure_ssh_agent_has_key() {
-	if ssh-add -l >/dev/null 2>&1; then
-		log "ssh-agent already has keys"
-		return 0
-	fi
-
-	log "starting ssh-agent and adding default key"
-	eval "$(ssh-agent -s)"
-	ssh-add "${HOME}/.ssh/id_rsa"
-	ssh-add -l
-}
-
 configure_docker_env() {
 	export DOCKER_BUILDKIT=1
 	if is_linux; then
@@ -107,7 +95,6 @@ start() {
 	if ! is_linux; then
 		ensure_colima_running
 	fi
-	ensure_ssh_agent_has_key
 	configure_docker_env
 }
 
@@ -127,7 +114,6 @@ build() {
 		--platform=linux/amd64 \
 		--cache-from=type=registry,ref="${CACHE_REF}" \
 		--cache-to=type=registry,ref="${CACHE_REF}",mode=max \
-		--ssh default \
 		-t "${image_tag}" \
 		--push .
 }
