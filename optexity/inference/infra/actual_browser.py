@@ -224,7 +224,11 @@ class ActualBrowser:
             if not self.rdp_parameter.host:
                 raise ValueError("host is required for rdp")
 
-            drives = [{"name": "shared", "path": "/opt/shared"}]
+            shared_drive_path = os.path.join(
+                os.path.expanduser("~"), settings.SHARED_DRIVE_PATH
+            )
+            os.makedirs(shared_drive_path, exist_ok=True)
+            drives = [{"name": "shared", "path": shared_drive_path}]
             args = [
                 f"/v:{self.rdp_parameter.host}",
                 f"/u:{self.rdp_parameter.username}",

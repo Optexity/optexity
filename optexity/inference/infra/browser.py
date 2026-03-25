@@ -52,7 +52,7 @@ class Browser:
         self.page = None
         self.cdp_url = f"http://localhost:{self.debug_port}"
         self.backend_agent = None
-        self.channel: Literal["chrome", "chromium"] = channel
+        self.channel: Literal["chrome", "chromium", "rdp"] = channel
         self.memory = memory
         self.page_to_target_id = []
         self.previous_total_pages = 0
