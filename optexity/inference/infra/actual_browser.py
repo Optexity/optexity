@@ -12,6 +12,7 @@ import aiohttp
 from playwright.async_api import ProxySettings
 
 from optexity.inference.infra.utils import _download_extension, _extract_extension
+from optexity.schema.automation import RDPParameter
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ class ActualBrowser:
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
         os_emulation: OsEmulation = None,
+        rdp_parameter: RDPParameter | None = None,
     ):
         # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
@@ -98,6 +100,11 @@ class ActualBrowser:
         self.context = None
         self.proc = None
         self.channel: Literal["chrome", "chromium", "rdp"] = channel
+        self.rdp_parameter = rdp_parameter
+
+        if self.channel == "rdp":
+            assert self.rdp_parameter is not None, "rdp_parameter is required for rdp"
+
         self.extensions = [
             # {
             #     "name": "optexity recorder",
@@ -201,10 +208,47 @@ class ActualBrowser:
         return args
 
     async def start(self):
-        if settings.USE_PLAYWRIGHT_BROWSER:
-            await self.start_playwright_browser()
+        if self.channel == "rdp":
+            await self.start_rdp_browser()
         else:
-            await self.start_native_browser()
+            if settings.USE_PLAYWRIGHT_BROWSER:
+                await self.start_playwright_browser()
+            else:
+                await self.start_native_browser()
+
+    async def start_rdp_browser(self):
+        try:
+            assert self.rdp_parameter is not None, "rdp_parameter is required for rdp"
+            logger.debug("Starting RDP Session")
+
+            if not self.rdp_parameter.host:
+                raise ValueError("host is required for rdp")
+
+            drives = [{"name": "shared", "path": "/opt/shared"}]
+            args = [
+                f"/v:{self.rdp_parameter.host}",
+                f"/u:{self.rdp_parameter.username}",
+                f"/p:{self.rdp_parameter.password}",
+                "/f",
+                "/cert:ignore",
+                "+clipboard",
+            ]
+            for d in drives:
+                args.append(f"/drive:{d['name']},{d['path']}")
+
+            env = {**os.environ, "DISPLAY": DISPLAY}
+            self.proc = await asyncio.create_subprocess_exec(
+                "xfreerdp",
+                *args,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                preexec_fn=os.setsid,  # critical: isolate process group
+                env=env,
+            )
+
+        except Exception as e:
+            logger.error(f"Error starting actual browser: {e}")
+            raise e
 
     async def start_native_browser(self):
         try:
@@ -279,6 +323,10 @@ class ActualBrowser:
         raise RuntimeError("Chrome CDP not reachable")
 
     async def check_browser_alive(self, timeout=10):
+        ## TODO: check if rdp session is alive
+        if self.channel == "rdp":
+            return True
+
         if settings.USE_PLAYWRIGHT_BROWSER:
             try:
                 if self.context is None:
@@ -292,15 +340,17 @@ class ActualBrowser:
             await self._wait_for_cdp(timeout)
 
     async def stop(self, graceful=True):
-        if settings.USE_PLAYWRIGHT_BROWSER:
+        if self.channel == "rdp":
+            await self.kill_subprocess(graceful)
+        elif settings.USE_PLAYWRIGHT_BROWSER:
             await self.stop_playwright_browser(graceful)
         else:
-            await self.stop_native_browser(graceful)
+            await self.kill_subprocess(graceful)
 
         if not self.is_dedicated:
             shutil.rmtree(self.user_data_dir, ignore_errors=True)
 
-    async def stop_native_browser(self, graceful=True):
+    async def kill_subprocess(self, graceful=True):
         if not self.proc or self.proc.returncode is not None:
             return
 

@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, model_validator
 
-from optexity.schema.automation import SecureParameter
+from optexity.schema.automation import RDPParameter, SecureParameter
 
 
 class InferenceRequest(BaseModel):
@@ -10,6 +10,7 @@ class InferenceRequest(BaseModel):
     input_parameters: dict[str, list[str | int | float | bool]]
     unique_parameter_names: list[str] = Field(default_factory=list)
     secure_parameters: dict[str, list[SecureParameter]] = Field(default_factory=dict)
+    rdp_parameter: RDPParameter | None = None
     max_timeout_in_minutes: int = 10
     use_proxy: bool = False
     is_dedicated: bool = (

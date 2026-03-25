@@ -46,6 +46,12 @@ class TOTPParameter(BaseModel):
     digits: int = 6
 
 
+class RDPParameter(BaseModel):
+    host: str
+    username: str | None = None
+    password: str | None = None
+
+
 class SecureParameter(BaseModel):
     onepassword: OnePasswordParameter | None = None
     amazon_secrets_manager: AmazonSecretsManagerParameter | None = None
