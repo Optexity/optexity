@@ -15,6 +15,7 @@ from optexity.inference.infra.utils import _download_extension, _extract_extensi
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
+DISPLAY = os.environ.get("DISPLAY", ":99")
 
 
 def find_chrome_binary(channel: Literal["chrome", "chromium"]) -> str:
@@ -201,6 +202,7 @@ class ActualBrowser:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
 
             self.chrome_path = find_chrome_binary(self.channel)
+            env = {**os.environ, "DISPLAY": DISPLAY}
 
             self.proc = await asyncio.create_subprocess_exec(
                 self.chrome_path,
@@ -208,6 +210,7 @@ class ActualBrowser:
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
                 preexec_fn=os.setsid,  # critical: isolate process group
+                env=env,
             )
 
             await self._wait_for_cdp()
@@ -223,9 +226,7 @@ class ActualBrowser:
             from patchright.async_api import async_playwright
 
             self.playwright = await async_playwright().start()
-            # set display to :100 so that xpra can connect to it
-            os.environ["DISPLAY"] = ":100"
-
+            env = {**os.environ, "DISPLAY": DISPLAY}
             self.context = await self.playwright.chromium.launch_persistent_context(
                 channel=self.channel,
                 user_data_dir=self.user_data_dir,
@@ -234,6 +235,7 @@ class ActualBrowser:
                 chromium_sandbox=False,
                 no_viewport=True,
                 proxy=self.get_proxy_playwright(),
+                env=env,
             )
 
             await self._wait_for_cdp()
