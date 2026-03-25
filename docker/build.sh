@@ -183,11 +183,13 @@ build() {
 	if [[ "$LOCAL_MODE" -eq 1 ]]; then
 		log "local mode: building image into Docker (no GHCR login or push)"
 		docker buildx build \
+			--build-arg CACHE_BREAK=$(date +%s) \
 			--platform="${DOCKER_PLATFORM}" \
 			-t "${image_ref}" \
 			--load .
 	else
 		docker buildx build \
+			--build-arg CACHE_BREAK=$(date +%s) \
 			--platform="${DOCKER_PLATFORM}" \
 			--cache-from=type=registry,ref="${CACHE_REF}" \
 			--cache-to=type=registry,ref="${CACHE_REF}",mode=max \
