@@ -1,4 +1,39 @@
 #!/usr/bin/env bash
+#
+# Optexity Docker image build (use this `docker/` directory for all future container builds).
+#
+# VNC / browser-view work: latest flow lives on the `vnc` branch in optexity; build artifacts still
+# ship from here (`docker/Dockerfile`, this script, supervisord, etc.).
+#
+# --- build.sh usage ---
+#
+#   ./build.sh --dev -t vnc --local
+#
+#   --dev    Target dev registry image: ghcr.io/optexity/opinference-dev (default without --dev is
+#            ghcr.io/optexity/opinference).
+#   -t, --tag <name>   Image tag (default: latest). Example `-t vnc` -> .../opinference-dev:vnc
+#   --local  EC2 / air-gapped / no-GitHub: build and load into local Docker only — skips `gh` and
+#            GHCR login, does not push. On machines with GitHub, omit --local to push to GHCR with
+#            registry build cache.
+#
+# --- run (example: dev VNC image with tag `vnc`) ---
+#
+# Do not commit real secrets; pass keys via env or an env-file.
+#
+#   sudo docker run \
+#     -p 8080:8080 \
+#     -p 9000:9000 \
+#     --shm-size=2g \
+#     -e USE_PLAYWRIGHT_BROWSER="False" \
+#     -e GOOGLE_API_KEY="<set-me>" \
+#     -e API_KEY="<set-me>" \
+#     -e DEPLOYMENT=dev \
+#     ghcr.io/optexity/opinference-dev:vnc
+#
+# Exposed ports:
+#   8080 — noVNC: open http://localhost:8080/vnc_lite.html?autoconnect=true&scale=true to view browsers
+#   9000 — inference API: http://localhost:9000/inference (same as non-VNC deployments)
+#
 
 set -euo pipefail
 set -x
