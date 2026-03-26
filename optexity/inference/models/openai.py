@@ -1,0 +1,116 @@
+import base64
+import logging
+import os
+from pathlib import Path
+from typing import Optional
+
+from pydantic import BaseModel, ValidationError
+
+from .llm_model import LLMModel, OpenAIModels, TokenUsage
+
+logger = logging.getLogger(__name__)
+
+
+class OpenAI(LLMModel):
+
+    def __init__(self, model_name: OpenAIModels, use_structured_output: bool):
+        super().__init__(model_name, use_structured_output)
+
+        try:
+            from openai import OpenAI as OpenAIClient
+
+            api_key = os.environ["OPENAI_API_KEY"]
+            self.client = OpenAIClient(api_key=api_key)
+        except KeyError:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
+        except ImportError:
+            raise ImportError("openai package not installed. Run: pip install openai")
+
+    def _get_model_response_with_structured_output(
+        self,
+        prompt: str,
+        response_schema: type[BaseModel],
+        screenshot: Optional[str] = None,
+        pdf_url: Optional[str | Path] = None,
+        system_instruction: Optional[str] = None,
+    ) -> tuple[BaseModel, TokenUsage]:
+
+        if pdf_url is not None and screenshot is not None:
+            raise ValueError("Cannot use both screenshot and pdf_url")
+
+        messages = []
+
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+
+        if screenshot is not None:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{screenshot}"},
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            )
+        else:
+            messages.append({"role": "user", "content": prompt})
+
+        token_usage = TokenUsage()
+        parsed_response = None
+
+        try:
+            if self.use_structured_output:
+                from openai import pydantic_function_tool
+
+                response = self.client.beta.chat.completions.parse(
+                    model=self.model_name.value,
+                    messages=messages,
+                    response_format=response_schema,
+                )
+                parsed_response = response.choices[0].message.parsed
+            else:
+                response = self.client.chat.completions.create(
+                    model=self.model_name.value,
+                    messages=messages,
+                )
+                content = response.choices[0].message.content
+                parsed_response = self.parse_from_completion(content, response_schema)
+
+            if response.usage is not None:
+                token_usage = self.get_token_usage(
+                    input_tokens=response.usage.prompt_tokens,
+                    output_tokens=response.usage.completion_tokens,
+                    total_tokens=response.usage.total_tokens,
+                )
+        except ValidationError as e:
+            logger.error(f"ValidationError in OpenAI model response: {e}")
+
+        return parsed_response, token_usage
+
+    def _get_model_response(
+        self, prompt: str, system_instruction: Optional[str] = None
+    ) -> tuple[str, TokenUsage]:
+
+        messages = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({"role": "user", "content": prompt})
+
+        response = self.client.chat.completions.create(
+            model=self.model_name.value,
+            messages=messages,
+        )
+
+        token_usage = TokenUsage()
+        if response.usage is not None:
+            token_usage = self.get_token_usage(
+                input_tokens=response.usage.prompt_tokens,
+                output_tokens=response.usage.completion_tokens,
+                total_tokens=response.usage.total_tokens,
+            )
+
+        return response.choices[0].message.content, token_usage
