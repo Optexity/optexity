@@ -118,9 +118,10 @@ async def input_text_coordinates(
     if input_text_action.input_text is None:
         return
 
-    def _paste(text: str):
+    async def _paste(text: str):
         _mod = modifier_key()
         pyperclip.copy(text)
+        await asyncio.sleep(0.2)
         pyautogui.hotkey(_mod, "v")
 
     try:
@@ -139,7 +140,7 @@ async def input_text_coordinates(
 
         pyautogui.click(x, y)
         await asyncio.sleep(0.2)
-        _paste(input_text_action.input_text)
+        await _paste(input_text_action.input_text)
 
         if input_text_action.press_enter:
             await asyncio.sleep(0.2)
