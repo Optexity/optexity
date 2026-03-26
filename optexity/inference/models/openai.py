@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from openai import OpenAI as OpenAIClient
 from pydantic import BaseModel, ValidationError
 
 from .llm_model import LLMModel, OpenAIModels, TokenUsage
@@ -17,12 +18,10 @@ class OpenAI(LLMModel):
         super().__init__(model_name, use_structured_output)
 
         try:
-            from openai import OpenAI as OpenAIClient
-
             api_key = os.environ["OPENAI_API_KEY"]
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY is not set")
             self.client = OpenAIClient(api_key=api_key)
-        except KeyError:
-            raise ValueError("OPENAI_API_KEY environment variable not set")
         except ImportError:
             raise ImportError("openai package not installed. Run: pip install openai")
 

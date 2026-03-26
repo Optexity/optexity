@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
+import anthropic
 from pydantic import BaseModel, ValidationError
 
 from .llm_model import AnthropicModels, LLMModel, TokenUsage
@@ -25,12 +26,10 @@ class Anthropic(LLMModel):
         self.thinking_budget_tokens = thinking_budget_tokens
 
         try:
-            import anthropic
-
             api_key = os.environ["ANTHROPIC_API_KEY"]
+            if not api_key:
+                raise ValueError("ANTHROPIC_API_KEY is not set")
             self.client = anthropic.Anthropic(api_key=api_key)
-        except KeyError:
-            raise ValueError("ANTHROPIC_API_KEY environment variable not set")
         except ImportError:
             raise ImportError(
                 "anthropic package not installed. Run: pip install anthropic"
