@@ -7,8 +7,8 @@ class CaptchaAction(BaseModel):
     locator: str
     secondary_locator: str | None = None
     wait_time: float = 2.0  # Seconds to wait after trigger click for captcha to appear
-    llm_provider: Literal["gemini"] = "gemini"
-    llm_model_name: str = "gemini-2.5-flash"
+    llm_provider: Literal["gemini", "openai", "anthropic"] = "gemini"
+    llm_model_name: str = "gemini-2.5-pro"
 
     config: dict = Field(
         default_factory=lambda: {

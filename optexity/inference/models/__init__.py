@@ -1,7 +1,13 @@
 import logging
 import time
 
-from .llm_model import GeminiModels, HumanModels, LLMModel, OpenAIModels
+from .llm_model import (
+    AnthropicModels,
+    GeminiModels,
+    HumanModels,
+    LLMModel,
+    OpenAIModels,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +19,8 @@ BACKOFF_FACTOR = 2
 
 
 def get_llm_model(
-    model_name: GeminiModels | HumanModels | OpenAIModels, use_structured_output: bool
+    model_name: GeminiModels | HumanModels | OpenAIModels | AnthropicModels,
+    use_structured_output: bool,
 ) -> LLMModel:
     cache_key = (model_name, use_structured_output)
     if cache_key in _model_cache:
@@ -25,16 +32,23 @@ def get_llm_model(
 
 
 def _create_model_with_backoff(
-    model_name: GeminiModels | HumanModels | OpenAIModels, use_structured_output: bool
+    model_name: GeminiModels | HumanModels | OpenAIModels | AnthropicModels,
+    use_structured_output: bool,
 ) -> LLMModel:
     if isinstance(model_name, GeminiModels):
         from .gemini import Gemini
 
         factory = lambda: Gemini(model_name, use_structured_output)
 
-    # elif isinstance(model_name, OpenAIModels):
-    #     from .openai import OpenAI
-    #     factory = lambda: OpenAI(model_name, use_structured_output)
+    elif isinstance(model_name, OpenAIModels):
+        from .openai import OpenAI
+
+        factory = lambda: OpenAI(model_name, use_structured_output)
+
+    elif isinstance(model_name, AnthropicModels):
+        from .anthropic import Anthropic
+
+        factory = lambda: Anthropic(model_name, use_structured_output)
 
     # elif isinstance(model_name, HumanModels):
     #     from .human import HumanModel
