@@ -407,6 +407,21 @@ class Automation(BaseModel):
         return data
 
     @model_validator(mode="after")
+    def validate_rdp_parameter(self):
+        if self.browser_channel == "rdp":
+            for node in self.nodes:
+                if isinstance(node, ActionNode):
+                    if node.interaction_action:
+                        if (
+                            node.interaction_action.click_element is None
+                            and node.interaction_action.input_text is None
+                        ):
+                            raise ValueError(
+                                "Only click_element and input_text are allowed for rdp"
+                            )
+        return self
+
+    @model_validator(mode="after")
     def validate_parameters_with_examples(self):
         ## TODO: static check that all parameters with examples are used in the nodes
         return self

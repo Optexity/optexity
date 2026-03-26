@@ -213,6 +213,8 @@ async def handle_close_tabs_until(
 async def handle_go_to_url(
     go_to_url_action: GoToUrlAction, task: Task, memory: Memory, browser: Browser
 ):
+    if browser.channel == "rdp":
+        return
     await browser.go_to_url(go_to_url_action.url)
 
 

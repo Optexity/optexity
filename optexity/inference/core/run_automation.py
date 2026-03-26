@@ -114,9 +114,11 @@ async def run_automation(
             )
             raise e
 
-        if task.use_proxy:
+        if task.use_proxy and browser.channel != "rdp":
 
             page = await browser.get_current_page()
+            if page is None:
+                raise ValueError("Page is not available")
             await browser.go_to_url("https://ip.oxylabs.io/location")
 
             ip_info = await page.evaluate("""

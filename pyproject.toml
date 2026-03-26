@@ -31,6 +31,10 @@ dependencies = [
     # misc runtime deps
     "tokencost",
     "onepassword-sdk",
+
+    # rdp
+    "mss",
+    "pyautogui",
 ]
 
 [project.optional-dependencies]

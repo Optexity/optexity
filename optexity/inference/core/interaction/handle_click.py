@@ -1,5 +1,7 @@
 import logging
 
+import pyautogui
+
 from optexity.exceptions import (
     ElementNotFoundInAxtreeException,
 )
@@ -16,6 +18,8 @@ from optexity.schema.actions.interaction_action import ClickElementAction
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
 
+pyautogui.FAILSAFE = True
+pyautogui.PAUSE = 0.05
 logger = logging.getLogger(__name__)
 
 
@@ -27,6 +31,10 @@ async def handle_click_element(
     max_timeout_seconds_per_try: float,
     max_tries: int,
 ):
+
+    if browser.channel == "rdp" or browser.backend == "computer-vision":
+        await click_element_coordinates(click_element_action, browser, memory, task)
+        return
 
     if click_element_action.command and not click_element_action.skip_command:
         last_error = await command_based_action_with_retry(
@@ -45,10 +53,7 @@ async def handle_click_element(
         logger.debug(
             f"Executing prompt-based action: {click_element_action.__class__.__name__}"
         )
-        if browser.backend == "computer-vision":
-            await click_element_coordinates(click_element_action, browser, memory, task)
-        else:
-            await click_element_index(click_element_action, browser, memory, task)
+        await click_element_index(click_element_action, browser, memory, task)
 
 
 async def click_element_index(
@@ -105,14 +110,9 @@ async def click_element_coordinates(
         x = float(data.get("x"))
         y = float(data.get("y"))
 
-        page = await browser.get_current_page()
-        dpr = await page.evaluate("window.devicePixelRatio")
-        css_x = x / dpr
-        css_y = y / dpr
+        print(f"Clicking element at coordinates: {x}, {y}")
 
-        print(f"Clicking element at coordinates: {css_x}, {css_y} (dpr={dpr})")
-
-        await page.mouse.click(css_x, css_y)
+        pyautogui.click(x, y)
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:
