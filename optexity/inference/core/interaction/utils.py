@@ -17,6 +17,7 @@ from optexity.inference.agents.index_prediction.action_prediction_locator_axtree
     ActionPredictionLocatorAxtree,
 )
 from optexity.inference.infra.browser import Browser
+from optexity.inference.models import GeminiModels, get_llm_model
 from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
 from optexity.utils.settings import settings
@@ -193,17 +194,25 @@ async def get_coordinates_from_prompt(
     ## call optexity api to get coordinates from prompt
     screenshot_base64 = await browser.get_screenshot()
 
-    url = urljoin(settings.SERVER_URL, settings.GET_COORDINATES_ENDPOINT)
-    headers = {"x-api-key": task.api_key}
-    body = {
-        "screenshot_base64": screenshot_base64,
-        "prompt_instructions": prompt_instructions,
-        "step_index": memory.automation_state.step_index,
-        "task_id": task.task_id,
-    }
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.post(url, headers=headers, json=body)
-        response.raise_for_status()
-        data = response.json()
+    model = get_llm_model(GeminiModels.GEMINI_3_FLASH, True)
+    coordinates, token_usage = model.get_computer_use_model_response(
+        prompt=prompt_instructions,
+        screenshot=screenshot_base64,
+    )
 
-    return data.get("coordinates")
+    return coordinates
+
+    # url = urljoin(settings.SERVER_URL, settings.GET_COORDINATES_ENDPOINT)
+    # headers = {"x-api-key": task.api_key}
+    # body = {
+    #     "screenshot_base64": screenshot_base64,
+    #     "prompt_instructions": prompt_instructions,
+    #     "step_index": memory.automation_state.step_index,
+    #     "task_id": task.task_id,
+    # }
+    # async with httpx.AsyncClient(timeout=60.0) as client:
+    #     response = await client.post(url, headers=headers, json=body)
+    #     response.raise_for_status()
+    #     data = response.json()
+
+    # return data.get("coordinates")

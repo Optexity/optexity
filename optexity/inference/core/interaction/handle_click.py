@@ -104,11 +104,17 @@ async def click_element_coordinates(
 ):
 
     try:
+
         data = await get_coordinates_from_prompt(
             memory, click_element_action.prompt_instructions, browser, task
         )
-        x = float(data.get("x"))
-        y = float(data.get("y"))
+
+        if data is None:
+            logger.error("No coordinates found")
+            return
+
+        x = data[0]
+        y = data[1]
 
         print(f"Clicking element at coordinates: {x}, {y}")
 

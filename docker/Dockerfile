@@ -10,6 +10,8 @@ ENV GALLIUM_DRIVER=llvmpipe
 ENV MESA_GL_VERSION_OVERRIDE=4.5
 ENV MESA_GLSL_VERSION_OVERRIDE=450
 ENV LIBGL_DRI3_DISABLE=1
+ENV SCREEN_WIDTH=1440
+ENV SCREEN_HEIGHT=900
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo git wget curl nano htop zsh tmux \
@@ -79,7 +81,7 @@ ARG CACHE_BREAK
 RUN echo "CACHE_BREAK: $CACHE_BREAK"
 
 # Copy system config files as root before switching user
-COPY openbox-rc.xml /etc/xdg/openbox/rc.xml
+COPY openbox-rc.xml.template /etc/xdg/openbox/rc.xml.template
 COPY supervisord.dev.conf /etc/supervisor/conf.d/supervisord.dev.conf
 COPY supervisord.prod.conf /etc/supervisor/conf.d/supervisord.prod.conf
 

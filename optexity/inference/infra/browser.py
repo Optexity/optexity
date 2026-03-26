@@ -69,7 +69,9 @@ class Browser:
 
     async def start(self):
         if self.channel == "rdp":
+            await asyncio.sleep(5)
             return
+
         logger.debug("Starting browser")
         try:
             await self.stop()

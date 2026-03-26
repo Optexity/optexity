@@ -18,7 +18,6 @@ from optexity.utils.settings import settings
 logger = logging.getLogger(__name__)
 
 OsEmulation = Literal["windows", "linux"] | None
-IN_DOCKER = os.path.exists("/.dockerenv")
 
 
 def get_display() -> str:
@@ -226,7 +225,7 @@ class ActualBrowser:
 
             args += [
                 f"--user-data-dir={self.user_data_dir}",
-                *(["--no-sandbox"] if IN_DOCKER else []),
+                *(["--no-sandbox"] if settings.IN_DOCKER else []),
                 # ---- privacy / security
                 "--disable-save-password-bubble",
                 "--use-mock-keychain",

@@ -23,8 +23,8 @@
         <y>0</y>
       </position>
       <size>
-        <width>1440</width>
-        <height>900</height>
+        <width>${SCREEN_WIDTH}</width>
+        <height>${SCREEN_HEIGHT}</height>
       </size>
     </application>
   </applications>

@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     PROXY_PROVIDER: Literal["oxylabs", "brightdata", "other"] | None = None
 
     SHARED_DRIVE_PATH: str = "optexity-shared"
+    SCREEN_WIDTH: int = 1440
+    SCREEN_HEIGHT: int = 900
+
+    IN_DOCKER: bool = os.path.exists("/.dockerenv")
 
     @model_validator(mode="after")
     def validate_local_callback_url(self):
