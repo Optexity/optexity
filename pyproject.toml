@@ -35,6 +35,7 @@ dependencies = [
     # rdp
     "mss",
     "pyautogui",
+    "pyperclip",
 ]
 
 [project.optional-dependencies]

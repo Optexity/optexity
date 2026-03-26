@@ -2,6 +2,9 @@ import asyncio
 import logging
 import re
 
+import pyautogui
+import pyperclip
+
 from optexity.exceptions import ElementNotFoundInAxtreeException
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
@@ -15,6 +18,8 @@ from optexity.schema.actions.interaction_action import InputTextAction
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
 
+pyautogui.FAILSAFE = True
+pyautogui.PAUSE = 0.05
 logger = logging.getLogger(__name__)
 
 
@@ -27,6 +32,9 @@ async def handle_input_text(
     max_tries: int,
 ):
 
+    if input_text_action.input_text is None:
+        return
+
     # {some english chars [0]}
     INT_INDEX_PATTERN = re.compile(r"^\{([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\}$")
 
@@ -34,6 +42,10 @@ async def handle_input_text(
         logger.debug(
             "Skipping input text because input variable was not present for this step"
         )
+        return
+
+    if browser.channel == "rdp" or browser.backend == "computer-vision":
+        await input_text_coordinates(input_text_action, browser, memory, task)
         return
 
     if input_text_action.command and not input_text_action.skip_command:
@@ -53,10 +65,7 @@ async def handle_input_text(
         logger.debug(
             f"Executing prompt-based action: {input_text_action.__class__.__name__}"
         )
-        if browser.backend == "computer-vision":
-            await input_text_coordinates(input_text_action, browser, memory, task)
-        else:
-            await input_text_index(input_text_action, browser, memory, task)
+        await input_text_index(input_text_action, browser, memory, task)
 
 
 async def input_text_index(
@@ -89,6 +98,16 @@ async def input_text_index(
         return
 
 
+def detect_platform() -> str:
+    import sys
+
+    return "macos" if sys.platform == "darwin" else "linux"
+
+
+def modifier_key() -> str:
+    return "command" if detect_platform() == "macos" else "ctrl"
+
+
 async def input_text_coordinates(
     input_text_action: InputTextAction,
     browser: Browser,
@@ -96,25 +115,36 @@ async def input_text_coordinates(
     task: Task,
 ):
 
+    if input_text_action.input_text is None:
+        return
+
+    def _paste(text: str):
+        _mod = modifier_key()
+        pyperclip.copy(text)
+        pyautogui.hotkey(_mod, "v")
+
     try:
-        if input_text_action.input_text is None:
-            return
         data = await get_coordinates_from_prompt(
             memory, input_text_action.prompt_instructions, browser, task
         )
-        x = float(data.get("x"))
-        y = float(data.get("y"))
 
-        page = await browser.get_current_page()
-        dpr = await page.evaluate("window.devicePixelRatio")
-        css_x = x / dpr
-        css_y = y / dpr
+        if data is None:
+            logger.error("No coordinates found")
+            return
 
-        print(f"Clicking element at coordinates: {css_x}, {css_y} (dpr={dpr})")
+        x = data[0]
+        y = data[1]
 
-        await page.mouse.click(css_x, css_y)
+        logger.debug(f"Typing text at coordinates: {x}, {y}")
+
+        pyautogui.click(x, y)
         await asyncio.sleep(0.2)
-        await page.keyboard.type(input_text_action.input_text)
+        _paste(input_text_action.input_text)
+
+        if input_text_action.press_enter:
+            await asyncio.sleep(0.2)
+            pyautogui.press("enter")
+
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:

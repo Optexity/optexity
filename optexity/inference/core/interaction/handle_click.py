@@ -116,7 +116,7 @@ async def click_element_coordinates(
         x = data[0]
         y = data[1]
 
-        print(f"Clicking element at coordinates: {x}, {y}")
+        logger.debug(f"Clicking element at coordinates: {x}, {y}")
 
         pyautogui.click(x, y)
     except ElementNotFoundInAxtreeException as e:
