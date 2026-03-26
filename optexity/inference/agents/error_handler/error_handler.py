@@ -20,7 +20,7 @@ class ErrorHandlerAgent:
         self.model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
 
     def classify_error(
-        self, command: str, screenshot: str
+        self, command: str, screenshot: str | None = None
     ) -> tuple[str, ErrorHandlerOutput, TokenUsage]:
 
         final_prompt = f"""

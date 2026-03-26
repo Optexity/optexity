@@ -273,15 +273,10 @@ async def handle_assert_locator_presence_error(
     )
     logger.debug(f"Handling {error_type} error: {error.command}")
     if retries_left > 1:
-        browser_state_summary = await browser.get_browser_state_summary()
-        memory.browser_states[-1] = BrowserState(
-            url=browser_state_summary.url,
-            screenshot=browser_state_summary.screenshot,
-            title=browser_state_summary.title,
-            axtree=browser_state_summary.dom_state.llm_representation(
-                remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-            ),
+        browser_state = await browser.get_browser_state_summary(
+            remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
         )
+        memory.browser_states[-1] = browser_state
         final_prompt, response, token_usage = error_handler_agent.classify_error(
             error.command, memory.browser_states[-1].screenshot
         )

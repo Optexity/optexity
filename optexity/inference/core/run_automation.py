@@ -285,17 +285,8 @@ async def run_final_logging(
 
         try:
             memory.automation_state.step_index += 1
-            browser_state_summary = await browser.get_browser_state_summary()
-            memory.browser_states.append(
-                BrowserState(
-                    url=browser_state_summary.url,
-                    screenshot=browser_state_summary.screenshot,
-                    title=browser_state_summary.title,
-                    axtree=browser_state_summary.dom_state.llm_representation(
-                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-                    ),
-                )
-            )
+            browser_state = await browser.get_browser_state_summary()
+            memory.browser_states.append(browser_state)
 
             memory.final_screenshot = await browser.get_screenshot(full_page=True)
         except Exception as e:

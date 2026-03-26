@@ -19,7 +19,7 @@ from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import Download, Locator, Page, Request, Response
 
-from optexity.schema.memory import Memory, NetworkRequest, NetworkResponse
+from optexity.schema.memory import BrowserState, Memory, NetworkRequest, NetworkResponse
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -363,10 +363,15 @@ class Browser:
             return None
 
     async def get_browser_state_summary(
-        self, include_full_page: bool = False
-    ) -> BrowserStateSummary | None:
+        self, include_full_page: bool = False, remove_empty_nodes: bool = False
+    ) -> BrowserState:
         if self.channel == "rdp":
-            return None
+            return BrowserState(
+                url="about:blank",
+                screenshot=await self.get_screenshot(full_page=include_full_page),
+                title="",
+                axtree="",
+            )
 
         if self.backend == "browser-use" and self.backend_agent is None:
             raise ValueError("Backend agent is not set")
@@ -379,8 +384,15 @@ class Browser:
                 include_full_page=include_full_page,
             )
 
-            return browser_state_summary
-        return None
+            return BrowserState(
+                url=browser_state_summary.url,
+                screenshot=browser_state_summary.screenshot,
+                title=browser_state_summary.title,
+                axtree=browser_state_summary.dom_state.llm_representation(
+                    remove_empty_nodes=remove_empty_nodes
+                ),
+            )
+        raise ValueError("Unknown error getting browser state summary")
 
     async def get_current_page_url(self) -> str:
         if self.channel == "rdp":
