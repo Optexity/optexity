@@ -10,7 +10,7 @@ from google.genai import types
 from google.genai.types import Content, Part
 from pydantic import BaseModel, ValidationError
 
-from optexity.utils.settings import settings
+# from optexity.utils.settings import settings
 from optexity.utils.utils import is_local_path, is_url
 
 from .llm_model import GeminiModels, LLMModel, TokenUsage
@@ -210,9 +210,7 @@ class Gemini(LLMModel):
                 return None, token_usage
 
             print("Executing actions...")
-            results = self.execute_function_calls(
-                candidate, screenshot, settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT
-            )
+            results = self.execute_function_calls(candidate, screenshot, 1440, 900)
 
             # if response.usage_metadata is not None:
             #     token_usage = self.get_token_usage(
