@@ -3,6 +3,7 @@ FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=:99
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV XAUTHORITY=/home/optexity/.Xauthority
 # Software rendering for WebGL on GPU-less EC2 instances
 ENV LIBGL_ALWAYS_SOFTWARE=1
 ENV GALLIUM_DRIVER=llvmpipe
@@ -25,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip fonts-liberation libappindicator3-1 libasound2 libnspr4 libnss3 libxss1 libxtst6 xdg-utils \
     fonts-noto-color-emoji fonts-liberation \
     pulseaudio pavucontrol \
+    python3-tk python3-dev \
     udev v4l2loopback-dkms v4l-utils \
     libgl1-mesa-dri libgl1 libegl-mesa0 libgles2 \
     mesa-utils mesa-vulkan-drivers libvulkan1 \
@@ -51,7 +53,8 @@ RUN patchright install chromium
 RUN groupadd -r optexity && \
     useradd -r -g optexity -m -d /home/optexity -s /bin/bash optexity && \
     echo "optexity ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/optexity && \
-    chmod 0440 /etc/sudoers.d/optexity
+    chmod 0440 /etc/sudoers.d/optexity && \
+    touch /home/optexity/.Xauthority
 
 # Make browser directories accessible to the non-root user
 RUN chmod -R o+rx /ms-playwright
@@ -77,7 +80,8 @@ RUN echo "CACHE_BREAK: $CACHE_BREAK"
 
 # Copy system config files as root before switching user
 COPY openbox-rc.xml /etc/xdg/openbox/rc.xml
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY supervisord.dev.conf /etc/supervisor/conf.d/supervisord.dev.conf
+COPY supervisord.prod.conf /etc/supervisor/conf.d/supervisord.prod.conf
 
 RUN git config --global --add safe.directory /home/optexity/optexity && \
     cd optexity && git pull && git checkout ui_agents && git pull && \
@@ -85,8 +89,12 @@ RUN git config --global --add safe.directory /home/optexity/optexity && \
     pip cache purge && \
     rm -rf /optexity/.git
 
+ENV APP_ENV=prod
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 USER optexity
 ENV USER=optexity \
     HOME=/home/optexity
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["/entrypoint.sh"]

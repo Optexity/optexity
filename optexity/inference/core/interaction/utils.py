@@ -199,6 +199,7 @@ async def get_coordinates_from_prompt(
         "screenshot_base64": screenshot_base64,
         "prompt_instructions": prompt_instructions,
         "step_index": memory.automation_state.step_index,
+        "task_id": task.task_id,
     }
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(url, headers=headers, json=body)
