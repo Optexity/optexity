@@ -15,8 +15,14 @@ MAX_TOKENS = 4096
 
 class Anthropic(LLMModel):
 
-    def __init__(self, model_name: AnthropicModels, use_structured_output: bool):
+    def __init__(
+        self,
+        model_name: AnthropicModels,
+        use_structured_output: bool,
+        thinking_budget_tokens: Optional[int] = None,
+    ):
         super().__init__(model_name, use_structured_output)
+        self.thinking_budget_tokens = thinking_budget_tokens
 
         try:
             import anthropic
@@ -60,13 +66,22 @@ class Anthropic(LLMModel):
         token_usage = TokenUsage()
         parsed_response = None
 
+        effective_max_tokens = MAX_TOKENS
+        if self.thinking_budget_tokens:
+            effective_max_tokens = max(MAX_TOKENS, self.thinking_budget_tokens + 1000)
+
         kwargs = {
             "model": self.model_name.value,
-            "max_tokens": MAX_TOKENS,
+            "max_tokens": effective_max_tokens,
             "messages": [{"role": "user", "content": content}],
         }
         if system_instruction:
             kwargs["system"] = system_instruction
+        if self.thinking_budget_tokens:
+            kwargs["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": self.thinking_budget_tokens,
+            }
 
         try:
             if self.use_structured_output:
@@ -106,13 +121,22 @@ class Anthropic(LLMModel):
         self, prompt: str, system_instruction: Optional[str] = None
     ) -> tuple[str, TokenUsage]:
 
+        effective_max_tokens = MAX_TOKENS
+        if self.thinking_budget_tokens:
+            effective_max_tokens = max(MAX_TOKENS, self.thinking_budget_tokens + 1000)
+
         kwargs = {
             "model": self.model_name.value,
-            "max_tokens": MAX_TOKENS,
+            "max_tokens": effective_max_tokens,
             "messages": [{"role": "user", "content": prompt}],
         }
         if system_instruction:
             kwargs["system"] = system_instruction
+        if self.thinking_budget_tokens:
+            kwargs["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": self.thinking_budget_tokens,
+            }
 
         response = self.client.messages.create(**kwargs)
 

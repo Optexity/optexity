@@ -21,12 +21,15 @@ BACKOFF_FACTOR = 2
 def get_llm_model(
     model_name: GeminiModels | HumanModels | OpenAIModels | AnthropicModels,
     use_structured_output: bool,
+    thinking_budget_tokens: int | None = None,
 ) -> LLMModel:
-    cache_key = (model_name, use_structured_output)
+    cache_key = (model_name, use_structured_output, thinking_budget_tokens)
     if cache_key in _model_cache:
         return _model_cache[cache_key]
 
-    model = _create_model_with_backoff(model_name, use_structured_output)
+    model = _create_model_with_backoff(
+        model_name, use_structured_output, thinking_budget_tokens
+    )
     _model_cache[cache_key] = model
     return model
 
@@ -34,6 +37,7 @@ def get_llm_model(
 def _create_model_with_backoff(
     model_name: GeminiModels | HumanModels | OpenAIModels | AnthropicModels,
     use_structured_output: bool,
+    thinking_budget_tokens: int | None = None,
 ) -> LLMModel:
     if isinstance(model_name, GeminiModels):
         from .gemini import Gemini
@@ -48,7 +52,9 @@ def _create_model_with_backoff(
     elif isinstance(model_name, AnthropicModels):
         from .anthropic import Anthropic
 
-        factory = lambda: Anthropic(model_name, use_structured_output)
+        factory = lambda: Anthropic(
+            model_name, use_structured_output, thinking_budget_tokens
+        )
 
     # elif isinstance(model_name, HumanModels):
     #     from .human import HumanModel

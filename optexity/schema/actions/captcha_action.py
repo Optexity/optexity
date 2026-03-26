@@ -17,6 +17,7 @@ class CaptchaAction(BaseModel):
             "grid_top_offset": 100,
             "grid_bottom_trim": 100,
             "max_captcha_retries": 3,
+            "thinking_budget_tokens": None,  # Set to int (e.g. 8000) to enable extended thinking (Anthropic only)
         }
     )
 
@@ -28,6 +29,7 @@ class CaptchaAction(BaseModel):
             "grid_top_offset": 100,
             "grid_bottom_trim": 100,
             "max_captcha_retries": 3,
+            "thinking_budget_tokens": None,
         }
         # Merge: defaults first, then override with any values provided in JSON
         self.config = {**defaults, **self.config}

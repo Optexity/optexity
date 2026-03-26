@@ -162,6 +162,7 @@ async def _solve_and_click(
     """Screenshot → LLM → click boxes → check for image refresh → repeat if refreshed → press verify."""
 
     max_retries = int(config.get("max_captcha_retries", 3))
+    thinking_budget_tokens = config.get("thinking_budget_tokens") or None
     for model_cls in (GeminiModels, OpenAIModels, AnthropicModels):
         try:
             model_enum = model_cls(llm_model_name)
@@ -170,7 +171,7 @@ async def _solve_and_click(
             continue
     else:
         raise ValueError(f"Unknown llm_model_name: {llm_model_name}")
-    llm_model = get_llm_model(model_enum, True)
+    llm_model = get_llm_model(model_enum, True, thinking_budget_tokens)
 
     refresh_count = 0
     while refresh_count <= max_retries:
