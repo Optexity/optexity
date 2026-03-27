@@ -209,6 +209,7 @@ async def get_coordinates_from_prompt(
             screenshot_base64, coordinates[0], coordinates[1]
         )
         memory.browser_states[-1].screenshot = screenshot_base64
+        memory.browser_states[-1].llm_response = f"Coordinates: {coordinates}"
 
     return coordinates
 
