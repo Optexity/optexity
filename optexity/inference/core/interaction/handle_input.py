@@ -13,6 +13,10 @@ from optexity.inference.core.interaction.utils import (
     get_coordinates_from_prompt,
     get_index_from_prompt,
 )
+from optexity.inference.core.vision.time import (
+    wait_for_screen_to_change,
+    wait_for_stable_screen,
+)
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import InputTextAction
 from optexity.schema.memory import Memory
@@ -98,16 +102,6 @@ async def input_text_index(
         return
 
 
-def detect_platform() -> str:
-    import sys
-
-    return "macos" if sys.platform == "darwin" else "linux"
-
-
-def modifier_key() -> str:
-    return "command" if detect_platform() == "macos" else "ctrl"
-
-
 async def input_text_coordinates(
     input_text_action: InputTextAction,
     browser: Browser,
@@ -118,11 +112,12 @@ async def input_text_coordinates(
     if input_text_action.input_text is None:
         return
 
-    async def _paste(text: str):
-        _mod = modifier_key()
-        pyperclip.copy(text)
+    async def _paste():
+        if input_text_action.input_text is None:
+            return
+        pyperclip.copy(input_text_action.input_text)
         await asyncio.sleep(0.2)
-        pyautogui.hotkey(_mod, "v")
+        pyautogui.hotkey(browser.modifier_key, "v")
 
     try:
         data = await get_coordinates_from_prompt(
@@ -140,7 +135,11 @@ async def input_text_coordinates(
 
         pyautogui.click(x, y)
         await asyncio.sleep(0.2)
-        await _paste(input_text_action.input_text)
+
+        changed, score = await wait_for_screen_to_change(_paste, browser)
+
+        if not changed:
+            logger.warning("Screen did not change after typing text")
 
         if input_text_action.press_enter:
             await asyncio.sleep(0.2)

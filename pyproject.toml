@@ -36,6 +36,10 @@ dependencies = [
     "mss",
     "pyautogui",
     "pyperclip",
+
+    # computer vision
+    "opencv-python",
+    "scikit-image",
 ]
 
 [project.optional-dependencies]

@@ -31,6 +31,7 @@ from optexity.inference.core.run_interaction import (
 )
 from optexity.inference.core.run_misc import run_sleep_action
 from optexity.inference.core.run_python_script import run_python_script_action
+from optexity.inference.core.vision.time import wait_for_stable_screen
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
 from optexity.schema.automation import ActionNode, ForLoopNode, IfElseNode
@@ -376,7 +377,10 @@ async def run_action_node(
             logger.debug(f"Switched to new tab after {total_time} seconds, as expected")
 
     else:
-        await sleep_for_page_to_load(browser, action_node.end_sleep_time)
+        if browser.channel == "rdp" or browser.backend == "computer-vision":
+            await wait_for_stable_screen(browser, timeout=action_node.end_sleep_time)
+        else:
+            await asyncio.sleep(action_node.end_sleep_time)
 
     logger.debug(f"-----Finished node {memory.automation_state.step_index}-----")
     memory.update_system_info()

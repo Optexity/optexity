@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import shutil
+import sys
 import time
 from typing import Literal
 from uuid import uuid4
@@ -23,6 +24,14 @@ from optexity.schema.memory import BrowserState, Memory, NetworkRequest, Network
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+def detect_platform() -> str:
+    return "macos" if sys.platform == "darwin" else "linux"
+
+
+def modifier_key() -> str:
+    return "command" if detect_platform() == "macos" else "ctrl"
 
 
 class Browser:
@@ -66,6 +75,8 @@ class Browser:
         self.network_calls: list[NetworkResponse | NetworkRequest] = []
         self.temp_downloads_dir = f"/tmp/temp_downloads"
         self._download_cdp_session = None
+
+        self.modifier_key = modifier_key()
 
     async def start(self):
         if self.channel == "rdp":
@@ -544,7 +555,9 @@ class Browser:
     async def clear_network_calls(self):
         self.network_calls.clear()
 
-    async def get_screenshot(self, full_page: bool = False) -> str | None:
+    async def get_screenshot(
+        self, full_page: bool = False, get_bytes: bool = False
+    ) -> str | bytes | None:
         if self.channel == "rdp":
             try:
                 time.sleep(1)
@@ -560,6 +573,8 @@ class Browser:
                     png_bytes = mss.tools.to_png(shot.rgb, shot.size, output=None)
                     if png_bytes is None:
                         raise RuntimeError("Failed to encode PNG")
+                    if get_bytes:
+                        return png_bytes
                     return base64.b64encode(png_bytes).decode("utf-8")
             except Exception as e:
                 logger.error(f"Error taking screenshot: {e}", exc_info=True)
@@ -571,6 +586,9 @@ class Browser:
                 return None
 
             screenshot_bytes = await page.screenshot(full_page=full_page)
+
+            if get_bytes:
+                return screenshot_bytes
             screenshot_base64 = base64.b64encode(screenshot_bytes).decode("utf-8")
             return screenshot_base64
         except Exception as e:
