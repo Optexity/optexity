@@ -16,6 +16,7 @@ from optexity.exceptions import (
 from optexity.inference.agents.index_prediction.action_prediction_locator_axtree import (
     ActionPredictionLocatorAxtree,
 )
+from optexity.inference.core.vision.utils import mark_screenshot
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import GeminiModels, get_llm_model
 from optexity.schema.memory import BrowserState, Memory
@@ -187,13 +188,27 @@ async def get_coordinates_from_prompt(
     memory: Memory, prompt_instructions: str, browser: Browser, task: Task
 ):
     ## call optexity api to get coordinates from prompt
-    screenshot_base64 = await browser.get_screenshot()
+    browser_state = await browser.get_browser_state_summary(
+        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+    )
+    memory.browser_states[-1] = browser_state
 
-    model = get_llm_model(GeminiModels.GEMINI_3_FLASH, True)
+    screenshot_base64 = browser_state.screenshot
+    if screenshot_base64 is None or not isinstance(screenshot_base64, str):
+        logger.error("Screenshot is None or not a string")
+        return None
+
+    model = get_llm_model(GeminiModels.GEMINI_2_5_COMPUTER_USE, True)
     coordinates, token_usage = model.get_computer_use_model_response(
         prompt=prompt_instructions,
         screenshot=screenshot_base64,
     )
+
+    if coordinates is not None:
+        screenshot_base64 = await mark_screenshot(
+            screenshot_base64, coordinates[0], coordinates[1]
+        )
+        memory.browser_states[-1].screenshot = screenshot_base64
 
     return coordinates
 
