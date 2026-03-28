@@ -13,6 +13,7 @@ from optexity.inference.core.interaction.utils import (
     get_index_from_prompt,
     handle_download,
 )
+from optexity.inference.core.vision.utils import mark_screenshot
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import ClickElementAction
 from optexity.schema.memory import Memory
@@ -104,26 +105,25 @@ async def click_element_coordinates(
 ):
 
     try:
-
+        x, y = None, None
         if click_element_action.coordinates:
             x = click_element_action.coordinates[0]
             y = click_element_action.coordinates[1]
-            logger.debug(f"Clicking element at coordinates: {x}, {y}")
-            pyautogui.click(x, y)
-            return
-
-        data = await get_coordinates_from_prompt(
-            memory, click_element_action.prompt_instructions, browser, task
-        )
-
-        if data is None:
-            logger.error("No coordinates found")
-            return
-
-        x = data[0]
-        y = data[1]
+        else:
+            data = await get_coordinates_from_prompt(
+                memory, click_element_action.prompt_instructions, browser, task
+            )
+            if data is None:
+                logger.error("No coordinates found")
+                return
+            x = data[0]
+            y = data[1]
+            memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
 
         logger.debug(f"Clicking element at coordinates: {x}, {y}")
+        screenshot_base64 = memory.browser_states[-1].screenshot
+        screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
+        memory.browser_states[-1].screenshot = screenshot_base64
 
         pyautogui.click(x, y)
     except ElementNotFoundInAxtreeException as e:
