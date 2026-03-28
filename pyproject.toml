@@ -48,6 +48,12 @@ dev = [
     "isort",
     "pre-commit",
 ]
+# Native GUI recorder client (optexity.recorder): screen capture + upload to opcloud
+recorder = [
+    "pynput",
+    "pillow",
+    "python-dotenv",
+]
 
 [project.scripts]
 optexity = "optexity.cli:main"
