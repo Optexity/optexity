@@ -40,6 +40,10 @@ dependencies = [
     # computer vision
     "opencv-python",
     "scikit-image",
+
+    "pynput",
+    "pillow",
+    "python-dotenv",
 ]
 
 [project.optional-dependencies]
@@ -47,12 +51,6 @@ dev = [
     "black",
     "isort",
     "pre-commit",
-]
-# Native GUI recorder client (optexity.recorder): screen capture + upload to opcloud
-recorder = [
-    "pynput",
-    "pillow",
-    "python-dotenv",
 ]
 
 [project.scripts]
