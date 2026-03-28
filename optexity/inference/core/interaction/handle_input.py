@@ -120,20 +120,26 @@ async def input_text_coordinates(
         pyautogui.hotkey(browser.modifier_key, "v")
 
     try:
-        data = await get_coordinates_from_prompt(
-            memory, input_text_action.prompt_instructions, browser, task
-        )
+        if input_text_action.coordinates:
+            x = input_text_action.coordinates[0]
+            y = input_text_action.coordinates[1]
+            logger.debug(f"Typing text at coordinates: {x}, {y}")
+            pyautogui.click(x, y)
 
-        if data is None:
-            logger.error("No coordinates found")
-            return
+        else:
+            data = await get_coordinates_from_prompt(
+                memory, input_text_action.prompt_instructions, browser, task
+            )
 
-        x = data[0]
-        y = data[1]
+            if data is None:
+                logger.error("No coordinates found")
+                return
 
-        logger.debug(f"Typing text at coordinates: {x}, {y}")
+            x = data[0]
+            y = data[1]
+            logger.debug(f"Typing text at coordinates: {x}, {y}")
+            pyautogui.click(x, y)
 
-        pyautogui.click(x, y)
         await asyncio.sleep(0.2)
 
         changed, score = await wait_for_screen_to_change(_paste, browser)
