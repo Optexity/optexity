@@ -77,8 +77,15 @@ class Browser:
         self._download_cdp_session = None
 
         self.modifier_key = modifier_key()
+        self.sct = None
+
+        if self.channel == "rdp" or self.backend == "computer-vision":
+            self.sct = mss.mss()
 
     async def start(self):
+        if self.channel == "rdp" or self.backend == "computer-vision":
+            self.sct = mss.mss()
+
         if self.channel == "rdp":
             await asyncio.sleep(5)
             return
@@ -177,6 +184,11 @@ class Browser:
             raise e
 
     async def stop(self, force: bool = False):
+
+        if self.sct is not None:
+            self.sct.close()
+            self.sct = None
+
         if self.channel == "rdp":
             return
 
@@ -558,24 +570,27 @@ class Browser:
     async def get_screenshot(
         self, full_page: bool = False, get_bytes: bool = False
     ) -> str | bytes | None:
-        if self.channel == "rdp":
+        if self.channel == "rdp" or self.backend == "computer-vision":
             try:
+                if self.sct is None:
+                    self.sct = mss.mss()
+
                 time.sleep(1)
-                with mss.mss() as sct:
-                    monitor = sct.monitors[
-                        1
-                    ]  # full virtual screen; use [0] for "all monitors"
-                    shot = sct.grab(monitor)
 
-                    # Optional: keep this only if you actually need the ndarray somewhere
-                    # pixels = np.array(shot)  # BGRA, shape: (H, W, 4)
+                monitor = self.sct.monitors[
+                    1
+                ]  # full virtual screen; use [0] for "all monitors"
+                shot = self.sct.grab(monitor)
 
-                    png_bytes = mss.tools.to_png(shot.rgb, shot.size, output=None)
-                    if png_bytes is None:
-                        raise RuntimeError("Failed to encode PNG")
-                    if get_bytes:
-                        return png_bytes
-                    return base64.b64encode(png_bytes).decode("utf-8")
+                # Optional: keep this only if you actually need the ndarray somewhere
+                # pixels = np.array(shot)  # BGRA, shape: (H, W, 4)
+
+                png_bytes = mss.tools.to_png(shot.rgb, shot.size, output=None)
+                if png_bytes is None:
+                    raise RuntimeError("Failed to encode PNG")
+                if get_bytes:
+                    return png_bytes
+                return base64.b64encode(png_bytes).decode("utf-8")
             except Exception as e:
                 logger.error(f"Error taking screenshot: {e}", exc_info=True)
                 return None

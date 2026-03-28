@@ -40,7 +40,7 @@ dependencies = [
     # computer vision
     "opencv-python",
     "scikit-image",
-
+    "pytesseract",
     "pynput",
     "pillow",
     "python-dotenv",
