@@ -105,6 +105,13 @@ async def click_element_coordinates(
 
     try:
 
+        if click_element_action.coordinates:
+            x = click_element_action.coordinates[0]
+            y = click_element_action.coordinates[1]
+            logger.debug(f"Clicking element at coordinates: {x}, {y}")
+            pyautogui.click(x, y)
+            return
+
         data = await get_coordinates_from_prompt(
             memory, click_element_action.prompt_instructions, browser, task
         )

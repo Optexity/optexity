@@ -1,9 +1,14 @@
 """
 Lightweight GUI Action Recorder (client for remote post-processing).
 
-Same capture behavior as ``opcloud.recording_processor.recorder``; after ESC stop, uploads the
-session as a zip to ``{SERVER_URL}/process_gui_recording_file`` instead of running
+Same capture behavior as ``opcloud.recording_processor.recorder``; after a **graceful** stop,
+uploads the session as a zip to ``{SERVER_URL}/process_gui_recording_file`` instead of running
 ``process_gui_recording_file`` locally.
+
+**Stopping:** ESC, **F12**, or **Ctrl+Shift+Q** end recording and trigger post-processing when
+``SERVER_URL`` is set. In Docker or over ``docker exec``, the terminal often consumes ESC (you
+see ``^[`` echoed) before pynput sees it—use **F12** or **Ctrl+Shift+Q** instead. Optional:
+set ``RECORDER_POST_ON_CTRL_C=1`` to run post-processing after Ctrl+C as well.
 
 Set ``SERVER_URL`` (e.g. ``http://localhost:8000``). The server must expose the FastAPI route
 from ``opcloud.api.gui_recording``.
@@ -141,6 +146,7 @@ class Recorder:
         self.key_flush_timer: threading.Timer = None
         self.key_flush_delay = 0.5
 
+        # True after ESC / F12 / Ctrl+Shift+Q (or Ctrl+C if RECORDER_POST_ON_CTRL_C=1)
         self._stop_requested_by_esc = False
         self._warned_secure_input = False
 
@@ -179,7 +185,8 @@ class Recorder:
         except Exception:
             return False
 
-    def _stop_for_escape(self) -> None:
+    def _request_graceful_stop(self) -> None:
+        """Stop recording and allow post-processing (ESC / F12 / Ctrl+Shift+Q)."""
         if self._stop_event.is_set():
             return
         if self.key_flush_timer:
@@ -187,6 +194,17 @@ class Recorder:
         self._flush_key_buffer()
         self._stop_requested_by_esc = True
         self.stop()
+
+    _CTRL_KEYS = frozenset({"ctrl", "ctrl_l", "ctrl_r"})
+    _SHIFT_KEYS = frozenset({"shift", "shift_l", "shift_r"})
+
+    def _is_ctrl_shift_q_press(self, key) -> bool:
+        """Docker-friendly stop: terminal often eats ESC; this combo usually reaches pynput."""
+        key_str = self._key_to_str(key).lower()
+        if key_str != "q":
+            return False
+        mods = self.held_keys & self._MODIFIER_NAMES
+        return bool(mods & self._CTRL_KEYS) and bool(mods & self._SHIFT_KEYS)
 
     def _save_screenshot(self, img, event_id: str, suffix: str, action_ts: float):
         ts_part = datetime.fromtimestamp(action_ts).strftime("%Y%m%d_%H%M%S_%f")
@@ -405,10 +423,19 @@ class Recorder:
     )
 
     def _on_key_press(self, key):
-        if self._is_escape_key(key):
-            self._stop_for_escape()
-            return False
         key_str = self._key_to_str(key)
+
+        # Graceful stops (before mutating held_keys). Prefer F12 / Ctrl+Shift+Q in Docker.
+        if self._is_ctrl_shift_q_press(key):
+            self._request_graceful_stop()
+            return False
+        if self._is_escape_key(key):
+            self._request_graceful_stop()
+            return False
+        if key_str.lower() == "f12":
+            self._request_graceful_stop()
+            return False
+
         self.held_keys.add(key_str)
 
         if key_str in self._MODIFIER_NAMES:
@@ -445,7 +472,7 @@ class Recorder:
         if self._is_escape_key(key):
             self.held_keys.discard(key_str)
             if not self._stop_event.is_set():
-                self._stop_for_escape()
+                self._request_graceful_stop()
             return False
 
         held_modifiers = self.held_keys & self._MODIFIER_NAMES
@@ -504,7 +531,11 @@ class Recorder:
             return
 
         print(f"Recording to: {self.session_dir}")
-        print("Press ESC to stop recording.\n")
+        print(
+            "Stop: ESC, or F12, or Ctrl+Shift+Q (recommended in Docker—terminal may swallow ESC).\n"
+            "Ctrl+C stops without post-processing unless RECORDER_POST_ON_CTRL_C=1.\n"
+            f"RECORDER_POST_ON_CTRL_C={os.environ.get('RECORDER_POST_ON_CTRL_C', '').strip().lower()}"
+        )
         self.running = True
 
         self._screenshot_thread = threading.Thread(
@@ -534,7 +565,12 @@ class Recorder:
         try:
             self._stop_event.wait()
         except KeyboardInterrupt:
-            pass
+            if os.environ.get("RECORDER_POST_ON_CTRL_C", "").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+            ):
+                self._stop_requested_by_esc = True
 
         if self.key_flush_timer:
             self.key_flush_timer.cancel()
