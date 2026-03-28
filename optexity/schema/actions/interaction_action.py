@@ -21,6 +21,8 @@ class DialogAction(BaseModel):
 
 class BaseAction(BaseModel):
     xpath: str | None = None
+    coordinates: tuple[int, int] | None = None
+    keyword: str | None = None
     command: str | None = None
     prompt_instructions: str
     skip_command: bool = False
@@ -28,27 +30,24 @@ class BaseAction(BaseModel):
     assert_locator_presence: bool = False
 
     @model_validator(mode="after")
-    def validate_one_extraction(cls, model: "BaseAction"):
+    def validate_one_extraction(self):
         """Ensure exactly one of the extraction types is set and matches the type."""
 
-        provided = {
-            "xpath": model.xpath,
-            "command": model.command,
-        }
+        provided = {"xpath": self.xpath, "command": self.command}
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) > 1:
             raise ValueError("Exactly one of xpath, command must be provided")
 
-        if model.assert_locator_presence:
+        if self.assert_locator_presence:
             assert (
-                model.command is not None
+                self.command is not None
             ), "command is required when assert_locator_presence is True"
 
-        if model.command is not None and model.command.strip() == "":
-            model.command = None
+        if self.command is not None and self.command.strip() == "":
+            self.command = None
 
-        return model
+        return self
 
     def replace(self, pattern: str, replacement: str):
         if self.prompt_instructions:
