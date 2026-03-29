@@ -3,9 +3,9 @@ from enum import Enum, unique
 from typing import Any, Literal
 from uuid import uuid4
 
-from pyautogui import KEY_NAMES
 from pydantic import BaseModel, Field, model_validator
 
+from optexity.schema.actions.keyboard_keys import KEY_NAMES
 from optexity.schema.actions.prompts import overlay_popup_prompt
 
 
