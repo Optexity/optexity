@@ -254,13 +254,13 @@ class KeyPressType(str, Enum):
 
 
 class KeyPressAction(BaseModel):
-    type: KeyPressType | str | list[KeyPressType | str]
+    type: str | list[str]
 
     @model_validator(mode="after")
     def validate_key_combination(self):
         if isinstance(self.type, str):
             try:
-                self.type = KeyPressType(self.type)
+                KeyPressType(self.type)
             except ValueError:
                 assert (
                     re.fullmatch(r"[a-zA-Z]", self.type) is not None
@@ -273,11 +273,12 @@ class KeyPressAction(BaseModel):
                 key = key.strip()
                 if isinstance(key, str):
                     try:
-                        key = KeyPressType(key)
+                        KeyPressType(key)
                     except ValueError:
                         if not re.fullmatch(r"[a-zA-Z]", key) is not None:
                             raise ValueError(f"Invalid key: {key}")
-                        key_combination.append(key)
+                    key_combination.append(key)
+
             self.type = key_combination
         return self
 
