@@ -35,9 +35,7 @@ class AmazonSecretsManagerParameter(BaseModel):
     pass
 
     @model_validator(mode="after")
-    def validate_amazon_secrets_manager_parameter(
-        cls, model: "AmazonSecretsManagerParameter"
-    ):
+    def validate_amazon_secrets_manager_parameter(self):
         raise NotImplementedError("Amazon Secrets Manager is not implemented yet")
 
 
