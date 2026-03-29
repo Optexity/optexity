@@ -2,7 +2,6 @@ import pyautogui
 
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import (
-    KeyCombinationAction,
     KeyPressAction,
     KeyPressType,
 )
@@ -54,18 +53,22 @@ async def handle_key_press(
 
 
 async def handle_keypress_native(
-    keypress_action: KeyPressAction | KeyCombinationAction,
+    keypress_action: KeyPressAction,
     memory: Memory,
     browser: Browser,
 ):
-    if isinstance(keypress_action, KeyPressAction):
-        pyautogui.press(keypress_action.type.value)
+    values = []
 
-    elif isinstance(keypress_action, KeyCombinationAction):
-        pyautogui.press(
-            [
-                key.value
-                for key in keypress_action.key_combination
-                if isinstance(key, KeyPressType)
-            ]
-        )
+    if isinstance(keypress_action.type, KeyPressType):
+        values.append(keypress_action.type.value)
+    elif isinstance(keypress_action.type, str):
+        values.append(keypress_action.type)
+
+    elif isinstance(keypress_action.type, list):
+        for key in keypress_action.type:
+            if isinstance(key, KeyPressType):
+                values.append(key.value)
+            elif isinstance(key, str):
+                values.append(key)
+
+    pyautogui.press(values)
