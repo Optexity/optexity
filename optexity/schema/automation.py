@@ -415,9 +415,11 @@ class Automation(BaseModel):
                         if (
                             node.interaction_action.click_element is None
                             and node.interaction_action.input_text is None
+                            and node.interaction_action.key_press is None
+                            and node.interaction_action.key_combination is None
                         ):
                             raise ValueError(
-                                "Only click_element and input_text are allowed for rdp"
+                                "Only click_element, input_text, key_press, and key_combination are allowed for rdp"
                             )
         return self
 
