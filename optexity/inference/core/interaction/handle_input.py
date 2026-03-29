@@ -144,10 +144,11 @@ async def input_text_coordinates(
 
         await asyncio.sleep(0.2)
 
-        changed, score = await wait_for_screen_to_change(_paste, browser)
+        await _paste()
+        # changed, score = await wait_for_screen_to_change(_paste, browser)
 
-        if not changed:
-            logger.warning("Screen did not change after typing text")
+        # if not changed:
+        #     logger.warning("Screen did not change after typing text")
 
         if input_text_action.press_enter:
             await asyncio.sleep(0.2)

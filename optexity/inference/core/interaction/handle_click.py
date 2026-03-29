@@ -137,7 +137,10 @@ async def click_element_coordinates(
 
         logger.debug(f"Clicking element at coordinates: {x}, {y}")
 
-        pyautogui.click(x, y)
+        if click_element_action.double_click:
+            pyautogui.doubleClick(x, y)
+        else:
+            pyautogui.click(x, y)
 
         screenshot_base64 = memory.browser_states[-1].screenshot
         if screenshot_base64:
