@@ -249,9 +249,12 @@ class KeyPressAction(BaseModel):
     @model_validator(mode="after")
     def validate_key_combination(self):
         if isinstance(self.type, str):
-            assert (
-                re.fullmatch(r"[a-zA-Z]", self.type) is not None
-            ), f"Invalid key: {self.type}"
+            try:
+                self.type = KeyPressType(self.type)
+            except ValueError:
+                assert (
+                    re.fullmatch(r"[a-zA-Z]", self.type) is not None
+                ), f"Invalid key: {self.type}"
         elif isinstance(self.type, list):
             key_combination = []
             for key in self.type:
