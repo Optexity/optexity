@@ -139,9 +139,7 @@ async def input_text_coordinates(
             memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
 
         logger.debug(f"Typing text at coordinates: {x}, {y}")
-        screenshot_base64 = memory.browser_states[-1].screenshot
-        screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
-        memory.browser_states[-1].screenshot = screenshot_base64
+
         pyautogui.click(x, y)
 
         await asyncio.sleep(0.2)
@@ -154,6 +152,13 @@ async def input_text_coordinates(
         if input_text_action.press_enter:
             await asyncio.sleep(0.2)
             pyautogui.press("enter")
+
+        screenshot_base64 = memory.browser_states[-1].screenshot
+        if screenshot_base64:
+            screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
+            memory.browser_states[-1].screenshot = (
+                screenshot_base64  # pyright: ignore[reportAttributeAccessIssue]
+            )
 
     except ElementNotFoundInAxtreeException as e:
         raise e

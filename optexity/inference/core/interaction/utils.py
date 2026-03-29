@@ -16,14 +16,17 @@ from optexity.exceptions import (
 from optexity.inference.agents.index_prediction.action_prediction_locator_axtree import (
     ActionPredictionLocatorAxtree,
 )
+from optexity.inference.core.vision.ocr.tesseract import Tesseract
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import GeminiModels, get_llm_model
 from optexity.schema.memory import BrowserState, Memory
+from optexity.schema.ocr import BoundingBox
 from optexity.schema.task import Task
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
+ocr = Tesseract()
 
 index_prediction_agent = ActionPredictionLocatorAxtree()
 
@@ -219,3 +222,33 @@ async def get_coordinates_from_prompt(
     #     data = response.json()
 
     # return data.get("coordinates")
+
+
+async def match_text_in_screenshot(
+    memory: Memory, keyword: str, region_of_interest: BoundingBox
+):
+
+    if memory.browser_states[-1].screenshot is None:
+        logger.error("Screenshot is None or not a string")
+        return None
+
+    results = ocr.ocr(
+        memory.browser_states[-1].screenshot,
+        region_of_interest=region_of_interest,
+        padding_factor=4.0,
+    )
+
+    for result in results:
+        if result.text.lower().strip() == keyword.lower().strip():
+            return int(result.bounding_box.x + result.bounding_box.width / 2), int(
+                result.bounding_box.y + result.bounding_box.height / 2,
+            )
+
+    results = ocr.ocr(memory.browser_states[-1].screenshot)
+    for result in results:
+        if result.text.lower().strip() == keyword.lower().strip():
+            return int(result.bounding_box.x + result.bounding_box.width / 2), int(
+                result.bounding_box.y + result.bounding_box.height / 2,
+            )
+
+    return None
