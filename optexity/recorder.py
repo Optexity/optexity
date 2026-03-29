@@ -42,23 +42,13 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from queue import Queue
+from urllib.parse import urljoin
 
 import httpx
-
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None  # type: ignore[assignment, misc]
-
 from PIL import ImageGrab
 from pynput import keyboard, mouse
 
-env_path = os.getenv("ENV_PATH")
-if not env_path:
-    print("ENV_PATH is not set, using default values")
-
-if load_dotenv is not None:
-    load_dotenv(env_path)
+from optexity.utils.settings import settings
 
 # macOS retina fix
 if sys.platform == "darwin":
@@ -565,12 +555,7 @@ class Recorder:
         try:
             self._stop_event.wait()
         except KeyboardInterrupt:
-            if os.environ.get("RECORDER_POST_ON_CTRL_C", "").strip().lower() in (
-                "1",
-                "true",
-                "yes",
-            ):
-                self._stop_requested_by_esc = True
+            self._stop_requested_by_esc = True
 
         if self.key_flush_timer:
             self.key_flush_timer.cancel()
@@ -591,8 +576,8 @@ class Recorder:
         print(f"\nDone. Captured {event_count} events, {frame_count} frames.")
         print(f"Session: {self.session_dir}")
 
-        if self._stop_requested_by_esc:
-            self._run_post_process_gui_recording()
+        # if self._stop_requested_by_esc:
+        #     self._run_post_process_gui_recording()
 
     def stop(self):
         if self._stop_event.is_set():
@@ -602,7 +587,7 @@ class Recorder:
 
     def _run_post_process_gui_recording(self) -> None:
         """POST session zip to ``{SERVER_URL}/process_gui_recording_file`` and save JSON locally."""
-        base = os.environ.get("SERVER_URL", "").strip().rstrip("/")
+        base = settings.SERVER_URL.strip().rstrip("/")
         if not base:
             print(
                 "\n[WARNING] SERVER_URL is not set; skipping remote post-processing.",
@@ -611,7 +596,7 @@ class Recorder:
             return
 
         recording_id = self.session_dir.name
-        url = f"{base}/process_gui_recording_file"
+        url = urljoin(base, "process_gui_recording_file")
         save_dir = self.session_dir / "processed"
         save_dir.mkdir(parents=True, exist_ok=True)
 
