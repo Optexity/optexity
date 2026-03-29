@@ -45,15 +45,11 @@ from queue import Queue
 from urllib.parse import urljoin
 
 import httpx
-from PIL import ImageGrab
+import mss
+from PIL import Image
 from pynput import keyboard, mouse
 
 from optexity.utils.settings import settings
-
-# macOS retina fix
-if sys.platform == "darwin":
-    # ImageGrab on macOS returns retina-scaled images by default, coords are logical
-    pass
 
 
 def _macos_is_secure_event_input_enabled() -> bool | None:
@@ -129,6 +125,7 @@ class Recorder:
         self._mouse_listener = None
         self._key_listener = None
         self._stop_event = threading.Event()
+        self._sct = mss.mss()
 
         self.key_buffer: list = []
         self.key_buffer_start_time = 0.0
@@ -155,8 +152,9 @@ class Recorder:
                     file=sys.stderr,
                 )
 
-    def _capture_screen(self) -> "PIL.Image":
-        return ImageGrab.grab()
+    def _capture_screen(self) -> Image.Image:
+        shot = self._sct.grab(self._sct.monitors[0])
+        return Image.frombytes("RGB", shot.size, shot.rgb)
 
     def _is_escape_key(self, key) -> bool:
         try:
