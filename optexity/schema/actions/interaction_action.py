@@ -244,38 +244,39 @@ class KeyPressType(str, Enum):
 
 
 class KeyPressAction(BaseModel):
-    type: KeyPressType | Any
+    type: KeyPressType | str | list[KeyPressType | str]
 
     @model_validator(mode="after")
-    def validate_type(self):
-        if self.type is None:
-            raise ValueError("type is required")
+    def validate_key_combination(self):
+        if isinstance(self.type, str):
+            assert (
+                re.fullmatch(r"[a-zA-Z]", self.type) is not None
+            ), f"Invalid key: {self.type}"
+        elif isinstance(self.type, list):
+            key_combination = []
+            for key in self.type:
+                if key is None:
+                    raise ValueError("key_combination is required")
+                key = key.strip()
+                if isinstance(key, str):
+                    try:
+                        key = KeyPressType(key)
+                    except ValueError:
+                        if not re.fullmatch(r"[a-zA-Z]", key) is not None:
+                            raise ValueError(f"Invalid key: {key}")
+                        key_combination.append(key)
+            self.type = key_combination
         return self
 
     def replace(self, pattern: str, replacement: str):
         if self.type:
-            self.type = self.type.replace(pattern, replacement).strip('"')
-        return self
+            if isinstance(self.type, str):
+                self.type = self.type.replace(pattern, replacement).strip('"')
+            elif isinstance(self.type, list):
+                for key in self.type:
+                    if isinstance(key, str):
+                        key = key.replace(pattern, replacement).strip('"')
 
-
-class KeyCombinationAction(BaseModel):
-    key_combination: list[KeyPressType | str]
-
-    @model_validator(mode="after")
-    def validate_key_combination(self):
-        key_combination = []
-        for key in self.key_combination:
-            if key is None:
-                raise ValueError("key_combination is required")
-            key = key.strip()
-            if isinstance(key, str):
-                try:
-                    key = KeyPressType(key)
-                except ValueError:
-                    if not re.fullmatch(r"[a-zA-Z]", key) is not None:
-                        raise ValueError(f"Invalid key: {key}")
-                    key_combination.append(key)
-        self.key_combination = key_combination
         return self
 
 
@@ -321,7 +322,6 @@ class InteractionAction(BaseModel):
     agentic_task: AgenticTask | None = None
     close_overlay_popup: CloseOverlayPopupAction | None = None
     key_press: KeyPressAction | None = None
-    key_combination: KeyCombinationAction | None = None
 
     @model_validator(mode="after")
     def validate_one_interaction(self):
@@ -345,7 +345,6 @@ class InteractionAction(BaseModel):
             "agentic_task": self.agentic_task,
             "close_overlay_popup": self.close_overlay_popup,
             "key_press": self.key_press,
-            "key_combination": self.key_combination,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
