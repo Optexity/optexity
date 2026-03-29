@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
+from optexity.schema.actions.keyboard_keys import KEY_NAMES
 from optexity.schema.actions.prompts import overlay_popup_prompt
 
 
@@ -259,27 +260,11 @@ class KeyPressAction(BaseModel):
     @model_validator(mode="after")
     def validate_key_combination(self):
         if isinstance(self.type, str):
-            try:
-                KeyPressType(self.type)
-            except ValueError:
-                assert (
-                    re.fullmatch(r"[a-zA-Z]", self.type) is not None
-                ), f"Invalid key: {self.type}"
+            assert self.type in KEY_NAMES, f"Invalid key: {self.type}"
         elif isinstance(self.type, list):
-            key_combination = []
-            for key in self.type:
-                if key is None:
-                    raise ValueError("key_combination is required")
-                key = key.strip()
-                if isinstance(key, str):
-                    try:
-                        KeyPressType(key)
-                    except ValueError:
-                        if not re.fullmatch(r"[a-zA-Z]", key) is not None:
-                            raise ValueError(f"Invalid key: {key}")
-                    key_combination.append(key)
-
-            self.type = key_combination
+            assert all(
+                key in KEY_NAMES for key in self.type
+            ), f"Invalid keys: {self.type}"
         return self
 
     def replace(self, pattern: str, replacement: str):
