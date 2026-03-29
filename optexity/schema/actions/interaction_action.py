@@ -79,12 +79,12 @@ class SelectOptionAction(BaseAction):
     download_filename: str | None = None
 
     @model_validator(mode="after")
-    def set_download_filename(cls, model: "SelectOptionAction"):
+    def set_download_filename(self):
 
-        if model.expect_download and model.download_filename is None:
-            model.download_filename = str(uuid4())
+        if self.expect_download and self.download_filename is None:
+            self.download_filename = str(uuid4())
 
-        return model
+        return self
 
     def replace(self, pattern: str, replacement: str):
         super().replace(pattern, replacement)
@@ -97,7 +97,6 @@ class SelectOptionAction(BaseAction):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        return self
 
 
 class ClickElementAction(BaseAction):
@@ -107,12 +106,12 @@ class ClickElementAction(BaseAction):
     button: Literal["left", "right", "middle"] = "left"
 
     @model_validator(mode="after")
-    def set_download_filename(cls, model: "ClickElementAction"):
+    def set_download_filename(self):
 
-        if model.expect_download and model.download_filename is None:
-            model.download_filename = str(uuid4())
+        if self.expect_download and self.download_filename is None:
+            self.download_filename = str(uuid4())
 
-        return model
+        return self
 
     def replace(self, pattern: str, replacement: str):
         super().replace(pattern, replacement)
@@ -120,7 +119,6 @@ class ClickElementAction(BaseAction):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        return self
 
 
 class InputTextAction(BaseAction):
@@ -139,7 +137,6 @@ class InputTextAction(BaseAction):
         super().replace(pattern, replacement)
         if self.input_text:
             self.input_text = self.input_text.replace(pattern, replacement).strip('"')
-        return self
 
 
 class DownloadUrlAsPdfAction(BaseModel):
@@ -152,7 +149,6 @@ class DownloadUrlAsPdfAction(BaseModel):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        return self
 
 
 class ScrollAction(BaseModel):
@@ -172,7 +168,6 @@ class UploadFileAction(BaseAction):
     def replace(self, pattern: str, replacement: str):
         if self.file_path:
             self.file_path = self.file_path.replace(pattern, replacement).strip('"')
-        return self
 
 
 class GoToUrlAction(BaseModel):
@@ -182,7 +177,6 @@ class GoToUrlAction(BaseModel):
     def replace(self, pattern: str, replacement: str):
         if self.url:
             self.url = self.url.replace(pattern, replacement).strip('"')
-        return self
 
 
 class GoBackAction(BaseModel):
@@ -219,7 +213,6 @@ class CloseTabsUntil(BaseModel):
             self.matching_url = self.matching_url.replace(pattern, replacement).strip(
                 '"'
             )
-        return self
 
 
 @unique
@@ -331,28 +324,28 @@ class InteractionAction(BaseModel):
     key_combination: KeyCombinationAction | None = None
 
     @model_validator(mode="after")
-    def validate_one_interaction(cls, model: "InteractionAction"):
+    def validate_one_interaction(self):
         """Ensure exactly one of the interaction types is set and matches the type."""
         provided = {
-            "click_element": model.click_element,
-            "input_text": model.input_text,
-            "select_option": model.select_option,
-            "check": model.check,
-            "uncheck": model.uncheck,
-            "hover": model.hover,
-            "download_url_as_pdf": model.download_url_as_pdf,
-            "scroll": model.scroll,
-            "upload_file": model.upload_file,
-            "go_to_url": model.go_to_url,
-            "go_back": model.go_back,
-            "switch_tab": model.switch_tab,
-            "close_current_tab": model.close_current_tab,
-            "close_all_but_last_tab": model.close_all_but_last_tab,
-            "close_tabs_until": model.close_tabs_until,
-            "agentic_task": model.agentic_task,
-            "close_overlay_popup": model.close_overlay_popup,
-            "key_press": model.key_press,
-            "key_combination": model.key_combination,
+            "click_element": self.click_element,
+            "input_text": self.input_text,
+            "select_option": self.select_option,
+            "check": self.check,
+            "uncheck": self.uncheck,
+            "hover": self.hover,
+            "download_url_as_pdf": self.download_url_as_pdf,
+            "scroll": self.scroll,
+            "upload_file": self.upload_file,
+            "go_to_url": self.go_to_url,
+            "go_back": self.go_back,
+            "switch_tab": self.switch_tab,
+            "close_current_tab": self.close_current_tab,
+            "close_all_but_last_tab": self.close_all_but_last_tab,
+            "close_tabs_until": self.close_tabs_until,
+            "agentic_task": self.agentic_task,
+            "close_overlay_popup": self.close_overlay_popup,
+            "key_press": self.key_press,
+            "key_combination": self.key_combination,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
@@ -361,14 +354,14 @@ class InteractionAction(BaseModel):
                 "Exactly one of click_element, input_text, select_option, check, uncheck, hover, download_url_as_pdf, scroll, upload_file, go_to_url, go_back, switch_tab, close_current_tab, close_all_but_last_tab, close_tabs_until, key_press, or agentic_task must be provided"
             )
 
-        if not model.max_tries and (
-            (model.click_element and model.click_element.skip_prompt)
-            or (model.input_text and model.input_text.skip_prompt)
-            or (model.select_option and model.select_option.skip_prompt)
+        if not self.max_tries and (
+            (self.click_element and self.click_element.skip_prompt)
+            or (self.input_text and self.input_text.skip_prompt)
+            or (self.select_option and self.select_option.skip_prompt)
         ):
-            model.max_tries = 5
+            self.max_tries = 5
 
-        return model
+        return self
 
     def replace(self, pattern: str, replacement: str):
         if self.click_element:
