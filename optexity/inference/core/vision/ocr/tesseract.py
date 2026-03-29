@@ -13,6 +13,7 @@ from pytesseract import Output
 
 from optexity.inference.core.vision.ocr.ocr import OCR, OCRModels, _load_cv2
 from optexity.schema.ocr import BoundingBox, OCRResult
+from optexity.utils.timeit import timeit
 
 if shutil.which("tesseract") is None:
     raise RuntimeError(
@@ -52,6 +53,7 @@ class Tesseract(OCR):
         self._min_conf = min_confidence
         self._use_gpu = use_gpu_preprocessing
 
+    @timeit
     def ocr(
         self,
         screenshot: str | bytes,
