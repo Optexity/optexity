@@ -267,7 +267,8 @@ class KeyPressAction(BaseModel):
                     except ValueError:
                         if not re.fullmatch(r"[a-zA-Z]", key) is not None:
                             raise ValueError(f"Invalid key: {key}")
-                        key_combination.append(key)
+                    key_combination.append(key)
+
             self.type = key_combination
         return self
 
