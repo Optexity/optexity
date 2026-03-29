@@ -1,3 +1,4 @@
+import re
 from enum import Enum, unique
 from typing import Any, Literal
 from uuid import uuid4
@@ -79,8 +80,10 @@ class SelectOptionAction(BaseAction):
 
     @model_validator(mode="after")
     def set_download_filename(self):
+
         if self.expect_download and self.download_filename is None:
             self.download_filename = str(uuid4())
+
         return self
 
     def replace(self, pattern: str, replacement: str):
@@ -94,7 +97,6 @@ class SelectOptionAction(BaseAction):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        return self
 
 
 class ClickElementAction(BaseAction):
@@ -105,8 +107,10 @@ class ClickElementAction(BaseAction):
 
     @model_validator(mode="after")
     def set_download_filename(self):
+
         if self.expect_download and self.download_filename is None:
             self.download_filename = str(uuid4())
+
         return self
 
     def replace(self, pattern: str, replacement: str):
@@ -115,7 +119,6 @@ class ClickElementAction(BaseAction):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        return self
 
 
 class InputTextAction(BaseAction):
@@ -134,7 +137,6 @@ class InputTextAction(BaseAction):
         super().replace(pattern, replacement)
         if self.input_text:
             self.input_text = self.input_text.replace(pattern, replacement).strip('"')
-        return self
 
 
 class DownloadUrlAsPdfAction(BaseModel):
@@ -147,7 +149,6 @@ class DownloadUrlAsPdfAction(BaseModel):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        return self
 
 
 class ScrollAction(BaseModel):
@@ -177,7 +178,6 @@ class UploadFileAction(BaseAction):
     def replace(self, pattern: str, replacement: str):
         if self.file_path:
             self.file_path = self.file_path.replace(pattern, replacement).strip('"')
-        return self
 
 
 class GoToUrlAction(BaseModel):
@@ -187,7 +187,6 @@ class GoToUrlAction(BaseModel):
     def replace(self, pattern: str, replacement: str):
         if self.url:
             self.url = self.url.replace(pattern, replacement).strip('"')
-        return self
 
 
 class GoBackAction(BaseModel):
@@ -224,7 +223,6 @@ class CloseTabsUntil(BaseModel):
             self.matching_url = self.matching_url.replace(pattern, replacement).strip(
                 '"'
             )
-        return self
 
 
 @unique
@@ -246,6 +244,13 @@ class KeyPressType(str, Enum):
     NINE = "9"
     SLASH = "/"
     SPACE = "Space"
+    CTRL = "Ctrl"
+    ALT = "Alt"
+    SHIFT = "Shift"
+    META = "Meta"
+    COMMAND = "Command"
+    OPTION = "Option"
+    CMD = "Cmd"
 
 
 class KeyPressAction(BaseModel):
@@ -267,6 +272,27 @@ class KeyPressAction(BaseModel):
             self.prompt_instructions = self.prompt_instructions.replace(
                 pattern, replacement
             )
+        return self
+
+
+class KeyCombinationAction(BaseModel):
+    key_combination: list[KeyPressType | str]
+
+    @model_validator(mode="after")
+    def validate_key_combination(self):
+        key_combination = []
+        for key in self.key_combination:
+            if key is None:
+                raise ValueError("key_combination is required")
+            key = key.strip()
+            if isinstance(key, str):
+                try:
+                    key = KeyPressType(key)
+                except ValueError:
+                    if not re.fullmatch(r"[a-zA-Z]", key) is not None:
+                        raise ValueError(f"Invalid key: {key}")
+                    key_combination.append(key)
+        self.key_combination = key_combination
         return self
 
 
@@ -312,6 +338,7 @@ class InteractionAction(BaseModel):
     agentic_task: AgenticTask | None = None
     close_overlay_popup: CloseOverlayPopupAction | None = None
     key_press: KeyPressAction | None = None
+    key_combination: KeyCombinationAction | None = None
 
     @model_validator(mode="after")
     def validate_one_interaction(self):
@@ -335,6 +362,7 @@ class InteractionAction(BaseModel):
             "agentic_task": self.agentic_task,
             "close_overlay_popup": self.close_overlay_popup,
             "key_press": self.key_press,
+            "key_combination": self.key_combination,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
