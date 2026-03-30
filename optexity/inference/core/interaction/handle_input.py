@@ -17,6 +17,7 @@ from optexity.inference.core.vision.time import (
     wait_for_screen_to_change,
     wait_for_stable_screen,
 )
+from optexity.inference.core.vision.utils import mark_screenshot
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import InputTextAction
 from optexity.schema.memory import Memory
@@ -120,20 +121,29 @@ async def input_text_coordinates(
         pyautogui.hotkey(browser.modifier_key, "v")
 
     try:
-        data = await get_coordinates_from_prompt(
-            memory, input_text_action.prompt_instructions, browser, task
-        )
+        x, y = None, None
+        if input_text_action.coordinates:
+            x = input_text_action.coordinates[0]
+            y = input_text_action.coordinates[1]
+        else:
+            data = await get_coordinates_from_prompt(
+                memory, input_text_action.prompt_instructions, browser, task
+            )
 
-        if data is None:
-            logger.error("No coordinates found")
-            return
+            if data is None:
+                logger.error("No coordinates found")
+                return
 
-        x = data[0]
-        y = data[1]
+            x = data[0]
+            y = data[1]
+            memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
 
         logger.debug(f"Typing text at coordinates: {x}, {y}")
-
+        screenshot_base64 = memory.browser_states[-1].screenshot
+        screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
+        memory.browser_states[-1].screenshot = screenshot_base64
         pyautogui.click(x, y)
+
         await asyncio.sleep(0.2)
 
         changed, score = await wait_for_screen_to_change(_paste, browser)

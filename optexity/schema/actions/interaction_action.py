@@ -21,6 +21,8 @@ class DialogAction(BaseModel):
 
 class BaseAction(BaseModel):
     xpath: str | None = None
+    coordinates: tuple[int, int] | None = None
+    keyword: str | None = None
     command: str | None = None
     prompt_instructions: str
     skip_command: bool = False
@@ -31,10 +33,7 @@ class BaseAction(BaseModel):
     def validate_one_extraction(self):
         """Ensure exactly one of the extraction types is set and matches the type."""
 
-        provided = {
-            "xpath": self.xpath,
-            "command": self.command,
-        }
+        provided = {"xpath": self.xpath, "command": self.command}
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) > 1:

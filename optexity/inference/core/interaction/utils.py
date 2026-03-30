@@ -187,9 +187,17 @@ async def get_coordinates_from_prompt(
     memory: Memory, prompt_instructions: str, browser: Browser, task: Task
 ):
     ## call optexity api to get coordinates from prompt
-    screenshot_base64 = await browser.get_screenshot()
+    browser_state = await browser.get_browser_state_summary(
+        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+    )
+    memory.browser_states[-1] = browser_state
 
-    model = get_llm_model(GeminiModels.GEMINI_3_FLASH, True)
+    screenshot_base64 = browser_state.screenshot
+    if screenshot_base64 is None or not isinstance(screenshot_base64, str):
+        logger.error("Screenshot is None or not a string")
+        return None
+
+    model = get_llm_model(GeminiModels.GEMINI_2_5_COMPUTER_USE, True)
     coordinates, token_usage = model.get_computer_use_model_response(
         prompt=prompt_instructions,
         screenshot=screenshot_base64,
