@@ -261,7 +261,7 @@ async def select_option_locator(
         ]
 
         matched_values = await smart_select(
-            select_option_values, select_option_action.select_values, memory
+            select_option_values, select_option_action.select_values, memory, task
         )
 
         logger.debug(

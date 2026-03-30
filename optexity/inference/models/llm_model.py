@@ -58,11 +58,17 @@ class AnthropicModels(Enum):
     CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
     CLAUDE_HAIKU_4_5 = "claude-haiku-4-5-20251001"
 
+    def is_computer_use_model(self) -> bool:
+        return self in [
+            AnthropicModels.CLAUDE_SONNET_4_6,
+            AnthropicModels.CLAUDE_OPUS_4_6,
+        ]
+
 
 class LLMModel:
     def __init__(
         self,
-        model_name: GeminiModels | HumanModels | OpenAIModels,
+        model_name: GeminiModels | HumanModels | OpenAIModels | AnthropicModels,
         use_structured_output: bool,
     ):
 

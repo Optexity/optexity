@@ -18,6 +18,19 @@ INITIAL_BACKOFF_S = 1.0
 BACKOFF_FACTOR = 2
 
 
+def resolve_model_name(
+    provider: str, model_name: str
+) -> GeminiModels | AnthropicModels | OpenAIModels:
+    if provider == "gemini":
+        return GeminiModels(model_name)
+    elif provider == "anthropic":
+        return AnthropicModels(model_name)
+    elif provider == "openai":
+        return OpenAIModels(model_name)
+    else:
+        raise ValueError(f"Invalid LLM provider: {provider}")
+
+
 def get_llm_model(
     model_name: GeminiModels | HumanModels | OpenAIModels | AnthropicModels,
     use_structured_output: bool,

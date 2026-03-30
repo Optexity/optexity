@@ -119,6 +119,8 @@ class Task(BaseModel):
     callback_url: CallbackUrl | None = None
     is_dedicated: bool = False
     company_id: CompanyID
+    llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
+    llm_model_name: str = "gemini-2.5-flash"
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}

@@ -8,6 +8,7 @@ import httpx
 from optexity.inference.agents.two_fa_extraction.two_fa_extraction import (
     TwoFAExtraction,
 )
+from optexity.inference.models import get_llm_model, resolve_model_name
 from optexity.schema.actions.two_fa_action import (
     EmailTwoFAAction,
     SlackTwoFAAction,
@@ -24,7 +25,17 @@ from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
-two_fa_extraction_agent = TwoFAExtraction()
+_two_fa_cache: dict[tuple, TwoFAExtraction] = {}
+
+
+def _get_two_fa_agent(task: "Task") -> TwoFAExtraction:
+    cache_key = (task.llm_provider, task.llm_model_name)
+    if cache_key not in _two_fa_cache:
+        model = get_llm_model(
+            resolve_model_name(task.llm_provider, task.llm_model_name), True
+        )
+        _two_fa_cache[cache_key] = TwoFAExtraction(model)
+    return _two_fa_cache[cache_key]
 
 
 async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory, task: Task):
@@ -41,7 +52,7 @@ async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory, task: Ta
             two_fa_action.action, memory, two_fa_action.max_wait_time, task
         )
         if messages and len(messages) > 0:
-            final_prompt, response, token_usage = two_fa_extraction_agent.extract_code(
+            final_prompt, response, token_usage = _get_two_fa_agent(task).extract_code(
                 two_fa_action.instructions, messages
             )
             memory.token_usage += token_usage

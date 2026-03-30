@@ -81,7 +81,7 @@ async def select_option_index(
         ]
 
         matched_values = await smart_select(
-            all_options, select_option_action.select_values, memory
+            all_options, select_option_action.select_values, memory, task
         )
 
         async def _actual_select_option():

@@ -44,6 +44,9 @@ dependencies = [
     "pynput",
     "pillow",
     "python-dotenv",
+    
+    # llm clients
+    "anthropic",
 ]
 
 [project.optional-dependencies]
