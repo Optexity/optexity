@@ -10,6 +10,7 @@ from pathlib import Path
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
+from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
     _wait_for_file_stable,
     clean_download,
@@ -366,6 +367,8 @@ async def run_action_node(
             await run_assertion_action(
                 action_node.assertion_action, memory, browser, task
             )
+        elif action_node.captcha_action:
+            await handle_captcha_action(action_node.captcha_action, browser, memory)
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")

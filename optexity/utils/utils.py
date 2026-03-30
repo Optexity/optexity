@@ -67,7 +67,9 @@ async def save_and_clear_downloaded_files(content: bytes | str, filename: Path):
         logger.error(f"Unsupported content type: {type(content)}")
 
 
-def get_totp_code(totp_secret: str, digits: int = 6):
+def get_totp_code(totp_secret: str, digits: int | None = None):
+    if digits is None:
+        digits = 6
     totp = pyotp.TOTP(totp_secret, digits=digits)
     return totp.now()
 
