@@ -37,5 +37,8 @@ class CaptchaAction(BaseModel):
 
     def replace(self, pattern: str, replacement: str):
         self.locator = self.locator.replace(pattern, replacement)
-        self.secondary_locator = self.secondary_locator.replace(pattern, replacement)
+        if self.secondary_locator:
+            self.secondary_locator = self.secondary_locator.replace(
+                pattern, replacement
+            )
         return self
