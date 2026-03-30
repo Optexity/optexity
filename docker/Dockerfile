@@ -81,7 +81,7 @@ COPY openbox-rc.xml /etc/xdg/openbox/rc.xml
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 RUN git config --global --add safe.directory /home/optexity/optexity && \
-    cd optexity && git pull && git checkout vnc && git pull && \
+    cd optexity && git pull && git checkout vnc_captcha_proxy && git pull && \
     pip install --upgrade --break-system-packages -e . && \
     pip cache purge && \
     rm -rf /optexity/.git
