@@ -1,9 +1,11 @@
+import re
 from enum import Enum, unique
 from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
+from optexity.schema.actions.keyboard_keys import KEY_NAMES
 from optexity.schema.actions.prompts import overlay_popup_prompt
 
 
@@ -79,8 +81,10 @@ class SelectOptionAction(BaseAction):
 
     @model_validator(mode="after")
     def set_download_filename(self):
+
         if self.expect_download and self.download_filename is None:
             self.download_filename = str(uuid4())
+
         return self
 
     def replace(self, pattern: str, replacement: str):
@@ -94,7 +98,6 @@ class SelectOptionAction(BaseAction):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        return self
 
 
 class ClickElementAction(BaseAction):
@@ -105,8 +108,10 @@ class ClickElementAction(BaseAction):
 
     @model_validator(mode="after")
     def set_download_filename(self):
+
         if self.expect_download and self.download_filename is None:
             self.download_filename = str(uuid4())
+
         return self
 
     def replace(self, pattern: str, replacement: str):
@@ -115,7 +120,6 @@ class ClickElementAction(BaseAction):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        return self
 
 
 class InputTextAction(BaseAction):
@@ -134,7 +138,6 @@ class InputTextAction(BaseAction):
         super().replace(pattern, replacement)
         if self.input_text:
             self.input_text = self.input_text.replace(pattern, replacement).strip('"')
-        return self
 
 
 class DownloadUrlAsPdfAction(BaseModel):
@@ -147,7 +150,6 @@ class DownloadUrlAsPdfAction(BaseModel):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        return self
 
 
 class ScrollAction(BaseModel):
@@ -177,7 +179,6 @@ class UploadFileAction(BaseAction):
     def replace(self, pattern: str, replacement: str):
         if self.file_path:
             self.file_path = self.file_path.replace(pattern, replacement).strip('"')
-        return self
 
 
 class GoToUrlAction(BaseModel):
@@ -187,7 +188,6 @@ class GoToUrlAction(BaseModel):
     def replace(self, pattern: str, replacement: str):
         if self.url:
             self.url = self.url.replace(pattern, replacement).strip('"')
-        return self
 
 
 class GoBackAction(BaseModel):
@@ -224,7 +224,6 @@ class CloseTabsUntil(BaseModel):
             self.matching_url = self.matching_url.replace(pattern, replacement).strip(
                 '"'
             )
-        return self
 
 
 @unique
@@ -246,27 +245,37 @@ class KeyPressType(str, Enum):
     NINE = "9"
     SLASH = "/"
     SPACE = "Space"
+    CTRL = "Ctrl"
+    ALT = "Alt"
+    SHIFT = "Shift"
+    META = "Meta"
+    COMMAND = "Command"
+    OPTION = "Option"
+    CMD = "Cmd"
 
 
 class KeyPressAction(BaseModel):
-    type: KeyPressType | Any
-    prompt_instructions: str | None = (
-        None  # optional; used by computer-vision / recorded workflows
-    )
+    type: str | list[str]
 
     @model_validator(mode="after")
-    def validate_type(self):
-        if self.type is None:
-            raise ValueError("type is required")
+    def validate_key_combination(self):
+        if isinstance(self.type, str):
+            assert self.type in KEY_NAMES, f"Invalid key: {self.type}"
+        elif isinstance(self.type, list):
+            assert all(
+                key in KEY_NAMES for key in self.type
+            ), f"Invalid keys: {self.type}"
         return self
 
     def replace(self, pattern: str, replacement: str):
-        if self.type and isinstance(self.type, str):
-            self.type = self.type.replace(pattern, replacement).strip('"')
-        if self.prompt_instructions:
-            self.prompt_instructions = self.prompt_instructions.replace(
-                pattern, replacement
-            )
+        if self.type:
+            if isinstance(self.type, str):
+                self.type = self.type.replace(pattern, replacement).strip('"')
+            elif isinstance(self.type, list):
+                for key in self.type:
+                    if isinstance(key, str):
+                        key = key.replace(pattern, replacement).strip('"')
+
         return self
 
 

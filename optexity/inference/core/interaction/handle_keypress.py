@@ -1,5 +1,10 @@
+import pyautogui
+
 from optexity.inference.infra.browser import Browser
-from optexity.schema.actions.interaction_action import KeyPressAction, KeyPressType
+from optexity.schema.actions.interaction_action import (
+    KeyPressAction,
+    KeyPressType,
+)
 from optexity.schema.memory import Memory
 
 
@@ -8,6 +13,11 @@ async def handle_key_press(
     memory: Memory,
     browser: Browser,
 ):
+
+    if browser.channel == "rdp" or browser.backend == "computer-vision":
+        await handle_keypress_native(keypress_action, memory, browser)
+        return
+
     page = await browser.get_current_page()
     if page is None:
         return
@@ -40,3 +50,25 @@ async def handle_key_press(
         await page.keyboard.press("/")
     if keypress_action.type == KeyPressType.SPACE:
         await page.keyboard.press("Space")
+
+
+async def handle_keypress_native(
+    keypress_action: KeyPressAction,
+    memory: Memory,
+    browser: Browser,
+):
+    values = []
+
+    if isinstance(keypress_action.type, KeyPressType):
+        values.append(keypress_action.type.value)
+    elif isinstance(keypress_action.type, str):
+        values.append(keypress_action.type)
+
+    elif isinstance(keypress_action.type, list):
+        for key in keypress_action.type:
+            if isinstance(key, KeyPressType):
+                values.append(key.value)
+            elif isinstance(key, str):
+                values.append(key)
+
+    pyautogui.press(values)

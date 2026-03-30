@@ -12,11 +12,13 @@ from optexity.inference.core.interaction.utils import (
     get_coordinates_from_prompt,
     get_index_from_prompt,
     handle_download,
+    match_text_in_screenshot,
 )
 from optexity.inference.core.vision.utils import mark_screenshot
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import ClickElementAction
 from optexity.schema.memory import Memory
+from optexity.schema.ocr import BoundingBox
 from optexity.schema.task import Task
 
 pyautogui.FAILSAFE = True
@@ -119,15 +121,33 @@ async def click_element_coordinates(
             y = data[1]
             memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
 
+        if click_element_action.keyword:
+            coordinates = await match_text_in_screenshot(
+                memory,
+                click_element_action.keyword,
+                BoundingBox(x=x, y=y, width=113, height=41),
+            )
+            if coordinates is not None:
+                x = coordinates[0]
+                y = coordinates[1]
+                logger.debug(
+                    f"Found keyword {click_element_action.keyword} at coordinates: {x}, {y}"
+                )
+
         logger.debug(f"Clicking element at coordinates: {x}, {y}")
-        screenshot_base64 = memory.browser_states[-1].screenshot
-        screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
-        memory.browser_states[-1].screenshot = screenshot_base64
 
         if click_element_action.double_click:
             pyautogui.doubleClick(x, y)
         else:
             pyautogui.click(x, y)
+
+        screenshot_base64 = memory.browser_states[-1].screenshot
+        if screenshot_base64:
+            screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
+            memory.browser_states[-1].screenshot = (
+                screenshot_base64  # pyright: ignore[reportAttributeAccessIssue]
+            )
+
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:

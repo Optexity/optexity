@@ -35,9 +35,7 @@ class AmazonSecretsManagerParameter(BaseModel):
     pass
 
     @model_validator(mode="after")
-    def validate_amazon_secrets_manager_parameter(
-        cls, model: "AmazonSecretsManagerParameter"
-    ):
+    def validate_amazon_secrets_manager_parameter(self):
         raise NotImplementedError("Amazon Secrets Manager is not implemented yet")
 
 
@@ -415,9 +413,10 @@ class Automation(BaseModel):
                         if (
                             node.interaction_action.click_element is None
                             and node.interaction_action.input_text is None
+                            and node.interaction_action.key_press is None
                         ):
                             raise ValueError(
-                                "Only click_element and input_text are allowed for rdp"
+                                "Only click_element, input_text, and key_press are allowed for rdp"
                             )
         return self
 

@@ -371,6 +371,28 @@ class ActualBrowser:
             logger.error(f"Error starting actual browser: {e}")
             raise e
 
+    async def goto_url(self, url: str) -> None:
+        """Navigate the first browser tab to *url* via CDP. No-op in RDP mode."""
+        if self.channel == "rdp":
+            return
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"http://localhost:{self.port}/json/list") as r:
+                tabs = await r.json()
+
+        ws_url = tabs[0]["webSocketDebuggerUrl"]
+
+        import json as _json
+
+        async with aiohttp.ClientSession() as session:
+            async with session.ws_connect(ws_url) as ws:
+                await ws.send_str(
+                    _json.dumps(
+                        {"id": 1, "method": "Page.navigate", "params": {"url": url}}
+                    )
+                )
+                await ws.receive()  # wait for response before closing
+
     async def _wait_for_cdp(self, timeout=10):
         logger.debug("Waiting for CDP")
         url = f"http://localhost:{self.port}/json/version"

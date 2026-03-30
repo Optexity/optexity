@@ -138,21 +138,27 @@ async def input_text_coordinates(
             memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
 
         logger.debug(f"Typing text at coordinates: {x}, {y}")
-        screenshot_base64 = memory.browser_states[-1].screenshot
-        screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
-        memory.browser_states[-1].screenshot = screenshot_base64
+
         pyautogui.click(x, y)
 
         await asyncio.sleep(0.2)
 
-        changed, score = await wait_for_screen_to_change(_paste, browser)
+        await _paste()
+        # changed, score = await wait_for_screen_to_change(_paste, browser)
 
-        if not changed:
-            logger.warning("Screen did not change after typing text")
+        # if not changed:
+        #     logger.warning("Screen did not change after typing text")
 
         if input_text_action.press_enter:
             await asyncio.sleep(0.2)
             pyautogui.press("enter")
+
+        screenshot_base64 = memory.browser_states[-1].screenshot
+        if screenshot_base64:
+            screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
+            memory.browser_states[-1].screenshot = (
+                screenshot_base64  # pyright: ignore[reportAttributeAccessIssue]
+            )
 
     except ElementNotFoundInAxtreeException as e:
         raise e

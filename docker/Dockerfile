@@ -78,6 +78,8 @@ RUN git clone https://github.com/Optexity/optexity.git && \
 RUN chown -R optexity:optexity /home/optexity && \
     chmod 1777 /tmp
 
+RUN apt-get update && apt-get install -y tesseract-ocr && rm -rf /var/lib/apt/lists/*
+
 ARG CACHE_BREAK
 RUN echo "CACHE_BREAK: $CACHE_BREAK"
 
