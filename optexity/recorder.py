@@ -267,6 +267,8 @@ class Recorder:
             self.mouse_press_pos = (x, y)
             return
 
+        print(f"Click: {x}, {y}")
+
         self.mouse_pressed = False
         self._flush_typing_before_pointer_action()
         dx = abs(x - self.mouse_press_pos[0])

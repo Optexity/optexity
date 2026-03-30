@@ -103,7 +103,6 @@ async def click_element_coordinates(
     memory: Memory,
     task: Task,
 ):
-
     try:
         x, y = None, None
         if click_element_action.coordinates:
@@ -125,9 +124,12 @@ async def click_element_coordinates(
         screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
         memory.browser_states[-1].screenshot = screenshot_base64
 
-        pyautogui.click(x, y)
+        if click_element_action.double_click:
+            pyautogui.doubleClick(x, y)
+        else:
+            pyautogui.click(x, y)
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:
-        logger.error(f"Error in click_element_index: {e}")
+        logger.error(f"Error in click_element_coordinates: {e}")
         return

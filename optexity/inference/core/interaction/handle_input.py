@@ -109,7 +109,6 @@ async def input_text_coordinates(
     memory: Memory,
     task: Task,
 ):
-
     if input_text_action.input_text is None:
         return
 
