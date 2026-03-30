@@ -11,12 +11,15 @@
 #
 #   --dev    Target dev registry image: ghcr.io/optexity/opinference-dev (default without --dev is
 #            ghcr.io/optexity/opinference).
-#   -t, --tag <name>   Image tag (default: latest). Example `-t vnc` -> .../opinference-dev:vnc
+#   -t, --tag <name>   Base image tag (default: latest). Platform is always appended, e.g. `-t vnc`
+#            on arm64 -> .../opinference-dev:vnc-linux-arm64
+#   --platform <os/arch>  Target platform (default: host native: linux/amd64 or linux/arm64).
+#            Example: `--platform linux/amd64` on Apple Silicon for cross-builds.
 #   --local  EC2 / air-gapped / no-GitHub: build and load into local Docker only — skips `gh` and
 #            GHCR login, does not push. On machines with GitHub, omit --local to push to GHCR with
 #            registry build cache.
 #
-# --- run (example: dev VNC image with tag `vnc`) ---
+# --- run (example: dev VNC image; tag includes platform, e.g. vnc-linux-arm64 on Apple Silicon) ---
 #
 # Do not commit real secrets; pass keys via env or an env-file.
 #
@@ -28,7 +31,7 @@
 #     -e GOOGLE_API_KEY="<set-me>" \
 #     -e API_KEY="<set-me>" \
 #     -e DEPLOYMENT=dev \
-#     ghcr.io/optexity/opinference-dev:vnc
+#     ghcr.io/optexity/opinference-dev:vnc-linux-arm64
 #
 # Exposed ports:
 #   8080 — noVNC: open http://localhost:8080/vnc_lite.html?autoconnect=true&scale=true to view browsers
@@ -47,7 +50,28 @@ readonly CACHE_REF="${GHCR_REGISTRY}/${GHCR_OWNER}/opinference-cache:buildcache"
 TAG_DEV=0
 LOCAL_MODE=0
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+DOCKER_PLATFORM=""
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+detect_docker_platform() {
+	case "$(uname -m)" in
+		x86_64 | amd64)
+			printf '%s' "linux/amd64"
+			;;
+		aarch64 | arm64)
+			printf '%s' "linux/arm64"
+			;;
+		*)
+			log "unsupported machine hardware name: $(uname -m); set --platform explicitly" >&2
+			return 1
+			;;
+	esac
+}
+
+platform_tag_suffix() {
+	local plat="$1"
+	printf '%s' "${plat//\//-}"
+}
 
 is_linux() {
 	[[ "$(uname -s)" == "Linux" ]]
@@ -145,25 +169,31 @@ login() {
 }
 
 build() {
-	local image_tag=""
+	local image_ref="" tag_suffix platform_tag
+	tag_suffix="$(platform_tag_suffix "${DOCKER_PLATFORM}")"
+	platform_tag="${IMAGE_TAG}-${tag_suffix}"
 	if [[ "$TAG_DEV" -eq 1 ]]; then
-		image_tag="${IMAGE_DEV}:${IMAGE_TAG}"
+		image_ref="${IMAGE_DEV}:${platform_tag}"
 	else
-		image_tag="${IMAGE_PROD}:${IMAGE_TAG}"
+		image_ref="${IMAGE_PROD}:${platform_tag}"
 	fi
+
+	log "platform=${DOCKER_PLATFORM} image=${image_ref}"
 
 	if [[ "$LOCAL_MODE" -eq 1 ]]; then
 		log "local mode: building image into Docker (no GHCR login or push)"
 		docker buildx build \
-			--platform=linux/amd64 \
-			-t "${image_tag}" \
+			--build-arg CACHE_BREAK=$(date +%s) \
+			--platform="${DOCKER_PLATFORM}" \
+			-t "${image_ref}" \
 			--load .
 	else
 		docker buildx build \
-			--platform=linux/amd64 \
+			--build-arg CACHE_BREAK=$(date +%s) \
+			--platform="${DOCKER_PLATFORM}" \
 			--cache-from=type=registry,ref="${CACHE_REF}" \
 			--cache-to=type=registry,ref="${CACHE_REF}",mode=max \
-			-t "${image_tag}" \
+			-t "${image_ref}" \
 			--push .
 	fi
 }
@@ -187,12 +217,24 @@ main() {
 				IMAGE_TAG="$2"
 				shift 2
 				;;
+			--platform)
+				if [[ -z "${2:-}" ]]; then
+					log "error: $1 requires a value (e.g. $1 linux/amd64)" >&2
+					exit 1
+				fi
+				DOCKER_PLATFORM="$2"
+				shift 2
+				;;
 			*)
-				log "unknown argument: $1 (supported: --local, --dev, --tag|-t <tag>)" >&2
+				log "unknown argument: $1 (supported: --local, --dev, --tag|-t <tag>, --platform <os/arch>)" >&2
 				exit 1
 				;;
 		esac
 	done
+
+	if [[ -z "${DOCKER_PLATFORM}" ]]; then
+		DOCKER_PLATFORM="$(detect_docker_platform)" || exit 1
+	fi
 
 	ensure_dependencies
 	start
