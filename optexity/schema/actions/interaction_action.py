@@ -105,12 +105,28 @@ class ClickElementAction(BaseAction):
     expect_download: bool = False
     download_filename: str | None = None
     button: Literal["left", "right", "middle"] = "left"
+    mouse_click: bool = False
+    mouse_click_deviation: dict[str, float | int] | None = None
 
     @model_validator(mode="after")
     def set_download_filename(self):
 
         if self.expect_download and self.download_filename is None:
             self.download_filename = str(uuid4())
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_mouse_click_deviation(self):
+        if self.mouse_click_deviation is None:
+            return self
+
+        allowed_keys = {"x", "y"}
+        extra_keys = set(self.mouse_click_deviation.keys()) - allowed_keys
+        if extra_keys:
+            raise ValueError(
+                f"mouse_click_deviation may only contain keys {sorted(allowed_keys)}; got {sorted(extra_keys)}"
+            )
 
         return self
 

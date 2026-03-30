@@ -4,6 +4,7 @@ from typing import Annotated, Any, ForwardRef, Literal
 from pydantic import BaseModel, Field, model_validator
 
 from optexity.schema.actions.assertion_action import AssertionAction
+from optexity.schema.actions.captcha_action import CaptchaAction
 from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
 from optexity.schema.actions.misc_action import PythonScriptAction, SleepAction
@@ -35,9 +36,7 @@ class AmazonSecretsManagerParameter(BaseModel):
     pass
 
     @model_validator(mode="after")
-    def validate_amazon_secrets_manager_parameter(
-        cls, model: "AmazonSecretsManagerParameter"
-    ):
+    def validate_amazon_secrets_manager_parameter(self):
         raise NotImplementedError("Amazon Secrets Manager is not implemented yet")
 
 
@@ -68,6 +67,7 @@ class ActionNode(BaseModel):
     extraction_action: ExtractionAction | None = None
     python_script_action: PythonScriptAction | None = None
     sleep_action: SleepAction | None = None
+    captcha_action: CaptchaAction | None = None
     before_sleep_time: float = 0.0
     end_sleep_time: float = 5.0
     expect_new_tab: bool = False
@@ -83,12 +83,13 @@ class ActionNode(BaseModel):
             "extraction_action": self.extraction_action,
             "python_script_action": self.python_script_action,
             "sleep_action": self.sleep_action,
+            "captcha_action": self.captcha_action,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, sleep_action must be provided"
+                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, sleep_action, captcha_action must be provided"
             )
 
         assert (
@@ -131,6 +132,8 @@ class ActionNode(BaseModel):
             pass
         if self.sleep_action:
             pass
+        if self.captcha_action:
+            self.captcha_action.replace(pattern, replacement)
 
         return self
 
