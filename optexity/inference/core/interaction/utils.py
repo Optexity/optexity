@@ -15,13 +15,23 @@ from optexity.inference.agents.index_prediction.action_prediction_locator_axtree
     ActionPredictionLocatorAxtree,
 )
 from optexity.inference.infra.browser import Browser
+from optexity.inference.models import GeminiModels, get_llm_model, resolve_model_name
 from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
 
+_index_prediction_cache: dict[tuple, ActionPredictionLocatorAxtree] = {}
 
-index_prediction_agent = ActionPredictionLocatorAxtree()
+
+def _get_index_prediction_agent(task: "Task") -> ActionPredictionLocatorAxtree:
+    cache_key = (task.llm_provider, task.llm_model_name)
+    if cache_key not in _index_prediction_cache:
+        model = get_llm_model(
+            resolve_model_name(task.llm_provider, task.llm_model_name), True
+        )
+        _index_prediction_cache[cache_key] = ActionPredictionLocatorAxtree(model)
+    return _index_prediction_cache[cache_key]
 
 
 async def get_index_from_prompt(
@@ -41,7 +51,9 @@ async def get_index_from_prompt(
         if memory.browser_states[-1].axtree is None:
             logger.error("Axtree is None, cannot predict action")
             return None
-        final_prompt, response, token_usage = index_prediction_agent.predict_action(
+        final_prompt, response, token_usage = _get_index_prediction_agent(
+            task
+        ).predict_action(
             prompt_instructions,
             memory.browser_states[-1].axtree,
             can_return_negative_index=task.version == "v2",

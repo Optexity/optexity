@@ -21,6 +21,7 @@ from optexity.inference.core.interaction.handle_keypress import handle_key_press
 from optexity.inference.core.interaction.handle_select import handle_select_option
 from optexity.inference.core.interaction.handle_upload import handle_upload_file
 from optexity.inference.infra.browser import Browser
+from optexity.inference.models import get_llm_model, resolve_model_name
 from optexity.schema.actions.interaction_action import (
     CloseOverlayPopupAction,
     CloseTabsUntil,
@@ -33,7 +34,17 @@ from optexity.schema.actions.interaction_action import (
 from optexity.schema.memory import BrowserState, Memory, OutputData
 from optexity.schema.task import Task
 
-error_handler_agent = ErrorHandlerAgent()
+_error_handler_cache: dict[tuple, ErrorHandlerAgent] = {}
+
+
+def _get_error_handler(task: "Task") -> ErrorHandlerAgent:
+    cache_key = (task.llm_provider, task.llm_model_name)
+    if cache_key not in _error_handler_cache:
+        model = get_llm_model(
+            resolve_model_name(task.llm_provider, task.llm_model_name), True
+        )
+        _error_handler_cache[cache_key] = ErrorHandlerAgent(model)
+    return _error_handler_cache[cache_key]
 
 
 logger = logging.getLogger(__name__)
@@ -280,7 +291,7 @@ async def handle_assert_locator_presence_error(
                 remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
             ),
         )
-        final_prompt, response, token_usage = error_handler_agent.classify_error(
+        final_prompt, response, token_usage = _get_error_handler(task).classify_error(
             error.command, memory.browser_states[-1].screenshot
         )
         memory.token_usage += token_usage

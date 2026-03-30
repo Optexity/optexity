@@ -4,7 +4,7 @@ import logging
 from pydantic import BaseModel, Field
 
 from optexity.inference.agents.two_fa_extraction.prompt import system_prompt
-from optexity.inference.models import GeminiModels, get_llm_model
+from optexity.inference.models.llm_model import LLMModel
 from optexity.schema.inference import Message
 from optexity.schema.token_usage import TokenUsage
 
@@ -18,8 +18,8 @@ class TwoFAExtractionOutput(BaseModel):
 
 
 class TwoFAExtraction:
-    def __init__(self):
-        self.model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
+    def __init__(self, model: LLMModel):
+        self.model = model
 
     def extract_code(
         self, instructions: str | None, messages: list[Message]
