@@ -23,13 +23,31 @@ class DialogAction(BaseModel):
 
 class BaseAction(BaseModel):
     xpath: str | None = None
-    coordinates: tuple[int, int] | None = None
+    coordinates: tuple[int, int] | tuple[str, str] | None = None
     keyword: str | None = None
     command: str | None = None
     prompt_instructions: str
     skip_command: bool = False
     skip_prompt: bool = False
     assert_locator_presence: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_coordinates(cls, data: Any) -> Any:
+        if (
+            isinstance(data, dict)
+            and "coordinates" in data
+            and data["coordinates"] is not None
+        ):
+            coords = data["coordinates"]
+            if isinstance(coords, (list, tuple)) and len(coords) == 2:
+                x, y = coords[0], coords[1]
+                # If both can be parsed as int, do so; otherwise keep as strings
+                try:
+                    data["coordinates"] = (int(x), int(y))
+                except (ValueError, TypeError):
+                    data["coordinates"] = (str(x), str(y))
+        return data
 
     @model_validator(mode="after")
     def validate_one_extraction(self):
@@ -60,6 +78,13 @@ class BaseAction(BaseModel):
             self.xpath = self.xpath.replace(pattern, replacement)
         if self.command:
             self.command = self.command.replace(pattern, replacement).strip('"')
+        if self.coordinates:
+            x_str = str(self.coordinates[0]).replace(pattern, replacement)
+            y_str = str(self.coordinates[1]).replace(pattern, replacement)
+            try:
+                self.coordinates = (int(x_str), int(y_str))
+            except (ValueError, TypeError):
+                self.coordinates = (x_str, y_str)
 
 
 class CheckAction(BaseAction):
