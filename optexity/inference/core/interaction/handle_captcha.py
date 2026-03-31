@@ -184,7 +184,10 @@ async def _solve_and_click(
         )
         memory.token_usage += token_usage
 
-        if refresh_response.images_refreshed:
+        if (
+            isinstance(refresh_response, CaptchaRefreshCheck)
+            and refresh_response.images_refreshed
+        ):
             logger.debug(f"[{label}] New images detected — re-solving before verify")
             refresh_count += 1
 
@@ -252,8 +255,8 @@ async def handle_captcha_action(
     await _mouse_click(page, x, y)
     logger.debug(f"Captcha trigger clicked at ({x:.1f}, {y:.1f})")
 
-    ## TODO: Implement the rest of the captcha solving logic
-    return
+    # ## TODO: Implement the rest of the captcha solving logic
+    # return
     # If no secondary_locator provided, just do the trigger click and move on
     if not captcha_action.secondary_locator:
         logger.debug("No secondary_locator provided — skipping captcha solving")

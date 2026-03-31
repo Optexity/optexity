@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     PROXY_COUNTRY: str | None = None
     PROXY_PROVIDER: Literal["oxylabs", "brightdata", "other"] | None = None
 
+    BROWSER_USE_API_KEY: str | None = None
+
     @model_validator(mode="after")
     def validate_local_callback_url(self):
         if self.DEPLOYMENT == "prod" and self.LOCAL_CALLBACK_URL is not None:

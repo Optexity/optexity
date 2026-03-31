@@ -65,7 +65,11 @@ def is_driver_closed_error(e: Exception) -> bool:
 
 
 async def run_automation(
-    task: Task, unique_child_arn: str, child_process_id: int, max_tries: int = 1
+    task: Task,
+    unique_child_arn: str,
+    child_process_id: int,
+    cdp_url: str,
+    max_tries: int = 1,
 ):
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
@@ -86,16 +90,7 @@ async def run_automation(
         memory.update_system_info()
 
         def _get_browser():
-            return Browser(
-                memory=memory,
-                headless=False,
-                channel=task.automation.browser_channel,
-                debug_port=9222 + child_process_id,
-                use_proxy=task.use_proxy,
-                proxy_session_id=task.proxy_session_id(
-                    settings.PROXY_PROVIDER if task.use_proxy else None
-                ),
-            )
+            return Browser(memory=memory, cdp_url=cdp_url)
 
         browser = _get_browser()
         memory.update_system_info()
@@ -117,6 +112,7 @@ async def run_automation(
         if task.use_proxy:
 
             page = await browser.get_current_page()
+            await asyncio.sleep(5)
             await browser.go_to_url("https://ip.oxylabs.io/location")
 
             ip_info = await page.evaluate("""

@@ -106,6 +106,7 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             _global_actual_browser = None
 
     if _global_actual_browser is None:
+        task.automation.browser_channel = "browser-use"
         logger.info("Starting new actual browser")
         _global_actual_browser = ActualBrowser(
             channel=task.automation.browser_channel,
@@ -158,6 +159,12 @@ async def run_automation_in_process(
         await setup_browser(task, unique_child_arn, child_process_id)
         log_system_info("Memory info after starting browser")
 
+        if _global_actual_browser is None:
+            raise ValueError("Browser is not setup")
+        _cdp_url = _global_actual_browser.cdp_url
+        if _cdp_url is None:
+            raise ValueError("CDP URL is not setup")
+
         logger.info(
             f"Starting worker attempt {attempt_index + 1}/{total_attempts} (attempts_left={attempts_left})"
         )
@@ -168,6 +175,7 @@ async def run_automation_in_process(
             task.model_dump_json(),
             unique_child_arn,
             str(child_process_id),
+            str(_cdp_url),
             str(attempts_left),
             preexec_fn=os.setsid,
         )
