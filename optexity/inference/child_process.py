@@ -106,7 +106,6 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             _global_actual_browser = None
 
     if _global_actual_browser is None:
-        task.automation.browser_channel = "browser-use"
         logger.info("Starting new actual browser")
         _global_actual_browser = ActualBrowser(
             channel=task.automation.browser_channel,
