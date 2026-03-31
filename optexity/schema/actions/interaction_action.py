@@ -78,6 +78,8 @@ class BaseAction(BaseModel):
             self.xpath = self.xpath.replace(pattern, replacement)
         if self.command:
             self.command = self.command.replace(pattern, replacement).strip('"')
+        if self.keyword:
+            self.keyword = self.keyword.replace(pattern, replacement)
         if self.coordinates:
             x_str = str(self.coordinates[0]).replace(pattern, replacement)
             y_str = str(self.coordinates[1]).replace(pattern, replacement)

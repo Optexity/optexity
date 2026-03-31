@@ -11,6 +11,7 @@ from optexity.schema.actions.extraction_action import (
     ExtractionAction,
     LLMExtraction,
     NetworkCallExtraction,
+    OCRCoordinatesExtraction,
     PDFExtraction,
     PythonScriptExtraction,
     ScreenshotExtraction,
@@ -78,6 +79,13 @@ async def run_extraction_action(
         await run_two_fa_action(extraction_action.two_fa_action, memory, task)
     elif extraction_action.pdf:
         await handle_pdf_extraction(extraction_action.pdf, memory, task)
+    elif extraction_action.ocr_coordinates:
+        await handle_ocr_coordinates_extraction(
+            extraction_action.ocr_coordinates,
+            memory,
+            browser,
+            extraction_action.unique_identifier,
+        )
 
 
 async def handle_state_extraction(
@@ -363,3 +371,59 @@ async def handle_pdf_extraction(
     )
 
     return output_data
+
+
+async def handle_ocr_coordinates_extraction(
+    ocr_extraction: OCRCoordinatesExtraction,
+    memory: Memory,
+    browser: "Browser",
+    unique_identifier: str | None = None,
+):
+    """Run OCR once on the screenshot, match all names from source_variable, store x/y as parallel lists."""
+    from optexity.inference.core.interaction.utils import match_text_in_screenshot
+
+    # Get the list of text elements to find
+    source_var = ocr_extraction.source_variable
+    if source_var in memory.variables.generated_variables:
+        names = memory.variables.generated_variables[source_var]
+    else:
+        logger.error(f"Source variable '{source_var}' not found in generated variables")
+        return
+
+    # Get screenshot and store in memory for match_text_in_screenshot
+    screenshot = await browser.get_screenshot()
+    if screenshot is None:
+        logger.error("Screenshot is None, cannot run OCR")
+        return
+
+    # Use match_text_in_screenshot in batch mode (single OCR call)
+    names_str = [str(n) for n in names]
+    found = await match_text_in_screenshot(
+        memory=memory,
+        keyword=names_str,
+        screenshot=screenshot,
+    )
+
+    coords_x: list[int] = []
+    coords_y: list[int] = []
+
+    for name in names_str:
+        coords = found.get(name)
+        if coords is not None:
+            coords_x.append(coords[0])
+            coords_y.append(coords[1])
+            logger.info(f"OCR matched '{name}' at ({coords[0]}, {coords[1]})")
+        else:
+            coords_x.append(0)
+            coords_y.append(0)
+            logger.warning(f"OCR could not find '{name}' on screen")
+
+    # Store in generated variables
+    memory.variables.generated_variables[ocr_extraction.output_x_variable] = coords_x
+    memory.variables.generated_variables[ocr_extraction.output_y_variable] = coords_y
+
+    # Also store in output_data
+    result_data = {name: [coords_x[i], coords_y[i]] for i, name in enumerate(names_str)}
+    memory.variables.output_data.append(
+        OutputData(unique_identifier=unique_identifier, json_data=result_data)
+    )

@@ -240,30 +240,86 @@ async def get_coordinates_from_prompt(
 
 
 async def match_text_in_screenshot(
-    memory: Memory, keyword: str, region_of_interest: BoundingBox
-):
+    memory: Memory,
+    keyword: str | list[str],
+    region_of_interest: BoundingBox | None = None,
+    screenshot: str | bytes | None = None,
+) -> tuple[int, int] | None | dict[str, tuple[int, int] | None]:
+    """Find text on screenshot and return center coordinates.
 
-    if memory.browser_states[-1].screenshot is None:
-        logger.error("Screenshot is None or not a string")
-        return None
-
-    results = ocr.ocr(
-        memory.browser_states[-1].screenshot,
-        region_of_interest=region_of_interest,
-        padding_factor=4.0,
+    Single keyword: returns (x, y) or None.
+    List of keywords: returns {keyword: (x, y) or None} for each keyword (single OCR call).
+    """
+    img = screenshot or (
+        memory.browser_states[-1].screenshot if memory.browser_states else None
     )
+    if img is None:
+        logger.error("Screenshot is None or not a string")
+        return None if isinstance(keyword, str) else {k: None for k in keyword}
 
-    for result in results:
-        if result.text.lower().strip() == keyword.lower().strip():
-            return int(result.bounding_box.x + result.bounding_box.width / 2), int(
-                result.bounding_box.y + result.bounding_box.height / 2,
-            )
+    # Save screenshot for debugging
+    try:
+        import base64 as _b64
 
-    results = ocr.ocr(memory.browser_states[-1].screenshot)
-    for result in results:
-        if result.text.lower().strip() == keyword.lower().strip():
-            return int(result.bounding_box.x + result.bounding_box.width / 2), int(
-                result.bounding_box.y + result.bounding_box.height / 2,
-            )
+        debug_path = "/tmp/ocr_debug_screenshot.png"
+        if isinstance(img, str):
+            with open(debug_path, "wb") as f:
+                f.write(_b64.b64decode(img))
+        elif isinstance(img, bytes):
+            with open(debug_path, "wb") as f:
+                f.write(img)
+        logger.info(f"Saved OCR debug screenshot to {debug_path}")
+    except Exception as e:
+        logger.error(f"Failed to save debug screenshot: {e}")
 
-    return None
+    batch_mode = isinstance(keyword, list)
+    keywords = keyword if batch_mode else [keyword]
+
+    def _find_in_results(ocr_results, keywords_to_find):
+        logger.info(f"ocr_results: {ocr_results}")
+        logger.info(f"keywords_to_find: {keywords_to_find}")
+        found = {}
+        for kw in keywords_to_find:
+            kw_lower = kw.lower().strip()
+            match = None
+            # Exact match
+            for r in ocr_results:
+                if r.text.lower().strip() == kw_lower:
+                    match = (
+                        int(r.bounding_box.x + r.bounding_box.width / 2),
+                        int(r.bounding_box.y + r.bounding_box.height / 2),
+                    )
+                    break
+            # Substring match fallback
+            if match is None:
+                for r in ocr_results:
+                    r_text = r.text.lower().strip()
+                    if kw_lower in r_text or r_text in kw_lower:
+                        match = (
+                            int(r.bounding_box.x + r.bounding_box.width / 2),
+                            int(r.bounding_box.y + r.bounding_box.height / 2),
+                        )
+                        break
+            found[kw] = match
+        return found
+
+    # Try ROI first if provided
+    if region_of_interest is not None:
+        results = ocr.ocr(
+            img, region_of_interest=region_of_interest, padding_factor=4.0
+        )
+        found = _find_in_results(results, keywords)
+        remaining = [kw for kw in keywords if found[kw] is None]
+    else:
+        found = {kw: None for kw in keywords}
+        remaining = keywords
+
+    # Full screenshot fallback for any unmatched keywords
+    if remaining:
+        results = ocr.ocr(img)
+        full_found = _find_in_results(results, remaining)
+        found.update(full_found)
+
+    if batch_mode:
+        return found
+    return found[keywords[0]]
