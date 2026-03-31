@@ -572,22 +572,19 @@ class Browser:
     ) -> str | bytes | None:
         if self.channel == "rdp" or self.backend == "computer-vision":
             try:
-                if self.sct is None:
-                    self.sct = mss.mss()
+                await asyncio.sleep(0.1)
 
-                time.sleep(1)
+                def _capture() -> bytes:
+                    with mss.mss() as sct:
+                        monitor = sct.monitors[1]
+                        shot = sct.grab(monitor)
+                        png_bytes = mss.tools.to_png(shot.rgb, shot.size, output=None)
+                        if png_bytes is None:
+                            raise RuntimeError("Failed to encode PNG")
+                        return png_bytes
 
-                monitor = self.sct.monitors[
-                    1
-                ]  # full virtual screen; use [0] for "all monitors"
-                shot = self.sct.grab(monitor)
-
-                # Optional: keep this only if you actually need the ndarray somewhere
-                # pixels = np.array(shot)  # BGRA, shape: (H, W, 4)
-
-                png_bytes = mss.tools.to_png(shot.rgb, shot.size, output=None)
-                if png_bytes is None:
-                    raise RuntimeError("Failed to encode PNG")
+                loop = asyncio.get_event_loop()
+                png_bytes = await loop.run_in_executor(None, _capture)
                 if get_bytes:
                     return png_bytes
                 return base64.b64encode(png_bytes).decode("utf-8")

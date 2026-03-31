@@ -46,27 +46,25 @@ async def wait_for_screen_to_change(
     Returns:
         (changed, ssim_score_of_last_comparison)
     """
-    before = await _grab(browser)
-    before_blurred = _blur(before)
-
     await action()
 
-    deadline = time.monotonic() + timeout
-    score = 1.0  # Default value in case loop doesn't run
-    while time.monotonic() < deadline:
-        await asyncio.sleep(poll_interval)
-        current = await _grab(browser)
+    score = 1.0
+    # TODO: Re-enable SSIM-based change detection once RDP screenshot overhead is low enough.
+    # deadline = time.monotonic() + timeout
+    # before = await _grab(browser)
+    # before_blurred = _blur(before)
+    # while time.monotonic() < deadline:
+    #     await asyncio.sleep(poll_interval)
+    #     current = await _grab(browser)
+    #     if current.shape != before.shape:
+    #         return True, 0.0
+    #     current_blurred = _blur(current)
+    #     score = ssim(before_blurred, current_blurred)
+    #     if score < threshold:
+    #         return True, score
 
-        if current.shape != before.shape:
-            return True, 0.0
-
-        current_blurred = _blur(current)
-        score = ssim(before_blurred, current_blurred)
-        if score < threshold:
-            return True, score
-
-    # timed out — nothing changed
-    return False, score
+    await asyncio.sleep(0.3)
+    return True, score
 
 
 async def wait_for_stable_screen(
@@ -89,9 +87,10 @@ async def wait_for_stable_screen(
     Returns:
         (is_stable, last_frame_grayscale)
     """
-    deadline = time.monotonic() + timeout
-    previous = await _grab(browser)
-    stable_since = time.monotonic()
+
+    # TODO: Re-enable SSIM-based stability detection once RDP screenshot overhead is low enough.
+    await asyncio.sleep(0.3)
+    return True, None
 
     while time.monotonic() < deadline:
         await asyncio.sleep(poll_interval)
