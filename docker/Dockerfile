@@ -89,7 +89,7 @@ COPY supervisord.dev.conf /etc/supervisor/conf.d/supervisord.dev.conf
 COPY supervisord.prod.conf /etc/supervisor/conf.d/supervisord.prod.conf
 
 RUN git config --global --add safe.directory /home/optexity/optexity && \
-    cd optexity && git pull && git checkout ui_agents && git pull && \
+    cd optexity && git pull && git checkout ui_agents_prince && git pull && \
     pip install --upgrade --break-system-packages -e . && \
     pip cache purge && \
     rm -rf /optexity/.git
