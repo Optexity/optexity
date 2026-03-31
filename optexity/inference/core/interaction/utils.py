@@ -16,6 +16,8 @@ from optexity.exceptions import (
 from optexity.inference.agents.index_prediction.action_prediction_locator_axtree import (
     ActionPredictionLocatorAxtree,
 )
+from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
+from optexity.inference.core.vision.ocr.ocr import OCRModels
 from optexity.inference.core.vision.ocr.tesseract import Tesseract
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import GeminiModels, get_llm_model, resolve_model_name
@@ -27,7 +29,6 @@ from optexity.utils.settings import settings
 logger = logging.getLogger(__name__)
 
 _index_prediction_cache: dict[tuple, ActionPredictionLocatorAxtree] = {}
-ocr = Tesseract()
 
 
 def _get_index_prediction_agent(task: "Task") -> ActionPredictionLocatorAxtree:
@@ -223,21 +224,6 @@ async def get_coordinates_from_prompt(
 
     return coordinates
 
-    # url = urljoin(settings.SERVER_URL, settings.GET_COORDINATES_ENDPOINT)
-    # headers = {"x-api-key": task.api_key}
-    # body = {
-    #     "screenshot_base64": screenshot_base64,
-    #     "prompt_instructions": prompt_instructions,
-    #     "step_index": memory.automation_state.step_index,
-    #     "task_id": task.task_id,
-    # }
-    # async with httpx.AsyncClient(timeout=60.0) as client:
-    #     response = await client.post(url, headers=headers, json=body)
-    #     response.raise_for_status()
-    #     data = response.json()
-
-    # return data.get("coordinates")
-
 
 async def match_text_in_screenshot(
     memory: Memory,
@@ -250,6 +236,7 @@ async def match_text_in_screenshot(
     Single keyword: returns (x, y) or None.
     List of keywords: returns {keyword: (x, y) or None} for each keyword (single OCR call).
     """
+    ocr = AWSTextract()
     img = screenshot or (
         memory.browser_states[-1].screenshot if memory.browser_states else None
     )
