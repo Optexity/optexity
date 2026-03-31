@@ -189,3 +189,60 @@ class OCR:
         self, screenshot: str | bytes, region_of_interest: Optional[BoundingBox] = None
     ) -> list[OCRResult]:
         raise NotImplementedError("This method is not implemented")
+
+    def visualize(
+        self,
+        screenshot: str | bytes,
+        results: list[OCRResult],
+        box_color: tuple[int, int, int] = (0, 255, 0),
+        text_color: tuple[int, int, int] = (0, 0, 0),
+        box_thickness: int = 1,
+        font_scale: float = 0.4,
+    ) -> tuple[bytes, bytes]:
+        """
+        Render OCR results onto two images and return both as PNG bytes.
+
+        Args:
+            screenshot: base64-encoded string or raw PNG/JPEG bytes of the original image.
+            results: list of OCRResult as returned by ocr().
+            box_color: BGR color for bounding box rectangles.
+            text_color: BGR color for text labels on the blank canvas.
+            box_thickness: thickness of the bounding box border in pixels.
+            font_scale: cv2 font scale for text rendered on the blank canvas.
+
+        Returns:
+            (annotated, canvas) where:
+              annotated — original image with all bounding boxes drawn over it.
+              canvas    — blank white image of the same size with bounding boxes
+                          and detected text labels drawn on it.
+        """
+        img = _load_cv2(screenshot)
+        h, w = img.shape[:2]
+
+        annotated = img.copy()
+        canvas = np.full((h, w, 3), 255, dtype=np.uint8)
+
+        for r in results:
+            bb = r.bounding_box
+            x1 = int(bb.x)
+            y1 = int(bb.y)
+            x2 = int(bb.x + bb.width)
+            y2 = int(bb.y + bb.height)
+
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), box_color, box_thickness)
+            cv2.rectangle(canvas, (x1, y1), (x2, y2), box_color, box_thickness)
+
+            # Place the text just above the bounding box; shift down if too close to top.
+            label_y = y1 - 3 if y1 - 3 > 8 else y2 + 10
+            cv2.putText(
+                canvas,
+                r.text,
+                (x1, label_y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                font_scale,
+                text_color,
+                1,
+                cv2.LINE_AA,
+            )
+
+        return _cv2_to_bytes(annotated), _cv2_to_bytes(canvas)
