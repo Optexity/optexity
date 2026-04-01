@@ -30,6 +30,7 @@ from optexity.inference.core.run_interaction import (
     run_interaction_action,
 )
 from optexity.inference.core.run_misc import run_sleep_action
+from optexity.inference.core.run_powershell import run_powershell_action
 from optexity.inference.core.run_python_script import run_python_script_action
 from optexity.inference.core.vision.time import wait_for_stable_screen
 from optexity.inference.infra.browser import Browser
@@ -350,6 +351,8 @@ async def run_action_node(
             await run_python_script_action(
                 action_node.python_script_action, memory, browser
             )
+        elif action_node.powershell_action:
+            await run_powershell_action(action_node.powershell_action)
         elif action_node.sleep_action:
             await run_sleep_action(action_node.sleep_action)
         elif action_node.assertion_action:

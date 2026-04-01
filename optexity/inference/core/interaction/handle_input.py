@@ -112,12 +112,15 @@ async def input_text_coordinates(
     if input_text_action.input_text is None:
         return
 
-    async def _paste():
+    async def _input():
         if input_text_action.input_text is None:
             return
-        pyperclip.copy(input_text_action.input_text)
-        await asyncio.sleep(0.2)
-        pyautogui.hotkey(browser.modifier_key, "v")
+        if input_text_action.fill_or_type == "type":
+            pyautogui.typewrite(input_text_action.input_text, interval=0.05)
+        else:
+            pyperclip.copy(input_text_action.input_text)
+            await asyncio.sleep(0.2)
+            pyautogui.hotkey(browser.modifier_key, "v")
 
     try:
         x, y = None, None
@@ -143,7 +146,7 @@ async def input_text_coordinates(
 
         await asyncio.sleep(0.2)
 
-        await _paste()
+        await _input()
         # changed, score = await wait_for_screen_to_change(_paste, browser)
 
         # if not changed:

@@ -71,4 +71,7 @@ async def handle_keypress_native(
             elif isinstance(key, str):
                 values.append(key)
 
-    pyautogui.press(values)
+    if len(values) > 1:
+        pyautogui.hotkey(*values)
+    else:
+        pyautogui.press(values[0])
