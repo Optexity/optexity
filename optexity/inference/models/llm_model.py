@@ -36,10 +36,17 @@ class OpenAIModels(Enum):
     GPT_4_1_MINI = "gpt-4.1-mini"
 
 
+@unique
+class AnthropicModels(Enum):
+    CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
+    CLAUDE_OPUS_4_6 = "claude-opus-4-6"
+    CLAUDE_HAIKU_4_5 = "claude-haiku-4-5-20251001"
+
+
 class LLMModel:
     def __init__(
         self,
-        model_name: GeminiModels | HumanModels | OpenAIModels,
+        model_name: GeminiModels | HumanModels | OpenAIModels | AnthropicModels,
         use_structured_output: bool,
     ):
 
@@ -47,7 +54,7 @@ class LLMModel:
         self.use_structured_output = use_structured_output
 
     def _get_model_response(
-        self, prompt: str, system_instruction: Optional[str] = None
+        self, prompt: str, system_instruction: str | None = None
     ) -> tuple[str, TokenUsage]:
         raise NotImplementedError("This method should be implemented by subclasses.")
 
@@ -55,14 +62,14 @@ class LLMModel:
         self,
         prompt: str,
         response_schema: type[BaseModel],
-        screenshot: Optional[str] = None,
+        screenshot: str | None = None,
         pdf_url: Optional[str | Path] = None,
-        system_instruction: Optional[str] = None,
+        system_instruction: str | None = None,
     ) -> tuple[BaseModel, TokenUsage]:
         raise NotImplementedError("This method should be implemented by subclasses.")
 
     def get_model_response(
-        self, prompt: str, system_instruction: Optional[str] = None
+        self, prompt: str, system_instruction: str | None = None
     ) -> tuple[str, TokenUsage]:
 
         max_retries = 3
@@ -81,9 +88,9 @@ class LLMModel:
         self,
         prompt: str,
         response_schema: type[BaseModel],
-        screenshot: Optional[str] = None,
-        pdf_url: Optional[str | Path] = None,
-        system_instruction: Optional[str] = None,
+        screenshot: str | None = None,
+        pdf_url: str | Path | None = None,
+        system_instruction: str | None = None,
     ) -> tuple[BaseModel, TokenUsage]:
 
         total_token_usage = TokenUsage()
@@ -139,6 +146,7 @@ class LLMModel:
         for pattern in patterns:
             json_blocks += re.findall(pattern, content, re.DOTALL)
         json_blocks += self.extract_json_objects(content)
+
         for block in json_blocks:
             block = block.strip()
             try:
