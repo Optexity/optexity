@@ -89,7 +89,7 @@ async def wait_for_stable_screen(
     """
 
     # TODO: Re-enable SSIM-based stability detection once RDP screenshot overhead is low enough.
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(2)
     return True, None
 
     while time.monotonic() < deadline:

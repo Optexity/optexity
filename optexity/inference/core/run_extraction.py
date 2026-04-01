@@ -401,13 +401,14 @@ async def handle_ocr_coordinates_extraction(
         logger.error("Screenshot is None, cannot run OCR")
         return
 
-    results = ocr.ocr(screenshot)
+    results, base64_image_sent_to_ocr = ocr.ocr(screenshot)
 
     annotated, canvas = ocr.visualize(screenshot, results)
     memory.browser_states[-1].ocr_annotated = base64.b64encode(annotated).decode(
         "utf-8"
     )
     memory.browser_states[-1].ocr_canvas = base64.b64encode(canvas).decode("utf-8")
+    memory.browser_states[-1].ocr_image_sent_to_ocr.append(base64_image_sent_to_ocr)
 
     # Use match_text_in_screenshot in batch mode (single OCR call)
     names_str = [str(n) for n in names]

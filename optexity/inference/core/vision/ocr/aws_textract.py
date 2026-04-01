@@ -9,6 +9,7 @@ Credentials are resolved from the standard AWS credential chain
 from typing import Optional
 
 import boto3
+import numpy as np
 
 from optexity.inference.core.vision.ocr.ocr import (
     OCR,
@@ -38,12 +39,11 @@ class AWSTextract(OCR):
         self._min_conf = min_confidence
         self._client = boto3.client("textract", region_name=region)
 
-    @timeit
-    def ocr(
+    def _ocr(
         self,
-        screenshot: str | bytes,
-        region_of_interest: Optional[BoundingBox] = None,
-        padding_factor: float = 1.0,
+        processed: np.ndarray,
+        offset_x: int,
+        offset_y: int,
     ) -> list[OCRResult]:
         """
         Run OCR on the screenshot (or a padded sub-region) and return all results
@@ -64,16 +64,8 @@ class AWSTextract(OCR):
           6. Translate bboxes back to full-screenshot coordinates.
           7. Filter by min_confidence; return list[OCRResult] (lines first, then words).
         """
-        img_bgr = _load_cv2(screenshot)
-
-        offset_x, offset_y = 0, 0
-        if region_of_interest is not None:
-            img_bgr, offset_x, offset_y = self._crop_array(
-                img_bgr, region_of_interest, padding_factor
-            )
-
-        img_h, img_w = img_bgr.shape[:2]
-        img_bytes = _cv2_to_bytes(img_bgr)
+        img_h, img_w = processed.shape[:2]
+        img_bytes = _cv2_to_bytes(processed)
 
         response = self._client.detect_document_text(Document={"Bytes": img_bytes})
 

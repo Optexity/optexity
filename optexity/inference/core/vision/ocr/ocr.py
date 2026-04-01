@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 
 from optexity.schema.ocr import BoundingBox, OCRResult
+from optexity.utils.timeit import timeit
 
 
 @unique
@@ -180,15 +181,40 @@ class OCR:
         Returns:
             Single-channel binary uint8 array.
         """
+        return img
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         if use_gpu and self._has_cuda():
             return self._preprocess_gpu(gray)
         return self._preprocess_cpu(gray)
 
-    def ocr(
-        self, screenshot: str | bytes, region_of_interest: Optional[BoundingBox] = None
+    def _ocr(
+        self, processed: np.ndarray, offset_x: int, offset_y: int
     ) -> list[OCRResult]:
         raise NotImplementedError("This method is not implemented")
+
+    @timeit
+    def ocr(
+        self,
+        screenshot: str | bytes,
+        region_of_interest: Optional[BoundingBox] = None,
+        padding_factor: float = 1.0,
+    ) -> tuple[list[OCRResult], str]:
+        # Entry point: str|bytes → np.ndarray. All subsequent ops are np.ndarray.
+        img_bgr = _load_cv2(screenshot)
+
+        offset_x, offset_y = 0, 0
+        if region_of_interest is not None:
+            img_bgr, offset_x, offset_y = self._crop_array(
+                img_bgr, region_of_interest, padding_factor
+            )
+
+        processed = self._preprocess_array(img_bgr, use_gpu=False)
+
+        ocr_results = self._ocr(processed, offset_x, offset_y)
+
+        image_sent_to_ocr = _cv2_to_bytes(processed)
+        base64_image_sent_to_ocr = base64.b64encode(image_sent_to_ocr).decode("utf-8")
+        return ocr_results, base64_image_sent_to_ocr
 
     def visualize(
         self,

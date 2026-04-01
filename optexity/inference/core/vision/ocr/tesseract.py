@@ -8,12 +8,12 @@ preprocessing pipeline when OpenCV is built with CUDA support.
 import shutil
 from typing import Optional
 
+import numpy as np
 import pytesseract
 from pytesseract import Output
 
-from optexity.inference.core.vision.ocr.ocr import OCR, OCRModels, _load_cv2
+from optexity.inference.core.vision.ocr.ocr import OCR, OCRModels
 from optexity.schema.ocr import BoundingBox, OCRResult
-from optexity.utils.timeit import timeit
 
 if shutil.which("tesseract") is None:
     raise RuntimeError(
@@ -53,12 +53,11 @@ class Tesseract(OCR):
         self._min_conf = min_confidence
         self._use_gpu = use_gpu_preprocessing
 
-    @timeit
-    def ocr(
+    def _ocr(
         self,
-        screenshot: str | bytes,
-        region_of_interest: Optional[BoundingBox] = None,
-        padding_factor: float = 1.0,
+        processed: np.ndarray,
+        offset_x: int,
+        offset_y: int,
     ) -> list[OCRResult]:
         """
         Run OCR on the screenshot (or a padded sub-region) and return all results
@@ -79,15 +78,6 @@ class Tesseract(OCR):
           6. Filter by min_confidence; return list[OCRResult].
         """
         # Entry point: str|bytes → np.ndarray. All subsequent ops are np.ndarray.
-        img_bgr = _load_cv2(screenshot)
-
-        offset_x, offset_y = 0, 0
-        if region_of_interest is not None:
-            img_bgr, offset_x, offset_y = self._crop_array(
-                img_bgr, region_of_interest, padding_factor
-            )
-
-        processed = self._preprocess_array(img_bgr, use_gpu=self._use_gpu)
 
         data = pytesseract.image_to_data(
             processed, config=self._config, output_type=Output.DICT

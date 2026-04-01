@@ -344,6 +344,14 @@ async def save_latest_memory_state_locally(
                 browser_state.ocr_canvas, step_directory / "ocr_canvas.png"
             )
 
+        for index, ocr_image_sent_to_ocr in enumerate(
+            browser_state.ocr_image_sent_to_ocr
+        ):
+            await save_screenshot(
+                ocr_image_sent_to_ocr,
+                step_directory / f"ocr_image_sent_to_ocr_{index + 1}.png",
+            )
+
         state_dict = {
             "title": browser_state.title,
             "url": browser_state.url,
