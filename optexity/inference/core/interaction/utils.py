@@ -5,10 +5,9 @@ import shutil
 import uuid
 from pathlib import Path
 from typing import Callable
-from urllib.parse import urljoin
 
 import aiofiles
-import httpx
+from rapidfuzz import fuzz
 
 from optexity.exceptions import (
     ElementNotFoundInAxtreeException,
@@ -17,18 +16,19 @@ from optexity.inference.agents.index_prediction.action_prediction_locator_axtree
     ActionPredictionLocatorAxtree,
 )
 from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
-from optexity.inference.core.vision.ocr.ocr import OCRModels
 from optexity.inference.core.vision.ocr.tesseract import Tesseract
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import GeminiModels, get_llm_model, resolve_model_name
-from optexity.schema.memory import BrowserState, Memory
-from optexity.schema.ocr import BoundingBox
+from optexity.schema.memory import Memory
+from optexity.schema.ocr import BoundingBox, OCRResult
 from optexity.schema.task import Task
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
 _index_prediction_cache: dict[tuple, ActionPredictionLocatorAxtree] = {}
+small_ocr = Tesseract()
+large_ocr = AWSTextract()
 
 
 def _get_index_prediction_agent(task: "Task") -> ActionPredictionLocatorAxtree:
@@ -227,86 +227,84 @@ async def get_coordinates_from_prompt(
 
 async def match_text_in_screenshot(
     memory: Memory,
-    keyword: str | list[str],
+    keyword: str,
     region_of_interest: BoundingBox | None = None,
     screenshot: str | bytes | None = None,
-) -> tuple[int, int] | None | dict[str, tuple[int, int] | None]:
+) -> OCRResult | None:
     """Find text on screenshot and return center coordinates.
 
     Single keyword: returns (x, y) or None.
     List of keywords: returns {keyword: (x, y) or None} for each keyword (single OCR call).
     """
-    ocr = AWSTextract()
     img = screenshot or (
         memory.browser_states[-1].screenshot if memory.browser_states else None
     )
     if img is None:
         logger.error("Screenshot is None or not a string")
-        return None if isinstance(keyword, str) else {k: None for k in keyword}
-
-    # Save screenshot for debugging
-    try:
-        import base64 as _b64
-
-        debug_path = "/tmp/ocr_debug_screenshot.png"
-        if isinstance(img, str):
-            with open(debug_path, "wb") as f:
-                f.write(_b64.b64decode(img))
-        elif isinstance(img, bytes):
-            with open(debug_path, "wb") as f:
-                f.write(img)
-        logger.info(f"Saved OCR debug screenshot to {debug_path}")
-    except Exception as e:
-        logger.error(f"Failed to save debug screenshot: {e}")
-
-    batch_mode = isinstance(keyword, list)
-    keywords = keyword if batch_mode else [keyword]
-
-    def _find_in_results(ocr_results, keywords_to_find):
-        logger.info(f"ocr_results: {ocr_results}")
-        logger.info(f"keywords_to_find: {keywords_to_find}")
-        found = {}
-        for kw in keywords_to_find:
-            kw_lower = kw.lower().strip()
-            match = None
-            # Exact match
-            for r in ocr_results:
-                if r.text.lower().strip() == kw_lower:
-                    match = (
-                        int(r.bounding_box.x + r.bounding_box.width / 2),
-                        int(r.bounding_box.y + r.bounding_box.height / 2),
-                    )
-                    break
-            # Substring match fallback
-            if match is None:
-                for r in ocr_results:
-                    r_text = r.text.lower().strip()
-                    if kw_lower in r_text or r_text in kw_lower:
-                        match = (
-                            int(r.bounding_box.x + r.bounding_box.width / 2),
-                            int(r.bounding_box.y + r.bounding_box.height / 2),
-                        )
-                        break
-            found[kw] = match
-        return found
+        return None
 
     # Try ROI first if provided
     if region_of_interest is not None:
-        results = ocr.ocr(
+        results = small_ocr.ocr(
             img, region_of_interest=region_of_interest, padding_factor=4.0
         )
-        found = _find_in_results(results, keywords)
-        remaining = [kw for kw in keywords if found[kw] is None]
-    else:
-        found = {kw: None for kw in keywords}
-        remaining = keywords
+        result = find_keyword_in_results(results, keyword)
+        if result is not None:
+            logger.info(f"Found keyword using small OCR {keyword} in ROI: {result}")
+            return result
 
     # Full screenshot fallback for any unmatched keywords
-    if remaining:
-        results = ocr.ocr(img)
-        full_found = _find_in_results(results, remaining)
-        found.update(full_found)
 
-    if batch_mode:
-        return found
-    return found[keywords[0]]
+    logger.info("Could not find keyword using small OCR, trying large OCR...")
+    results = large_ocr.ocr(img)
+    result = find_keyword_in_results(results, keyword)
+
+    if result is not None:
+        logger.info(f"Found keyword using large OCR {keyword}: {result}")
+        return result
+    return None
+
+
+def find_keyword_in_results(ocr_results: list[OCRResult], keyword: str):
+
+    scored = []
+    target = keyword.lower().strip()
+    for i, candidate in enumerate(ocr_results):
+        candidate_text = candidate.text.lower().strip()
+        if target == candidate_text:
+            scored.append((i, candidate, 100, 100, 100))
+            continue
+        scored.append(
+            (
+                i,
+                candidate,
+                fuzz.ratio(target, candidate_text),
+                fuzz.partial_ratio(target, candidate_text),
+                fuzz.token_sort_ratio(target, candidate_text),
+            )
+        )
+    # combined score: weight partial and token_sort higher
+    scored.sort(key=lambda x: (x[2] + x[3] * 1.5 + x[4] * 1.2) / 3.7, reverse=True)
+    return scored[0][1]
+    # return [(s[1], round((s[2] + s[3]*1.5 + s[4]*1.2)/3.7, 1), s[0]) for s in scored]
+
+    keyword = keyword.lower().strip()
+    # Exact match
+    for r in ocr_results:
+        if r.text.lower().strip() == keyword:
+            return r
+
+    # Substring match fallback
+    for r in ocr_results:
+        r_text = r.text.lower().strip()
+        if keyword in r_text or r_text in keyword:
+            return r
+
+    return None
+
+
+def get_coordinates_from_ocr_result(ocr_result: OCRResult):
+    return (
+        int(ocr_result.bounding_box.x + ocr_result.bounding_box.width / 2),
+        int(ocr_result.bounding_box.y + ocr_result.bounding_box.height / 2),
+    )

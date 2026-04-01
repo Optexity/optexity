@@ -9,6 +9,7 @@ from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
 from optexity.inference.core.interaction.utils import (
+    get_coordinates_from_ocr_result,
     get_coordinates_from_prompt,
     get_index_from_prompt,
     handle_download,
@@ -108,8 +109,8 @@ async def click_element_coordinates(
     try:
         x, y = None, None
         if click_element_action.coordinates:
-            x = click_element_action.coordinates[0]
-            y = click_element_action.coordinates[1]
+            x = int(click_element_action.coordinates[0])
+            y = int(click_element_action.coordinates[1])
         else:
             data = await get_coordinates_from_prompt(
                 memory, click_element_action.prompt_instructions, browser, task
@@ -122,17 +123,23 @@ async def click_element_coordinates(
             memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
 
         if click_element_action.keyword:
-            coordinates = await match_text_in_screenshot(
+            result = await match_text_in_screenshot(
                 memory,
                 click_element_action.keyword,
                 BoundingBox(x=x, y=y, width=113, height=41),
             )
-            if coordinates is not None:
-                x = coordinates[0]
-                y = coordinates[1]
-                logger.debug(
-                    f"Found keyword {click_element_action.keyword} at coordinates: {x}, {y}"
-                )
+            if result is not None:
+                x_new, y_new = get_coordinates_from_ocr_result(result)
+
+                if x is not None and y is not None:
+                    logger.info(
+                        f"Matched target text {click_element_action.keyword}  with found one {result.text} New coordinates: {x_new}, {y_new} compared to old coordinates: {x}, {y}"
+                    )
+                else:
+                    logger.info(f"Using new coordinates: {x_new}, {y_new}")
+
+                x = x_new
+                y = y_new
 
         logger.debug(f"Clicking element at coordinates: {x}, {y}")
 

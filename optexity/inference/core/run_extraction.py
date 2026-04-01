@@ -1,10 +1,16 @@
+import base64
 import logging
 import traceback
 
 import aiofiles
 import httpx
 
+from optexity.inference.core.interaction.utils import (
+    find_keyword_in_results,
+    get_coordinates_from_ocr_result,
+)
 from optexity.inference.core.run_two_fa import run_two_fa_action
+from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import get_llm_model, resolve_model_name
 from optexity.schema.actions.extraction_action import (
@@ -18,7 +24,6 @@ from optexity.schema.actions.extraction_action import (
     StateExtraction,
 )
 from optexity.schema.memory import (
-    BrowserState,
     Memory,
     NetworkRequest,
     NetworkResponse,
@@ -28,6 +33,7 @@ from optexity.schema.memory import (
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
+ocr = AWSTextract()
 
 
 async def run_extraction_action(
@@ -380,7 +386,6 @@ async def handle_ocr_coordinates_extraction(
     unique_identifier: str | None = None,
 ):
     """Run OCR once on the screenshot, match all names from source_variable, store x/y as parallel lists."""
-    from optexity.inference.core.interaction.utils import match_text_in_screenshot
 
     # Get the list of text elements to find
     source_var = ocr_extraction.source_variable
@@ -396,23 +401,27 @@ async def handle_ocr_coordinates_extraction(
         logger.error("Screenshot is None, cannot run OCR")
         return
 
+    results = ocr.ocr(screenshot)
+
+    annotated, canvas = ocr.visualize(screenshot, results)
+    memory.browser_states[-1].ocr_annotated = base64.b64encode(annotated).decode(
+        "utf-8"
+    )
+    memory.browser_states[-1].ocr_canvas = base64.b64encode(canvas).decode("utf-8")
+
     # Use match_text_in_screenshot in batch mode (single OCR call)
     names_str = [str(n) for n in names]
-    found = await match_text_in_screenshot(
-        memory=memory,
-        keyword=names_str,
-        screenshot=screenshot,
-    )
 
     coords_x: list[int] = []
     coords_y: list[int] = []
 
     for name in names_str:
-        coords = found.get(name)
-        if coords is not None:
-            coords_x.append(coords[0])
-            coords_y.append(coords[1])
-            logger.info(f"OCR matched '{name}' at ({coords[0]}, {coords[1]})")
+        result = find_keyword_in_results(results, name)
+        if result is not None:
+            x, y = get_coordinates_from_ocr_result(result)
+            coords_x.append(x)
+            coords_y.append(y)
+            logger.info(f"OCR matched '{name}' at ({x}, {y})")
         else:
             coords_x.append(0)
             coords_y.append(0)

@@ -335,6 +335,15 @@ async def save_latest_memory_state_locally(
                 "No screenshot found for step %s", automation_state.step_index
             )
 
+        if browser_state.ocr_annotated:
+            await save_screenshot(
+                browser_state.ocr_annotated, step_directory / "ocr_annotated.png"
+            )
+        if browser_state.ocr_canvas:
+            await save_screenshot(
+                browser_state.ocr_canvas, step_directory / "ocr_canvas.png"
+            )
+
         state_dict = {
             "title": browser_state.title,
             "url": browser_state.url,

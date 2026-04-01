@@ -139,11 +139,8 @@ if __name__ == "__main__":
 
     print(f"Time taken in full image: {end_time - start_time} seconds")
 
-    bounding_box = BoundingBox(x=116.0, y=898.0, width=113.0, height=41.0)
-
-    start_time = time.time()
-    results = ocr.ocr(screenshot_bytes, region_of_interest=bounding_box)
-    end_time = time.time()
-    print(results)
-
-    print(f"Time taken in ROI: {end_time - start_time} seconds")
+    annotated, canvas = ocr.visualize(screenshot_bytes, results)
+    with open("/tmp/ocr_annotated.png", "wb") as f:
+        f.write(annotated)
+    with open("/tmp/ocr_canvas.png", "wb") as f:
+        f.write(canvas)
