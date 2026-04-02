@@ -8,6 +8,7 @@ from optexity.schema.actions.captcha_action import CaptchaAction
 from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
 from optexity.schema.actions.misc_action import PythonScriptAction, SleepAction
+from optexity.utils.aws_secret_manager import get_aws_secret_value
 from optexity.utils.utils import get_onepassword_value, get_totp_code
 
 logger = logging.getLogger(__name__)
@@ -33,11 +34,19 @@ class OnePasswordParameter(BaseModel):
 
 
 class AmazonSecretsManagerParameter(BaseModel):
-    pass
+    secret_name: str
+    region_name: str
+    key: str | None = None
+    type: Literal["raw", "totp_secret"] = "raw"
+    digits: int | None = None
 
     @model_validator(mode="after")
     def validate_amazon_secrets_manager_parameter(self):
-        raise NotImplementedError("Amazon Secrets Manager is not implemented yet")
+        if self.type == "totp_secret":
+            assert self.digits is not None, "digits must be provided for totp_secret"
+        else:
+            assert self.digits is None, "digits must not be provided for raw"
+        return self
 
 
 class TOTPParameter(BaseModel):
@@ -145,6 +154,8 @@ class ActionNode(BaseModel):
             for index, value in enumerate(values):
                 pattern = f"{{{key}[{index}]}}"
 
+                str_value = str(value)
+
                 if isinstance(value, SecureParameter):
                     if value.onepassword:
                         str_value = await get_onepassword_value(
@@ -158,9 +169,15 @@ class ActionNode(BaseModel):
                             )
 
                     elif value.amazon_secrets_manager:
-                        raise NotImplementedError(
-                            "Amazon Secrets Manager is not implemented yet"
+                        asm = value.amazon_secrets_manager
+                        str_value = await get_aws_secret_value(
+                            asm.secret_name,
+                            asm.region_name,
+                            asm.key,
                         )
+                        if asm.type == "totp_secret":
+                            assert asm.digits is not None
+                            str_value = get_totp_code(str_value, asm.digits)
                     elif value.totp:
                         str_value = get_totp_code(
                             value.totp.totp_secret, value.totp.digits
