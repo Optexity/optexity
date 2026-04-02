@@ -317,6 +317,10 @@ async def run_action_node(
     memory.automation_state.step_index += 1
     memory.automation_state.try_index = 0
 
+    # Inject default generated variables (current_time is dynamic per step)
+    memory.variables.generated_variables["current_time"] = [str(int(time.time()))]
+    memory.variables.generated_variables["task_id"] = [str(task.task_id)]
+
     await action_node.replace_variables(task.input_parameters)
     await action_node.replace_variables(task.secure_parameters)
     await action_node.replace_variables(memory.variables.generated_variables)

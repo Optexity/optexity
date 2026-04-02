@@ -333,7 +333,7 @@ class Parameters(BaseModel):
 
     @model_validator(mode="after")
     def validate_parameters(self):
-        reserved_parameter_names = set(["current_page_url"])
+        reserved_parameter_names = set(["current_page_url", "current_time", "task_id"])
 
         for d in [
             self.input_parameters,
