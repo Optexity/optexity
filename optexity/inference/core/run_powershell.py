@@ -10,21 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 async def run_powershell_action(powershell_action: PowerShellAction):
-    """Open PowerShell via Win+R on the RDP session, run commands, and close it."""
+    """Open PowerShell on the RDP session (machine 2), run commands, and close it."""
     logger.debug(
         f"Running PowerShell action with {len(powershell_action.commands)} command(s)"
     )
-
-    # Win+R to open Run dialog
-    pyautogui.hotkey("win", "r")
-    await asyncio.sleep(1)
-
-    # Type 'powershell' and press Enter to open PowerShell
-    pyautogui.typewrite("powershell", interval=0.05)
-    await asyncio.sleep(0.3)
-    pyautogui.press("enter")
-    await asyncio.sleep(2)
-
     # Execute each command
     for cmd in powershell_action.commands:
         logger.debug(f"Executing command: {cmd}")
