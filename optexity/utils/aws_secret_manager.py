@@ -82,7 +82,7 @@ async def get_aws_secret_value(
     key: str | None = None,
 ) -> str:
     """
-    Cached module-level helper — mirrors ``get_onepassword_value`` in utils.py.
+    Cached module-level helper. Sync call running inside the event loop for non-blocking operation.
     """
     manager = AWSSecretsManager(region_name)
     loop = asyncio.get_event_loop()
