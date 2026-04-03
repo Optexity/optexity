@@ -163,12 +163,26 @@ docker_ghcr_login() {
 	echo "${token}" | docker login "${GHCR_REGISTRY}" --username "${username}" --password-stdin
 }
 
+ensure_buildx_builder() {
+	local builder="optexity-builder"
+	if docker buildx inspect "${builder}" >/dev/null 2>&1; then
+		docker buildx use "${builder}"
+		log "buildx: using existing builder '${builder}'"
+	else
+		log "buildx: creating docker-container builder '${builder}' (required for registry cache)"
+		docker buildx create --name "${builder}" --driver docker-container --use --bootstrap
+	fi
+}
+
 start() {
 	cd_to_script_dir
 	if ! is_linux; then
 		ensure_colima_running
 	fi
 	configure_docker_env
+	if [[ "$LOCAL_MODE" -ne 1 ]]; then
+		ensure_buildx_builder
+	fi
 }
 
 login() {
