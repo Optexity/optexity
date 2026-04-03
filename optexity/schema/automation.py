@@ -147,7 +147,9 @@ class ActionNode(BaseModel):
         return self
 
     async def replace_variables(
-        self, variables: dict[str, list[str | SecureParameter]]
+        self,
+        variables: dict[str, list[str | SecureParameter]],
+        workspace_id: str | None = None,
     ):
         for key, values in variables.items():
 
@@ -162,6 +164,7 @@ class ActionNode(BaseModel):
                             value.onepassword.vault_name,
                             value.onepassword.item_name,
                             value.onepassword.field_name,
+                            workspace_id,
                         )
                         if value.onepassword.type == "totp_secret":
                             str_value = get_totp_code(
@@ -174,6 +177,7 @@ class ActionNode(BaseModel):
                             asm.secret_name,
                             asm.region_name,
                             asm.key,
+                            workspace_id,
                         )
                         if asm.type == "totp_secret":
                             assert asm.digits is not None

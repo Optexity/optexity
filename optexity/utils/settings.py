@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     GET_CALLBACK_DATA_ENDPOINT: str = "api/v1/get_callback_data"
     FETCH_EMAIL_MESSAGES_ENDPOINT: str = "api/v1/fetch_email_messages"
     FETCH_SLACK_MESSAGES_ENDPOINT: str = "api/v1/fetch_slack_messages"
+    INTEGRATION_SECRETS_ENDPOINT: str = "api/v1/integration-secrets/{type}/encrypt"
+
+    FERNET_SECRET_KEY: str | None = None  # required when using integration secrets
 
     OPTEXITY_API_KEY: str = Field(
         validation_alias=AliasChoices("OPTEXITY_API_KEY", "API_KEY")
