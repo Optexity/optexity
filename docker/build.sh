@@ -132,12 +132,19 @@ configure_docker_env() {
 }
 
 ensure_gh_authenticated() {
+	# GH_TOKEN / GITHUB_TOKEN are honoured natively by gh CLI — no login needed.
+	if [[ -n "${GH_TOKEN:-}" || -n "${GITHUB_TOKEN:-}" ]]; then
+		log "gh CLI: using GH_TOKEN / GITHUB_TOKEN env var"
+		return 0
+	fi
+
 	if gh api user >/dev/null 2>&1; then
 		log "gh CLI already authenticated"
 		return 0
 	fi
 
 	log "gh CLI not authenticated or token invalid; launching login"
+	log "  (headless/EC2: set GH_TOKEN=<pat> or GHCR_TOKEN=<pat> GHCR_USERNAME=<user> to skip browser auth)"
 	gh auth login --hostname github.com --git-protocol https --scopes write:packages,read:packages
 }
 
