@@ -19,9 +19,13 @@ async def _resolve_aws_credentials(workspace_id: str | None) -> tuple[str, str]:
     """
     if workspace_id is not None:
         try:
-            from optexity.utils.integration_secrets import fetch_decrypted_integration_secret
+            from optexity.utils.integration_secrets import (
+                fetch_decrypted_integration_secret,
+            )
 
-            data = await fetch_decrypted_integration_secret(workspace_id, "aws_secret_manager")
+            data = await fetch_decrypted_integration_secret(
+                workspace_id, "aws_secret_manager"
+            )
             access_key = data.get("access_key_id")
             secret_key = data.get("secret_access_key")
             if access_key and secret_key:

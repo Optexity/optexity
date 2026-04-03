@@ -1,4 +1,5 @@
 import base64
+import json
 import logging
 import os
 from pathlib import Path
@@ -8,10 +9,21 @@ from urllib.parse import urlparse
 import aiofiles
 import pyotp
 from async_lru import alru_cache
+from cryptography.fernet import Fernet
 from onepassword import Client as OnePasswordClient
 from pydantic import create_model
 
+from optexity.utils.settings import settings
+
 logger = logging.getLogger(__name__)
+
+
+def decrypt_fernet_payload(encrypted_data: str) -> dict:
+    if not settings.FERNET_SECRET_KEY:
+        raise ValueError("FERNET_SECRET_KEY must be set in settings to decrypt secrets")
+    fernet = Fernet(settings.FERNET_SECRET_KEY.encode())
+    return json.loads(fernet.decrypt(encrypted_data.encode()).decode())
+
 
 # Cached clients keyed by the service-account token so a single process can
 # serve multiple workspaces without re-authenticating unnecessarily.
@@ -26,9 +38,13 @@ async def _get_onepassword_token(workspace_id: str | None) -> str:
     """
     if workspace_id is not None:
         try:
-            from optexity.utils.integration_secrets import fetch_decrypted_integration_secret
+            from optexity.utils.integration_secrets import (
+                fetch_decrypted_integration_secret,
+            )
 
-            data = await fetch_decrypted_integration_secret(workspace_id, "one_password")
+            data = await fetch_decrypted_integration_secret(
+                workspace_id, "one_password"
+            )
             token = data.get("service_account_token")
             if token:
                 return token

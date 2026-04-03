@@ -1,23 +1,17 @@
-import json
 import logging
 from urllib.parse import urljoin
 
 import httpx
-from cryptography.fernet import Fernet
 
 from optexity.utils.settings import settings
+from optexity.utils.utils import decrypt_fernet_payload
 
 logger = logging.getLogger(__name__)
 
 
-def decrypt_fernet_payload(encrypted_data: str) -> dict:
-    if not settings.FERNET_SECRET_KEY:
-        raise ValueError("FERNET_SECRET_KEY must be set in settings to decrypt secrets")
-    fernet = Fernet(settings.FERNET_SECRET_KEY.encode())
-    return json.loads(fernet.decrypt(encrypted_data.encode()).decode())
-
-
-async def fetch_decrypted_integration_secret(workspace_id: str, secret_type: str) -> dict:
+async def fetch_decrypted_integration_secret(
+    workspace_id: str, secret_type: str
+) -> dict:
     """Fetch an integration secret from the opbackend API and decrypt it.
 
     Makes a GET request to /integration-secrets/{type}/encrypt using the configured
