@@ -46,7 +46,7 @@ RUN pip3 install --break-system-packages --no-cache-dir playwright patchright "c
 # Install Chromium and Chrome in separate layers
 RUN playwright install --with-deps chromium
 RUN patchright install chromium
-RUN python -m cloakbrowser install
+RUN python3 -m cloakbrowser install
 
 # Create non-root user 'optexity' with passwordless sudo
 RUN groupadd -r optexity && \
