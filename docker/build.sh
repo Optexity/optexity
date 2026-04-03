@@ -132,12 +132,12 @@ configure_docker_env() {
 }
 
 ensure_gh_authenticated() {
-	if gh auth status >/dev/null 2>&1; then
+	if gh api user >/dev/null 2>&1; then
 		log "gh CLI already authenticated"
 		return 0
 	fi
 
-	log "gh CLI not authenticated; launching login"
+	log "gh CLI not authenticated or token invalid; launching login"
 	gh auth login --hostname github.com --git-protocol https --scopes write:packages,read:packages
 }
 
