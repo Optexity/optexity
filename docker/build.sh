@@ -163,15 +163,17 @@ docker_ghcr_login() {
 	echo "${token}" | docker login "${GHCR_REGISTRY}" --username "${username}" --password-stdin
 }
 
+BUILDX_BUILDER=""
+
 ensure_buildx_builder() {
 	local builder="optexity-builder"
-	if docker buildx inspect "${builder}" >/dev/null 2>&1; then
-		docker buildx use "${builder}"
-		log "buildx: using existing builder '${builder}'"
-	else
+	if ! docker buildx inspect "${builder}" >/dev/null 2>&1; then
 		log "buildx: creating docker-container builder '${builder}' (required for registry cache)"
-		docker buildx create --name "${builder}" --driver docker-container --use --bootstrap
+		docker buildx create --name "${builder}" --driver docker-container --bootstrap
+	else
+		log "buildx: using existing builder '${builder}'"
 	fi
+	BUILDX_BUILDER="${builder}"
 }
 
 start() {
@@ -210,6 +212,7 @@ build() {
 			--load .
 	else
 		docker buildx build \
+			--builder="${BUILDX_BUILDER}" \
 			--build-arg CACHE_BREAK=$(date +%s) \
 			--platform="${DOCKER_PLATFORM}" \
 			--cache-from=type=registry,ref="${CACHE_REF}" \
