@@ -7,7 +7,11 @@ from optexity.schema.actions.assertion_action import AssertionAction
 from optexity.schema.actions.captcha_action import CaptchaAction
 from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
-from optexity.schema.actions.misc_action import PythonScriptAction, SleepAction
+from optexity.schema.actions.misc_action import (
+    FailStateAction,
+    PythonScriptAction,
+    SleepAction,
+)
 from optexity.utils.utils import get_onepassword_value, get_totp_code
 
 logger = logging.getLogger(__name__)
@@ -67,6 +71,7 @@ class ActionNode(BaseModel):
     extraction_action: ExtractionAction | None = None
     python_script_action: PythonScriptAction | None = None
     sleep_action: SleepAction | None = None
+    fail_state_action: FailStateAction | None = None
     captcha_action: CaptchaAction | None = None
     before_sleep_time: float = 0.0
     end_sleep_time: float = 5.0
@@ -83,13 +88,14 @@ class ActionNode(BaseModel):
             "extraction_action": self.extraction_action,
             "python_script_action": self.python_script_action,
             "sleep_action": self.sleep_action,
+            "fail_state_action": self.fail_state_action,
             "captcha_action": self.captcha_action,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, sleep_action, captcha_action must be provided"
+                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, sleep_action, fail_state_action, captcha_action must be provided"
             )
 
         assert (
@@ -132,6 +138,8 @@ class ActionNode(BaseModel):
             pass
         if self.sleep_action:
             pass
+        if self.fail_state_action:
+            self.fail_state_action.replace(pattern, replacement)
         if self.captcha_action:
             self.captcha_action.replace(pattern, replacement)
 
