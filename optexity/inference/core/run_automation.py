@@ -327,7 +327,7 @@ async def run_action_node(
     memory.automation_state.try_index = 0
 
     await action_node.replace_variables(task.input_parameters)
-    await action_node.replace_variables(task.secure_parameters)
+    await action_node.replace_variables(task.secure_parameters, task.workspace_id)
     await action_node.replace_variables(memory.variables.generated_variables)
 
     # ## TODO: optimize this by taking screenshot and axtree only if needed
