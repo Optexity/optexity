@@ -52,6 +52,7 @@
                             "/docs/advanced/best-practices",
                             "/docs/advanced/callbacks",
                             "/docs/advanced/onepassword",
+                            "/docs/advanced/aws-secrets-manager",
                             "/docs/advanced/two-fa-integration",
                             "/docs/advanced/totp-integration",
                             "/docs/advanced/orchestration",

@@ -23,7 +23,7 @@ description: Frequently asked questions about Optexity
   </Accordion>
 
   <Accordion title="How do I handle passwords and secrets securely?">
-    Use `secure_parameters` instead of hardcoding credentials. Optexity retrieves values at runtime from secure storage like 1Password or generates TOTP codes. Your secrets are never exposed in the automation definition.
+    Use `secure_parameters` instead of hardcoding credentials. Optexity retrieves values at runtime from secure storage like 1Password or generates TOTP codes. Your secrets are never exposed in the workflow.
 
     | Provider | Use Case | Documentation |
     |----------|----------|---------------|
@@ -158,6 +158,6 @@ description: Frequently asked questions about Optexity
   </Accordion>
 
   <Accordion title="Automation is not working reliably">
-    If the automation is correct but failing, try changing `browser_channel` to `"chrome"` instead of `"chromium"` in your automation definition. Some websites work better with Chrome.
+    If the automation is correct but failing, try changing `browser_channel` to `"chrome"` instead of `"chromium"` in your workflow. Some websites work better with Chrome.
   </Accordion>
 </AccordionGroup>
