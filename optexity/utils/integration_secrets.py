@@ -3,9 +3,10 @@ from urllib.parse import urljoin
 
 import httpx
 
-from optexity.utils.settings import settings
+from optexity.utils.settings import Settings
 from optexity.utils.utils import decrypt_fernet_payload
 
+settings = Settings()
 logger = logging.getLogger(__name__)
 
 

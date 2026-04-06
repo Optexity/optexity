@@ -13,8 +13,9 @@ from cryptography.fernet import Fernet
 from onepassword import Client as OnePasswordClient
 from pydantic import create_model
 
-from optexity.utils.settings import settings
+from optexity.utils.settings import Settings
 
+settings = Settings()
 logger = logging.getLogger(__name__)
 
 
