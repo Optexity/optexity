@@ -13,16 +13,14 @@ from cryptography.fernet import Fernet
 from onepassword import Client as OnePasswordClient
 from pydantic import create_model
 
-from optexity.utils.settings import Settings
-
-settings = Settings()
 logger = logging.getLogger(__name__)
 
 
 def decrypt_fernet_payload(encrypted_data: str) -> dict:
-    if not settings.FERNET_SECRET_KEY:
-        raise ValueError("FERNET_SECRET_KEY must be set in settings to decrypt secrets")
-    fernet = Fernet(settings.FERNET_SECRET_KEY.encode())
+    FERNET_SECRET_KEY = os.getenv("FERNET_SECRET_KEY")
+    if not FERNET_SECRET_KEY:
+        raise ValueError("FERNET_SECRET_KEY must be set in env to decrypt secrets")
+    fernet = Fernet(FERNET_SECRET_KEY.encode())
     return json.loads(fernet.decrypt(encrypted_data.encode()).decode())
 
 
