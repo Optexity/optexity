@@ -132,12 +132,19 @@ configure_docker_env() {
 }
 
 ensure_gh_authenticated() {
-	if gh auth status >/dev/null 2>&1; then
+	# GH_TOKEN / GITHUB_TOKEN are honoured natively by gh CLI — no login needed.
+	if [[ -n "${GH_TOKEN:-}" || -n "${GITHUB_TOKEN:-}" ]]; then
+		log "gh CLI: using GH_TOKEN / GITHUB_TOKEN env var"
+		return 0
+	fi
+
+	if gh api user >/dev/null 2>&1; then
 		log "gh CLI already authenticated"
 		return 0
 	fi
 
-	log "gh CLI not authenticated; launching login"
+	log "gh CLI not authenticated or token invalid; launching login"
+	log "  (headless/EC2: set GH_TOKEN=<pat> or GHCR_TOKEN=<pat> GHCR_USERNAME=<user> to skip browser auth)"
 	gh auth login --hostname github.com --git-protocol https --scopes write:packages,read:packages
 }
 
@@ -156,12 +163,28 @@ docker_ghcr_login() {
 	echo "${token}" | docker login "${GHCR_REGISTRY}" --username "${username}" --password-stdin
 }
 
+BUILDX_BUILDER=""
+
+ensure_buildx_builder() {
+	local builder="optexity-builder"
+	if ! docker buildx inspect "${builder}" >/dev/null 2>&1; then
+		log "buildx: creating docker-container builder '${builder}' (required for registry cache)"
+		docker buildx create --name "${builder}" --driver docker-container --bootstrap
+	else
+		log "buildx: using existing builder '${builder}'"
+	fi
+	BUILDX_BUILDER="${builder}"
+}
+
 start() {
 	cd_to_script_dir
 	if ! is_linux; then
 		ensure_colima_running
 	fi
 	configure_docker_env
+	if [[ "$LOCAL_MODE" -ne 1 ]]; then
+		ensure_buildx_builder
+	fi
 }
 
 login() {
@@ -189,6 +212,7 @@ build() {
 			--load .
 	else
 		docker buildx build \
+			--builder="${BUILDX_BUILDER}" \
 			--build-arg CACHE_BREAK=$(date +%s) \
 			--platform="${DOCKER_PLATFORM}" \
 			--cache-from=type=registry,ref="${CACHE_REF}" \
