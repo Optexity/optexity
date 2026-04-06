@@ -29,7 +29,9 @@ def decrypt_fernet_payload(encrypted_data: str) -> dict:
 _onepassword_clients: dict[str, OnePasswordClient] = {}
 
 
-async def _get_onepassword_token(workspace_id: str | None) -> str:
+async def _get_onepassword_token(
+    workspace_id: str | None, api_key: str | None = None
+) -> str:
     """Resolve the 1Password service-account token.
 
     Prefers fetching the 'one_password' integration secret from the opbackend API
@@ -42,7 +44,7 @@ async def _get_onepassword_token(workspace_id: str | None) -> str:
             )
 
             data = await fetch_decrypted_integration_secret(
-                workspace_id, "one_password"
+                workspace_id, "one_password", api_key
             )
             token = data.get("service_account_token")
             if token:
@@ -67,8 +69,10 @@ async def _get_onepassword_token(workspace_id: str | None) -> str:
     )
 
 
-async def get_onepassword_client(workspace_id: str | None = None) -> OnePasswordClient:
-    token = await _get_onepassword_token(workspace_id)
+async def get_onepassword_client(
+    workspace_id: str | None = None, api_key: str | None = None
+) -> OnePasswordClient:
+    token = await _get_onepassword_token(workspace_id, api_key)
     if token not in _onepassword_clients:
         _onepassword_clients[token] = await OnePasswordClient.authenticate(
             auth=token,
@@ -128,8 +132,9 @@ async def get_onepassword_value(
     item_name: str,
     field_name: str,
     workspace_id: str | None = None,
+    api_key: str | None = None,
 ) -> str:
-    client = await get_onepassword_client(workspace_id)
+    client = await get_onepassword_client(workspace_id, api_key)
     return await client.secrets.resolve(f"op://{vault_name}/{item_name}/{field_name}")
 
 

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 async def fetch_decrypted_integration_secret(
-    workspace_id: str, secret_type: str
+    workspace_id: str, secret_type: str, api_key: str | None = None
 ) -> dict:
     """Fetch an integration secret from the opbackend API and decrypt it.
 
@@ -23,7 +23,7 @@ async def fetch_decrypted_integration_secret(
         settings.INTEGRATION_SECRETS_ENDPOINT.format(type=secret_type),
     )
     headers = {
-        "x-api-key": settings.OPTEXITY_API_KEY,
+        "x-api-key": api_key if api_key is not None else settings.OPTEXITY_API_KEY,
         "x-workspace-id": workspace_id,
     }
 
