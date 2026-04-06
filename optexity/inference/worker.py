@@ -11,11 +11,16 @@ async def main():
     task = Task.model_validate_json(sys.argv[1])
     unique_child_arn = sys.argv[2]
     child_process_id = int(sys.argv[3])
-    max_tries = int(sys.argv[4]) if len(sys.argv) > 4 else 1
+    cdp_url = sys.argv[4]
+    max_tries = int(sys.argv[5]) if len(sys.argv) > 5 else 1
 
     try:
         await run_automation(
-            task, unique_child_arn, child_process_id, max_tries=max_tries
+            task,
+            unique_child_arn,
+            child_process_id,
+            cdp_url=cdp_url,
+            max_tries=max_tries,
         )
     except Exception:
         sys.exit(ExitCodes.WORKER_CRASHED.value)

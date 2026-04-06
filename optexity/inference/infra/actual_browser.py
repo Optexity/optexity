@@ -17,6 +17,8 @@ from optexity.utils.settings import settings
 logger = logging.getLogger(__name__)
 
 OsEmulation = Literal["windows", "linux"] | None
+DISPLAY = os.environ.get("DISPLAY", ":99")
+IN_DOCKER = os.path.exists("/.dockerenv")
 
 
 def find_chrome_binary(channel: Literal["chrome", "chromium"]) -> str:
@@ -75,7 +77,7 @@ class ActualBrowser:
 
     def __init__(
         self,
-        channel: Literal["chrome", "chromium", "rdp"],
+        channel: Literal["chrome", "chromium", "cloakbrowser", "browser-use", "rdp"],
         unique_child_arn: str,
         port: int = 9222,
         headless: bool = False,
@@ -95,7 +97,10 @@ class ActualBrowser:
         self.playwright = None
         self.context = None
         self.proc = None
-        self.channel: Literal["chrome", "chromium", "rdp"] = channel
+        self.cdp_url = None
+        self.channel: Literal[
+            "chrome", "chromium", "cloakbrowser", "browser-use", "rdp"
+        ] = channel
         self.extensions = [
             # {
             #     "name": "optexity recorder",
@@ -118,6 +123,9 @@ class ActualBrowser:
                 "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dddkjiahejlhfcafbddmgiahcphecmpfh%26uc",
             },
         ]
+
+        if self.channel == "browser-use" and self.is_dedicated:
+            raise ValueError("Browser-use is not supported for dedicated browsers")
 
     def get_args(self) -> list[str]:
         args = [
@@ -160,7 +168,7 @@ class ActualBrowser:
 
             args += [
                 f"--user-data-dir={self.user_data_dir}",
-                # "--no-sandbox",
+                *(["--no-sandbox"] if IN_DOCKER else []),
                 # ---- privacy / security
                 "--disable-save-password-bubble",
                 "--use-mock-keychain",
@@ -217,6 +225,7 @@ class ActualBrowser:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
 
             self.chrome_path = find_chrome_binary(self.channel)
+            env = {**os.environ, "DISPLAY": DISPLAY}
 
             self.proc = await asyncio.create_subprocess_exec(
                 self.chrome_path,
@@ -224,6 +233,7 @@ class ActualBrowser:
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
                 preexec_fn=os.setsid,  # critical: isolate process group
+                env=env,
             )
 
             await self._wait_for_cdp()
@@ -236,21 +246,44 @@ class ActualBrowser:
         try:
             logger.debug("Starting actual browser")
 
-            from patchright.async_api import async_playwright
+            if self.channel == "browser-use":
+                from browser_use_sdk.v3 import AsyncBrowserUse
 
-            self.playwright = await async_playwright().start()
-            self.context = await self.playwright.chromium.launch_persistent_context(
-                channel=self.channel,
-                user_data_dir=self.user_data_dir,
-                headless=self.headless,
-                args=self.get_args(),
-                chromium_sandbox=False,
-                no_viewport=True,
-                proxy=self.get_proxy_playwright(),
-            )
+                assert (
+                    settings.BROWSER_USE_API_KEY is not None
+                ), "BROWSER_USE_API_KEY is not set"
+                self.client = AsyncBrowserUse(api_key=settings.BROWSER_USE_API_KEY)
+                self.context = await self.client.browsers.create(timeout=10)
+                self.cdp_url = self.context.cdp_url
 
-            await self._wait_for_cdp()
-            logger.debug("CDP ready")
+            else:
+
+                if self.channel == "cloakbrowser":
+                    from cloakbrowser import launch_persistent_context_async
+                else:
+                    from patchright.async_api import async_playwright
+
+                    self.playwright = await async_playwright().start()
+                    launch_persistent_context_async = (
+                        self.playwright.chromium.launch_persistent_context
+                    )
+
+                env = {**os.environ, "DISPLAY": DISPLAY}
+                self.context = await launch_persistent_context_async(
+                    # humanize=True,
+                    channel=self.channel,
+                    user_data_dir=self.user_data_dir,
+                    headless=self.headless,
+                    args=self.get_args(),
+                    chromium_sandbox=False,
+                    no_viewport=True,
+                    proxy=self.get_proxy_playwright(),  # type: ignore
+                    env=env,
+                )
+                self.cdp_url = f"http://localhost:{self.port}"
+
+                await self._wait_for_cdp()
+                logger.debug("CDP ready")
         except Exception as e:
             logger.error(f"Error starting actual browser: {e}")
             raise e
@@ -277,6 +310,8 @@ class ActualBrowser:
             try:
                 if self.context is None:
                     return False
+                if self.channel == "browser-use":
+                    return True
                 await self.context.pages[0].goto("about:blank")
             except Exception:
                 return False
@@ -284,16 +319,24 @@ class ActualBrowser:
         else:
             # TODO: handle goto url using cdp methods
             await self._wait_for_cdp(timeout)
-            # raise NotImplementedError("CDP check is not supported for native browser")
 
     async def stop(self, graceful=True):
         if settings.USE_PLAYWRIGHT_BROWSER:
-            await self.stop_playwright_browser(graceful)
+            if (
+                self.channel == "browser-use"
+                and self.context is not None
+                and self.client is not None
+            ):
+                await self.client.browsers.stop(self.context.id)
+            else:
+                await self.stop_playwright_browser(graceful)
         else:
             await self.stop_native_browser(graceful)
 
         if not self.is_dedicated:
             shutil.rmtree(self.user_data_dir, ignore_errors=True)
+
+            self.cdp_url = None
 
     async def stop_native_browser(self, graceful=True):
         if not self.proc or self.proc.returncode is not None:

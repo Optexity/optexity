@@ -10,6 +10,7 @@ from pathlib import Path
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
+from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
     _wait_for_file_stable,
     clean_download,
@@ -64,7 +65,11 @@ def is_driver_closed_error(e: Exception) -> bool:
 
 
 async def run_automation(
-    task: Task, unique_child_arn: str, child_process_id: int, max_tries: int = 1
+    task: Task,
+    unique_child_arn: str,
+    child_process_id: int,
+    cdp_url: str,
+    max_tries: int = 1,
 ):
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
@@ -85,16 +90,7 @@ async def run_automation(
         memory.update_system_info()
 
         def _get_browser():
-            return Browser(
-                memory=memory,
-                headless=False,
-                channel=task.automation.browser_channel,
-                debug_port=9222 + child_process_id,
-                use_proxy=task.use_proxy,
-                proxy_session_id=task.proxy_session_id(
-                    settings.PROXY_PROVIDER if task.use_proxy else None
-                ),
-            )
+            return Browser(memory=memory, cdp_url=cdp_url)
 
         browser = _get_browser()
         memory.update_system_info()
@@ -116,6 +112,7 @@ async def run_automation(
         if task.use_proxy:
 
             page = await browser.get_current_page()
+            await asyncio.sleep(5)
             await browser.go_to_url("https://ip.oxylabs.io/location")
 
             ip_info = await page.evaluate("""
@@ -370,6 +367,8 @@ async def run_action_node(
             await run_assertion_action(
                 action_node.assertion_action, memory, browser, task
             )
+        elif action_node.captcha_action:
+            await handle_captcha_action(action_node.captcha_action, browser, memory)
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
@@ -465,13 +464,14 @@ async def handle_for_loop_node(
     full_automation: list[ActionNode],
 ):
     memory.update_system_info()
-    if for_loop_node.variable_name in task.input_parameters:
-        values = task.input_parameters[for_loop_node.variable_name]
-    elif for_loop_node.variable_name in memory.variables.generated_variables:
-        values = memory.variables.generated_variables[for_loop_node.variable_name]
+    primary_variable = for_loop_node.variable_name.split(",")[0].strip()
+    if primary_variable in task.input_parameters:
+        values = task.input_parameters[primary_variable]
+    elif primary_variable in memory.variables.generated_variables:
+        values = memory.variables.generated_variables[primary_variable]
     else:
         raise ValueError(
-            f"Variable name {for_loop_node.variable_name} not found in input variables or generated variables"
+            f"Variable name {primary_variable} not found in input variables or generated variables"
         )
     memory.variables.for_loop_status.append([])
     for index in range(len(values)):
