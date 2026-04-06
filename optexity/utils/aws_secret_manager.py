@@ -10,7 +10,9 @@ from async_lru import alru_cache
 logger = logging.getLogger(__name__)
 
 
-async def _resolve_aws_credentials(workspace_id: str | None) -> tuple[str, str]:
+async def _resolve_aws_credentials(
+    workspace_id: str | None, api_key: str | None = None
+) -> tuple[str, str]:
     """Resolve AWS credentials.
 
     Prefers fetching the 'aws_secret_manager' integration secret from the opbackend API
@@ -24,7 +26,7 @@ async def _resolve_aws_credentials(workspace_id: str | None) -> tuple[str, str]:
             )
 
             data = await fetch_decrypted_integration_secret(
-                workspace_id, "aws_secret_manager"
+                workspace_id, "aws_secret_manager", api_key
             )
             access_key = data.get("access_key_id")
             secret_key = data.get("secret_access_key")
@@ -99,11 +101,12 @@ async def get_aws_secret_value(
     region_name: str,
     key: str | None = None,
     workspace_id: str | None = None,
+    api_key: str | None = None,
 ) -> str:
     """
     Cached helper to fetch a value from AWS Secrets Manager.
     """
-    access_key, secret_key = await _resolve_aws_credentials(workspace_id)
+    access_key, secret_key = await _resolve_aws_credentials(workspace_id, api_key)
     manager = AWSSecretsManager(region_name, access_key, secret_key)
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(

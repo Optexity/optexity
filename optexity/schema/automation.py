@@ -158,6 +158,7 @@ class ActionNode(BaseModel):
         self,
         variables: dict[str, list[str | SecureParameter]],
         workspace_id: str | None = None,
+        api_key: str | None = None,
     ):
         for key, values in variables.items():
 
@@ -173,6 +174,7 @@ class ActionNode(BaseModel):
                             value.onepassword.item_name,
                             value.onepassword.field_name,
                             workspace_id,
+                            api_key,
                         )
                         if value.onepassword.type == "totp_secret":
                             str_value = get_totp_code(
@@ -186,6 +188,7 @@ class ActionNode(BaseModel):
                             asm.region_name,
                             asm.key,
                             workspace_id,
+                            api_key,
                         )
                         if asm.type == "totp_secret":
                             assert asm.digits is not None
