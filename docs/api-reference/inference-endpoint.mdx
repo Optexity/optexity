@@ -255,7 +255,7 @@ Returned when an unexpected server error occurs.
 
 1. The inference server receives the `InferenceRequest`
 2. It forwards the request to the Optexity control plane at `api.optexity.com`
-3. The control plane returns a serialized `Task` object containing the full automation definition
+3. The control plane returns a serialized `Task` object containing the full workflow
 4. The task is enqueued locally for background execution
 5. A `202 Accepted` response is returned immediately
 6. The browser automation executes asynchronously
@@ -286,7 +286,7 @@ class Task:
     task_id: str                          # Unique identifier
     user_id: str                          # Owner of the task
     recording_id: str                     # Source automation ID
-    automation: Automation                # Full automation definition
+    automation: Automation                # Full workflow
     input_parameters: dict[str, list[str]]
     unique_parameter_names: list[str]
     unique_parameters: dict[str, list[str]] | None
