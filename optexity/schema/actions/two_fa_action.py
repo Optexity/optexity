@@ -7,8 +7,13 @@ class EmailTwoFAAction(BaseModel):
     type: Literal["email_two_fa_action"]
     receiver_email_address: str
     sender_email_address: str
+    integration_email_address: str | None = None
 
     def replace(self, pattern: str, replacement: str):
+        if self.integration_email_address:
+            self.integration_email_address = self.integration_email_address.replace(
+                pattern, replacement
+            )
         if self.receiver_email_address:
             self.receiver_email_address = self.receiver_email_address.replace(
                 pattern, replacement

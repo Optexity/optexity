@@ -45,7 +45,8 @@ Fetch verification codes from email messages:
       "action": {
         "type": "email_two_fa_action",
         "receiver_email_address": "user@example.com",
-        "sender_email_address": "noreply@example.com"
+        "sender_email_address": "noreply@example.com",
+        "integration_email_address": "automation-inbox@example.com"
       },
       "output_variable_name": "auth_code"
     }
@@ -55,10 +56,15 @@ Fetch verification codes from email messages:
 
 ### Properties
 
-| Property                 | Type  | Required | Description                                  |
-| ------------------------ | ----- | -------- | -------------------------------------------- |
-| `receiver_email_address` | `str` | Yes      | Your email address (identifies integration)  |
-| `sender_email_address`   | `str` | Yes      | Sender to filter (e.g., `noreply@site.com`) |
+| Property                    | Type           | Required | Description                                                                 |
+| --------------------------- | -------------- | -------- | --------------------------------------------------------------------------- |
+| `receiver_email_address`    | `str`          | Yes      | Recipient mailbox to search for 2FA emails                                  |
+| `sender_email_address`      | `str`          | Yes      | Sender to filter (e.g., `noreply@site.com`)                                 |
+| `integration_email_address` | `str \| null`  | No       | Connected integration mailbox. Defaults to `receiver_email_address` if omitted |
+
+<Tip>
+Use `integration_email_address` when the connected mailbox is different from the mailbox receiving the 2FA email (for example, alias/forwarding setups).
+</Tip>
 
 ---
 

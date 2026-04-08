@@ -38,6 +38,9 @@ class InferenceRequest(BaseModel):
 class FetchEmailMessagesRequest(BaseModel):
     receiver_email_address: str  # receiver's email address
     sender_email_address: str  # sender's email address
+    integration_email_address: str | None = (
+        None  # integration's email address which might be different from receiver's email address
+    )
     start_2fa_time: datetime
     end_2fa_time: datetime
     endpoint_name: str
