@@ -1,52 +1,49 @@
 import logging
 import time
 
-from .llm_model import GeminiModels, HumanModels, LLMModel, OpenAIModels
+from .llm_model import LLMModel, ModelEnum
+from .registry import MODEL_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-_model_cache: dict[tuple, LLMModel] = {}
+__all__ = ["GeminiModels"]
+
+# Re-export for convenience
+from .llm_model import GeminiModels
+
+_model_cache: dict[ModelEnum, LLMModel] = {}
 
 MAX_RETRIES = 5
 INITIAL_BACKOFF_S = 1.0
 BACKOFF_FACTOR = 2
 
 
-def get_llm_model(
-    model_name: GeminiModels | HumanModels | OpenAIModels, use_structured_output: bool
-) -> LLMModel:
-    cache_key = (model_name, use_structured_output)
-    if cache_key in _model_cache:
-        return _model_cache[cache_key]
+def get_llm_model(model_name: ModelEnum) -> LLMModel:
+    """Get or create an LLM model instance with caching and backoff."""
+    if model_name in _model_cache:
+        return _model_cache[model_name]
 
-    model = _create_model_with_backoff(model_name, use_structured_output)
-    _model_cache[cache_key] = model
+    model = _create_model_with_backoff(model_name)
+    _model_cache[model_name] = model
     return model
 
 
-def _create_model_with_backoff(
-    model_name: GeminiModels | HumanModels | OpenAIModels, use_structured_output: bool
-) -> LLMModel:
-    if isinstance(model_name, GeminiModels):
-        from .gemini import Gemini
+def _create_model_with_backoff(model_name: ModelEnum) -> LLMModel:
+    """Create a model instance with exponential backoff on failure."""
+    # Find the model class from the registry
+    model_cls = None
+    for enum_type, cls in MODEL_REGISTRY.items():
+        if isinstance(model_name, enum_type):
+            model_cls = cls
+            break
 
-        factory = lambda: Gemini(model_name, use_structured_output)
-
-    # elif isinstance(model_name, OpenAIModels):
-    #     from .openai import OpenAI
-    #     factory = lambda: OpenAI(model_name, use_structured_output)
-
-    # elif isinstance(model_name, HumanModels):
-    #     from .human import HumanModel
-    #     factory = lambda: HumanModel(model_name, use_structured_output)
-
-    else:
+    if model_cls is None:
         raise ValueError(f"Invalid model type: {model_name}")
 
     backoff = INITIAL_BACKOFF_S
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            return factory()
+            return model_cls(model_name)
         except Exception as e:
             if attempt == MAX_RETRIES:
                 logger.warning(

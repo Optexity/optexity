@@ -2,45 +2,47 @@ import base64
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 import httpx
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, ValidationError
+from typing_extensions import override
 
+from optexity.schema.token_usage import TokenUsage
 from optexity.utils.utils import is_local_path, is_url
 
-from .llm_model import GeminiModels, LLMModel, TokenUsage
+from .llm_model import GeminiModels, LLMModel
+from .registry import register_model
 
 logger = logging.getLogger(__name__)
 
 
 class Gemini(LLMModel):
-
-    def __init__(self, model_name: GeminiModels, use_structured_output: bool):
-        super().__init__(model_name, use_structured_output)
+    def __init__(self, model_name: GeminiModels):
+        super().__init__(model_name)
 
         self.api_key = os.environ["GOOGLE_API_KEY"]
         try:
             self.client = genai.Client(api_key=self.api_key)
             self.client.models.list()
-        except Exception as e:
+        except Exception:
             raise ValueError("Invalid GOOGLE_API_KEY")
 
+    @override
     def _get_model_response_with_structured_output(
         self,
         prompt: str,
         response_schema: type[BaseModel],
-        screenshot: Optional[str] = None,
-        pdf_url: Optional[str | Path] = None,
-        system_instruction: Optional[str] = None,
-    ) -> tuple[BaseModel, TokenUsage]:
+        screenshot: str | None = None,
+        pdf_url: str | Path | None = None,
+        system_instruction: str | None = None,
+    ) -> tuple[BaseModel | None, TokenUsage]:
 
         if pdf_url is not None and screenshot is not None:
             raise ValueError("Cannot use both screenshot and pdf_url")
 
-        final_prompt = prompt
+        final_prompt: str | list = prompt
 
         if screenshot is not None:
             final_prompt = [
@@ -68,36 +70,26 @@ class Gemini(LLMModel):
                     ),
                     prompt,
                 ]
+
         response = None
         parsed_response = None
         token_usage = TokenUsage()
 
         try:
-            if self.use_structured_output:
-                response = self.client.models.generate_content(
-                    model=self.model_name.value,
-                    contents=final_prompt,
-                    config={
-                        "response_mime_type": "application/json",
-                        "system_instruction": system_instruction,
-                        "response_json_schema": response_schema.model_json_schema(),
-                    },
-                )
+            response = self.client.models.generate_content(
+                model=self.model_name.value,
+                contents=final_prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "system_instruction": system_instruction,
+                    "response_json_schema": response_schema.model_json_schema(),
+                },
+            )
 
-                if isinstance(response.parsed, BaseModel):
-                    parsed_response = response.parsed
-                else:
-                    parsed_response = response_schema.model_validate(response.parsed)
+            if isinstance(response.parsed, BaseModel):
+                parsed_response: BaseModel = response.parsed
             else:
-                response = self.client.models.generate_content(
-                    model=self.model_name.value,
-                    contents=final_prompt,
-                    config={"system_instruction": system_instruction},
-                )
-
-                parsed_response: BaseModel = self.parse_from_completion(
-                    str(response.candidates[0].content.parts[0].text), response_schema
-                )
+                parsed_response = response_schema.model_validate(response.parsed)
 
             if response.usage_metadata is not None:
                 token_usage = self.get_token_usage(
@@ -107,14 +99,17 @@ class Gemini(LLMModel):
                     thoughts_tokens=response.usage_metadata.thoughts_token_count,
                     total_tokens=response.usage_metadata.total_token_count,
                 )
-        except ValidationError as e:
-            logger.error(f"ValidationError in Gemini model response: {e}")
-            pass
+
+        except ValidationError:
+            logger.error("ValidationError in Gemini model response")
+            response = None
+            parsed_response = None
 
         return parsed_response, token_usage
 
+    @override
     def _get_model_response(
-        self, prompt: str, system_instruction: Optional[str] = None
+        self, prompt: str, system_instruction: str | None = None
     ) -> tuple[str, TokenUsage]:
 
         response = self.client.models.generate_content(
@@ -130,3 +125,6 @@ class Gemini(LLMModel):
         else:
             token_usage = TokenUsage()
         return str(response.candidates[0].content.parts[0].text), token_usage
+
+
+register_model(GeminiModels, Gemini)

@@ -16,7 +16,7 @@ class SelectValuePredictionOutput(BaseModel):
 
 class SelectValuePredictionAgent:
     def __init__(self):
-        self.model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
+        self.model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH)
 
     def predict_select_value(
         self, options: list[dict[str, str]], patterns: list[str]
@@ -27,7 +27,7 @@ class SelectValuePredictionAgent:
         {json.dumps(options, indent=4)}
 
         [User Provided Patterns]
-        [{', '.join(patterns)}]
+        [{", ".join(patterns)}]
         """
 
         response, token_usage = self.model.get_model_response_with_structured_output(
