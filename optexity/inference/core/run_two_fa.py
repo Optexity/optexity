@@ -8,7 +8,7 @@ import httpx
 from optexity.inference.agents.two_fa_extraction.two_fa_extraction import (
     TwoFAExtraction,
 )
-from optexity.inference.models import get_llm_model, resolve_model_name
+from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.two_fa_action import (
     EmailTwoFAAction,
     SlackTwoFAAction,
@@ -31,8 +31,8 @@ _two_fa_cache: dict[tuple, TwoFAExtraction] = {}
 def _get_two_fa_agent(task: "Task") -> TwoFAExtraction:
     cache_key = (task.llm_provider, task.llm_model_name)
     if cache_key not in _two_fa_cache:
-        model = get_llm_model(
-            resolve_model_name(task.llm_provider, task.llm_model_name), True
+        model = get_llm_model_with_fallback(
+            task.llm_provider, task.llm_model_name, True
         )
         _two_fa_cache[cache_key] = TwoFAExtraction(model)
     return _two_fa_cache[cache_key]

@@ -15,7 +15,7 @@ from optexity.inference.agents.index_prediction.action_prediction_locator_axtree
     ActionPredictionLocatorAxtree,
 )
 from optexity.inference.infra.browser import Browser
-from optexity.inference.models import GeminiModels, get_llm_model, resolve_model_name
+from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
 
@@ -27,8 +27,8 @@ _index_prediction_cache: dict[tuple, ActionPredictionLocatorAxtree] = {}
 def _get_index_prediction_agent(task: "Task") -> ActionPredictionLocatorAxtree:
     cache_key = (task.llm_provider, task.llm_model_name)
     if cache_key not in _index_prediction_cache:
-        model = get_llm_model(
-            resolve_model_name(task.llm_provider, task.llm_model_name), True
+        model = get_llm_model_with_fallback(
+            task.llm_provider, task.llm_model_name, True
         )
         _index_prediction_cache[cache_key] = ActionPredictionLocatorAxtree(model)
     return _index_prediction_cache[cache_key]

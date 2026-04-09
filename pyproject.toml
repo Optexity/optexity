@@ -37,6 +37,7 @@ dependencies = [
 
     # llm clients
     "anthropic",
+    "openai",
 ]
 
 [project.optional-dependencies]

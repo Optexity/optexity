@@ -4,7 +4,10 @@ import os
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from pydantic import BaseModel, ValidationError
+
+from optexity.utils.utils import is_local_path, is_url
 
 from .llm_model import LLMModel, OpenAIModels, TokenUsage
 
@@ -56,6 +59,32 @@ class OpenAI(LLMModel):
                     ],
                 }
             )
+        elif pdf_url is not None:
+            if is_local_path(pdf_url):
+                pdf_b64 = base64.standard_b64encode(
+                    Path(str(pdf_url)).read_bytes()
+                ).decode("utf-8")
+            elif is_url(pdf_url):
+                pdf_b64 = base64.standard_b64encode(
+                    httpx.get(str(pdf_url)).content
+                ).decode("utf-8")
+            else:
+                raise ValueError(f"Invalid pdf_url: {pdf_url}")
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "file",
+                            "file": {
+                                "filename": Path(str(pdf_url)).name,
+                                "file_data": f"data:application/pdf;base64,{pdf_b64}",
+                            },
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            )
         else:
             messages.append({"role": "user", "content": prompt})
 
@@ -64,8 +93,6 @@ class OpenAI(LLMModel):
 
         try:
             if self.use_structured_output:
-                from openai import pydantic_function_tool
-
                 response = self.client.beta.chat.completions.parse(
                     model=self.model_name.value,
                     messages=messages,

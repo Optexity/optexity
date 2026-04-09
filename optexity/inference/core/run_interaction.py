@@ -21,7 +21,7 @@ from optexity.inference.core.interaction.handle_keypress import handle_key_press
 from optexity.inference.core.interaction.handle_select import handle_select_option
 from optexity.inference.core.interaction.handle_upload import handle_upload_file
 from optexity.inference.infra.browser import Browser
-from optexity.inference.models import get_llm_model, resolve_model_name
+from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.interaction_action import (
     CloseOverlayPopupAction,
     CloseTabsUntil,
@@ -40,8 +40,8 @@ _error_handler_cache: dict[tuple, ErrorHandlerAgent] = {}
 def _get_error_handler(task: "Task") -> ErrorHandlerAgent:
     cache_key = (task.llm_provider, task.llm_model_name)
     if cache_key not in _error_handler_cache:
-        model = get_llm_model(
-            resolve_model_name(task.llm_provider, task.llm_model_name), True
+        model = get_llm_model_with_fallback(
+            task.llm_provider, task.llm_model_name, True
         )
         _error_handler_cache[cache_key] = ErrorHandlerAgent(model)
     return _error_handler_cache[cache_key]
