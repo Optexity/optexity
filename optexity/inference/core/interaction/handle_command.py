@@ -49,6 +49,8 @@ async def command_based_action_with_retry(
 
     logger.debug(f"Executing command-based action: {action.__class__.__name__}")
 
+    force = task.automation.browser_channel == "browser-use"
+
     for try_index in range(max_tries):
         last_error = None
         try:
@@ -66,9 +68,13 @@ async def command_based_action_with_retry(
             is_visible = await locator.is_visible()
 
             if is_visible:
-                await locator.scroll_into_view_if_needed(
-                    timeout=max_timeout_seconds_per_try * 1000
-                )
+                if not force:
+                    try:
+                        await locator.scroll_into_view_if_needed(
+                            timeout=max_timeout_seconds_per_try * 1000
+                        )
+                    except Exception:
+                        pass
                 await asyncio.sleep(0.05)
                 # browser_state_summary = await browser.get_browser_state_summary()
                 memory.browser_states[-1] = BrowserState(
@@ -86,6 +92,7 @@ async def command_based_action_with_retry(
                         memory,
                         task,
                         max_timeout_seconds_per_try,
+                        force,
                     )
                 elif isinstance(action, InputTextAction):
                     await input_text_locator(
@@ -102,14 +109,14 @@ async def command_based_action_with_retry(
                     )
                 elif isinstance(action, CheckAction):
                     await check_locator(
-                        action, locator, max_timeout_seconds_per_try, browser
+                        action, locator, max_timeout_seconds_per_try, browser, force
                     )
                 elif isinstance(action, UncheckAction):
                     await uncheck_locator(
-                        action, locator, max_timeout_seconds_per_try, browser
+                        action, locator, max_timeout_seconds_per_try, browser, force
                     )
                 elif isinstance(action, HoverAction):
-                    await hover_locator(locator, max_timeout_seconds_per_try)
+                    await hover_locator(locator, max_timeout_seconds_per_try, force)
                 elif isinstance(action, UploadFileAction):
                     await upload_file_locator(action, locator)
                 logger.debug(
@@ -148,6 +155,7 @@ async def click_locator(
     memory: Memory,
     task: Task,
     max_timeout_seconds_per_try: float,
+    force: bool = False,
 ):
     async def _actual_click():
         if click_element_action.mouse_click:
@@ -159,8 +167,9 @@ async def click_locator(
 
             bbox = await locator.bounding_box()
             if bbox is None:
-                # Fallback if Playwright can't compute the bounding-box.
-                if click_element_action.double_click:
+                if force:
+                    await locator.evaluate("el => el.click()")
+                elif click_element_action.double_click:
                     await locator.dblclick(
                         no_wait_after=True,
                         timeout=max_timeout_seconds_per_try * 1000,
@@ -180,8 +189,6 @@ async def click_locator(
             x = float(bbox["x"]) + dx
             y = float(bbox["y"]) + dy
 
-            # TODO: Remove this later
-            # Lightweight visual marker for debugging coordinate clicks.
             await page.evaluate(
                 """([x, y]) => {
                     const el = document.createElement('div');
@@ -211,9 +218,21 @@ async def click_locator(
                 )
             else:
                 await page.mouse.click(x, y)
+            return
+
+        if force:
+            if click_element_action.double_click:
+                await locator.dispatch_event("dblclick")
+            elif click_element_action.button == "right":
+                await locator.dispatch_event("contextmenu")
+            else:
+                await locator.evaluate("el => el.click()")
+            return
+
         if click_element_action.double_click:
             await locator.dblclick(
-                no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000
+                no_wait_after=True,
+                timeout=max_timeout_seconds_per_try * 1000,
             )
         else:
             await locator.click(
@@ -266,7 +285,11 @@ async def check_locator(
     locator: Locator,
     max_timeout_seconds_per_try: float,
     browser: Browser,
+    force: bool = False,
 ):
+    if force:
+        await locator.evaluate("el => { if (!el.checked) el.click() }")
+        return
     await locator.uncheck(
         no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000
     )
@@ -280,7 +303,11 @@ async def uncheck_locator(
     locator: Locator,
     max_timeout_seconds_per_try: float,
     browser: Browser,
+    force: bool = False,
 ):
+    if force:
+        await locator.evaluate("el => { if (el.checked) el.click() }")
+        return
     await locator.check(no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000)
     await asyncio.sleep(1)
     locator = await browser.get_locator_from_command(action.command)
@@ -292,7 +319,11 @@ async def uncheck_locator(
 async def hover_locator(
     locator: Locator,
     max_timeout_seconds_per_try: float,
+    force: bool = False,
 ):
+    if force:
+        await locator.dispatch_event("mouseenter")
+        return
     await locator.hover(no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000)
 
 

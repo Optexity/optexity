@@ -111,11 +111,7 @@ class Browser:
             # )
 
             browser_session = BrowserSession(
-                browser=self.browser,
-                browser_context=self.context,
-                playwright=self.playwright,
-                keep_alive=True,
-                auto_download_pdfs=False,
+                cdp_url=self.cdp_url, keep_alive=True, auto_download_pdfs=False
             )
 
             self.backend_agent = Agent(
