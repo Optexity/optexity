@@ -398,6 +398,7 @@ class Automation(BaseModel):
     expected_downloads: int = 0
     remove_empty_nodes_in_axtree: bool = True
     url: str
+    take_final_screenshot: bool = True
     parameters: Parameters
     nodes: list[
         Annotated[ActionNode | ForLoopNode | IfElseNode, Field(discriminator="type")]
