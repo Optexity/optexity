@@ -7,6 +7,7 @@ import aiofiles
 from optexity.exceptions import (
     AssertLocatorPresenceException,
     ElementNotFoundInAxtreeException,
+    KeywordNotFoundOnScreenException,
 )
 from optexity.inference.agents.error_handler.error_handler import ErrorHandlerAgent
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
@@ -158,6 +159,9 @@ async def run_interaction_action(
             await handle_key_press(interaction_action.key_press, memory, browser)
         elif interaction_action.scroll:
             await handle_scroll(interaction_action.scroll, memory, browser)
+    except KeywordNotFoundOnScreenException as e:
+        logger.error(f"Keyword not found on screen: {e.keyword}. Failing automation.")
+        raise
     except (AssertLocatorPresenceException, ElementNotFoundInAxtreeException) as e:
         await handle_assert_locator_presence_error(
             e, interaction_action, task, memory, browser, retries_left

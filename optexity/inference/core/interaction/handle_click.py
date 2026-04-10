@@ -4,6 +4,7 @@ import pyautogui
 
 from optexity.exceptions import (
     ElementNotFoundInAxtreeException,
+    KeywordNotFoundOnScreenException,
 )
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
@@ -13,13 +14,12 @@ from optexity.inference.core.interaction.utils import (
     get_coordinates_from_prompt,
     get_index_from_prompt,
     handle_download,
-    match_text_in_screenshot,
+    resolve_keyword_coordinates,
 )
 from optexity.inference.core.vision.utils import mark_screenshot
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import ClickElementAction
 from optexity.schema.memory import Memory
-from optexity.schema.ocr import BoundingBox
 from optexity.schema.task import Task
 
 pyautogui.FAILSAFE = True
@@ -123,23 +123,15 @@ async def click_element_coordinates(
             memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
 
         if click_element_action.keyword:
-            result = await match_text_in_screenshot(
-                memory,
-                click_element_action.keyword,
-                BoundingBox(x=x, y=y, width=113, height=41),
+            result = await resolve_keyword_coordinates(
+                click_element_action.keyword, x, y, memory
             )
-            if result is not None:
-                x_new, y_new = get_coordinates_from_ocr_result(result)
-
-                if x is not None and y is not None:
-                    logger.info(
-                        f"Matched target text {click_element_action.keyword}  with found one {result.text} New coordinates: {x_new}, {y_new} compared to old coordinates: {x}, {y}"
-                    )
-                else:
-                    logger.info(f"Using new coordinates: {x_new}, {y_new}")
-
-                x = x_new
-                y = y_new
+            x_new, y_new = get_coordinates_from_ocr_result(result)
+            logger.info(
+                f"Matched keyword '{click_element_action.keyword}' with '{result.text}'. New coordinates: ({x_new}, {y_new}), old: ({x}, {y})"
+            )
+            x = x_new
+            y = y_new
 
         logger.debug(f"Clicking element at coordinates: {x}, {y}")
 
@@ -155,8 +147,13 @@ async def click_element_coordinates(
                 screenshot_base64  # pyright: ignore[reportAttributeAccessIssue]
             )
 
-    except ElementNotFoundInAxtreeException as e:
+    except (ElementNotFoundInAxtreeException, KeywordNotFoundOnScreenException) as e:
         raise e
     except Exception as e:
+        if click_element_action.keyword:
+            raise KeywordNotFoundOnScreenException(
+                message=f"Failed to verify keyword '{click_element_action.keyword}' on screen due to error: {e}",
+                keyword=click_element_action.keyword,
+            )
         logger.error(f"Error in click_element_coordinates: {e}")
         return

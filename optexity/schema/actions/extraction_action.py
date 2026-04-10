@@ -1,7 +1,7 @@
 from typing import Any, List, Literal, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from optexity.schema.actions.two_fa_action import TwoFAAction
 from optexity.utils.utils import build_model
@@ -104,7 +104,14 @@ class ScreenshotExtraction(BaseModel):
 
 
 class StateExtraction(BaseModel):
-    pass
+    model_config = ConfigDict(extra="allow")
+
+    def replace(self, pattern: str, replacement: str):
+        if self.model_extra:
+            for key, value in self.model_extra.items():
+                if isinstance(value, str):
+                    self.model_extra[key] = value.replace(pattern, replacement)
+        return self
 
 
 class PDFExtraction(BaseModel):
@@ -188,6 +195,8 @@ class ExtractionAction(BaseModel):
                 pattern, replacement
             )
 
+        if self.state:
+            self.state.replace(pattern, replacement)
         if self.two_fa_action:
             self.two_fa_action.replace(pattern, replacement)
 

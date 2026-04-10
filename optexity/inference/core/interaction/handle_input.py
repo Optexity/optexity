@@ -5,18 +5,23 @@ import re
 import pyautogui
 import pyperclip
 
-from optexity.exceptions import ElementNotFoundInAxtreeException
+from optexity.exceptions import (
+    ElementNotFoundInAxtreeException,
+    KeywordNotFoundOnScreenException,
+)
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
 from optexity.inference.core.interaction.utils import (
     get_coordinates_from_prompt,
     get_index_from_prompt,
+    resolve_keyword_coordinates,
 )
-from optexity.inference.core.vision.time import (
-    wait_for_screen_to_change,
-    wait_for_stable_screen,
-)
+
+# from optexity.inference.core.vision.time import (
+#     wait_for_screen_to_change,
+#     wait_for_stable_screen,
+# )
 from optexity.inference.core.vision.utils import mark_screenshot
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import InputTextAction
@@ -140,6 +145,17 @@ async def input_text_coordinates(
             y = data[1]
             memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
 
+        if input_text_action.keyword:
+            result = await resolve_keyword_coordinates(
+                input_text_action.keyword, x, y, memory
+            )
+            # Click at start (left edge) of bounding box for input fields
+            x = int(result.bounding_box.x)
+            y = int(result.bounding_box.y + result.bounding_box.height / 2)
+            logger.info(
+                f"Keyword '{input_text_action.keyword}' matched '{result.text}', clicking at start of bounding box: ({x}, {y})"
+            )
+
         logger.debug(f"Typing text at coordinates: {x}, {y}")
 
         pyautogui.click(x, y)
@@ -163,8 +179,13 @@ async def input_text_coordinates(
                 screenshot_base64  # pyright: ignore[reportAttributeAccessIssue]
             )
 
-    except ElementNotFoundInAxtreeException as e:
+    except (ElementNotFoundInAxtreeException, KeywordNotFoundOnScreenException) as e:
         raise e
     except Exception as e:
+        if input_text_action.keyword:
+            raise KeywordNotFoundOnScreenException(
+                message=f"Failed to verify keyword '{input_text_action.keyword}' on screen due to error: {e}",
+                keyword=input_text_action.keyword,
+            )
         logger.error(f"Error in input_text_coordinates: {e}")
         return

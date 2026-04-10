@@ -267,11 +267,125 @@ async def match_text_in_screenshot(
     return None
 
 
+async def match_all_text_in_screenshot(
+    memory: Memory,
+    keyword: str,
+    region_of_interest: BoundingBox | None = None,
+    screenshot: str | bytes | None = None,
+) -> list[OCRResult]:
+    """Find all matching text on screenshot for the keyword."""
+    img = screenshot or (
+        memory.browser_states[-1].screenshot if memory.browser_states else None
+    )
+    if img is None:
+        logger.error("Screenshot is None or not a string")
+        return []
+
+    # Try ROI first if provided
+    if region_of_interest is not None:
+        results, base64_image_sent_to_ocr = small_ocr.ocr(
+            img, region_of_interest=region_of_interest, padding_factor=4.0
+        )
+        matches = find_all_keyword_matches(results, keyword)
+        memory.browser_states[-1].ocr_image_sent_to_ocr.append(base64_image_sent_to_ocr)
+        if matches:
+            logger.info(
+                f"Found {len(matches)} match(es) using small OCR for keyword '{keyword}' in ROI"
+            )
+            return matches
+
+    # Full screenshot fallback
+    logger.info("Could not find keyword using small OCR, trying large OCR...")
+    results, base64_image_sent_to_ocr = large_ocr.ocr(img)
+    memory.browser_states[-1].ocr_image_sent_to_ocr.append(base64_image_sent_to_ocr)
+    matches = find_all_keyword_matches(results, keyword)
+
+    if matches:
+        logger.info(
+            f"Found {len(matches)} match(es) using large OCR for keyword '{keyword}'"
+        )
+    return matches
+
+
+def _join_adjacent_ocr_results(
+    ocr_results: list[OCRResult], num_words: int
+) -> list[OCRResult]:
+    """Join horizontally adjacent OCR words into multi-word results.
+
+    Only joins words whose y-coordinates are within 10% of each other's height,
+    ensuring words from different lines are not merged.
+    """
+    if num_words <= 1 or len(ocr_results) < num_words:
+        return []
+
+    # Sort by y first (group lines), then by x within each line
+    sorted_results = sorted(
+        ocr_results, key=lambda r: (r.bounding_box.y, r.bounding_box.x)
+    )
+
+    joined = []
+    for i in range(len(sorted_results) - num_words + 1):
+        group = sorted_results[i : i + num_words]
+
+        # Check all words in group have similar y (within 10% of avg height)
+        avg_height = sum(r.bounding_box.height for r in group) / len(group)
+        y_threshold = max(avg_height * 0.1, 5)
+        base_y = group[0].bounding_box.y
+        if any(abs(r.bounding_box.y - base_y) > y_threshold for r in group):
+            continue
+
+        # Sort group by x to ensure left-to-right order
+        group = sorted(group, key=lambda r: r.bounding_box.x)
+
+        # Build combined result
+        combined_text = " ".join(r.text for r in group)
+        min_x = group[0].bounding_box.x
+        min_y = min(r.bounding_box.y for r in group)
+        max_x_end = max(r.bounding_box.x + r.bounding_box.width for r in group)
+        max_y_end = max(r.bounding_box.y + r.bounding_box.height for r in group)
+        avg_confidence = sum(r.confidence for r in group) / len(group)
+
+        logger.debug(
+            f"Joined adjacent OCR words: '{combined_text}' at ({min_x}, {min_y})"
+        )
+
+        joined.append(
+            OCRResult(
+                text=combined_text,
+                confidence=avg_confidence,
+                bounding_box=BoundingBox(
+                    x=min_x,
+                    y=min_y,
+                    width=max_x_end - min_x,
+                    height=max_y_end - min_y,
+                ),
+            )
+        )
+
+    if joined:
+        logger.info(
+            f"Created {len(joined)} joined multi-word candidates from {len(ocr_results)} OCR results"
+        )
+
+    return joined
+
+
+def _score(entry):
+    return (entry[2] + entry[3] * 1.5) / 2.5
+
+
 def find_keyword_in_results(ocr_results: list[OCRResult], keyword: str):
+
+    # Build candidate list: original results + joined multi-word results
+    num_words = len(keyword.strip().split())
+    candidates = list(ocr_results)
+    if num_words > 1:
+        joined = _join_adjacent_ocr_results(ocr_results, num_words)
+        candidates.extend(joined)
 
     scored = []
     target = keyword.lower().strip()
-    for i, candidate in enumerate(ocr_results):
+    for i, candidate in enumerate(candidates):
         candidate_text = candidate.text.lower().strip()
         if target == candidate_text:
             scored.append((i, candidate, 100, 100, 100))
@@ -282,27 +396,56 @@ def find_keyword_in_results(ocr_results: list[OCRResult], keyword: str):
                 candidate,
                 fuzz.ratio(target, candidate_text),
                 fuzz.partial_ratio(target, candidate_text),
-                fuzz.token_sort_ratio(target, candidate_text),
             )
         )
-    # combined score: weight partial and token_sort higher
-    scored.sort(key=lambda x: (x[2] + x[3] * 1.5 + x[4] * 1.2) / 3.7, reverse=True)
-    return scored[0][1]
-    # return [(s[1], round((s[2] + s[3]*1.5 + s[4]*1.2)/3.7, 1), s[0]) for s in scored]
+    # combined score: weight partial higher
+    scored.sort(key=_score, reverse=True)
+    best = scored[0]
+    best_score = _score(best)
+    logger.info(
+        f"Best match for keyword '{keyword}': '{best[1].text}' with score {best_score:.1f}"
+    )
+    return best[1]
 
-    keyword = keyword.lower().strip()
-    # Exact match
-    for r in ocr_results:
-        if r.text.lower().strip() == keyword:
-            return r
 
-    # Substring match fallback
-    for r in ocr_results:
-        r_text = r.text.lower().strip()
-        if keyword in r_text or r_text in keyword:
-            return r
+def find_all_keyword_matches(
+    ocr_results: list[OCRResult], keyword: str
+) -> list[OCRResult]:
+    """Return all OCR results that share the same top fuzzy score for the keyword."""
 
-    return None
+    num_words = len(keyword.strip().split())
+    candidates = list(ocr_results)
+    if num_words > 1:
+        joined = _join_adjacent_ocr_results(ocr_results, num_words)
+        candidates.extend(joined)
+
+    scored = []
+    target = keyword.lower().strip()
+    for i, candidate in enumerate(candidates):
+        candidate_text = candidate.text.lower().strip()
+        if target == candidate_text:
+            scored.append((i, candidate, 100, 100))
+            continue
+        scored.append(
+            (
+                i,
+                candidate,
+                fuzz.ratio(target, candidate_text),
+                fuzz.partial_ratio(target, candidate_text),
+            )
+        )
+
+    if not scored:
+        return []
+
+    scores = [(s, (s[2] + s[3] * 1.5) / 2.5) for s in scored]
+    best_score = max(sc for _, sc in scores)
+    matches = [s[1] for s, sc in scores if sc == best_score]
+    logger.info(
+        f"find_all_keyword_matches for '{keyword}': best score {best_score:.1f}, "
+        f"{len(matches)} match(es): {[m.text for m in matches]}"
+    )
+    return matches
 
 
 def get_coordinates_from_ocr_result(ocr_result: OCRResult):
@@ -310,3 +453,42 @@ def get_coordinates_from_ocr_result(ocr_result: OCRResult):
         int(ocr_result.bounding_box.x + ocr_result.bounding_box.width / 2),
         int(ocr_result.bounding_box.y + ocr_result.bounding_box.height / 2),
     )
+
+
+async def resolve_keyword_coordinates(
+    keyword: str,
+    x: int,
+    y: int,
+    memory: Memory,
+) -> OCRResult:
+    """Find keyword on screen and return the nearest match to (x, y).
+
+    Raises KeywordNotFoundOnScreenException if not found.
+    """
+    from optexity.exceptions import KeywordNotFoundOnScreenException
+
+    matches = await match_all_text_in_screenshot(
+        memory,
+        keyword,
+        BoundingBox(x=x, y=y, width=113, height=41),
+    )
+    if not matches:
+        raise KeywordNotFoundOnScreenException(
+            message=f"Keyword '{keyword}' not found on screen.",
+            keyword=keyword,
+        )
+
+    if len(matches) == 1:
+        return matches[0]
+
+    result = min(
+        matches,
+        key=lambda m: (
+            (m.bounding_box.x + m.bounding_box.width / 2 - x) ** 2
+            + (m.bounding_box.y + m.bounding_box.height / 2 - y) ** 2
+        ),
+    )
+    logger.info(
+        f"Multiple matches ({len(matches)}) for keyword '{keyword}', picked nearest: '{result.text}' at ({result.bounding_box.x}, {result.bounding_box.y})"
+    )
+    return result

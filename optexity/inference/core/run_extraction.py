@@ -100,6 +100,21 @@ async def handle_state_extraction(
     browser: Browser,
     unique_identifier: str | None = None,
 ):
+    # Push any manually set variables into generated_variables
+    extra_vars = state_extraction.model_extra or {}
+    for key, value in extra_vars.items():
+        memory.variables.generated_variables[key] = (
+            value if isinstance(value, list) else [value]
+        )
+
+    if extra_vars:
+        memory.variables.output_data.append(
+            OutputData(
+                unique_identifier=unique_identifier,
+                json_data=extra_vars,
+            )
+        )
+
     page = await browser.get_current_page()
     if page is None:
         return
