@@ -339,7 +339,7 @@ async def handle_pdf_extraction(
             logger.error(
                 f"No matching PDF file found in downloads with filename {pdf_extraction.filename}. Total downloads: {len(memory.downloads)}"
             )
-            return
+            return None
 
     provider = pdf_extraction.llm_provider or task.llm_provider
     model_name_str = pdf_extraction.llm_model_name or task.llm_model_name

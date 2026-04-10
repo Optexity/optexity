@@ -33,7 +33,11 @@ class FallbackLLMModel(LLMModel):
                         f"Model {model.model_name} failed: {e}. "
                         f"Falling back to {self.models[i + 1].model_name}"
                     )
-        raise last_error
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError(
+            "FallbackLLMModel: all models exhausted with no error captured"
+        )
 
     def get_model_response_with_structured_output(
         self,
@@ -60,4 +64,8 @@ class FallbackLLMModel(LLMModel):
                         f"Model {model.model_name} failed: {e}. "
                         f"Falling back to {self.models[i + 1].model_name}"
                     )
-        raise last_error
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError(
+            "FallbackLLMModel: all models exhausted with no error captured"
+        )
