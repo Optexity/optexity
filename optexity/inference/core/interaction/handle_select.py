@@ -124,12 +124,6 @@ async def select_option_index(
         )
 
         async def _actual_select_option():
-            try:
-                if await _playwright_select_option(browser, node, matched_values):
-                    return
-            except Exception:
-                pass
-
             action_model = browser.backend_agent.ActionModel(
                 **{
                     "select_dropdown": {
@@ -138,7 +132,17 @@ async def select_option_index(
                     }
                 }
             )
-            await browser.backend_agent.multi_act([action_model])
+            results = await browser.backend_agent.multi_act([action_model])
+            if results and results[0].error:
+                logger.debug(
+                    f"Falling back to playwright select_option: {results[0].error}"
+                )
+                playwright_success = await _playwright_select_option(
+                    browser, node, matched_values
+                )
+                logger.debug(
+                    f"Playwright select_option succeeded: {playwright_success}"
+                )
 
         if select_option_action.expect_download:
             await handle_download(
