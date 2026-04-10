@@ -51,6 +51,41 @@ async def handle_select_option(
         await select_option_index(select_option_action, browser, memory, task)
 
 
+def _build_css_selector(node) -> str | None:
+    """Build a CSS selector from the node's attributes to locate it in the live DOM."""
+    tag = node.node_name.lower() if node.node_name else "select"
+    attrs = node.attributes or {}
+
+    for attr in ("id", "name", "data-testid", "aria-label"):
+        val = attrs.get(attr)
+        if val:
+            return f'{tag}[{attr}="{val}"]'
+
+    return None
+
+
+async def _playwright_select_option(
+    browser: Browser, node, matched_values: list[str]
+) -> bool:
+    """Select an option via Playwright, searching across all frames (pierces shadow DOM and iframes)."""
+    css_selector = _build_css_selector(node)
+    if css_selector is None:
+        return False
+
+    page = await browser.get_current_page()
+
+    for frame in page.frames:
+        try:
+            locator = frame.locator(css_selector)
+            if await locator.count() > 0:
+                await locator.first.select_option(value=matched_values[0])
+                return True
+        except Exception:
+            continue
+
+    return False
+
+
 async def select_option_index(
     select_option_action: SelectOptionAction,
     browser: Browser,
@@ -84,7 +119,17 @@ async def select_option_index(
             all_options, select_option_action.select_values, memory
         )
 
+        logger.debug(
+            f"Matched values for {select_option_action.command}: {matched_values}"
+        )
+
         async def _actual_select_option():
+            try:
+                if await _playwright_select_option(browser, node, matched_values):
+                    return
+            except Exception:
+                pass
+
             action_model = browser.backend_agent.ActionModel(
                 **{
                     "select_dropdown": {
