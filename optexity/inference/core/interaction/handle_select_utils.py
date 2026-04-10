@@ -6,11 +6,24 @@ from pydantic import BaseModel
 from optexity.inference.agents.select_value_prediction.select_value_prediction import (
     SelectValuePredictionAgent,
 )
+from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.interaction_action import Locator
 from optexity.schema.memory import Memory
+from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
-select_value_prediction_agent = SelectValuePredictionAgent()
+
+_select_prediction_cache: dict[tuple, SelectValuePredictionAgent] = {}
+
+
+def _get_select_prediction_agent(task: Task) -> SelectValuePredictionAgent:
+    cache_key = (task.llm_provider, task.llm_model_name)
+    if cache_key not in _select_prediction_cache:
+        model = get_llm_model_with_fallback(
+            task.llm_provider, task.llm_model_name, True
+        )
+        _select_prediction_cache[cache_key] = SelectValuePredictionAgent(model)
+    return _select_prediction_cache[cache_key]
 
 
 class SelectOptionValue(BaseModel):
@@ -19,13 +32,11 @@ class SelectOptionValue(BaseModel):
 
 
 def llm_select_match(
-    options: list[SelectOptionValue], patterns: list[str], memory: Memory
+    options: list[SelectOptionValue], patterns: list[str], memory: Memory, task: Task
 ) -> list[str]:
-    final_prompt, response, token_usage = (
-        select_value_prediction_agent.predict_select_value(
-            [o.model_dump() for o in options], patterns
-        )
-    )
+    final_prompt, response, token_usage = _get_select_prediction_agent(
+        task
+    ).predict_select_value([o.model_dump() for o in options], patterns)
     memory.token_usage += token_usage
     memory.browser_states[-1].final_prompt = final_prompt
     memory.browser_states[-1].llm_response = response.model_dump()
@@ -54,7 +65,7 @@ def score_match(pat: str, val: str) -> int:
 
 
 async def smart_select(
-    options: list[SelectOptionValue], patterns: list[str], memory: Memory
+    options: list[SelectOptionValue], patterns: list[str], memory: Memory, task: Task
 ):
     # Get all options from the <select>
     ## TODO: remove this once we have a better way to handle select one
@@ -134,7 +145,7 @@ async def smart_select(
                     matched_values.append(best_value)
 
     if len(matched_values) == 0:
-        matched_values = llm_select_match(options, patterns, memory)
+        matched_values = llm_select_match(options, patterns, memory, task)
 
     if len(matched_values) == 0:
         matched_values = patterns

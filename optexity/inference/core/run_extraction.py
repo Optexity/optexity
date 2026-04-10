@@ -6,7 +6,7 @@ import httpx
 
 from optexity.inference.core.run_two_fa import run_two_fa_action
 from optexity.inference.infra.browser import Browser
-from optexity.inference.models import GeminiModels, get_llm_model
+from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.extraction_action import (
     ExtractionAction,
     LLMExtraction,
@@ -27,8 +27,6 @@ from optexity.schema.memory import (
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
-
-llm_model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
 
 
 async def run_extraction_action(
@@ -79,7 +77,7 @@ async def run_extraction_action(
     elif extraction_action.two_fa_action:
         await run_two_fa_action(extraction_action.two_fa_action, memory, task)
     elif extraction_action.pdf:
-        await handle_pdf_extraction(extraction_action.pdf, memory)
+        await handle_pdf_extraction(extraction_action.pdf, memory, task)
 
 
 async def handle_state_extraction(
@@ -196,11 +194,9 @@ async def handle_llm_extraction(
     [/INPUT]
     """
 
-    if llm_extraction.llm_provider == "gemini":
-        model_name = GeminiModels(llm_extraction.llm_model_name)
-        llm_model.model_name = model_name
-    else:
-        raise ValueError(f"Invalid LLM provider: {llm_extraction.llm_provider}")
+    provider = llm_extraction.llm_provider or task.llm_provider
+    model_name_str = llm_extraction.llm_model_name or task.llm_model_name
+    llm_model = get_llm_model_with_fallback(provider, model_name_str, True)
 
     response, token_usage = llm_model.get_model_response_with_structured_output(
         prompt=prompt,
@@ -322,7 +318,9 @@ async def download_request(
         logger.error(f"Failed to download request: {e}, {traceback.format_exc()}")
 
 
-async def handle_pdf_extraction(pdf_extraction: PDFExtraction, memory: Memory):
+async def handle_pdf_extraction(
+    pdf_extraction: PDFExtraction, memory: Memory, task: Task
+):
     """
     Expects the PDF file to be in the downloads directory and the filename to be the same as the one specified in the PDFExtraction schema.
     If the PDF file is not found, it will use the first PDF file in the downloads directory.
@@ -341,13 +339,11 @@ async def handle_pdf_extraction(pdf_extraction: PDFExtraction, memory: Memory):
             logger.error(
                 f"No matching PDF file found in downloads with filename {pdf_extraction.filename}. Total downloads: {len(memory.downloads)}"
             )
-            return
+            return None
 
-    if pdf_extraction.llm_provider == "gemini":
-        model_name = GeminiModels(pdf_extraction.llm_model_name)
-        llm_model.model_name = model_name
-    else:
-        raise ValueError(f"Invalid LLM provider: {pdf_extraction.llm_provider}")
+    provider = pdf_extraction.llm_provider or task.llm_provider
+    model_name_str = pdf_extraction.llm_model_name or task.llm_model_name
+    llm_model = get_llm_model_with_fallback(provider, model_name_str, True)
 
     system_instruction = "Extract the information from the PDF file and return it in the format specified by the instructions."
     response, token_usage = llm_model.get_model_response_with_structured_output(

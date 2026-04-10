@@ -12,7 +12,7 @@ class LLMExtraction(BaseModel):
     extraction_format: dict
     extraction_instructions: str
     output_variable_names: list[str] | None = None
-    llm_provider: Literal["gemini"] = "gemini"
+    llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
     llm_model_name: str = "gemini-2.5-flash"
     include_full_page: bool = False
 
@@ -111,7 +111,7 @@ class PDFExtraction(BaseModel):
     filename: str
     extraction_format: dict
     extraction_instructions: str
-    llm_provider: Literal["gemini"] = "gemini"
+    llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
     llm_model_name: str = "gemini-2.5-flash"
 
     def build_model(self):

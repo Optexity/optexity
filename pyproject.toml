@@ -34,6 +34,10 @@ dependencies = [
     "tokencost",
     "onepassword-sdk",
     "boto3",
+
+    # llm clients
+    "anthropic",
+    "openai",
 ]
 
 [project.optional-dependencies]

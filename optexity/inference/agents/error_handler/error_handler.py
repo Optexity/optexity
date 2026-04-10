@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from optexity.inference.agents.error_handler.prompt import system_prompt
-from optexity.inference.models import GeminiModels, get_llm_model
+from optexity.inference.models.llm_model import LLMModel
 from optexity.schema.token_usage import TokenUsage
 
 logger = logging.getLogger(__name__)
@@ -16,11 +16,11 @@ class ErrorHandlerOutput(BaseModel):
 
 
 class ErrorHandlerAgent:
-    def __init__(self):
-        self.model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
+    def __init__(self, model: LLMModel):
+        self.model = model
 
     def classify_error(
-        self, command: str, screenshot: str
+        self, command: str, screenshot: str | None
     ) -> tuple[str, ErrorHandlerOutput, TokenUsage]:
 
         final_prompt = f"""

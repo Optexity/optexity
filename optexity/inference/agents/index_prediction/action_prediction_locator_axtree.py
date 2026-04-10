@@ -7,7 +7,7 @@ from optexity.inference.agents.index_prediction.prompt import (
     can_return_negative_index_prompt,
     system_prompt,
 )
-from optexity.inference.models import GeminiModels, get_llm_model
+from optexity.inference.models.llm_model import LLMModel
 from optexity.schema.token_usage import TokenUsage
 
 logger = logging.getLogger(__name__)
@@ -20,8 +20,8 @@ class IndexPredictionOutput(BaseModel):
 
 
 class ActionPredictionLocatorAxtree:
-    def __init__(self):
-        self.model = get_llm_model(GeminiModels.GEMINI_2_5_FLASH, True)
+    def __init__(self, model: LLMModel):
+        self.model = model
 
     def predict_action(
         self,
