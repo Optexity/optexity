@@ -96,7 +96,7 @@ async def command_based_action_with_retry(
                     )
                 elif isinstance(action, InputTextAction):
                     await input_text_locator(
-                        action, locator, browser, max_timeout_seconds_per_try
+                        action, locator, browser, max_timeout_seconds_per_try, force
                     )
                 elif isinstance(action, SelectOptionAction):
                     await select_option_locator(
@@ -221,7 +221,16 @@ async def click_locator(
             return
 
         if force:
-            if click_element_action.double_click:
+            page = await browser.get_current_page()
+            bbox = await locator.bounding_box()
+            if page is not None and bbox is not None:
+                x = float(bbox["x"]) + float(bbox["width"]) / 2
+                y = float(bbox["y"]) + float(bbox["height"]) / 2
+                if click_element_action.double_click:
+                    await page.mouse.dblclick(x, y, button=click_element_action.button)
+                else:
+                    await page.mouse.click(x, y, button=click_element_action.button)
+            elif click_element_action.double_click:
                 await locator.dispatch_event("dblclick")
             elif click_element_action.button == "right":
                 await locator.dispatch_event("contextmenu")
@@ -254,17 +263,29 @@ async def input_text_locator(
     locator: Locator,
     browser: Browser,
     max_timeout_seconds_per_try: float,
+    force: bool = False,
 ):
+    text = input_text_action.input_text
 
-    if input_text_action.fill_or_type == "fill":
+    if force:
+        await locator.evaluate(
+            """(el, text) => {
+                el.focus();
+                el.value = text;
+                el.dispatchEvent(new Event('input', {bubbles: true}));
+                el.dispatchEvent(new Event('change', {bubbles: true}));
+            }""",
+            text,
+        )
+    elif input_text_action.fill_or_type == "fill":
         await locator.fill(
-            input_text_action.input_text,
+            text,
             no_wait_after=True,
             timeout=max_timeout_seconds_per_try * 1000,
         )
     elif input_text_action.fill_or_type == "type":
         await locator.type(
-            input_text_action.input_text,
+            text,
             no_wait_after=True,
             timeout=max_timeout_seconds_per_try * 1000,
         )
@@ -272,12 +293,14 @@ async def input_text_locator(
         page = await browser.get_current_page()
         if page is None:
             return
-        for char in input_text_action.input_text:
+        for char in text:
             await page.keyboard.press(char)
             await asyncio.sleep(0.1)
 
     if input_text_action.press_enter:
-        await locator.press("Enter")
+        page = await browser.get_current_page()
+        if page is not None:
+            await page.keyboard.press("Enter")
 
 
 async def check_locator(
