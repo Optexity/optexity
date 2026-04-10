@@ -74,7 +74,7 @@ async def complete_task_in_server(
         headers = {"x-api-key": task.api_key}
         body = {
             "task_id": task.task_id,
-            "child_process_id": child_process_id,
+            "child_process_id": str(child_process_id),
             "unique_child_arn": unique_child_arn,
             "completed_at": task.completed_at.isoformat(),
             "status": task.status,
