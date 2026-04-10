@@ -227,6 +227,7 @@ class TaskStartedRequest(BaseModel):
 class TaskCompleteRequest(BaseModel):
     task_id: str
     child_process_id: str
+    unique_child_arn: str | None = None
 
     status: Literal["success", "failed", "cancelled", "killed"]
     error: str | None
