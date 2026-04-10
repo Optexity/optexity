@@ -58,7 +58,7 @@ async def run_interaction_action(
     browser: Browser,
     retries_left: int,
 ):
-    await asyncio.to_thread(input, "Press any key to continue...")
+    # await asyncio.to_thread(input, "Press any key to continue...")
     if retries_left <= 0:
         return
 
