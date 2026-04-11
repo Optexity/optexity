@@ -22,6 +22,7 @@ from uvicorn import run
 from optexity.inference.core.logging import (
     complete_task_in_server,
     delete_local_data,
+    initiate_callback,
     save_trajectory_in_server,
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
@@ -198,6 +199,7 @@ async def run_automation_in_process(
             if attempts_left <= 1:
                 task.completed_at = datetime.now(timezone.utc)
                 await complete_task_in_server(task, None, child_process_id)
+                await initiate_callback(task)
             returncode = -1
 
         if returncode == ExitCodes.SUCCESS.value:
