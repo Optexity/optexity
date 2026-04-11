@@ -27,7 +27,7 @@ from optexity.utils.settings import settings
 logger = logging.getLogger(__name__)
 
 _index_prediction_cache: dict[tuple, ActionPredictionLocatorAxtree] = {}
-small_ocr = Tesseract()
+small_ocr = AWSTextract()
 large_ocr = AWSTextract()
 
 
