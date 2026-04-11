@@ -107,6 +107,7 @@ class Task(BaseModel):
     status: Literal[
         "queued", "allocated", "running", "success", "failed", "cancelled", "killed"
     ]
+    workspace_id: str | None = None
     is_cloud: bool = False
     save_directory: Path = Field(default=Path("/tmp/optexity"))
     use_proxy: bool = False
