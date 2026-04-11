@@ -4,15 +4,10 @@ from typing import Annotated, Any, ForwardRef, Literal
 from pydantic import BaseModel, Field, model_validator
 
 from optexity.schema.actions.assertion_action import AssertionAction
-from optexity.schema.actions.captcha_action import CaptchaAction
 from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
-from optexity.schema.actions.misc_action import (
-    FailStateAction,
-    PythonScriptAction,
-    SleepAction,
-)
-from optexity.utils.aws_secret_manager import get_aws_secret_value
+from optexity.schema.actions.misc_action import PythonScriptAction, SleepAction
+from optexity.schema.actions.powershell_action import PowerShellAction
 from optexity.utils.utils import get_onepassword_value, get_totp_code
 
 logger = logging.getLogger(__name__)
@@ -38,24 +33,22 @@ class OnePasswordParameter(BaseModel):
 
 
 class AmazonSecretsManagerParameter(BaseModel):
-    secret_name: str
-    region_name: str
-    key: str | None = None
-    type: Literal["raw", "totp_secret"] = "raw"
-    digits: int | None = None
+    pass
 
     @model_validator(mode="after")
     def validate_amazon_secrets_manager_parameter(self):
-        if self.type == "totp_secret":
-            assert self.digits is not None, "digits must be provided for totp_secret"
-        else:
-            assert self.digits is None, "digits must not be provided for raw"
-        return self
+        raise NotImplementedError("Amazon Secrets Manager is not implemented yet")
 
 
 class TOTPParameter(BaseModel):
     totp_secret: str
     digits: int = 6
+
+
+class RDPParameter(BaseModel):
+    host: str
+    username: str | None = None
+    password: str | None = None
 
 
 class SecureParameter(BaseModel):
@@ -79,9 +72,8 @@ class ActionNode(BaseModel):
     assertion_action: AssertionAction | None = None
     extraction_action: ExtractionAction | None = None
     python_script_action: PythonScriptAction | None = None
+    powershell_action: PowerShellAction | None = None
     sleep_action: SleepAction | None = None
-    fail_state_action: FailStateAction | None = None
-    captcha_action: CaptchaAction | None = None
     before_sleep_time: float = 0.0
     end_sleep_time: float = 5.0
     expect_new_tab: bool = False
@@ -96,15 +88,14 @@ class ActionNode(BaseModel):
             "assertion_action": self.assertion_action,
             "extraction_action": self.extraction_action,
             "python_script_action": self.python_script_action,
+            "powershell_action": self.powershell_action,
             "sleep_action": self.sleep_action,
-            "fail_state_action": self.fail_state_action,
-            "captcha_action": self.captcha_action,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, sleep_action, fail_state_action, captcha_action must be provided"
+                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, powershell_action, sleep_action must be provided"
             )
 
         assert (
@@ -145,27 +136,20 @@ class ActionNode(BaseModel):
             self.extraction_action.replace(pattern, replacement)
         if self.python_script_action:
             pass
+        if self.powershell_action:
+            self.powershell_action.replace(pattern, replacement)
         if self.sleep_action:
             pass
-        if self.fail_state_action:
-            self.fail_state_action.replace(pattern, replacement)
-        if self.captcha_action:
-            self.captcha_action.replace(pattern, replacement)
 
         return self
 
     async def replace_variables(
-        self,
-        variables: dict[str, list[str | SecureParameter]],
-        workspace_id: str | None = None,
-        api_key: str | None = None,
+        self, variables: dict[str, list[str | SecureParameter]]
     ):
         for key, values in variables.items():
 
             for index, value in enumerate(values):
                 pattern = f"{{{key}[{index}]}}"
-
-                str_value = str(value)
 
                 if isinstance(value, SecureParameter):
                     if value.onepassword:
@@ -173,8 +157,6 @@ class ActionNode(BaseModel):
                             value.onepassword.vault_name,
                             value.onepassword.item_name,
                             value.onepassword.field_name,
-                            workspace_id,
-                            api_key,
                         )
                         if value.onepassword.type == "totp_secret":
                             str_value = get_totp_code(
@@ -182,17 +164,9 @@ class ActionNode(BaseModel):
                             )
 
                     elif value.amazon_secrets_manager:
-                        asm = value.amazon_secrets_manager
-                        str_value = await get_aws_secret_value(
-                            asm.secret_name,
-                            asm.region_name,
-                            asm.key,
-                            workspace_id,
-                            api_key,
+                        raise NotImplementedError(
+                            "Amazon Secrets Manager is not implemented yet"
                         )
-                        if asm.type == "totp_secret":
-                            assert asm.digits is not None
-                            str_value = get_totp_code(str_value, asm.digits)
                     elif value.totp:
                         str_value = get_totp_code(
                             value.totp.totp_secret, value.totp.digits
@@ -359,7 +333,7 @@ class Parameters(BaseModel):
 
     @model_validator(mode="after")
     def validate_parameters(self):
-        reserved_parameter_names = set(["current_page_url"])
+        reserved_parameter_names = set(["current_page_url", "current_time", "task_id"])
 
         for d in [
             self.input_parameters,
@@ -378,9 +352,7 @@ class Parameters(BaseModel):
 
 ## TODO: fix expected downloads for ForLoop
 class Automation(BaseModel):
-    browser_channel: Literal[
-        "chromium", "chrome", "cloakbrowser", "browser-use", "rdp"
-    ] = "chromium"
+    browser_channel: Literal["chromium", "chrome", "rdp"] = "chromium"
     backend: Literal["browser-use", "computer-vision"] = "browser-use"
     os_emulation: Literal["windows", "linux"] | None = None
     max_retries: int = 0
@@ -436,6 +408,22 @@ class Automation(BaseModel):
 
         data["nodes"] = new_nodes
         return data
+
+    @model_validator(mode="after")
+    def validate_rdp_parameter(self):
+        if self.browser_channel == "rdp":
+            for node in self.nodes:
+                if isinstance(node, ActionNode):
+                    if node.interaction_action:
+                        if (
+                            node.interaction_action.click_element is None
+                            and node.interaction_action.input_text is None
+                            and node.interaction_action.key_press is None
+                        ):
+                            raise ValueError(
+                                "Only click_element, input_text, and key_press are allowed for rdp"
+                            )
+        return self
 
     @model_validator(mode="after")
     def validate_parameters_with_examples(self):

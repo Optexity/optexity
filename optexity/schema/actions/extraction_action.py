@@ -1,7 +1,7 @@
 from typing import Any, List, Literal, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from optexity.schema.actions.two_fa_action import TwoFAAction
 from optexity.utils.utils import build_model
@@ -104,7 +104,14 @@ class ScreenshotExtraction(BaseModel):
 
 
 class StateExtraction(BaseModel):
-    pass
+    model_config = ConfigDict(extra="allow")
+
+    def replace(self, pattern: str, replacement: str):
+        if self.model_extra:
+            for key, value in self.model_extra.items():
+                if isinstance(value, str):
+                    self.model_extra[key] = value.replace(pattern, replacement)
+        return self
 
 
 class PDFExtraction(BaseModel):
@@ -134,6 +141,15 @@ class PDFExtraction(BaseModel):
         return self
 
 
+class OCRCoordinatesExtraction(BaseModel):
+    source_variable: str
+    output_x_variable: str = "coords_x"
+    output_y_variable: str = "coords_y"
+
+    def replace(self, pattern: str, replacement: str):
+        return self
+
+
 class ExtractionAction(BaseModel):
     unique_identifier: str | None = None
     network_call: Optional[NetworkCallExtraction] = None
@@ -143,6 +159,7 @@ class ExtractionAction(BaseModel):
     state: Optional[StateExtraction] = None
     two_fa_action: TwoFAAction | None = None
     pdf: Optional[PDFExtraction] = None
+    ocr_coordinates: Optional[OCRCoordinatesExtraction] = None
 
     @model_validator(mode="after")
     def validate_one_extraction(self):
@@ -155,12 +172,13 @@ class ExtractionAction(BaseModel):
             "state": self.state,
             "two_fa_action": self.two_fa_action,
             "pdf": self.pdf,
+            "ocr_coordinates": self.ocr_coordinates,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of llm, networkcall, python_script, screenshot, state, or two_fa_action must be provided"
+                "Exactly one of llm, networkcall, python_script, screenshot, state, two_fa_action, pdf, or ocr_coordinates must be provided"
             )
 
         return self
@@ -177,6 +195,8 @@ class ExtractionAction(BaseModel):
                 pattern, replacement
             )
 
+        if self.state:
+            self.state.replace(pattern, replacement)
         if self.two_fa_action:
             self.two_fa_action.replace(pattern, replacement)
 

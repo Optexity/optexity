@@ -107,6 +107,9 @@ class BrowserState(BaseModel):
     url: str = Field(...)
     title: str | None = Field(default=None)
     screenshot: str | None = Field(default=None)
+    ocr_annotated: str | None = Field(default=None)
+    ocr_canvas: str | None = Field(default=None)
+    ocr_image_sent_to_ocr: list[str] = Field(default_factory=list)
     html: str | None = Field(default=None)
     axtree: str | None = Field(default=None)
     final_prompt: str | None = Field(default=None)
@@ -122,7 +125,7 @@ class ScreenshotData(BaseModel):
 class OutputData(BaseModel):
     unique_identifier: str | None = None
     json_data: dict | None = Field(default=None)
-    screenshot: ScreenshotData = Field(default=None)
+    screenshot: ScreenshotData | None = Field(default=None)
     text: str | None = Field(default=None)
 
 
