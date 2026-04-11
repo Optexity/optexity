@@ -78,9 +78,13 @@ async def command_based_action_with_retry(
                 await asyncio.sleep(0.05)
                 # browser_state_summary = await browser.get_browser_state_summary()
                 memory.browser_states[-1] = BrowserState(
-                    url=await browser.get_current_page_url(),
-                    screenshot=await browser.get_screenshot(),
-                    title=await browser.get_current_page_title(),
+                    url=(
+                        "https://www.google.com"
+                        if force
+                        else await browser.get_current_page_url()
+                    ),
+                    screenshot=None if force else await browser.get_screenshot(),
+                    title="Google" if force else await browser.get_current_page_title(),
                     axtree=None,
                 )
 

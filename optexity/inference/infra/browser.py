@@ -132,6 +132,7 @@ class Browser:
                 {
                     "behavior": "allow",
                     "downloadPath": self.temp_downloads_dir,
+                    "eventsEnabled": True,
                 },
             )
             logger.info(f"CDP download behavior set to: {self.temp_downloads_dir}")

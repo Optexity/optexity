@@ -99,18 +99,53 @@ async def _wait_for_file_stable(
     return prev_size > 0
 
 
-async def handle_download(
+def _resolve_download_path(
+    base_path: Path, suggested_filename: str, downloads_dir: Path
+) -> Path:
+    """Resolve final download path, handling UUID placeholders and missing extensions."""
+    try:
+        uuid.UUID(base_path.stem)
+        return downloads_dir / suggested_filename
+    except Exception:
+        pass
+    if not base_path.suffix:
+        suffix = Path(suggested_filename).suffix
+        if suffix:
+            return base_path.with_suffix(suffix)
+    return base_path
+
+
+async def _handle_download_remote(
     func: Callable, memory: Memory, browser: Browser, task: Task, download_filename: str
 ):
-    download_path: Path = task.downloads_directory / download_filename
+    """Handle downloads for remote browsers via Playwright's streaming download."""
+    download_path = task.downloads_directory / download_filename
+    page = await browser.get_current_page()
 
+    async with page.expect_download(timeout=30000) as download_info:
+        await func()
+    download = await download_info.value
+
+    download_path = _resolve_download_path(
+        download_path, download.suggested_filename, task.downloads_directory
+    )
+    await download.save_as(str(download_path))
+    logger.info(f"Remote download saved to {download_path}")
+
+    if download_path.exists() and download_path.stat().st_size > 0:
+        memory.downloads.append(download_path)
+    else:
+        logger.error(f"Download file is empty or missing: {download_path}")
+
+
+async def _handle_download_local(
+    func: Callable, memory: Memory, browser: Browser, task: Task, download_filename: str
+):
+    """Handle downloads for local browsers via filesystem polling."""
+    download_path = task.downloads_directory / download_filename
     before = _snapshot_dir(browser.temp_downloads_dir)
 
-    # page = await browser.get_current_page()
-    # async with page.expect_download() as download_info:
     await func()
-    # download = await download_info.value
-    # logger.info(f"Suggested filename: {download.suggested_filename}")
 
     timeout = 30.0
     poll_interval = 0.5
@@ -143,28 +178,28 @@ async def handle_download(
     if not await _wait_for_file_stable(src_path):
         logger.warning(f"Downloaded file {src_path} may be incomplete")
 
-    try:
-        uuid.UUID(download_path.stem)
-        is_uuid_filename = True
-    except Exception:
-        is_uuid_filename = False
-
-    if is_uuid_filename:
-        download_path = task.downloads_directory / new_file
-    elif not download_path.suffix:
-        suffix = Path(new_file).suffix
-        if suffix:
-            download_path = download_path.with_suffix(suffix)
+    download_path = _resolve_download_path(
+        download_path, new_file, task.downloads_directory
+    )
 
     shutil.move(str(src_path), str(download_path))
     logger.info(f"Moved download {src_path} -> {download_path}")
-
-    # await clean_download(download_path)
 
     if download_path.exists() and download_path.stat().st_size > 0:
         memory.downloads.append(download_path)
     else:
         logger.error(f"Download file is empty or missing: {download_path}")
+
+
+async def handle_download(
+    func: Callable, memory: Memory, browser: Browser, task: Task, download_filename: str
+):
+    is_remote = task.automation.browser_channel == "browser-use"
+
+    if is_remote:
+        await _handle_download_remote(func, memory, browser, task, download_filename)
+    else:
+        await _handle_download_local(func, memory, browser, task, download_filename)
 
 
 async def clean_download(download_path: Path):
