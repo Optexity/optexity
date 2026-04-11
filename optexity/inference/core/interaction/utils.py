@@ -248,6 +248,11 @@ async def match_text_in_screenshot(
         results, base64_image_sent_to_ocr = small_ocr.ocr(
             img, region_of_interest=region_of_interest, padding_factor=4.0
         )
+        logger.info(
+            f"Found {len(results)} results using small OCR for keyword '{keyword}' in ROI"
+        )
+        for result in results:
+            logger.info(f"Result: {result.text} with confidence {result.confidence}")
         result = find_keyword_in_results(results, keyword)
         memory.browser_states[-1].ocr_image_sent_to_ocr.append(base64_image_sent_to_ocr)
         if result is not None:
@@ -284,7 +289,7 @@ async def match_all_text_in_screenshot(
     # Try ROI first if provided
     if region_of_interest is not None:
         results, base64_image_sent_to_ocr = small_ocr.ocr(
-            img, region_of_interest=region_of_interest, padding_factor=4.0
+            img, region_of_interest=region_of_interest, padding_factor=1.0
         )
         matches = find_all_keyword_matches(results, keyword)
         memory.browser_states[-1].ocr_image_sent_to_ocr.append(base64_image_sent_to_ocr)
