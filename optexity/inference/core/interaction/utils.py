@@ -291,7 +291,13 @@ async def match_all_text_in_screenshot(
         results, base64_image_sent_to_ocr = small_ocr.ocr(
             img, region_of_interest=region_of_interest, padding_factor=1.0
         )
+        for result in results:
+            logger.info(f"Result: {result.text} with confidence {result.confidence}")
+
         matches = find_all_keyword_matches(results, keyword)
+        for match in matches:
+            logger.info(f"Match: {match.text} with confidence {match.confidence}")
+
         memory.browser_states[-1].ocr_image_sent_to_ocr.append(base64_image_sent_to_ocr)
         if matches:
             logger.info(
