@@ -163,7 +163,7 @@ async def run_automation_in_process(
         if _global_actual_browser is None:
             raise ValueError("Browser is not setup")
         _cdp_url = _global_actual_browser.cdp_url
-        if _cdp_url is None:
+        if _cdp_url is None and _global_actual_browser.channel != "rdp":
             raise ValueError("CDP URL is not setup")
 
         logger.info(
@@ -176,7 +176,7 @@ async def run_automation_in_process(
             task.model_dump_json(),
             unique_child_arn,
             str(child_process_id),
-            str(_cdp_url),
+            str(_cdp_url) if _cdp_url is not None else "None",
             str(attempts_left),
             preexec_fn=os.setsid,
         )

@@ -70,7 +70,7 @@ async def run_automation(
     task: Task,
     unique_child_arn: str,
     child_process_id: int,
-    cdp_url: str,
+    cdp_url: str | None,
     max_tries: int = 1,
 ):
     file_handler = logging.FileHandler(str(task.log_file_path))

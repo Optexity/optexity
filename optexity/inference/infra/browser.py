@@ -38,7 +38,7 @@ class Browser:
     def __init__(
         self,
         memory: Memory,
-        cdp_url: str,
+        cdp_url: str | None = None,
         stealth: bool = True,
         backend: Literal[
             "browser-use", "computer-vision", "browserbase"
