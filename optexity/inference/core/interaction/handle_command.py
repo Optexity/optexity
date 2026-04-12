@@ -150,7 +150,67 @@ async def click_locator(
     max_timeout_seconds_per_try: float,
 ):
     async def _actual_click():
+        if click_element_action.mouse_click:
+            page = await browser.get_current_page()
+            if page is None:
+                raise RuntimeError(
+                    "click_locator(mouse_click=true): browser.get_current_page() returned None"
+                )
 
+            bbox = await locator.bounding_box()
+            if bbox is None:
+                # Fallback if Playwright can't compute the bounding-box.
+                if click_element_action.double_click:
+                    await locator.dblclick(
+                        no_wait_after=True,
+                        timeout=max_timeout_seconds_per_try * 1000,
+                    )
+                else:
+                    await locator.click(
+                        button=click_element_action.button,
+                        no_wait_after=True,
+                        timeout=max_timeout_seconds_per_try * 1000,
+                    )
+                return
+
+            deviation = click_element_action.mouse_click_deviation or {}
+            dx = float(deviation.get("x", 0))
+            dy = float(deviation.get("y", 0))
+
+            x = float(bbox["x"]) + dx
+            y = float(bbox["y"]) + dy
+
+            # TODO: Remove this later
+            # Lightweight visual marker for debugging coordinate clicks.
+            await page.evaluate(
+                """([x, y]) => {
+                    const el = document.createElement('div');
+                    el.id = '__optexity_click_marker';
+                    el.style.position = 'fixed';
+                    el.style.left = `${x - 8}px`;
+                    el.style.top = `${y - 8}px`;
+                    el.style.width = '16px';
+                    el.style.height = '16px';
+                    el.style.border = '2px solid red';
+                    el.style.borderRadius = '50%';
+                    el.style.background = 'rgba(255,0,0,0.25)';
+                    el.style.zIndex = '2147483647';
+                    el.style.pointerEvents = 'none';
+                    document.body.appendChild(el);
+                    setTimeout(() => el.remove(), 800);
+                }""",
+                [x, y],
+            )
+
+            if click_element_action.double_click:
+                await page.mouse.dblclick(
+                    x,
+                    y,
+                    button=click_element_action.button,
+                    timeout=max_timeout_seconds_per_try * 1000,
+                )
+            else:
+                await page.mouse.click(x, y)
         if click_element_action.double_click:
             await locator.dblclick(
                 no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000

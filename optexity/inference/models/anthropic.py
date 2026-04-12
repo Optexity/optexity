@@ -5,13 +5,42 @@ from pathlib import Path
 from typing import Optional
 
 import anthropic
+import httpx
 from pydantic import BaseModel, ValidationError
+
+from optexity.utils.utils import is_local_path, is_url
 
 from .llm_model import AnthropicModels, LLMModel, TokenUsage
 
 logger = logging.getLogger(__name__)
 
 MAX_TOKENS = 4096
+
+_SPACE_PLACEHOLDER = "_._"
+
+
+def _sanitize_schema_keys(obj):
+    """Recursively replace spaces in dict keys with _._"""
+    if isinstance(obj, dict):
+        return {
+            k.replace(" ", _SPACE_PLACEHOLDER): _sanitize_schema_keys(v)
+            for k, v in obj.items()
+        }
+    elif isinstance(obj, list):
+        return [_sanitize_schema_keys(item) for item in obj]
+    return obj
+
+
+def _restore_schema_keys(obj):
+    """Recursively replace _._ in dict keys back to spaces."""
+    if isinstance(obj, dict):
+        return {
+            k.replace(_SPACE_PLACEHOLDER, " "): _restore_schema_keys(v)
+            for k, v in obj.items()
+        }
+    elif isinstance(obj, list):
+        return [_restore_schema_keys(item) for item in obj]
+    return obj
 
 
 class Anthropic(LLMModel):
@@ -49,6 +78,28 @@ class Anthropic(LLMModel):
                 },
                 {"type": "text", "text": prompt},
             ]
+        elif pdf_url is not None:
+            if is_local_path(pdf_url):
+                pdf_data = base64.standard_b64encode(
+                    Path(str(pdf_url)).read_bytes()
+                ).decode("utf-8")
+            elif is_url(pdf_url):
+                pdf_data = base64.standard_b64encode(
+                    httpx.get(str(pdf_url)).content
+                ).decode("utf-8")
+            else:
+                raise ValueError(f"Invalid pdf_url: {pdf_url}")
+            content = [
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "application/pdf",
+                        "data": pdf_data,
+                    },
+                },
+                {"type": "text", "text": prompt},
+            ]
         else:
             content = prompt
 
@@ -65,13 +116,12 @@ class Anthropic(LLMModel):
 
         try:
             if self.use_structured_output:
-                import anthropic
-
+                schema = _sanitize_schema_keys(response_schema.model_json_schema())
                 kwargs["tools"] = [
                     {
                         "name": "structured_output",
                         "description": "Return the structured response",
-                        "input_schema": response_schema.model_json_schema(),
+                        "input_schema": schema,
                     }
                 ]
                 kwargs["tool_choice"] = {"type": "tool", "name": "structured_output"}
@@ -80,7 +130,8 @@ class Anthropic(LLMModel):
 
                 for block in response.content:
                     if block.type == "tool_use" and block.name == "structured_output":
-                        parsed_response = response_schema.model_validate(block.input)
+                        restored = _restore_schema_keys(block.input)
+                        parsed_response = response_schema.model_validate(restored)
                         break
             else:
                 response = self.client.messages.create(**kwargs)

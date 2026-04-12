@@ -22,6 +22,7 @@ from uvicorn import run
 from optexity.inference.core.logging import (
     complete_task_in_server,
     delete_local_data,
+    initiate_callback,
     save_trajectory_in_server,
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
@@ -159,6 +160,12 @@ async def run_automation_in_process(
         await setup_browser(task, unique_child_arn, child_process_id)
         log_system_info("Memory info after starting browser")
 
+        if _global_actual_browser is None:
+            raise ValueError("Browser is not setup")
+        _cdp_url = _global_actual_browser.cdp_url
+        if _cdp_url is None:
+            raise ValueError("CDP URL is not setup")
+
         logger.info(
             f"Starting worker attempt {attempt_index + 1}/{total_attempts} (attempts_left={attempts_left})"
         )
@@ -169,6 +176,7 @@ async def run_automation_in_process(
             task.model_dump_json(),
             unique_child_arn,
             str(child_process_id),
+            str(_cdp_url),
             str(attempts_left),
             preexec_fn=os.setsid,
         )
@@ -192,6 +200,7 @@ async def run_automation_in_process(
             if attempts_left <= 1:
                 task.completed_at = datetime.now(timezone.utc)
                 await complete_task_in_server(task, None, child_process_id)
+                await initiate_callback(task)
             returncode = -1
 
         if returncode == ExitCodes.SUCCESS.value:

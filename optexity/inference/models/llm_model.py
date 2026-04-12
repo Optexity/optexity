@@ -14,6 +14,19 @@ from optexity.schema.token_usage import TokenUsage
 
 logger = logging.getLogger(__name__)
 
+# Maps our model names to tokencost-recognized names for cost calculation
+_TOKENCOST_MODEL_MAP: dict[str, str] = {
+    # Anthropic
+    "claude-opus-4-6": "claude-opus-4-1",
+    "claude-sonnet-4-6": "claude-sonnet-4-20250514",
+    "claude-haiku-4-5-20251001": "claude-3-5-haiku-20241022",
+    # Gemini (models not yet in tokencost, mapped to closest equivalent)
+    "gemini-2.5-computer-use-preview-10-2025": "gemini-2.5-flash",
+    "gemini-3-flash-preview": "gemini-2.5-flash",
+    "gemini-3.1-flash-lite-preview": "gemini-2.5-flash-lite",
+    "gemini-3.1-pro-preview": "gemini-2.5-pro",
+}
+
 
 @unique
 class HumanModels(Enum):
@@ -50,6 +63,19 @@ class OpenAIModels(Enum):
 
     def is_computer_use_model(self) -> bool:
         return False
+
+
+@unique
+class AnthropicModels(Enum):
+    CLAUDE_OPUS_4_6 = "claude-opus-4-6"
+    CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
+    CLAUDE_HAIKU_4_5 = "claude-haiku-4-5-20251001"
+
+    def is_computer_use_model(self) -> bool:
+        return self in [
+            AnthropicModels.CLAUDE_SONNET_4_6,
+            AnthropicModels.CLAUDE_OPUS_4_6,
+        ]
 
 
 @unique
@@ -146,7 +172,7 @@ class LLMModel:
                 if i < max_retries - 1:
                     logger.info(f"Retrying... {i + 1}/{max_retries}")
 
-                    time.sleep(20)
+                    time.sleep(5)
                 last_exception = str(e)
 
         raise Exception(
@@ -254,26 +280,36 @@ class LLMModel:
             thoughts_tokens = 0
         if total_tokens is None:
             total_tokens = 0
-        input_cost = tokencost.costs.calculate_cost_by_tokens(
-            model=self.model_name.value,
-            num_tokens=input_tokens,
-            token_type="input",
+        cost_model = _TOKENCOST_MODEL_MAP.get(
+            self.model_name.value, self.model_name.value
         )
-        output_cost = tokencost.costs.calculate_cost_by_tokens(
-            model=self.model_name.value,
-            num_tokens=output_tokens,
-            token_type="output",
-        )
-        tool_use_cost = tokencost.costs.calculate_cost_by_tokens(
-            model=self.model_name.value,
-            num_tokens=tool_use_tokens,
-            token_type="output",
-        )
-        thoughts_cost = tokencost.costs.calculate_cost_by_tokens(
-            model=self.model_name.value,
-            num_tokens=thoughts_tokens,
-            token_type="output",
-        )
+        try:
+            input_cost = tokencost.costs.calculate_cost_by_tokens(
+                model=cost_model,
+                num_tokens=input_tokens,
+                token_type="input",
+            )
+            output_cost = tokencost.costs.calculate_cost_by_tokens(
+                model=cost_model,
+                num_tokens=output_tokens,
+                token_type="output",
+            )
+            tool_use_cost = tokencost.costs.calculate_cost_by_tokens(
+                model=cost_model,
+                num_tokens=tool_use_tokens,
+                token_type="output",
+            )
+            thoughts_cost = tokencost.costs.calculate_cost_by_tokens(
+                model=cost_model,
+                num_tokens=thoughts_tokens,
+                token_type="output",
+            )
+        except KeyError:
+            logger.warning(
+                f"Model {self.model_name.value} (mapped to {cost_model}) not found in "
+                f"tokencost pricing data. Cost will be reported as 0."
+            )
+            input_cost = output_cost = tool_use_cost = thoughts_cost = 0
         calculated_total_tokens = (
             input_tokens + output_tokens + tool_use_tokens + thoughts_tokens
         )

@@ -10,6 +10,7 @@ from pathlib import Path
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
+from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
     _wait_for_file_stable,
     clean_download,
@@ -29,7 +30,7 @@ from optexity.inference.core.run_interaction import (
     handle_download_url_as_pdf,
     run_interaction_action,
 )
-from optexity.inference.core.run_misc import run_sleep_action
+from optexity.inference.core.run_misc import run_fail_state_action, run_sleep_action
 from optexity.inference.core.run_powershell import run_powershell_action
 from optexity.inference.core.run_python_script import run_python_script_action
 from optexity.inference.core.vision.time import wait_for_stable_screen
@@ -66,7 +67,11 @@ def is_driver_closed_error(e: Exception) -> bool:
 
 
 async def run_automation(
-    task: Task, unique_child_arn: str, child_process_id: int, max_tries: int = 1
+    task: Task,
+    unique_child_arn: str,
+    child_process_id: int,
+    cdp_url: str,
+    max_tries: int = 1,
 ):
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
@@ -89,7 +94,7 @@ async def run_automation(
         def _get_browser():
             return Browser(
                 memory=memory,
-                headless=False,
+                cdp_url=cdp_url,
                 backend=task.automation.backend,
                 channel=task.automation.browser_channel,
                 debug_port=9222 + child_process_id,
@@ -121,6 +126,7 @@ async def run_automation(
             page = await browser.get_current_page()
             if page is None:
                 raise ValueError("Page is not available")
+            await asyncio.sleep(5)
             await browser.go_to_url("https://ip.oxylabs.io/location")
 
             ip_info = await page.evaluate("""
@@ -322,7 +328,9 @@ async def run_action_node(
     memory.variables.generated_variables["task_id"] = [str(task.task_id)]
 
     await action_node.replace_variables(task.input_parameters)
-    await action_node.replace_variables(task.secure_parameters)
+    await action_node.replace_variables(
+        task.secure_parameters, task.workspace_id, task.api_key
+    )
     await action_node.replace_variables(memory.variables.generated_variables)
 
     # ## TODO: optimize this by taking screenshot and axtree only if needed
@@ -359,10 +367,16 @@ async def run_action_node(
             await run_powershell_action(action_node.powershell_action)
         elif action_node.sleep_action:
             await run_sleep_action(action_node.sleep_action)
+        elif action_node.fail_state_action:
+            await run_fail_state_action(
+                action_node.fail_state_action, memory, browser, task
+            )
         elif action_node.assertion_action:
             await run_assertion_action(
                 action_node.assertion_action, memory, browser, task
             )
+        elif action_node.captcha_action:
+            await handle_captcha_action(action_node.captcha_action, browser, memory)
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")

@@ -38,19 +38,21 @@ class Browser:
     def __init__(
         self,
         memory: Memory,
-        headless: bool = False,
+        cdp_url: str,
         stealth: bool = True,
-        backend: Literal["browser-use", "computer-vision"] = "browser-use",
+        backend: Literal[
+            "browser-use", "computer-vision", "browserbase"
+        ] = "browser-use",
         debug_port: int = 9222,
-        channel: Literal["chromium", "chrome", "rdp"] = "chromium",
+        channel: Literal[
+            "chromium", "chrome", "cloakbrowser", "browser-use", "rdp"
+        ] = "chromium",
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
     ):
 
-        self.headless = headless
         self.stealth = stealth
         self.backend = backend
-        self.debug_port = debug_port
 
         self.playwright: (
             playwright.async_api.Playwright | patchright.async_api.Playwright | None
@@ -62,9 +64,11 @@ class Browser:
             | None
         ) = None
         self.page = None
-        self.cdp_url = f"http://localhost:{self.debug_port}"
+        self.cdp_url = cdp_url
         self.backend_agent = None
-        self.channel: Literal["chrome", "chromium", "rdp"] = channel
+        self.channel: Literal[
+            "chrome", "chromium", "cloakbrowser", "browser-use", "rdp"
+        ] = channel
         self.memory = memory
         self.page_to_target_id = []
         self.previous_total_pages = 0

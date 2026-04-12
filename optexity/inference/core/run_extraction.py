@@ -12,7 +12,7 @@ from optexity.inference.core.interaction.utils import (
 from optexity.inference.core.run_two_fa import run_two_fa_action
 from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
 from optexity.inference.infra.browser import Browser
-from optexity.inference.models import get_llm_model, resolve_model_name
+from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.extraction_action import (
     ExtractionAction,
     LLMExtraction,
@@ -204,8 +204,7 @@ async def handle_llm_extraction(
 
     provider = llm_extraction.llm_provider or task.llm_provider
     model_name_str = llm_extraction.llm_model_name or task.llm_model_name
-    model_name = resolve_model_name(provider, model_name_str)
-    llm_model = get_llm_model(model_name, True)
+    llm_model = get_llm_model_with_fallback(provider, model_name_str, True)
 
     response, token_usage = llm_model.get_model_response_with_structured_output(
         prompt=prompt,
@@ -348,12 +347,11 @@ async def handle_pdf_extraction(
             logger.error(
                 f"No matching PDF file found in downloads with filename {pdf_extraction.filename}. Total downloads: {len(memory.downloads)}"
             )
-            return
+            return None
 
     provider = pdf_extraction.llm_provider or task.llm_provider
     model_name_str = pdf_extraction.llm_model_name or task.llm_model_name
-    model_name = resolve_model_name(provider, model_name_str)
-    llm_model = get_llm_model(model_name, True)
+    llm_model = get_llm_model_with_fallback(provider, model_name_str, True)
 
     system_instruction = "Extract the information from the PDF file and return it in the format specified by the instructions."
     response, token_usage = llm_model.get_model_response_with_structured_output(

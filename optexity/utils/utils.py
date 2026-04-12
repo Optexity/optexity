@@ -1,4 +1,5 @@
 import base64
+import json
 import logging
 import os
 from pathlib import Path
@@ -8,26 +9,77 @@ from urllib.parse import urlparse
 import aiofiles
 import pyotp
 from async_lru import alru_cache
+from cryptography.fernet import Fernet
 from onepassword import Client as OnePasswordClient
 from pydantic import create_model
 
 logger = logging.getLogger(__name__)
 
-_onepassword_client = None
+
+def decrypt_fernet_payload(encrypted_data: str) -> dict:
+    FERNET_SECRET_KEY = os.getenv("FERNET_SECRET_KEY")
+    if not FERNET_SECRET_KEY:
+        raise ValueError("FERNET_SECRET_KEY must be set in env to decrypt secrets")
+    fernet = Fernet(FERNET_SECRET_KEY.encode())
+    return json.loads(fernet.decrypt(encrypted_data.encode()).decode())
 
 
-async def get_onepassword_client():
-    global _onepassword_client
-    if _onepassword_client is None:
-        token = os.getenv("OP_SERVICE_ACCOUNT_TOKEN")
-        if token is None:
-            raise ValueError("OP_SERVICE_ACCOUNT_TOKEN is not set")
-        _onepassword_client = await OnePasswordClient.authenticate(
+# Cached clients keyed by the service-account token so a single process can
+# serve multiple workspaces without re-authenticating unnecessarily.
+_onepassword_clients: dict[str, OnePasswordClient] = {}
+
+
+async def _get_onepassword_token(
+    workspace_id: str | None, api_key: str | None = None
+) -> str:
+    """Resolve the 1Password service-account token.
+
+    Prefers fetching the 'one_password' integration secret from the opbackend API
+    when workspace_id is provided; falls back to the OP_SERVICE_ACCOUNT_TOKEN env var.
+    """
+    if workspace_id is not None:
+        try:
+            from optexity.utils.integration_secrets import (
+                fetch_decrypted_integration_secret,
+            )
+
+            data = await fetch_decrypted_integration_secret(
+                workspace_id, "one_password", api_key
+            )
+            token = data.get("service_account_token")
+            if token:
+                return token
+            logger.warning(
+                f"Integration secret for workspace={workspace_id} missing token, "
+                "falling back to env var"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to fetch 1Password token from API for workspace={workspace_id}: {e}. "
+                "Falling back to env var"
+            )
+
+    token = os.getenv("OP_SERVICE_ACCOUNT_TOKEN")
+    if token:
+        return token
+
+    raise ValueError(
+        "1Password token could not be resolved: API fetch failed or workspace_id not provided, "
+        "and OP_SERVICE_ACCOUNT_TOKEN env var is not set"
+    )
+
+
+async def get_onepassword_client(
+    workspace_id: str | None = None, api_key: str | None = None
+) -> OnePasswordClient:
+    token = await _get_onepassword_token(workspace_id, api_key)
+    if token not in _onepassword_clients:
+        _onepassword_clients[token] = await OnePasswordClient.authenticate(
             auth=token,
             integration_name="Optexity 1Password Integration",
             integration_version="v1.0.0",
         )
-    return _onepassword_client
+    return _onepassword_clients[token]
 
 
 def build_model(schema: dict, model_name="AutoModel"):
@@ -67,19 +119,23 @@ async def save_and_clear_downloaded_files(content: bytes | str, filename: Path):
         logger.error(f"Unsupported content type: {type(content)}")
 
 
-def get_totp_code(totp_secret: str, digits: int = 6):
+def get_totp_code(totp_secret: str, digits: int | None = None):
+    if digits is None:
+        digits = 6
     totp = pyotp.TOTP(totp_secret, digits=digits)
     return totp.now()
 
 
 @alru_cache(maxsize=1000)
-async def get_onepassword_value(vault_name: str, item_name: str, field_name: str):
-    client = await get_onepassword_client()
-    str_value = await client.secrets.resolve(
-        f"op://{vault_name}/{item_name}/{field_name}"
-    )
-
-    return str_value
+async def get_onepassword_value(
+    vault_name: str,
+    item_name: str,
+    field_name: str,
+    workspace_id: str | None = None,
+    api_key: str | None = None,
+) -> str:
+    client = await get_onepassword_client(workspace_id, api_key)
+    return await client.secrets.resolve(f"op://{vault_name}/{item_name}/{field_name}")
 
 
 def clean_url(url: str) -> str:

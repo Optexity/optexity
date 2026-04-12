@@ -46,11 +46,12 @@ RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
         && rm /tmp/chrome.deb; \
     fi && apt-get update && apt-get install -y chromium && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --break-system-packages --no-cache-dir playwright patchright
+RUN pip3 install --break-system-packages --no-cache-dir playwright patchright "cloakbrowser[geoip]"
 
 # Install Chromium and Chrome in separate layers
 RUN playwright install --with-deps chromium
 RUN patchright install chromium
+RUN python3 -m cloakbrowser install
 
 # Create non-root user 'optexity' with passwordless sudo
 RUN groupadd -r optexity && \

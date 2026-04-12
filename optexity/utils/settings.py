@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     FETCH_EMAIL_MESSAGES_ENDPOINT: str = "api/v1/fetch_email_messages"
     FETCH_SLACK_MESSAGES_ENDPOINT: str = "api/v1/fetch_slack_messages"
     GET_COORDINATES_ENDPOINT: str = "api/v1/get_coordinates"
+    INTEGRATION_SECRETS_ENDPOINT: str = "api/v1/integration-secrets/{type}/encrypt"
+
+    FERNET_SECRET_KEY: str | None = None  # required when using integration secrets
 
     OPTEXITY_API_KEY: str = Field(
         validation_alias=AliasChoices("OPTEXITY_API_KEY", "API_KEY")
@@ -50,6 +53,8 @@ class Settings(BaseSettings):
     SCREEN_HEIGHT: int = 900
 
     IN_DOCKER: bool = os.path.exists("/.dockerenv")
+
+    BROWSER_USE_API_KEY: str | None = None
 
     @model_validator(mode="after")
     def validate_local_callback_url(self):

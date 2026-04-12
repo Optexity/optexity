@@ -7,7 +7,9 @@ class CallbackResponse(BaseModel):
     task_id: str
     recording_id: str
     output_data: list[dict | str] | None
-    status: Literal["queued", "allocated", "running", "success", "failed", "cancelled"]
+    status: Literal[
+        "queued", "allocated", "running", "success", "failed", "cancelled", "killed"
+    ]
     error: str | None
     final_screenshot: str | None = None
     endpoint_name: str

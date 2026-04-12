@@ -96,6 +96,29 @@ Use a `sleep_action` when you want to pause without performing any browser inter
 }
 ```
 
+### Fail State Node
+
+A `fail_state_action` is used to handle failure states in the automation. It will stop the automation, raise an exception with the provided failure message and mark it as failed.
+
+```json
+{
+  "type": "action_node",
+  "fail_state_action": {
+    "failure_message": "Automation completed at one of the failure states."
+  }
+}
+```
+
+`fail_state_action` can also be used with variables.
+```json
+{
+  "type": "action_node",
+  "fail_state_action": {
+    "failure_message": "Error in login process for user {username[0]}"
+  }
+}
+```
+
 ### Opens New Tab
 
 ```json

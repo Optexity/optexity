@@ -10,7 +10,7 @@ Use `if_else_node` for conditional execution based on runtime conditions—handl
 ```json
 {
   "type": "if_else_node",
-  "condition": "has_captcha",
+  "condition": "has_captcha[0]",
   "if_nodes": [
     {
       "type": "action_node",
@@ -48,15 +48,22 @@ Use `if_else_node` for conditional execution based on runtime conditions—handl
 
 Conditions are Python-like expressions that can reference parameters:
 
+
 ```json
 {
-  "condition": "{has_2fa[0]} == 'true'"
+  "condition": "is_login_screen[0]"
 }
 ```
 
 ```json
 {
-  "condition": "{verification_needed[0]} is not None and {verification_needed[0]} != 'skip'"
+  "condition": "has_2fa[0] == 'true'"
+}
+```
+
+```json
+{
+  "condition": "verification_needed[0] is not None and verification_needed[0] != 'skip'"
 }
 ```
 
@@ -64,12 +71,12 @@ Conditions are Python-like expressions that can reference parameters:
 
 | Operator | Example |
 |----------|---------|
-| Equality | `{var[0]} == 'value'` |
-| Inequality | `{var[0]} != 'value'` |
-| None check | `{var[0]} is not None` |
-| Boolean | `{var[0]} == 'true'` |
-| Logical AND | `{a[0]} == 'x' and {b[0]} == 'y'` |
-| Logical OR | `{a[0]} == 'x' or {b[0]} == 'y'` |
+| Equality | `var[0] == 'value'` |
+| Inequality | `var[0] != 'value'` |
+| None check | `var[0] is not None` |
+| Boolean | `var[0] == 'true'` |
+| Logical AND | `a[0] == 'x' and b[0] == 'y'` |
+| Logical OR | `a[0] == 'x' or b[0] == 'y'` |
 
 ## Examples
 
@@ -78,7 +85,7 @@ Conditions are Python-like expressions that can reference parameters:
 ```json
 {
   "type": "if_else_node",
-  "condition": "{requires_2fa[0]} == 'true'",
+  "condition": "requires_2fa[0] == 'true'",
   "if_nodes": [
     {
       "type": "action_node",
@@ -110,7 +117,7 @@ Conditions are Python-like expressions that can reference parameters:
   },
   {
     "type": "if_else_node",
-    "condition": "{status[0]} == 'pending'",
+    "condition": "status[0] == 'pending'",
     "if_nodes": [
       {
         "type": "action_node",
@@ -131,11 +138,11 @@ Conditions are Python-like expressions that can reference parameters:
 ```json
 {
   "type": "if_else_node",
-  "condition": "{user_type[0]} == 'admin'",
+  "condition": "user_type[0] == 'admin'",
   "if_nodes": [
     {
       "type": "if_else_node",
-      "condition": "{access_level[0]} == 'full'",
+      "condition": "access_level[0] == 'full'",
       "if_nodes": [ ... ],
       "else_nodes": [ ... ]
     }
