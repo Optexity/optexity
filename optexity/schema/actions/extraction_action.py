@@ -104,14 +104,7 @@ class ScreenshotExtraction(BaseModel):
 
 
 class StateExtraction(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
-    def replace(self, pattern: str, replacement: str):
-        if self.model_extra:
-            for key, value in self.model_extra.items():
-                if isinstance(value, str):
-                    self.model_extra[key] = value.replace(pattern, replacement)
-        return self
+    pass
 
 
 class PDFExtraction(BaseModel):
