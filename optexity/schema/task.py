@@ -10,7 +10,7 @@ from typing import Literal, Optional
 from PIL import Image
 from pydantic import BaseModel, Field, computed_field, model_validator
 
-from optexity.schema.automation import Automation, SecureParameter
+from optexity.schema.automation import Automation, RDPParameter, SecureParameter
 from optexity.schema.memory import ForLoopStatus, SystemInfo
 from optexity.schema.token_usage import TokenUsage
 from optexity.schema.types import CompanyID, DedupKey, RecordingID, TaskID, UserID
@@ -96,6 +96,7 @@ class Task(BaseModel):
     automation: Automation
     input_parameters: dict[str, list[str | int | float | bool]]
     secure_parameters: dict[str, list[SecureParameter]]
+    rdp_parameter: RDPParameter | None = None
     unique_parameter_names: list[str]
     unique_parameters: dict[str, list[str]] | None = None
     created_at: datetime
