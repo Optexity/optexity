@@ -170,6 +170,7 @@ class InputTextAction(BaseAction):
     is_slider: bool = False
     fill_or_type: Literal["fill", "type", "key_press"] = "fill"
     press_enter: bool = False
+    click_before_input: bool = True
 
     @model_validator(mode="after")
     def validate_press_enter(self):
