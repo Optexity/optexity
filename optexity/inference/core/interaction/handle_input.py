@@ -169,7 +169,7 @@ async def input_text_coordinates(
         #     logger.warning("Screen did not change after typing text")
 
         if input_text_action.press_enter:
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.8)
             pyautogui.press("enter")
 
         screenshot_base64 = memory.browser_states[-1].screenshot
