@@ -158,9 +158,9 @@ async def input_text_coordinates(
 
         logger.debug(f"Typing text at coordinates: {x}, {y}")
 
-        pyautogui.click(x, y)
-
-        await asyncio.sleep(0.2)
+        if input_text_action.click_before_input:
+            pyautogui.click(x, y)
+            await asyncio.sleep(0.2)
 
         await _input()
         # changed, score = await wait_for_screen_to_change(_paste, browser)
