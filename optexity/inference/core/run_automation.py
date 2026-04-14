@@ -280,7 +280,9 @@ async def run_final_logging(
 ):
 
     try:
-        await complete_task_in_server(task, memory.token_usage, child_process_id)
+        await complete_task_in_server(
+            task, memory.token_usage, child_process_id, memory.unique_child_arn
+        )
 
         try:
             memory.automation_state.step_index += 1
