@@ -12,6 +12,7 @@ from optexity.schema.actions.misc_action import (
     PythonScriptAction,
     SleepAction,
 )
+from optexity.schema.actions.powershell_action import PowerShellAction
 from optexity.utils.aws_secret_manager import get_aws_secret_value
 from optexity.utils.utils import get_onepassword_value, get_totp_code
 
@@ -58,6 +59,12 @@ class TOTPParameter(BaseModel):
     digits: int = 6
 
 
+class RDPParameter(BaseModel):
+    host: str
+    username: str | None = None
+    password: str | None = None
+
+
 class SecureParameter(BaseModel):
     onepassword: OnePasswordParameter | None = None
     amazon_secrets_manager: AmazonSecretsManagerParameter | None = None
@@ -79,6 +86,7 @@ class ActionNode(BaseModel):
     assertion_action: AssertionAction | None = None
     extraction_action: ExtractionAction | None = None
     python_script_action: PythonScriptAction | None = None
+    powershell_action: PowerShellAction | None = None
     sleep_action: SleepAction | None = None
     fail_state_action: FailStateAction | None = None
     captcha_action: CaptchaAction | None = None
@@ -96,6 +104,7 @@ class ActionNode(BaseModel):
             "assertion_action": self.assertion_action,
             "extraction_action": self.extraction_action,
             "python_script_action": self.python_script_action,
+            "powershell_action": self.powershell_action,
             "sleep_action": self.sleep_action,
             "fail_state_action": self.fail_state_action,
             "captcha_action": self.captcha_action,
@@ -145,6 +154,8 @@ class ActionNode(BaseModel):
             self.extraction_action.replace(pattern, replacement)
         if self.python_script_action:
             pass
+        if self.powershell_action:
+            self.powershell_action.replace(pattern, replacement)
         if self.sleep_action:
             pass
         if self.fail_state_action:
@@ -359,7 +370,7 @@ class Parameters(BaseModel):
 
     @model_validator(mode="after")
     def validate_parameters(self):
-        reserved_parameter_names = set(["current_page_url"])
+        reserved_parameter_names = set(["current_page_url", "current_time", "task_id"])
 
         for d in [
             self.input_parameters,
@@ -436,6 +447,22 @@ class Automation(BaseModel):
 
         data["nodes"] = new_nodes
         return data
+
+    @model_validator(mode="after")
+    def validate_rdp_parameter(self):
+        if self.browser_channel == "rdp":
+            for node in self.nodes:
+                if isinstance(node, ActionNode):
+                    if node.interaction_action:
+                        if (
+                            node.interaction_action.click_element is None
+                            and node.interaction_action.input_text is None
+                            and node.interaction_action.key_press is None
+                        ):
+                            raise ValueError(
+                                "Only click_element, input_text, and key_press are allowed for rdp"
+                            )
+        return self
 
     @model_validator(mode="after")
     def validate_parameters_with_examples(self):

@@ -23,13 +23,31 @@ class DialogAction(BaseModel):
 
 class BaseAction(BaseModel):
     xpath: str | None = None
-    coordinates: tuple[int, int] | None = None
+    coordinates: tuple[int, int] | tuple[str, str] | None = None
     keyword: str | None = None
     command: str | None = None
     prompt_instructions: str
     skip_command: bool = False
     skip_prompt: bool = False
     assert_locator_presence: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_coordinates(cls, data: Any) -> Any:
+        if (
+            isinstance(data, dict)
+            and "coordinates" in data
+            and data["coordinates"] is not None
+        ):
+            coords = data["coordinates"]
+            if isinstance(coords, (list, tuple)) and len(coords) == 2:
+                x, y = coords[0], coords[1]
+                # If both can be parsed as int, do so; otherwise keep as strings
+                try:
+                    data["coordinates"] = (int(x), int(y))
+                except (ValueError, TypeError):
+                    data["coordinates"] = (str(x), str(y))
+        return data
 
     @model_validator(mode="after")
     def validate_one_extraction(self):
@@ -60,6 +78,15 @@ class BaseAction(BaseModel):
             self.xpath = self.xpath.replace(pattern, replacement)
         if self.command:
             self.command = self.command.replace(pattern, replacement).strip('"')
+        if self.keyword:
+            self.keyword = self.keyword.replace(pattern, replacement)
+        if self.coordinates:
+            x_str = str(self.coordinates[0]).replace(pattern, replacement)
+            y_str = str(self.coordinates[1]).replace(pattern, replacement)
+            try:
+                self.coordinates = (int(x_str), int(y_str))
+            except (ValueError, TypeError):
+                self.coordinates = (x_str, y_str)
 
 
 class CheckAction(BaseAction):
@@ -143,6 +170,7 @@ class InputTextAction(BaseAction):
     is_slider: bool = False
     fill_or_type: Literal["fill", "type", "key_press"] = "fill"
     press_enter: bool = False
+    click_before_input: bool = True
 
     @model_validator(mode="after")
     def validate_press_enter(self):
@@ -171,11 +199,21 @@ class DownloadUrlAsPdfAction(BaseModel):
 class ScrollAction(BaseModel):
     down: bool = True  # True to scroll down, False to scroll up
     amount: int = -1  ## -1 means scroll max amount
+    prompt_instructions: str | None = (
+        None  # optional; used by computer-vision / recorded workflows
+    )
 
     @model_validator(mode="after")
     def validate_amount(self):
         if self.amount is None or (self.amount < 0 and self.amount != -1):
             raise ValueError("amount must be -1 or positive")
+        return self
+
+    def replace(self, pattern: str, replacement: str):
+        if self.prompt_instructions:
+            self.prompt_instructions = self.prompt_instructions.replace(
+                pattern, replacement
+            )
         return self
 
 
@@ -392,6 +430,8 @@ class InteractionAction(BaseModel):
             self.go_to_url.replace(pattern, replacement)
         if self.upload_file:
             self.upload_file.replace(pattern, replacement)
+        if self.scroll:
+            self.scroll.replace(pattern, replacement)
         if self.key_press:
             self.key_press.replace(pattern, replacement)
 
