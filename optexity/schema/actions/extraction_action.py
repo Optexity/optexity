@@ -188,8 +188,6 @@ class ExtractionAction(BaseModel):
                 pattern, replacement
             )
 
-        if self.state:
-            self.state.replace(pattern, replacement)
         if self.two_fa_action:
             self.two_fa_action.replace(pattern, replacement)
 
