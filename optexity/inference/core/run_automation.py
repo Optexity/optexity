@@ -280,7 +280,9 @@ async def run_final_logging(
 ):
 
     try:
-        await complete_task_in_server(task, memory.token_usage, child_process_id)
+        await complete_task_in_server(
+            task, memory.token_usage, child_process_id, memory.unique_child_arn
+        )
 
         try:
             memory.automation_state.step_index += 1
@@ -296,7 +298,8 @@ async def run_final_logging(
                 )
             )
 
-            memory.final_screenshot = await browser.get_screenshot(full_page=True)
+            if task.automation.take_final_screenshot:
+                memory.final_screenshot = await browser.get_screenshot(full_page=True)
         except Exception as e:
             logger.error(f"Error getting final screenshot: {e}")
 

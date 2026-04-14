@@ -62,7 +62,10 @@ async def start_task_in_server(task: Task):
 
 
 async def complete_task_in_server(
-    task: Task, token_usage: TokenUsage | None, child_process_id: int
+    task: Task,
+    token_usage: TokenUsage | None,
+    child_process_id: int,
+    unique_child_arn: str | None = None,
 ) -> dict | None:
     try:
         task.completed_at = datetime.now(timezone.utc)
@@ -72,6 +75,7 @@ async def complete_task_in_server(
         body = {
             "task_id": task.task_id,
             "child_process_id": child_process_id,
+            "unique_child_arn": unique_child_arn,
             "completed_at": task.completed_at.isoformat(),
             "status": task.status,
             "error": task.error,
