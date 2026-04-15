@@ -196,8 +196,11 @@ async def run_automation_in_process(
                 )
                 try:
                     os.killpg(proc.pid, signal.SIGKILL)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to SIGKILL worker process group for task "
+                        f"{task.task_id} after timeout: {exc}"
+                    )
                 task.status = "killed"
                 task.error = f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
                 if attempts_left <= 1:
@@ -393,7 +396,10 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
                 os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
                 logger.info(f"Killed worker process group for task {task_id}")
             except ProcessLookupError:
-                pass
+                logger.info(
+                    f"Worker process group for task {task_id} was already gone; "
+                    "treating /kill_task as successful"
+                )
             except Exception as e:
                 logger.warning(f"Failed to kill worker process for task {task_id}: {e}")
         return JSONResponse(
