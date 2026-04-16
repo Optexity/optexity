@@ -199,7 +199,9 @@ async def run_automation_in_process(
             task.error = f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
             if attempts_left <= 1:
                 task.completed_at = datetime.now(timezone.utc)
-                await complete_task_in_server(task, None, child_process_id)
+                await complete_task_in_server(
+                    task, None, child_process_id, unique_child_arn
+                )
                 await initiate_callback(task)
             returncode = -1
 

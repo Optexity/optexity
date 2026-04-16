@@ -349,6 +349,7 @@ class ActualBrowser:
             )
 
             await self._wait_for_cdp()
+            self.cdp_url = f"http://localhost:{self.port}"
             logger.debug("CDP ready")
         except Exception as e:
             logger.error(f"Error starting actual browser: {e}")

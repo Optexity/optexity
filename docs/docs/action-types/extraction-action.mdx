@@ -10,6 +10,7 @@ Extraction actions capture data from web pages during automation—essential for
 | Type | Purpose | Best For |
 |------|---------|----------|
 | `llm` | AI-powered structured data extraction | Tables, forms, text content |
+| `locator` | Extract text directly via Playwright locator | Single values, fast extraction, no LLM tokens |
 | `network_call` | Capture API/AJAX responses | API data, JSON responses |
 | `screenshot` | Save visual snapshot | Receipts, proofs, visual records |
 | `state` | Capture page state (URL, title, storage, cookies) | Debugging auth, navigation validation |
@@ -114,6 +115,76 @@ After this action, use `{order_ids[0]}`, `{order_ids[index]}`, or iterate with `
 
 <Tip>
 Be specific about where data appears, what it looks like, and expected format.
+</Tip>
+
+---
+
+## Locator Extraction
+
+Extract text from a specific element on the page using a Playwright locator — no LLM tokens consumed. If the locator fails, it can fall back to LLM extraction.
+
+```json
+{
+  "extraction_action": {
+    "locator": {
+      "command": "get_by_role(\"cell\", name=\"Authorization Number\").locator(\"+ td\")",
+      "output_variable_name": "auth_number",
+      "extraction_format": {
+        "auth_number": "str"
+      }
+    }
+  }
+}
+```
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `command` | `str` | Required | Playwright locator command to find the element |
+| `output_variable_name` | `str` | Required | Variable name to store the extracted text |
+| `extraction_format` | `dict` | Required | Must contain `output_variable_name` as a key |
+| `extraction_instructions` | `str \| None` | `None` | LLM fallback instructions if the locator fails |
+| `llm_provider` | `"gemini"` | `"gemini"` | LLM provider to use for fallback |
+| `llm_model_name` | `str` | `"gemini-2.5-flash"` | LLM model for fallback |
+
+<Warning>
+`extraction_format` must contain `output_variable_name` as a key, or validation will fail.
+</Warning>
+
+### Fallback Behavior
+
+If the locator fails to find the element or find text content, two outcomes are possible:
+
+- **With `extraction_instructions`** — falls back to LLM extraction automatically
+- **Without `extraction_instructions`** — variable is set to `None`
+
+```json
+{
+  "extraction_action": {
+    "locator": {
+      "command": "get_by_label(\"Total Amount\")",
+      "output_variable_name": "total_amount",
+      "extraction_format": {
+        "total_amount": "str"
+      },
+      "extraction_instructions": "Extract the total amount shown on the invoice page"
+    }
+  }
+}
+```
+
+### When to Use Locator vs LLM
+
+| Situation | Use |
+|-----------|-----|
+| Element has a stable, reliable locator | `locator` (faster, no cost) |
+| Page structure changes often | `llm` |
+| Single known value to extract | `locator` with LLM fallback |
+| Multiple fields at once | `llm` |
+
+<Tip>
+Always provide `extraction_instructions` as a fallback. This makes the extraction resilient if the page structure changes.
 </Tip>
 
 ---
@@ -255,6 +326,8 @@ Override if needed:
 | Scenario | Recommended |
 |----------|-------------|
 | Extract text/tables from page | `llm` with `axtree` |
+| Extract a single known element | `locator` |
+| Extract with locator + LLM fallback | `locator` with `extraction_instructions` |
 | Charts, images, visual content | `llm` with `screenshot` |
 | Intercept API data | `network_call` |
 | Visual proof/documentation | `screenshot` |

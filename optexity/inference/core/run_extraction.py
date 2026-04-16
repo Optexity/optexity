@@ -16,6 +16,7 @@ from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.extraction_action import (
     ExtractionAction,
     LLMExtraction,
+    LocatorExtraction,
     NetworkCallExtraction,
     OCRCoordinatesExtraction,
     PDFExtraction,
@@ -90,6 +91,14 @@ async def run_extraction_action(
             extraction_action.ocr_coordinates,
             memory,
             browser,
+            extraction_action.unique_identifier,
+        )
+    elif extraction_action.locator:
+        await handle_locator_extraction(
+            extraction_action.locator,
+            memory,
+            browser,
+            task,
             extraction_action.unique_identifier,
         )
 
@@ -241,6 +250,67 @@ async def handle_llm_extraction(
                     f"Output variable {output_variable_name} must be a string, int, float, bool, or a list of strings, ints, floats, or bools. Extracted values: {response_dict[output_variable_name]}"
                 )
     return output_data
+
+
+async def handle_locator_extraction(
+    locator_extraction: LocatorExtraction,
+    memory: Memory,
+    browser: Browser,
+    task: Task,
+    unique_identifier: str | None = None,
+):
+    var_name = locator_extraction.output_variable_name
+    extracted_value = None
+    locator_failed = False
+
+    try:
+        locator = await browser.get_locator_from_command(locator_extraction.command)
+        if locator is None:
+            raise ValueError(
+                f"Locator returned None for command: {locator_extraction.command}"
+            )
+        text = await locator.first.inner_text(timeout=5000)
+        if text is None:
+            raise ValueError(
+                f"No text content found for locator: {locator_extraction.command}"
+            )
+        extracted_value = text.strip()
+        memory.variables.generated_variables[var_name] = [extracted_value]
+        logger.debug(f"Locator extracted {var_name}={extracted_value!r}")
+    except Exception as e:
+        logger.warning(f"Locator extraction failed for {var_name!r}: {e}")
+        locator_failed = True
+        memory.variables.generated_variables[var_name] = [None]
+
+    if locator_failed:
+        if locator_extraction.extraction_instructions is not None:
+            try:
+                llm_extraction = LLMExtraction(
+                    extraction_format=locator_extraction.extraction_format,
+                    extraction_instructions=locator_extraction.extraction_instructions,
+                    output_variable_names=[var_name],
+                    llm_provider=locator_extraction.llm_provider,
+                    llm_model_name=locator_extraction.llm_model_name,
+                )
+                output = await handle_llm_extraction(
+                    llm_extraction, memory, browser, task, unique_identifier
+                )
+                if output is not None and var_name in output.json_data:
+                    extracted_value = output.json_data[var_name]
+                logger.debug(f"LLM fallback extracted {var_name}={extracted_value!r}")
+            except Exception as e:
+                logger.warning(f"LLM fallback also failed for {var_name!r}: {e}")
+        else:
+            logger.warning(
+                f"No extraction_instructions for LLM fallback; {var_name} set to None"
+            )
+
+    memory.variables.output_data.append(
+        OutputData(
+            unique_identifier=unique_identifier,
+            json_data={var_name: extracted_value},
+        )
+    )
 
 
 async def handle_network_call_extraction(
