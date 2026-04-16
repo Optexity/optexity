@@ -11,8 +11,10 @@ from optexity.inference.core.interaction.handle_select_utils import (
     smart_select,
 )
 from optexity.inference.core.interaction.utils import (
+    get_element_viewport_bbox_by_index,
     get_index_from_prompt,
     handle_download,
+    highlight_element_and_screenshot,
 )
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import SelectOptionAction
@@ -100,6 +102,16 @@ async def select_option_index(
         )
         if index is None:
             return
+
+        page = await browser.get_current_page()
+        if page:
+            bbox = await get_element_viewport_bbox_by_index(browser, index)
+            if bbox:
+                highlighted = await highlight_element_and_screenshot(
+                    page, browser, bbox
+                )
+                if highlighted:
+                    memory.browser_states[-1].screenshot = highlighted
 
         node = await browser.backend_agent.browser_session.get_element_by_index(index)
         if node is None:

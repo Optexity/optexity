@@ -4,9 +4,11 @@ import os
 import shutil
 import uuid
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Union
 
 import aiofiles
+import patchright.async_api
+import playwright.async_api
 
 from optexity.exceptions import (
     ElementNotFoundInAxtreeException,
@@ -20,6 +22,98 @@ from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
+
+Page = Union[playwright.async_api.Page, patchright.async_api.Page]
+
+_HIGHLIGHT_JS_INJECT = """
+(bbox) => {
+    const el = document.createElement('div');
+    el.id = '__optexity_element_highlight';
+    el.style.position = 'fixed';
+    el.style.left = `${bbox.x}px`;
+    el.style.top = `${bbox.y}px`;
+    el.style.width = `${bbox.width}px`;
+    el.style.height = `${bbox.height}px`;
+    el.style.border = '3px solid red';
+    el.style.background = 'rgba(255, 0, 0, 0.15)';
+    el.style.zIndex = '2147483647';
+    el.style.pointerEvents = 'none';
+    el.style.boxSizing = 'border-box';
+    document.body.appendChild(el);
+    return el.id;
+}
+"""
+
+_HIGHLIGHT_JS_REMOVE = """
+(id) => {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+}
+"""
+
+
+async def highlight_element_and_screenshot(
+    page: Page, browser: Browser, bbox: dict
+) -> str | None:
+    """Inject a bounding-box highlight overlay, take a screenshot, then remove
+    the overlay.  Returns the base64 screenshot or ``None`` on failure."""
+    highlight_id: str | None = None
+    try:
+        highlight_id = await page.evaluate(_HIGHLIGHT_JS_INJECT, bbox)
+        screenshot = await browser.get_screenshot()
+        return screenshot
+    except Exception as e:
+        logger.debug(f"highlight_element_and_screenshot failed: {e}")
+        return None
+    finally:
+        if highlight_id is not None:
+            try:
+                await page.evaluate(_HIGHLIGHT_JS_REMOVE, highlight_id)
+            except Exception:
+                pass
+
+
+async def get_element_viewport_bbox_by_index(
+    browser: Browser, index: int
+) -> dict | None:
+    """Resolve an element *index* (backend_node_id) to a viewport-coordinate
+    bounding box ``{x, y, width, height}``.  Returns ``None`` when the
+    position cannot be determined."""
+    try:
+        element = await browser.backend_agent.browser_session.get_dom_element_by_index(
+            index
+        )
+        if element is None:
+            return None
+
+        # Prefer clientRects – already in viewport coordinates.
+        if element.snapshot_node and element.snapshot_node.clientRects:
+            rect = element.snapshot_node.clientRects
+            return {
+                "x": rect.x,
+                "y": rect.y,
+                "width": rect.width,
+                "height": rect.height,
+            }
+
+        # Fallback: absolute_position (document coords) adjusted by scroll.
+        if element.absolute_position:
+            page = await browser.get_current_page()
+            if page is None:
+                return None
+            scroll = await page.evaluate("({x: window.scrollX, y: window.scrollY})")
+            return {
+                "x": element.absolute_position.x - scroll["x"],
+                "y": element.absolute_position.y - scroll["y"],
+                "width": element.absolute_position.width,
+                "height": element.absolute_position.height,
+            }
+    except Exception as e:
+        logger.debug(
+            f"get_element_viewport_bbox_by_index failed for index {index}: {e}"
+        )
+    return None
+
 
 _index_prediction_cache: dict[tuple, ActionPredictionLocatorAxtree] = {}
 

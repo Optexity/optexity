@@ -4,7 +4,11 @@ from optexity.exceptions import ElementNotFoundInAxtreeException
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
-from optexity.inference.core.interaction.utils import get_index_from_prompt
+from optexity.inference.core.interaction.utils import (
+    get_element_viewport_bbox_by_index,
+    get_index_from_prompt,
+    highlight_element_and_screenshot,
+)
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import HoverAction
 from optexity.schema.memory import Memory
@@ -55,6 +59,16 @@ async def hover_element_index(
         )
         if index is None:
             return
+
+        page = await browser.get_current_page()
+        if page:
+            bbox = await get_element_viewport_bbox_by_index(browser, index)
+            if bbox:
+                highlighted = await highlight_element_and_screenshot(
+                    page, browser, bbox
+                )
+                if highlighted:
+                    memory.browser_states[-1].screenshot = highlighted
 
         print(f"Hovering element with index: {index}")
 
