@@ -9,6 +9,11 @@ from optexity.exceptions import (
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
+from optexity.inference.core.interaction.screenshot_comparison import (
+    _fetch_recording_screenshot,
+    compare_screenshots_with_llm,
+    crop_screenshot_at_coordinates,
+)
 from optexity.inference.core.interaction.utils import (
     get_coordinates_from_ocr_result,
     get_coordinates_from_prompt,
@@ -37,7 +42,9 @@ async def handle_click_element(
 ):
 
     if browser.channel == "rdp" or browser.backend == "computer-vision":
-        await click_element_coordinates(click_element_action, browser, memory, task)
+        await click_element_coordinates(
+            click_element_action, browser, memory, task, max_tries
+        )
         return
 
     if click_element_action.command and not click_element_action.skip_command:
@@ -105,10 +112,77 @@ async def click_element_coordinates(
     browser: Browser,
     memory: Memory,
     task: Task,
+    max_tries: int = 3,
 ):
     try:
         x, y = None, None
-        if click_element_action.coordinates:
+
+        if (
+            click_element_action.recording_screenshot
+            and click_element_action.coordinates
+        ):
+            recording_x = int(click_element_action.coordinates[0])
+            recording_y = int(click_element_action.coordinates[1])
+
+            recording_b64 = await _fetch_recording_screenshot(
+                click_element_action.recording_screenshot
+            )
+            recording_crop = crop_screenshot_at_coordinates(
+                recording_b64, recording_x, recording_y
+            )
+
+            data = await get_coordinates_from_prompt(
+                memory, click_element_action.prompt_instructions, browser, task
+            )
+            if data is None:
+                raise KeywordNotFoundOnScreenException(
+                    message="Could not locate element on current screen",
+                    keyword=click_element_action.keyword or "element",
+                )
+            current_x, current_y = int(data[0]), int(data[1])
+            current_screenshot_b64 = memory.browser_states[-1].screenshot
+
+            matched = False
+            for attempt in range(max_tries):
+                current_crop = crop_screenshot_at_coordinates(
+                    current_screenshot_b64, current_x, current_y
+                )
+                matches = await compare_screenshots_with_llm(
+                    recording_crop,
+                    current_crop,
+                    click_element_action.keyword,
+                    task,
+                    memory,
+                )
+                if matches:
+                    matched = True
+                    x, y = current_x, current_y
+                    break
+
+                logger.info(
+                    f"Recording validation attempt {attempt + 1}/{max_tries} failed, retrying..."
+                )
+                if attempt < max_tries - 1:
+                    data = await get_coordinates_from_prompt(
+                        memory,
+                        click_element_action.prompt_instructions,
+                        browser,
+                        task,
+                    )
+                    if data is not None:
+                        current_x, current_y = int(data[0]), int(data[1])
+                        current_screenshot_b64 = memory.browser_states[-1].screenshot
+
+            if not matched:
+                raise KeywordNotFoundOnScreenException(
+                    message=(
+                        f"Recording screenshot validation failed after {max_tries} "
+                        f"attempt(s). Element not found on current screen."
+                    ),
+                    keyword=click_element_action.keyword or "element",
+                )
+
+        elif click_element_action.coordinates:
             x = int(click_element_action.coordinates[0])
             y = int(click_element_action.coordinates[1])
         else:
@@ -128,7 +202,8 @@ async def click_element_coordinates(
             )
             x_new, y_new = get_coordinates_from_ocr_result(result)
             logger.info(
-                f"Matched keyword '{click_element_action.keyword}' with '{result.text}'. New coordinates: ({x_new}, {y_new}), old: ({x}, {y})"
+                f"Matched keyword '{click_element_action.keyword}' with '{result.text}'. "
+                f"New coordinates: ({x_new}, {y_new}), old: ({x}, {y})"
             )
             x = x_new
             y = y_new

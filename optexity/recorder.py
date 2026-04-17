@@ -555,7 +555,8 @@ class Recorder:
         try:
             self._stop_event.wait()
         except KeyboardInterrupt:
-            self._stop_requested_by_esc = True
+            if os.environ.get("RECORDER_POST_ON_CTRL_C", "").strip() == "1":
+                self._stop_requested_by_esc = True
 
         if self.key_flush_timer:
             self.key_flush_timer.cancel()
@@ -576,8 +577,8 @@ class Recorder:
         print(f"\nDone. Captured {event_count} events, {frame_count} frames.")
         print(f"Session: {self.session_dir}")
 
-        # if self._stop_requested_by_esc:
-        #     self._run_post_process_gui_recording()
+        if self._stop_requested_by_esc:
+            self._run_post_process_gui_recording()
 
     def stop(self):
         if self._stop_event.is_set():
