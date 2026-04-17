@@ -5,9 +5,8 @@ from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
 from optexity.inference.core.interaction.utils import (
-    get_element_viewport_bbox_by_index,
     get_index_from_prompt,
-    highlight_element_and_screenshot,
+    update_screenshot_with_highlight,
 )
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import UploadFileAction
@@ -55,15 +54,7 @@ async def upload_file_index(
         if index is None:
             return
 
-        page = await browser.get_current_page()
-        if page:
-            bbox = await get_element_viewport_bbox_by_index(browser, index)
-            if bbox:
-                highlighted = await highlight_element_and_screenshot(
-                    page, browser, bbox
-                )
-                if highlighted:
-                    memory.browser_states[-1].screenshot = highlighted
+        await update_screenshot_with_highlight(browser, memory, index)
 
         action_model = browser.backend_agent.ActionModel(
             **{"upload_file": {"index": index, "path": upload_file_action.file_path}}

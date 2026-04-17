@@ -153,6 +153,21 @@ async def get_element_viewport_bbox_by_index(
     return None
 
 
+async def update_screenshot_with_highlight(
+    browser: Browser, memory: Memory, index: int
+) -> None:
+    """Highlight the element at *index* and update the last browser-state screenshot."""
+    page = await browser.get_current_page()
+    if page is None:
+        return
+    bbox = await get_element_viewport_bbox_by_index(browser, index)
+    if bbox is None:
+        return
+    highlighted = await highlight_element_and_screenshot(page, browser, bbox)
+    if highlighted:
+        memory.browser_states[-1].screenshot = highlighted
+
+
 _index_prediction_cache: dict[tuple, ActionPredictionLocatorAxtree] = {}
 
 
