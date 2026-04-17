@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import os
 import shutil
 import uuid
@@ -79,35 +80,72 @@ async def get_element_viewport_bbox_by_index(
     """Resolve an element *index* (backend_node_id) to a viewport-coordinate
     bounding box ``{x, y, width, height}``.  Returns ``None`` when the
     position cannot be determined."""
+
+    def _rect_to_bbox(rect) -> dict | None:
+        if rect is None:
+            return None
+        try:
+            x = float(getattr(rect, "x"))
+            y = float(getattr(rect, "y"))
+            width = float(getattr(rect, "width"))
+            height = float(getattr(rect, "height"))
+        except Exception:
+            return None
+
+        if not all(math.isfinite(v) for v in (x, y, width, height)):
+            return None
+        if width <= 0 or height <= 0:
+            return None
+
+        return {"x": x, "y": y, "width": width, "height": height}
+
     try:
-        element = await browser.backend_agent.browser_session.get_dom_element_by_index(
-            index
-        )
+        backend_agent = browser.backend_agent
+        if backend_agent is None or backend_agent.browser_session is None:
+            return None
+
+        element = await backend_agent.browser_session.get_dom_element_by_index(index)
         if element is None:
             return None
 
-        # Prefer clientRects – already in viewport coordinates.
+        client_bbox = None
         if element.snapshot_node and element.snapshot_node.clientRects:
-            rect = element.snapshot_node.clientRects
-            return {
-                "x": rect.x,
-                "y": rect.y,
-                "width": rect.width,
-                "height": rect.height,
+            client_bbox = _rect_to_bbox(element.snapshot_node.clientRects)
+
+        abs_doc_bbox = _rect_to_bbox(element.absolute_position)
+        abs_viewport_bbox = None
+
+        page = await browser.get_current_page()
+        if abs_doc_bbox and page is not None:
+            scroll = await page.evaluate("({x: window.scrollX, y: window.scrollY})")
+            abs_viewport_bbox = {
+                "x": abs_doc_bbox["x"] - float(scroll["x"]),
+                "y": abs_doc_bbox["y"] - float(scroll["y"]),
+                "width": abs_doc_bbox["width"],
+                "height": abs_doc_bbox["height"],
             }
 
-        # Fallback: absolute_position (document coords) adjusted by scroll.
-        if element.absolute_position:
-            page = await browser.get_current_page()
-            if page is None:
-                return None
-            scroll = await page.evaluate("({x: window.scrollX, y: window.scrollY})")
-            return {
-                "x": element.absolute_position.x - scroll["x"],
-                "y": element.absolute_position.y - scroll["y"],
-                "width": element.absolute_position.width,
-                "height": element.absolute_position.height,
-            }
+        if client_bbox and abs_viewport_bbox:
+            # In practice, some snapshot client rects resolve to (0,0) for nodes
+            # that are not actually at the viewport origin (e.g. frame/local coords).
+            client_near_origin = (
+                abs(client_bbox["x"]) <= 1 and abs(client_bbox["y"]) <= 1
+            )
+            abs_not_near_origin = (
+                abs(abs_viewport_bbox["x"]) > 5 or abs(abs_viewport_bbox["y"]) > 5
+            )
+            if client_near_origin and abs_not_near_origin:
+                return abs_viewport_bbox
+
+            # Prefer absolute coordinates when both are available because they are
+            # translated to top-page coordinates (better for iframes/shadow contexts).
+            return abs_viewport_bbox
+
+        if abs_viewport_bbox:
+            return abs_viewport_bbox
+
+        if client_bbox:
+            return client_bbox
     except Exception as e:
         logger.debug(
             f"get_element_viewport_bbox_by_index failed for index {index}: {e}"
