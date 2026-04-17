@@ -99,6 +99,7 @@ async def compare_screenshots_with_llm(
         )
 
     # Save composite image for debugging
+    img_path = None
     try:
         _DEBUG_DIR.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -117,6 +118,6 @@ async def compare_screenshots_with_llm(
     memory.token_usage += token_usage
     logger.info(
         f"[screenshot_comparison] keyword={keyword!r} matches={result.matches} "
-        f"(debug: {img_path.name if '_DEBUG_DIR' not in str(img_path) else img_path})"
+        f"(debug: {img_path})"
     )
     return result.matches
