@@ -100,14 +100,14 @@ async def compare_screenshots_with_llm(
 
     # Save composite image for debugging
     img_path = None
-    try:
-        _DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        img_path = _DEBUG_DIR / f"{ts}_composite.png"
-        img_path.write_bytes(base64.b64decode(composite_b64))
-        logger.info(f"[screenshot_comparison] composite image saved: {img_path}")
-    except Exception as e:
-        logger.warning(f"[screenshot_comparison] could not save debug image: {e}")
+    # try:
+    #     _DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+    #     ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    #     img_path = _DEBUG_DIR / f"{ts}_composite.png"
+    #     img_path.write_bytes(base64.b64decode(composite_b64))
+    #     logger.info(f"[screenshot_comparison] composite image saved: {img_path}")
+    # except Exception as e:
+    #     logger.warning(f"[screenshot_comparison] could not save debug image: {e}")
 
     model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name, True)
     result, token_usage = model.get_model_response_with_structured_output(
