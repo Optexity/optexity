@@ -81,8 +81,6 @@ async def command_based_action_with_retry(
                         page, browser, bbox
                     )
                 else:
-                    screenshot = None
-                if screenshot is None:
                     screenshot = await browser.get_screenshot()
 
                 memory.browser_states[-1] = BrowserState(

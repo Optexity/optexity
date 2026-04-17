@@ -60,18 +60,21 @@ async def highlight_element_and_screenshot(
     the overlay.  Returns the base64 screenshot or ``None`` on failure."""
     highlight_id: str | None = None
     try:
+        logger.debug(f"Injecting highlight overlay for bbox: {bbox}")
         highlight_id = await page.evaluate(_HIGHLIGHT_JS_INJECT, bbox)
         screenshot = await browser.get_screenshot()
+        logger.debug(f"Screenshot captured successfully")
         return screenshot
     except Exception as e:
-        logger.debug(f"highlight_element_and_screenshot failed: {e}")
+        logger.error(f"highlight_element_and_screenshot failed: {e}")
         return None
     finally:
         if highlight_id is not None:
             try:
                 await page.evaluate(_HIGHLIGHT_JS_REMOVE, highlight_id)
-            except Exception:
-                pass
+                logger.debug(f"Highlight removed successfully")
+            except Exception as e:
+                logger.warning(f"Failed to remove highlight {highlight_id}: {e}")
 
 
 async def get_element_viewport_bbox_by_index(
@@ -80,6 +83,7 @@ async def get_element_viewport_bbox_by_index(
     """Resolve an element *index* (backend_node_id) to a viewport-coordinate
     bounding box ``{x, y, width, height}``.  Returns ``None`` when the
     position cannot be determined."""
+    logger.debug(f"Getting viewport bbox for element index: {index}")
 
     def _rect_to_bbox(rect) -> dict | None:
         if rect is None:
@@ -142,14 +146,19 @@ async def get_element_viewport_bbox_by_index(
             return abs_viewport_bbox
 
         if abs_viewport_bbox:
+            logger.debug(
+                f"Using absolute viewport bbox for index {index}: {abs_viewport_bbox}"
+            )
             return abs_viewport_bbox
 
         if client_bbox:
+            logger.debug(f"Using client bbox for index {index}: {client_bbox}")
             return client_bbox
     except Exception as e:
-        logger.debug(
+        logger.error(
             f"get_element_viewport_bbox_by_index failed for index {index}: {e}"
         )
+    logger.warning(f"Could not determine viewport bbox for element index {index}")
     return None
 
 
@@ -157,8 +166,10 @@ async def update_screenshot_with_highlight(
     browser: Browser, memory: Memory, index: int
 ) -> None:
     """Highlight the element at *index* and update the last browser-state screenshot."""
+    logger.info(f"Updating screenshot with highlight for element index: {index}")
     page = await browser.get_current_page()
     if page is None:
+        logger.warning(f"Cannot update screenshot highlight - current page is None")
         return
     bbox = await get_element_viewport_bbox_by_index(browser, index)
     if bbox is None:
@@ -166,6 +177,13 @@ async def update_screenshot_with_highlight(
     highlighted = await highlight_element_and_screenshot(page, browser, bbox)
     if highlighted:
         memory.browser_states[-1].screenshot = highlighted
+        logger.info(
+            f"Successfully updated screenshot with highlight for element index {index}"
+        )
+    else:
+        logger.warning(
+            f"Failed to capture highlighted screenshot for element index {index}"
+        )
 
 
 _index_prediction_cache: dict[tuple, ActionPredictionLocatorAxtree] = {}
