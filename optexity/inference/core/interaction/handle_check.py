@@ -45,6 +45,7 @@ async def handle_check_element(
         await check_element_index(check_element_action, browser, memory, task)
 
 
+## TODO: fix this as check/uncheck action does ont exist in backend agent multiact
 async def check_element_index(
     check_action: CheckAction,
     browser: Browser,
