@@ -219,6 +219,7 @@ async def handle_llm_extraction(
         prompt=prompt,
         response_schema=llm_extraction.build_model(),
         screenshot=screenshot,
+        recording_screenshot=llm_extraction.recording_screenshot,
         system_instruction=system_instruction,
     )
     response_dict = response.model_dump()

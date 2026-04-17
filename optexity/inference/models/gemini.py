@@ -34,6 +34,7 @@ class Gemini(LLMModel):
         self,
         prompt: str,
         response_schema: type[BaseModel],
+        recording_screenshot: Optional[str] = None,
         screenshot: Optional[str] = None,
         pdf_url: Optional[str | Path] = None,
         system_instruction: Optional[str] = None,
@@ -42,34 +43,54 @@ class Gemini(LLMModel):
         if pdf_url is not None and screenshot is not None:
             raise ValueError("Cannot use both screenshot and pdf_url")
 
-        final_prompt = prompt
+        final_prompt = []
+
+        if recording_screenshot is not None:
+            img_response = httpx.get(str(recording_screenshot))
+            mime_type = (
+                img_response.headers.get("content-type", "image/jpeg")
+                .split(";")[0]
+                .strip()
+            )
+
+            if not mime_type.startswith("image/"):
+                raise ValueError(
+                    f"The image url provided is not a valid image: {recording_screenshot} (got: {mime_type!r})"
+                )
+
+            final_prompt.append(
+                types.Part.from_bytes(
+                    data=img_response.content,
+                    mime_type=mime_type,
+                ),
+            )
 
         if screenshot is not None:
-            final_prompt = [
+            final_prompt.append(
                 types.Part.from_bytes(
                     data=base64.b64decode(screenshot),
                     mime_type="image/png",
-                ),
-                prompt,
-            ]
+                )
+            )
         if pdf_url is not None:
             if is_local_path(pdf_url):
-                final_prompt = [
+                final_prompt.append(
                     types.Part.from_bytes(
                         data=Path(str(pdf_url)).read_bytes(),
                         mime_type="application/pdf",
                     ),
-                    prompt,
-                ]
+                )
             elif is_url(pdf_url):
                 doc_data = httpx.get(str(pdf_url)).content
-                final_prompt = [
+                final_prompt.append(
                     types.Part.from_bytes(
                         data=doc_data,
                         mime_type="application/pdf",
                     ),
-                    prompt,
-                ]
+                )
+
+        final_prompt.append(prompt)
+
         response = None
         parsed_response = None
         token_usage = TokenUsage()

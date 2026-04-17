@@ -11,6 +11,7 @@ class LLMExtraction(BaseModel):
     source: list[Literal["axtree", "screenshot"]] = ["axtree"]
     extraction_format: dict
     extraction_instructions: str
+    recording_screenshot: str | None = None
     output_variable_names: list[str] | None = None
     llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
     llm_model_name: str = "gemini-2.5-flash"

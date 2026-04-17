@@ -30,6 +30,7 @@ class BaseAction(BaseModel):
     skip_command: bool = False
     skip_prompt: bool = False
     assert_locator_presence: bool = False
+    recording_screenshot: str | None = None
 
     @model_validator(mode="before")
     @classmethod
