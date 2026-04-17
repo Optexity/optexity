@@ -1,4 +1,7 @@
 import base64
+import logging
+from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -9,6 +12,9 @@ from optexity.inference.core.vision.ocr.ocr import _cv2_to_bytes, _load_cv2
 from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
+
+logger = logging.getLogger(__name__)
+_DEBUG_DIR = Path("/tmp/screenshot_comparison_debug")
 
 _CROP_ELEMENT_WIDTH = 113
 _CROP_ELEMENT_HEIGHT = 41
@@ -92,6 +98,16 @@ async def compare_screenshots_with_llm(
             "Respond with matches=false if the content differs significantly."
         )
 
+    # Save composite image for debugging
+    try:
+        _DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        img_path = _DEBUG_DIR / f"{ts}_composite.png"
+        img_path.write_bytes(base64.b64decode(composite_b64))
+        logger.info(f"[screenshot_comparison] composite image saved: {img_path}")
+    except Exception as e:
+        logger.warning(f"[screenshot_comparison] could not save debug image: {e}")
+
     model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name, True)
     result, token_usage = model.get_model_response_with_structured_output(
         prompt=prompt,
@@ -99,4 +115,8 @@ async def compare_screenshots_with_llm(
         screenshot=composite_b64,
     )
     memory.token_usage += token_usage
+    logger.info(
+        f"[screenshot_comparison] keyword={keyword!r} matches={result.matches} "
+        f"(debug: {img_path.name if '_DEBUG_DIR' not in str(img_path) else img_path})"
+    )
     return result.matches
