@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 import pyautogui
@@ -43,7 +44,12 @@ async def handle_click_element(
 
     if browser.channel == "rdp" or browser.backend == "computer-vision":
         await click_element_coordinates(
-            click_element_action, browser, memory, task, max_tries
+            click_element_action,
+            browser,
+            memory,
+            task,
+            max_tries,
+            max_timeout_seconds_per_try,
         )
         return
 
@@ -113,6 +119,7 @@ async def click_element_coordinates(
     memory: Memory,
     task: Task,
     max_tries: int = 3,
+    max_timeout_seconds_per_try: float = 5.0,
 ):
     try:
         x, y = None, None
@@ -131,21 +138,14 @@ async def click_element_coordinates(
                 recording_b64, recording_x, recording_y
             )
 
-            data = await get_coordinates_from_prompt(
-                memory, click_element_action.prompt_instructions, browser, task
-            )
-            if data is None:
-                raise KeywordNotFoundOnScreenException(
-                    message="Could not locate element on current screen",
-                    keyword=click_element_action.keyword or "element",
-                )
-            current_x, current_y = int(data[0]), int(data[1])
-            current_screenshot_b64 = memory.browser_states[-1].screenshot
-
             matched = False
             for attempt in range(max_tries):
+                browser_state = await browser.get_browser_state_summary(
+                    remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+                )
+                memory.browser_states[-1] = browser_state
                 current_crop = crop_screenshot_at_coordinates(
-                    current_screenshot_b64, current_x, current_y
+                    browser_state.screenshot, recording_x, recording_y
                 )
                 matches = await compare_screenshots_with_llm(
                     recording_crop,
@@ -156,22 +156,15 @@ async def click_element_coordinates(
                 )
                 if matches:
                     matched = True
-                    x, y = current_x, current_y
+                    x, y = recording_x, recording_y
                     break
 
                 logger.info(
-                    f"Recording validation attempt {attempt + 1}/{max_tries} failed, retrying..."
+                    f"Recording validation attempt {attempt + 1}/{max_tries} failed, "
+                    f"retrying in {max_timeout_seconds_per_try}s..."
                 )
                 if attempt < max_tries - 1:
-                    data = await get_coordinates_from_prompt(
-                        memory,
-                        click_element_action.prompt_instructions,
-                        browser,
-                        task,
-                    )
-                    if data is not None:
-                        current_x, current_y = int(data[0]), int(data[1])
-                        current_screenshot_b64 = memory.browser_states[-1].screenshot
+                    await asyncio.sleep(max_timeout_seconds_per_try)
 
             if not matched:
                 raise KeywordNotFoundOnScreenException(
