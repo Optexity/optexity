@@ -18,7 +18,12 @@ from optexity.inference.agents.index_prediction.action_prediction_locator_axtree
 from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
 from optexity.inference.core.vision.ocr.tesseract import Tesseract
 from optexity.inference.infra.browser import Browser
-from optexity.inference.models import get_llm_model_with_fallback
+from optexity.inference.models import (
+    GeminiModels,
+    get_llm_model,
+    get_llm_model_with_fallback,
+    resolve_model_name,
+)
 from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.ocr import BoundingBox, OCRResult
 from optexity.schema.task import Task
