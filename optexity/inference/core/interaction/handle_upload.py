@@ -4,7 +4,10 @@ from optexity.exceptions import ElementNotFoundInAxtreeException
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
-from optexity.inference.core.interaction.utils import get_index_from_prompt
+from optexity.inference.core.interaction.utils import (
+    get_index_from_prompt,
+    update_screenshot_with_highlight,
+)
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import UploadFileAction
 from optexity.schema.memory import Memory
@@ -50,6 +53,12 @@ async def upload_file_index(
         )
         if index is None:
             return
+        try:
+            await update_screenshot_with_highlight(browser, memory, index)
+        except Exception as e:
+            logger.error(
+                f"Error in updating screenshot with highlight in upload_file_index: {e}"
+            )
 
         action_model = browser.backend_agent.ActionModel(
             **{"upload_file": {"index": index, "path": upload_file_action.file_path}}

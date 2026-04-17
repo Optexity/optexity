@@ -9,6 +9,7 @@ from optexity.inference.core.interaction.handle_command import (
 from optexity.inference.core.interaction.utils import (
     get_index_from_prompt,
     handle_download,
+    update_screenshot_with_highlight,
 )
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import ClickElementAction
@@ -60,6 +61,12 @@ async def click_element_index(
         )
         if index is None:
             return
+        try:
+            await update_screenshot_with_highlight(browser, memory, index)
+        except Exception as e:
+            logger.error(
+                f"Error in updating screenshot with highlight in click_element_index: {e}"
+            )
 
         async def _actual_click_element():
             print(
