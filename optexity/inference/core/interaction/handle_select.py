@@ -101,8 +101,12 @@ async def select_option_index(
         )
         if index is None:
             return
-
-        await update_screenshot_with_highlight(browser, memory, index)
+        try:
+            await update_screenshot_with_highlight(browser, memory, index)
+        except Exception as e:
+            logger.error(
+                f"Error in updating screenshot with highlight in select_option_index: {e}"
+            )
 
         node = await browser.backend_agent.browser_session.get_element_by_index(index)
         if node is None:

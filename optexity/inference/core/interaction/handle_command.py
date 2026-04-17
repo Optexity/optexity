@@ -74,13 +74,17 @@ async def command_based_action_with_retry(
                 )
                 await asyncio.sleep(0.05)
 
-                page = await browser.get_current_page()
-                bbox = await locator.bounding_box() if page else None
-                if page and bbox:
-                    screenshot = await highlight_element_and_screenshot(
-                        page, browser, bbox
-                    )
-                else:
+                try:
+                    page = await browser.get_current_page()
+                    bbox = await locator.bounding_box() if page else None
+                    if page and bbox:
+                        screenshot = await highlight_element_and_screenshot(
+                            page, browser, bbox
+                        )
+                    else:
+                        screenshot = await browser.get_screenshot()
+                except Exception as e:
+                    logger.error(f"Error in command_based_action_with_retry: {e}")
                     screenshot = await browser.get_screenshot()
 
                 memory.browser_states[-1] = BrowserState(

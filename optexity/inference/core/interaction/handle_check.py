@@ -58,16 +58,18 @@ async def check_element_index(
         if index is None:
             return
 
-        backend_agent = browser.backend_agent
-        if backend_agent is None:
-            return
+        try:
+            await update_screenshot_with_highlight(browser, memory, index)
+        except Exception as e:
+            logger.error(
+                f"Error in updating screenshot with highlight in check_element_index: {e}"
+            )
 
-        await update_screenshot_with_highlight(browser, memory, index)
-
-        action_model = backend_agent.ActionModel(
+        logger.debug(f"Checking element with index: {index}")
+        action_model = browser.backend_agent.ActionModel(
             **{"click": {"index": int(index), "button": "left"}}
         )
-        await backend_agent.multi_act([action_model])
+        await browser.backend_agent.multi_act([action_model])
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:
@@ -117,16 +119,18 @@ async def uncheck_element_index(
         if index is None:
             return
 
-        backend_agent = browser.backend_agent
-        if backend_agent is None:
-            return
+        try:
+            await update_screenshot_with_highlight(browser, memory, index)
+        except Exception as e:
+            logger.error(
+                f"Error in updating screenshot with highlight in uncheck_element_index: {e}"
+            )
 
-        await update_screenshot_with_highlight(browser, memory, index)
-
-        action_model = backend_agent.ActionModel(
+        logger.debug(f"Unchecking element with index: {index}")
+        action_model = browser.backend_agent.ActionModel(
             **{"click": {"index": int(index), "button": "left"}}
         )
-        await backend_agent.multi_act([action_model])
+        await browser.backend_agent.multi_act([action_model])
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:

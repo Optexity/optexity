@@ -59,7 +59,12 @@ async def hover_element_index(
         if index is None:
             return
 
-        await update_screenshot_with_highlight(browser, memory, index)
+        try:
+            await update_screenshot_with_highlight(browser, memory, index)
+        except Exception as e:
+            logger.error(
+                f"Error in updating screenshot with highlight in hover_element_index: {e}"
+            )
 
         logger.debug(f"Hovering element with index: {index}")
 

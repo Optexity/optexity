@@ -56,39 +56,28 @@ async def click_element_index(
 ):
 
     try:
-        raw_index = await get_index_from_prompt(
+        index = await get_index_from_prompt(
             memory, click_element_action.prompt_instructions, browser, task
         )
-
-        if raw_index is None:
+        if index is None:
             return
-
         try:
-            index = int(raw_index)
-        except (TypeError, ValueError):
+            await update_screenshot_with_highlight(browser, memory, index)
+        except Exception as e:
             logger.error(
-                "Invalid click index from prompt fallback. raw_index=%r type=%s prompt_instructions=%r",
-                raw_index,
-                type(raw_index).__name__,
-                click_element_action.prompt_instructions,
+                f"Error in updating screenshot with highlight in click_element_index: {e}"
             )
-            return
-
-        backend_agent = browser.backend_agent
-        if backend_agent is None:
-            return
-
-        await update_screenshot_with_highlight(browser, memory, index)
 
         async def _actual_click_element():
-            action_model = backend_agent.ActionModel(
+            print(
+                f"Clicking element with index: {index} and button: {click_element_action.button}"
+            )
+            action_model = browser.backend_agent.ActionModel(
                 **{"click": {"index": index, "button": click_element_action.button}}
             )
-            await backend_agent.multi_act([action_model])
+            await browser.backend_agent.multi_act([action_model])
 
         if click_element_action.expect_download:
-            if click_element_action.download_filename is None:
-                return
             await handle_download(
                 _actual_click_element,
                 memory,

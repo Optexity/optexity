@@ -53,8 +53,12 @@ async def upload_file_index(
         )
         if index is None:
             return
-
-        await update_screenshot_with_highlight(browser, memory, index)
+        try:
+            await update_screenshot_with_highlight(browser, memory, index)
+        except Exception as e:
+            logger.error(
+                f"Error in updating screenshot with highlight in upload_file_index: {e}"
+            )
 
         action_model = browser.backend_agent.ActionModel(
             **{"upload_file": {"index": index, "path": upload_file_action.file_path}}
