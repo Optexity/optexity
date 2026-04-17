@@ -125,7 +125,6 @@ class Recorder:
         self._mouse_listener = None
         self._key_listener = None
         self._stop_event = threading.Event()
-        self._sct = mss.mss()
 
         self.key_buffer: list = []
         self.key_buffer_start_time = 0.0
@@ -214,15 +213,43 @@ class Recorder:
             return self._frame_history[0][1].copy()
 
     def _screenshot_loop(self):
+        import logging as _logging
+
+        _log = _logging.getLogger(__name__)
+        _captured = 0
+        _errors = 0
+        try:
+            sct = mss.mss()
+            _log.info("[recorder] screenshot thread: mss instance created OK")
+        except Exception as e:
+            _log.error(
+                f"[recorder] screenshot thread: failed to create mss instance: {e}"
+            )
+            return
+
         while self.running:
             try:
-                img = self._capture_screen()
+                shot = sct.grab(sct.monitors[0])
+                img = Image.frombytes("RGB", shot.size, shot.rgb)
                 ts = time.time()
                 with self._frame_lock:
                     self._frame_history.append((ts, img))
-            except Exception:
-                pass
+                _captured += 1
+                if _captured == 1:
+                    _log.info(
+                        f"[recorder] screenshot thread: first frame captured at {ts:.3f}"
+                    )
+            except Exception as e:
+                _errors += 1
+                if _errors <= 5:
+                    _log.error(
+                        f"[recorder] screenshot thread: capture error #{_errors}: {e}"
+                    )
             time.sleep(self._screenshot_interval_s)
+
+        _log.info(
+            f"[recorder] screenshot thread: exiting. captured={_captured}, errors={_errors}"
+        )
 
     def _process_events(self):
         with open(self.events_file, "a") as f:
