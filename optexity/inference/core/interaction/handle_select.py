@@ -13,6 +13,7 @@ from optexity.inference.core.interaction.handle_select_utils import (
 from optexity.inference.core.interaction.utils import (
     get_index_from_prompt,
     handle_download,
+    update_screenshot_with_highlight,
 )
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import SelectOptionAction
@@ -100,6 +101,12 @@ async def select_option_index(
         )
         if index is None:
             return
+        try:
+            await update_screenshot_with_highlight(browser, memory, index)
+        except Exception as e:
+            logger.error(
+                f"Error in updating screenshot with highlight in select_option_index: {e}"
+            )
 
         node = await browser.backend_agent.browser_session.get_element_by_index(index)
         if node is None:
