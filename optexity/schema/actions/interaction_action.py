@@ -26,7 +26,7 @@ class BaseAction(BaseModel):
     coordinates: tuple[int, int] | tuple[str, str] | None = None
     keyword: str | None = None
     command: str | None = None
-    prompt_instructions: str
+    prompt_instructions: str = ""
     skip_command: bool = False
     skip_prompt: bool = False
     assert_locator_presence: bool = False
@@ -299,7 +299,7 @@ class KeyPressType(str, Enum):
     CMD = "Cmd"
 
 
-class KeyPressAction(BaseModel):
+class KeyPressAction(BaseAction):
     type: str | list[str]
 
     @model_validator(mode="after")
@@ -313,6 +313,7 @@ class KeyPressAction(BaseModel):
         return self
 
     def replace(self, pattern: str, replacement: str):
+        super().replace(pattern, replacement)
         if self.type:
             if isinstance(self.type, str):
                 self.type = self.type.replace(pattern, replacement).strip('"')

@@ -1,21 +1,35 @@
 import pyautogui
 
+from optexity.inference.core.interaction.screenshot_comparison import (
+    validate_recording_action,
+)
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import (
     KeyPressAction,
     KeyPressType,
 )
 from optexity.schema.memory import Memory
+from optexity.schema.task import Task
 
 
 async def handle_key_press(
     keypress_action: KeyPressAction,
     memory: Memory,
     browser: Browser,
+    task: Task,
+    max_tries: int = 3,
+    max_timeout_seconds_per_try: float = 5.0,
 ):
 
     if browser.channel == "rdp" or browser.backend == "computer-vision":
-        await handle_keypress_native(keypress_action, memory, browser)
+        await handle_keypress_native(
+            keypress_action,
+            memory,
+            browser,
+            task,
+            max_tries,
+            max_timeout_seconds_per_try,
+        )
         return
 
     page = await browser.get_current_page()
@@ -56,7 +70,20 @@ async def handle_keypress_native(
     keypress_action: KeyPressAction,
     memory: Memory,
     browser: Browser,
+    task: Task,
+    max_tries: int = 3,
+    max_timeout_seconds_per_try: float = 5.0,
 ):
+    if keypress_action.recording_screenshot and keypress_action.coordinates:
+        await validate_recording_action(
+            keypress_action,
+            browser,
+            memory,
+            task,
+            max_tries,
+            max_timeout_seconds_per_try,
+        )
+
     values = []
 
     if isinstance(keypress_action.type, KeyPressType):

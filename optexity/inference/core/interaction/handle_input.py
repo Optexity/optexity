@@ -12,6 +12,9 @@ from optexity.exceptions import (
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
+from optexity.inference.core.interaction.screenshot_comparison import (
+    validate_recording_action,
+)
 from optexity.inference.core.interaction.utils import (
     get_coordinates_from_prompt,
     get_index_from_prompt,
@@ -55,7 +58,14 @@ async def handle_input_text(
         return
 
     if browser.channel == "rdp" or browser.backend == "computer-vision":
-        await input_text_coordinates(input_text_action, browser, memory, task)
+        await input_text_coordinates(
+            input_text_action,
+            browser,
+            memory,
+            task,
+            max_tries,
+            max_timeout_seconds_per_try,
+        )
         return
 
     if input_text_action.command and not input_text_action.skip_command:
@@ -113,6 +123,8 @@ async def input_text_coordinates(
     browser: Browser,
     memory: Memory,
     task: Task,
+    max_tries: int = 3,
+    max_timeout_seconds_per_try: float = 5.0,
 ):
     if input_text_action.input_text is None:
         return
@@ -129,32 +141,46 @@ async def input_text_coordinates(
 
     try:
         x, y = None, None
-        if input_text_action.coordinates:
+
+        if input_text_action.recording_screenshot and input_text_action.coordinates:
+            x, y = await validate_recording_action(
+                input_text_action,
+                browser,
+                memory,
+                task,
+                max_tries,
+                max_timeout_seconds_per_try,
+            )
+        elif input_text_action.coordinates:
             x = input_text_action.coordinates[0]
             y = input_text_action.coordinates[1]
+            if input_text_action.keyword:
+                result = await resolve_keyword_coordinates(
+                    input_text_action.keyword, x, y, memory
+                )
+                x = int(result.bounding_box.x)
+                y = int(result.bounding_box.y + result.bounding_box.height / 2)
+                logger.info(
+                    f"Keyword '{input_text_action.keyword}' matched '{result.text}' at ({x}, {y})"
+                )
         else:
             data = await get_coordinates_from_prompt(
                 memory, input_text_action.prompt_instructions, browser, task
             )
-
             if data is None:
                 logger.error("No coordinates found")
                 return
-
-            x = data[0]
-            y = data[1]
+            x, y = data[0], data[1]
             memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
-
-        if input_text_action.keyword:
-            result = await resolve_keyword_coordinates(
-                input_text_action.keyword, x, y, memory
-            )
-            # Click at start (left edge) of bounding box for input fields
-            x = int(result.bounding_box.x)
-            y = int(result.bounding_box.y + result.bounding_box.height / 2)
-            logger.info(
-                f"Keyword '{input_text_action.keyword}' matched '{result.text}', clicking at start of bounding box: ({x}, {y})"
-            )
+            if input_text_action.keyword:
+                result = await resolve_keyword_coordinates(
+                    input_text_action.keyword, x, y, memory
+                )
+                x = int(result.bounding_box.x)
+                y = int(result.bounding_box.y + result.bounding_box.height / 2)
+                logger.info(
+                    f"Keyword '{input_text_action.keyword}' matched '{result.text}' at ({x}, {y})"
+                )
 
         logger.debug(f"Typing text at coordinates: {x}, {y}")
 

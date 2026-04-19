@@ -156,7 +156,14 @@ async def run_interaction_action(
                 interaction_action.close_tabs_until, task, memory, browser
             )
         elif interaction_action.key_press:
-            await handle_key_press(interaction_action.key_press, memory, browser)
+            await handle_key_press(
+                interaction_action.key_press,
+                memory,
+                browser,
+                task,
+                interaction_action.max_tries,
+                interaction_action.max_timeout_seconds_per_try,
+            )
         elif interaction_action.scroll:
             await handle_scroll(interaction_action.scroll, memory, browser)
     except KeywordNotFoundOnScreenException as e:
