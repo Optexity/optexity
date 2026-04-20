@@ -290,6 +290,10 @@ async def _validate_crop(
             recording_crop, current_crop, prompt_instructions, task, memory
         )
         if matches:
+            logger.info(
+                f"[screenshot_comparison] crop matched on attempt {attempt + 1}, "
+                "invoking computer use model for precise coordinates"
+            )
             coordinates = await _computer_use_coordinates(
                 browser_state.screenshot, prompt_instructions, task, memory
             )
