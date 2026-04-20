@@ -135,17 +135,20 @@ async def _llm_crop_comparison(
     path = _save_debug(composite_b64, "composite")
 
     prompt = (
-        f"You are verifying a UI automation step. The task is: '{prompt_instructions}'.\n"
-        "You are shown two cropped screenshots side by side:\n"
-        "- LEFT: the expected UI area from a recording\n"
-        "- RIGHT: the same screen area right now\n\n"
-        "Answer matches=true ONLY if the RIGHT image clearly shows the same specific UI element "
-        "that is visible in the LEFT image (same type of control, same context).\n"
-        "Answer matches=false if:\n"
-        "- The RIGHT image shows a completely different screen or dialog\n"
-        "- The expected element is not visible in the RIGHT image\n"
-        "- The RIGHT image shows a loading/error/login screen instead of the expected element\n\n"
-        "Also provide a concise reason explaining what you see in both images and why you made this decision."
+        f"You are verifying a UI automation step. The task is: '{prompt_instructions}'.\n\n"
+        "You are shown a composite image split by a vertical divider into two halves:\n"
+        "- LEFT HALF: the expected UI element from a recording (reference only)\n"
+        "- RIGHT HALF: the current state of the screen (this is what you must evaluate)\n\n"
+        "YOUR TASK: Does the RIGHT HALF show the same UI element as the LEFT HALF?\n\n"
+        "Answer matches=true ONLY if the RIGHT HALF clearly shows the same specific element "
+        "visible in the LEFT HALF (same control type, same context, same screen).\n\n"
+        "Answer matches=false if ANY of these are true about the RIGHT HALF:\n"
+        "- The RIGHT HALF is empty, gray, blank, or has no meaningful UI\n"
+        "- The RIGHT HALF shows a completely different screen, page, or dialog\n"
+        "- The expected element from the LEFT HALF is not visible in the RIGHT HALF\n"
+        "- The RIGHT HALF shows a loading, error, or login screen\n\n"
+        "IMPORTANT: Only the RIGHT HALF matters for your decision. "
+        "Describe what you see in each half separately and explain your decision."
     )
 
     model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name, True)
