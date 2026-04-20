@@ -35,6 +35,7 @@ _OCR_CANDIDATE_LIMIT = 20
 
 class ScreenshotMatchResult(BaseModel):
     matches: bool
+    reason: str
 
 
 class KeywordMatchResult(BaseModel):
@@ -129,10 +130,8 @@ async def _llm_crop_comparison(
     prompt_instructions: str,
     task: Task,
     memory: Memory,
-) -> bool:
+) -> tuple[bool, str, ScreenshotMatchResult]:
     composite_b64 = _build_composite(recording_crop_b64, current_crop_b64)
-    if memory.browser_states:
-        memory.browser_states[-1].comparison_screenshot = composite_b64
     path = _save_debug(composite_b64, "composite")
 
     prompt = (
@@ -145,20 +144,23 @@ async def _llm_crop_comparison(
         "Answer matches=false if:\n"
         "- The RIGHT image shows a completely different screen or dialog\n"
         "- The expected element is not visible in the RIGHT image\n"
-        "- The RIGHT image shows a loading/error/login screen instead of the expected element"
+        "- The RIGHT image shows a loading/error/login screen instead of the expected element\n\n"
+        "Also provide a concise reason explaining what you see in both images and why you made this decision."
     )
 
     model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name, True)
-    result, token_usage = model.get_model_response_with_structured_output(
+    raw_result, token_usage = model.get_model_response_with_structured_output(
         prompt=prompt,
         response_schema=ScreenshotMatchResult,
         screenshot=composite_b64,
     )
+    result = ScreenshotMatchResult.model_validate(raw_result.model_dump())
     memory.token_usage += token_usage
     logger.info(
-        f"[screenshot_comparison] crop comparison matches={result.matches} (debug: {path})"
+        f"[screenshot_comparison] crop comparison matches={result.matches} "
+        f"reason='{result.reason}' (debug: {path})"
     )
-    return result.matches
+    return result.matches, composite_b64, result
 
 
 async def _llm_keyword_fallback(
@@ -181,11 +183,12 @@ async def _llm_keyword_fallback(
     path = _save_debug(screenshot_b64, "llm_keyword_fallback")
 
     model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name, True)
-    result, token_usage = model.get_model_response_with_structured_output(
+    raw_result, token_usage = model.get_model_response_with_structured_output(
         prompt=prompt,
         response_schema=KeywordMatchResult,
         screenshot=screenshot_b64,
     )
+    result = KeywordMatchResult.model_validate(raw_result.model_dump())
     memory.token_usage += token_usage
     logger.info(
         f"[screenshot_comparison] keyword fallback: '{keyword}' → matched_index={result.matched_index} "
@@ -292,9 +295,14 @@ async def _validate_crop(
         memory.browser_states[-1] = browser_state
         current_crop = _crop_at(browser_state.screenshot, recording_x, recording_y)
 
-        matches = await _llm_crop_comparison(
+        matches, composite_b64, llm_result = await _llm_crop_comparison(
             recording_crop, current_crop, prompt_instructions, task, memory
         )
+        is_last_attempt = attempt == max_tries - 1
+        if matches or is_last_attempt:
+            memory.browser_states[-1].comparison_screenshot = composite_b64
+            memory.browser_states[-1].comparison_result = llm_result.model_dump()
+
         if matches:
             logger.info(
                 f"[screenshot_comparison] crop matched on attempt {attempt + 1}, "
@@ -317,7 +325,7 @@ async def _validate_crop(
             f"[screenshot_comparison] crop comparison attempt {attempt + 1}/{max_tries} failed, "
             f"retrying in {max_timeout_seconds_per_try}s..."
         )
-        if attempt < max_tries - 1:
+        if not is_last_attempt:
             await asyncio.sleep(max_timeout_seconds_per_try)
 
     raise KeywordNotFoundOnScreenException(

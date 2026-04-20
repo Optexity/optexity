@@ -345,6 +345,12 @@ async def save_latest_memory_state_locally(
                 step_directory / "comparison_screenshot.png",
             )
 
+        if browser_state.comparison_result:
+            async with aiofiles.open(
+                step_directory / "comparison_result.json", "w"
+            ) as f:
+                await f.write(json.dumps(browser_state.comparison_result, indent=4))
+
         if browser_state.validation_ocr_results:
             async with aiofiles.open(
                 step_directory / "validation_ocr_results.json", "w"
