@@ -13,7 +13,12 @@ from pydantic import BaseModel
 from optexity.exceptions import KeywordNotFoundOnScreenException
 from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
 from optexity.inference.core.vision.ocr.ocr import _cv2_to_bytes, _load_cv2
-from optexity.inference.models import get_llm_model_with_fallback
+from optexity.inference.models import (
+    GeminiModels,
+    get_llm_model,
+    get_llm_model_with_fallback,
+    resolve_model_name,
+)
 from optexity.schema.memory import Memory
 from optexity.schema.ocr import OCRResult
 from optexity.schema.task import Task
@@ -99,6 +104,25 @@ def _save_debug(image_b64: str, suffix: str) -> Optional[Path]:
         return None
 
 
+async def _computer_use_coordinates(
+    screenshot_b64: str,
+    prompt_instructions: str,
+    task: Task,
+    memory: Memory,
+) -> tuple[int, int] | None:
+    model_name = resolve_model_name(task.llm_provider, task.llm_model_name)
+    if not model_name.is_computer_use_model():
+        model_name = GeminiModels.GEMINI_3_FLASH
+    model = get_llm_model(model_name, True)
+    coordinates, token_usage = model.get_computer_use_model_response(
+        prompt=prompt_instructions,
+        screenshot=screenshot_b64,
+    )
+    memory.token_usage += token_usage
+    logger.info(f"[screenshot_comparison] computer use coordinates: {coordinates}")
+    return coordinates
+
+
 async def _llm_crop_comparison(
     recording_crop_b64: str,
     current_crop_b64: str,
@@ -110,11 +134,16 @@ async def _llm_crop_comparison(
     path = _save_debug(composite_b64, "composite")
 
     prompt = (
-        f"You are verifying a UI automation step. The task is: '{prompt_instructions}'. "
-        "The LEFT image is a crop from a recording. The RIGHT image is the same area on the current screen. "
-        "Are both images showing the same UI element, or is the current screen in a transitional state "
-        "(loading, animation) leading to it? "
-        "Respond with matches=true if yes, matches=false if the screens are clearly different."
+        f"You are verifying a UI automation step. The task is: '{prompt_instructions}'.\n"
+        "You are shown two cropped screenshots side by side:\n"
+        "- LEFT: the expected UI area from a recording\n"
+        "- RIGHT: the same screen area right now\n\n"
+        "Answer matches=true ONLY if the RIGHT image clearly shows the same specific UI element "
+        "that is visible in the LEFT image (same type of control, same context).\n"
+        "Answer matches=false if:\n"
+        "- The RIGHT image shows a completely different screen or dialog\n"
+        "- The expected element is not visible in the RIGHT image\n"
+        "- The RIGHT image shows a loading/error/login screen instead of the expected element"
     )
 
     model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name, True)
@@ -261,7 +290,18 @@ async def _validate_crop(
             recording_crop, current_crop, prompt_instructions, task, memory
         )
         if matches:
-            return recording_x, recording_y
+            coordinates = await _computer_use_coordinates(
+                browser_state.screenshot, prompt_instructions, task, memory
+            )
+            if coordinates is None:
+                raise KeywordNotFoundOnScreenException(
+                    message=(
+                        f"Screen matched recording but computer use model could not "
+                        f"locate the element. Task: '{prompt_instructions}'"
+                    ),
+                    keyword="element",
+                )
+            return coordinates
 
         logger.info(
             f"[screenshot_comparison] crop comparison attempt {attempt + 1}/{max_tries} failed, "
