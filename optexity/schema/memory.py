@@ -110,6 +110,8 @@ class BrowserState(BaseModel):
     ocr_annotated: str | None = Field(default=None)
     ocr_canvas: str | None = Field(default=None)
     ocr_image_sent_to_ocr: list[str] = Field(default_factory=list)
+    comparison_screenshot: str | None = Field(default=None)
+    validation_ocr_results: list[dict] = Field(default_factory=list)
     html: str | None = Field(default=None)
     axtree: str | None = Field(default=None)
     final_prompt: str | None = Field(default=None)

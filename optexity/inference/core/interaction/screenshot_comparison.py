@@ -131,6 +131,8 @@ async def _llm_crop_comparison(
     memory: Memory,
 ) -> bool:
     composite_b64 = _build_composite(recording_crop_b64, current_crop_b64)
+    if memory.browser_states:
+        memory.browser_states[-1].comparison_screenshot = composite_b64
     path = _save_debug(composite_b64, "composite")
 
     prompt = (
@@ -215,6 +217,10 @@ async def _validate_keyword(
 
         results, _ = _ocr.ocr(browser_state.screenshot)
         last_results = results
+        memory.browser_states[-1].ocr_image_sent_to_ocr.append(browser_state.screenshot)
+        memory.browser_states[-1].validation_ocr_results = [
+            r.model_dump() for r in results
+        ]
 
         exact = [
             r for r in results if r.text.strip().lower() == keyword.strip().lower()
