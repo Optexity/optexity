@@ -8,7 +8,10 @@ from optexity.inference.core.interaction.handle_select_utils import (
     SelectOptionValue,
     smart_select,
 )
-from optexity.inference.core.interaction.utils import handle_download
+from optexity.inference.core.interaction.utils import (
+    handle_download,
+    highlight_element_and_screenshot,
+)
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import (
     CheckAction,
@@ -70,10 +73,23 @@ async def command_based_action_with_retry(
                     timeout=max_timeout_seconds_per_try * 1000
                 )
                 await asyncio.sleep(0.05)
-                # browser_state_summary = await browser.get_browser_state_summary()
+
+                try:
+                    page = await browser.get_current_page()
+                    bbox = await locator.bounding_box() if page else None
+                    if page and bbox:
+                        screenshot = await highlight_element_and_screenshot(
+                            page, browser, bbox
+                        )
+                    else:
+                        screenshot = await browser.get_screenshot()
+                except Exception as e:
+                    logger.error(f"Error in command_based_action_with_retry: {e}")
+                    screenshot = await browser.get_screenshot()
+
                 memory.browser_states[-1] = BrowserState(
                     url=await browser.get_current_page_url(),
-                    screenshot=await browser.get_screenshot(),
+                    screenshot=screenshot,
                     title=await browser.get_current_page_title(),
                     axtree=None,
                 )

@@ -19,6 +19,7 @@ from optexity.inference.core.interaction.utils import (
     get_coordinates_from_prompt,
     get_index_from_prompt,
     resolve_keyword_coordinates,
+    update_screenshot_with_highlight,
 )
 
 # from optexity.inference.core.vision.time import (
@@ -100,6 +101,12 @@ async def input_text_index(
         )
         if index is None:
             return
+        try:
+            await update_screenshot_with_highlight(browser, memory, index)
+        except Exception as e:
+            logger.error(
+                f"Error in updating screenshot with highlight in input_text_index: {e}"
+            )
 
         action_model = browser.backend_agent.ActionModel(
             **{
