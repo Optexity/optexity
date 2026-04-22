@@ -47,6 +47,8 @@ task_running = False
 last_task_start_time = None
 task_queue: asyncio.Queue[Task] = asyncio.Queue()
 tasks_to_kill: set[str] = set()
+# task_id -> worker subprocess, so /kill_task can signal an in-flight worker.
+running_task_processes: dict[str, asyncio.subprocess.Process] = {}
 _global_actual_browser: ActualBrowser | None = None
 
 
@@ -180,30 +182,50 @@ async def run_automation_in_process(
             str(attempts_left),
             preexec_fn=os.setsid,
         )
+        running_task_processes[task.task_id] = proc
 
         try:
-            logger.debug("Waiting for automation to finish")
-            returncode = await asyncio.wait_for(
-                proc.wait(), timeout=task.max_timeout_in_minutes * 60
-            )
-            logger.info(f"Worker finished with return code {returncode}")
-        except asyncio.TimeoutError:
-            logger.info(
-                f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
-            )
             try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except Exception:
-                pass
-            task.status = "killed"
-            task.error = f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
-            if attempts_left <= 1:
-                task.completed_at = datetime.now(timezone.utc)
-                await complete_task_in_server(
-                    task, None, child_process_id, unique_child_arn
+                logger.debug("Waiting for automation to finish")
+                returncode = await asyncio.wait_for(
+                    proc.wait(), timeout=task.max_timeout_in_minutes * 60
                 )
-                await initiate_callback(task)
+                logger.info(f"Worker finished with return code {returncode}")
+            except asyncio.TimeoutError:
+                logger.info(
+                    f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
+                )
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to SIGKILL worker process group for task "
+                        f"{task.task_id} after timeout: {exc}"
+                    )
+                task.status = "killed"
+                task.error = f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
+                if attempts_left <= 1:
+                    task.completed_at = datetime.now(timezone.utc)
+                    await complete_task_in_server(
+                        task, None, child_process_id, unique_child_arn
+                    )
+                    await initiate_callback(task)
             returncode = -1
+        finally:
+            running_task_processes.pop(task.task_id, None)
+
+        # If the task was cancelled (via /kill_task) while the worker was running,
+        # the subprocess has been killed from under us. Report cancellation and
+        # skip the retry loop.
+        if task.task_id in tasks_to_kill:
+            tasks_to_kill.discard(task.task_id)
+            task.status = "cancelled"
+            task.error = "Task cancelled by user"
+            task.completed_at = datetime.now(timezone.utc)
+            await complete_task_in_server(
+                task, None, child_process_id, unique_child_arn
+            )
+            return returncode
 
         if returncode == ExitCodes.SUCCESS.value:
             return returncode
@@ -361,8 +383,26 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
 
     @app.post("/kill_task")
     async def kill_task(task_id: str = Body(...)):
-        """Kill task endpoint."""
+        """Kill task endpoint.
+
+        - Adds task_id to tasks_to_kill so queued tasks are skipped by the
+          processor and a running worker's post-exit retry loop bails out.
+        - If a worker subprocess for this task is currently running, SIGKILL
+          its process group so the worker exits promptly.
+        """
         tasks_to_kill.add(task_id)
+        proc = running_task_processes.get(task_id)
+        if proc is not None and proc.returncode is None:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                logger.info(f"Killed worker process group for task {task_id}")
+            except ProcessLookupError:
+                logger.info(
+                    f"Worker process group for task {task_id} was already gone; "
+                    "treating /kill_task as successful"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to kill worker process for task {task_id}: {e}")
         return JSONResponse(
             content={"success": True, "message": "Task has been killed"},
             status_code=200,

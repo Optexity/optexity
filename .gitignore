@@ -1,6 +1,7 @@
 .vscode/
 recordings/
 tmp-optexity/
+sbom.cdx.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

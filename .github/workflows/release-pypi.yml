@@ -73,6 +73,18 @@ jobs:
                   git diff --staged --quiet || git commit -m "chore(release): bump version to ${{ env.NEW_VERSION }}"
                   git push
 
+            - name: Set up Node.js (for SBOM)
+              if: steps.skip.outputs.skip != 'true'
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+
+            - name: Generate SBOM (CycloneDX)
+              if: steps.skip.outputs.skip != 'true'
+              run: |
+                  npm install -g @cyclonedx/cdxgen
+                  cdxgen -t python -o sbom.cdx.json
+
             - name: Create GitHub Release
               if: steps.skip.outputs.skip != 'true' && github.event.inputs.dry_run != 'true'
               uses: softprops/action-gh-release@v2
@@ -80,6 +92,7 @@ jobs:
                   tag_name: v${{ env.NEW_VERSION }}
                   name: v${{ env.NEW_VERSION }}
                   generate_release_notes: true
+                  files: sbom.cdx.json
               env:
                   GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
 
