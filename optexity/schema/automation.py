@@ -113,7 +113,7 @@ class ActionNode(BaseModel):
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, sleep_action, fail_state_action, captcha_action must be provided"
+                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, powershell_action, sleep_action, fail_state_action, captcha_action must be provided"
             )
 
         assert (
