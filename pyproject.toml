@@ -61,3 +61,6 @@ target-version = ["py311"]
 [tool.isort]
 profile = "black"
 line_length = 88
+
+[tool.uv]
+exclude-newer = "7 days"
