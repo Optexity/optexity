@@ -5,6 +5,6 @@
         "dev": "mintlify dev"
     },
     "dependencies": {
-        "@mintlify/cli": "^4.0.822"
+        "@mintlify/cli": "^4.0.1128"
     }
 }
