@@ -31,7 +31,9 @@ from optexity.inference.core.run_interaction import (
     run_interaction_action,
 )
 from optexity.inference.core.run_misc import run_fail_state_action, run_sleep_action
+from optexity.inference.core.run_powershell import run_powershell_action
 from optexity.inference.core.run_python_script import run_python_script_action
+from optexity.inference.core.vision.time import wait_for_stable_screen
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
 from optexity.schema.automation import ActionNode, ForLoopNode, IfElseNode
@@ -68,7 +70,7 @@ async def run_automation(
     task: Task,
     unique_child_arn: str,
     child_process_id: int,
-    cdp_url: str,
+    cdp_url: str | None,
     max_tries: int = 1,
 ):
     file_handler = logging.FileHandler(str(task.log_file_path))
@@ -90,7 +92,17 @@ async def run_automation(
         memory.update_system_info()
 
         def _get_browser():
-            return Browser(memory=memory, cdp_url=cdp_url)
+            return Browser(
+                memory=memory,
+                cdp_url=cdp_url,
+                backend=task.automation.backend,
+                channel=task.automation.browser_channel,
+                debug_port=9222 + child_process_id,
+                use_proxy=task.use_proxy,
+                proxy_session_id=task.proxy_session_id(
+                    settings.PROXY_PROVIDER if task.use_proxy else None
+                ),
+            )
 
         browser = _get_browser()
         memory.update_system_info()
@@ -109,9 +121,11 @@ async def run_automation(
             )
             raise e
 
-        if task.use_proxy:
+        if task.use_proxy and browser.channel != "rdp":
 
             page = await browser.get_current_page()
+            if page is None:
+                raise ValueError("Page is not available")
             await asyncio.sleep(5)
             await browser.go_to_url("https://ip.oxylabs.io/location")
 
@@ -149,12 +163,7 @@ async def run_automation(
                 await handle_if_else_node(node, memory, task, browser, full_automation)
             else:
                 full_automation.append(node.model_dump())
-                await run_action_node(
-                    node,
-                    task,
-                    memory,
-                    browser,
-                )
+                await run_action_node(node, task, memory, browser)
 
         task.status = "success"
     except AssertionError as e:
@@ -286,17 +295,8 @@ async def run_final_logging(
 
         try:
             memory.automation_state.step_index += 1
-            browser_state_summary = await browser.get_browser_state_summary()
-            memory.browser_states.append(
-                BrowserState(
-                    url=browser_state_summary.url,
-                    screenshot=browser_state_summary.screenshot,
-                    title=browser_state_summary.title,
-                    axtree=browser_state_summary.dom_state.llm_representation(
-                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-                    ),
-                )
-            )
+            browser_state = await browser.get_browser_state_summary()
+            memory.browser_states.append(browser_state)
 
             if task.automation.take_final_screenshot:
                 memory.final_screenshot = await browser.get_screenshot(full_page=True)
@@ -325,6 +325,10 @@ async def run_action_node(
 
     memory.automation_state.step_index += 1
     memory.automation_state.try_index = 0
+
+    # Inject default generated variables (current_time is dynamic per step)
+    memory.variables.generated_variables["current_time"] = [str(int(time.time()))]
+    memory.variables.generated_variables["task_id"] = [str(task.task_id)]
 
     await action_node.replace_variables(task.input_parameters)
     await action_node.replace_variables(
@@ -362,6 +366,8 @@ async def run_action_node(
             await run_python_script_action(
                 action_node.python_script_action, memory, browser
             )
+        elif action_node.powershell_action:
+            await run_powershell_action(action_node.powershell_action)
         elif action_node.sleep_action:
             await run_sleep_action(action_node.sleep_action)
         elif action_node.fail_state_action:
@@ -395,7 +401,10 @@ async def run_action_node(
             logger.debug(f"Switched to new tab after {total_time} seconds, as expected")
 
     else:
-        await sleep_for_page_to_load(browser, action_node.end_sleep_time)
+        if browser.channel == "rdp" or browser.backend == "computer-vision":
+            await wait_for_stable_screen(browser, timeout=action_node.end_sleep_time)
+        else:
+            await asyncio.sleep(action_node.end_sleep_time)
 
     logger.debug(f"-----Finished node {memory.automation_state.step_index}-----")
     memory.update_system_info()
@@ -469,6 +478,7 @@ async def handle_for_loop_node(
     full_automation: list[ActionNode],
 ):
     memory.update_system_info()
+    # Use the first variable name for iteration length (supports comma-separated variables)
     primary_variable = for_loop_node.variable_name.split(",")[0].strip()
     if primary_variable in task.input_parameters:
         values = task.input_parameters[primary_variable]

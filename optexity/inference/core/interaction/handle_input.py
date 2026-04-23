@@ -1,19 +1,39 @@
+import asyncio
 import logging
 import re
 
-from optexity.exceptions import ElementNotFoundInAxtreeException
+import pyautogui
+import pyperclip
+
+from optexity.exceptions import (
+    ElementNotFoundInAxtreeException,
+    KeywordNotFoundOnScreenException,
+)
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
+from optexity.inference.core.interaction.screenshot_comparison import (
+    validate_recording_action,
+)
 from optexity.inference.core.interaction.utils import (
+    get_coordinates_from_prompt,
     get_index_from_prompt,
+    resolve_keyword_coordinates,
     update_screenshot_with_highlight,
 )
+
+# from optexity.inference.core.vision.time import (
+#     wait_for_screen_to_change,
+#     wait_for_stable_screen,
+# )
+from optexity.inference.core.vision.utils import mark_screenshot
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import InputTextAction
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
 
+pyautogui.FAILSAFE = True
+pyautogui.PAUSE = 0.05
 logger = logging.getLogger(__name__)
 
 
@@ -26,12 +46,26 @@ async def handle_input_text(
     max_tries: int,
 ):
 
+    if input_text_action.input_text is None:
+        return
+
     # {some english chars [0]}
     INT_INDEX_PATTERN = re.compile(r"^\{([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\}$")
 
     if INT_INDEX_PATTERN.match(input_text_action.input_text) is not None:
         logger.debug(
             "Skipping input text because input variable was not present for this step"
+        )
+        return
+
+    if browser.channel == "rdp" or browser.backend == "computer-vision":
+        await input_text_coordinates(
+            input_text_action,
+            browser,
+            memory,
+            task,
+            max_tries,
+            max_timeout_seconds_per_try,
         )
         return
 
@@ -88,4 +122,103 @@ async def input_text_index(
         raise e
     except Exception as e:
         logger.error(f"Error in input_text_index: {e}")
+        return
+
+
+async def input_text_coordinates(
+    input_text_action: InputTextAction,
+    browser: Browser,
+    memory: Memory,
+    task: Task,
+    max_tries: int = 3,
+    max_timeout_seconds_per_try: float = 5.0,
+):
+    if input_text_action.input_text is None:
+        return
+
+    async def _input():
+        if input_text_action.input_text is None:
+            return
+        if input_text_action.fill_or_type == "type":
+            pyautogui.typewrite(input_text_action.input_text, interval=0.05)
+        else:
+            pyperclip.copy(input_text_action.input_text)
+            await asyncio.sleep(0.2)
+            pyautogui.hotkey(browser.modifier_key, "v")
+
+    try:
+        x, y = None, None
+
+        if input_text_action.recording_screenshot and input_text_action.coordinates:
+            x, y = await validate_recording_action(
+                input_text_action,
+                browser,
+                memory,
+                task,
+                max_tries,
+                max_timeout_seconds_per_try,
+            )
+        elif input_text_action.coordinates:
+            x = input_text_action.coordinates[0]
+            y = input_text_action.coordinates[1]
+            if input_text_action.keyword:
+                result = await resolve_keyword_coordinates(
+                    input_text_action.keyword, x, y, memory
+                )
+                x = int(result.bounding_box.x)
+                y = int(result.bounding_box.y + result.bounding_box.height / 2)
+                logger.info(
+                    f"Keyword '{input_text_action.keyword}' matched '{result.text}' at ({x}, {y})"
+                )
+        else:
+            data = await get_coordinates_from_prompt(
+                memory, input_text_action.prompt_instructions, browser, task
+            )
+            if data is None:
+                logger.error("No coordinates found")
+                return
+            x, y = data[0], data[1]
+            memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
+            if input_text_action.keyword:
+                result = await resolve_keyword_coordinates(
+                    input_text_action.keyword, x, y, memory
+                )
+                x = int(result.bounding_box.x)
+                y = int(result.bounding_box.y + result.bounding_box.height / 2)
+                logger.info(
+                    f"Keyword '{input_text_action.keyword}' matched '{result.text}' at ({x}, {y})"
+                )
+
+        logger.debug(f"Typing text at coordinates: {x}, {y}")
+
+        if input_text_action.click_before_input:
+            pyautogui.click(x, y)
+            await asyncio.sleep(0.2)
+
+        await _input()
+        # changed, score = await wait_for_screen_to_change(_paste, browser)
+
+        # if not changed:
+        #     logger.warning("Screen did not change after typing text")
+
+        if input_text_action.press_enter:
+            await asyncio.sleep(0.8)
+            pyautogui.press("enter")
+
+        screenshot_base64 = memory.browser_states[-1].screenshot
+        if screenshot_base64:
+            screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
+            memory.browser_states[-1].screenshot = (
+                screenshot_base64  # pyright: ignore[reportAttributeAccessIssue]
+            )
+
+    except (ElementNotFoundInAxtreeException, KeywordNotFoundOnScreenException) as e:
+        raise e
+    except Exception as e:
+        if input_text_action.keyword:
+            raise KeywordNotFoundOnScreenException(
+                message=f"Failed to verify keyword '{input_text_action.keyword}' on screen due to error: {e}",
+                keyword=input_text_action.keyword,
+            )
+        logger.error(f"Error in input_text_coordinates: {e}")
         return

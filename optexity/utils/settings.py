@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     GET_CALLBACK_DATA_ENDPOINT: str = "api/v1/get_callback_data"
     FETCH_EMAIL_MESSAGES_ENDPOINT: str = "api/v1/fetch_email_messages"
     FETCH_SLACK_MESSAGES_ENDPOINT: str = "api/v1/fetch_slack_messages"
+    GET_COORDINATES_ENDPOINT: str = "api/v1/get_coordinates"
     INTEGRATION_SECRETS_ENDPOINT: str = "api/v1/integration-secrets/{type}/encrypt"
 
     FERNET_SECRET_KEY: str | None = None  # required when using integration secrets
@@ -46,6 +47,12 @@ class Settings(BaseSettings):
     PROXY_PASSWORD: str | None = None
     PROXY_COUNTRY: str | None = None
     PROXY_PROVIDER: Literal["oxylabs", "brightdata", "other"] | None = None
+
+    SHARED_DRIVE_PATH: str = "optexity-shared"
+    SCREEN_WIDTH: int = 1440
+    SCREEN_HEIGHT: int = 900
+
+    IN_DOCKER: bool = os.path.exists("/.dockerenv")
 
     BROWSER_USE_API_KEY: str | None = None
 

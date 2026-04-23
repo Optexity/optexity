@@ -3,12 +3,15 @@ FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=:99
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV XAUTHORITY=/home/optexity/.Xauthority
 # Software rendering for WebGL on GPU-less EC2 instances
 ENV LIBGL_ALWAYS_SOFTWARE=1
 ENV GALLIUM_DRIVER=llvmpipe
 ENV MESA_GL_VERSION_OVERRIDE=4.5
 ENV MESA_GLSL_VERSION_OVERRIDE=450
 ENV LIBGL_DRI3_DISABLE=1
+ENV SCREEN_WIDTH=1440
+ENV SCREEN_HEIGHT=900
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo git wget curl nano htop zsh tmux \
@@ -17,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11vnc novnc websockify \
     supervisor wmctrl \
     python3 python3-pip \
+    xclip wl-clipboard \
     && pip3 install --break-system-packages fastapi uvicorn \
     && rm -rf /var/lib/apt/lists/*
 
@@ -25,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip fonts-liberation libappindicator3-1 libasound2 libnspr4 libnss3 libxss1 libxtst6 xdg-utils \
     fonts-noto-color-emoji fonts-liberation \
     pulseaudio pavucontrol \
+    python3-tk python3-dev \
     udev v4l2loopback-dkms v4l-utils \
     libgl1-mesa-dri libgl1 libegl-mesa0 libgles2 \
     mesa-utils mesa-vulkan-drivers libvulkan1 \
@@ -52,7 +57,8 @@ RUN python3 -m cloakbrowser install
 RUN groupadd -r optexity && \
     useradd -r -g optexity -m -d /home/optexity -s /bin/bash optexity && \
     echo "optexity ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/optexity && \
-    chmod 0440 /etc/sudoers.d/optexity
+    chmod 0440 /etc/sudoers.d/optexity && \
+    touch /home/optexity/.Xauthority
 
 # Make browser directories accessible to the non-root user
 RUN chmod -R o+rx /ms-playwright
@@ -73,22 +79,28 @@ RUN git clone https://github.com/Optexity/optexity.git && \
 RUN chown -R optexity:optexity /home/optexity && \
     chmod 1777 /tmp
 
+RUN apt-get update && apt-get install -y tesseract-ocr && rm -rf /var/lib/apt/lists/*
+
 ARG CACHE_BREAK
 RUN echo "CACHE_BREAK: $CACHE_BREAK"
 
 # Copy system config files as root before switching user
-# COPY controller.py /opt/controller.py
-COPY docker/openbox-rc.xml /etc/xdg/openbox/rc.xml
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY openbox-rc.xml.template /etc/xdg/openbox/rc.xml.template
+COPY supervisord.dev.conf /etc/supervisor/conf.d/supervisord.dev.conf
+COPY supervisord.prod.conf /etc/supervisor/conf.d/supervisord.prod.conf
 
 RUN git config --global --add safe.directory /home/optexity/optexity && \
-    cd optexity && git pull && git checkout main && git pull && \
+    cd optexity && git pull && git checkout ui_agents_prince && git pull && \
     pip install --upgrade --break-system-packages -e . && \
     pip cache purge && \
     rm -rf /optexity/.git
+
+ENV APP_ENV=prod
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 USER optexity
 ENV USER=optexity \
     HOME=/home/optexity
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["/entrypoint.sh"]

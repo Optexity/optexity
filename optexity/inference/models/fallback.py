@@ -43,6 +43,7 @@ class FallbackLLMModel(LLMModel):
         self,
         prompt: str,
         response_schema: type[BaseModel],
+        recording_screenshot: Optional[str] = None,
         screenshot: Optional[str] = None,
         pdf_url: Optional[str | Path] = None,
         system_instruction: Optional[str] = None,
@@ -53,6 +54,7 @@ class FallbackLLMModel(LLMModel):
                 return model.get_model_response_with_structured_output(
                     prompt=prompt,
                     response_schema=response_schema,
+                    recording_screenshot=recording_screenshot,
                     screenshot=screenshot,
                     pdf_url=pdf_url,
                     system_instruction=system_instruction,

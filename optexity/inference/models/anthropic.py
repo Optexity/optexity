@@ -58,6 +58,7 @@ class Anthropic(LLMModel):
         self,
         prompt: str,
         response_schema: type[BaseModel],
+        recording_screenshot: Optional[str] = None,
         screenshot: Optional[str] = None,
         pdf_url: Optional[str | Path] = None,
         system_instruction: Optional[str] = None,
@@ -66,8 +67,20 @@ class Anthropic(LLMModel):
         if pdf_url is not None and screenshot is not None:
             raise ValueError("Cannot use both screenshot and pdf_url")
 
+        content = []
+        if recording_screenshot is not None:
+            content.append(
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": recording_screenshot,
+                    },
+                }
+            )
+
         if screenshot is not None:
-            content = [
+            content.append(
                 {
                     "type": "image",
                     "source": {
@@ -75,9 +88,8 @@ class Anthropic(LLMModel):
                         "media_type": "image/png",
                         "data": screenshot,
                     },
-                },
-                {"type": "text", "text": prompt},
-            ]
+                }
+            )
         elif pdf_url is not None:
             if is_local_path(pdf_url):
                 pdf_data = base64.standard_b64encode(
@@ -89,7 +101,7 @@ class Anthropic(LLMModel):
                 ).decode("utf-8")
             else:
                 raise ValueError(f"Invalid pdf_url: {pdf_url}")
-            content = [
+            content.append(
                 {
                     "type": "document",
                     "source": {
@@ -97,11 +109,10 @@ class Anthropic(LLMModel):
                         "media_type": "application/pdf",
                         "data": pdf_data,
                     },
-                },
-                {"type": "text", "text": prompt},
-            ]
-        else:
-            content = prompt
+                }
+            )
+
+        content.append({"type": "text", "text": prompt})
 
         token_usage = TokenUsage()
         parsed_response = None

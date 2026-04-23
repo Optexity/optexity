@@ -5,9 +5,13 @@ import logging
 import os
 import re
 import shutil
+import sys
+import time
 from typing import Literal
 from uuid import uuid4
 
+import mss
+import mss.tools
 import patchright.async_api
 import playwright.async_api
 from browser_use import Agent, BrowserSession, ChatGoogle
@@ -16,19 +20,35 @@ from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import Download, Locator, Page, Request, Response
 
-from optexity.schema.memory import Memory, NetworkRequest, NetworkResponse
+from optexity.schema.memory import BrowserState, Memory, NetworkRequest, NetworkResponse
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+def detect_platform() -> str:
+    return "macos" if sys.platform == "darwin" else "linux"
+
+
+def modifier_key() -> str:
+    return "command" if detect_platform() == "macos" else "ctrl"
 
 
 class Browser:
     def __init__(
         self,
         memory: Memory,
-        cdp_url: str,
+        cdp_url: str | None = None,
         stealth: bool = True,
-        backend: Literal["browser-use", "browserbase"] = "browser-use",
+        backend: Literal[
+            "browser-use", "computer-vision", "browserbase"
+        ] = "browser-use",
+        debug_port: int = 9222,
+        channel: Literal[
+            "chromium", "chrome", "cloakbrowser", "browser-use", "rdp"
+        ] = "chromium",
+        use_proxy: bool = False,
+        proxy_session_id: str | None = None,
     ):
 
         self.stealth = stealth
@@ -46,6 +66,9 @@ class Browser:
         self.page = None
         self.cdp_url = cdp_url
         self.backend_agent = None
+        self.channel: Literal[
+            "chrome", "chromium", "cloakbrowser", "browser-use", "rdp"
+        ] = channel
         self.memory = memory
         self.page_to_target_id = []
         self.previous_total_pages = 0
@@ -57,7 +80,20 @@ class Browser:
         self.temp_downloads_dir = f"/tmp/temp_downloads"
         self._download_cdp_session = None
 
+        self.modifier_key = modifier_key()
+        self.sct = None
+
+        if self.channel == "rdp" or self.backend == "computer-vision":
+            self.sct = mss.mss()
+
     async def start(self):
+        if self.channel == "rdp" or self.backend == "computer-vision":
+            self.sct = mss.mss()
+
+        if self.channel == "rdp":
+            await asyncio.sleep(5)
+            return
+
         logger.debug("Starting browser")
         try:
             await self.stop()
@@ -114,14 +150,21 @@ class Browser:
                 cdp_url=self.cdp_url, keep_alive=True, auto_download_pdfs=False
             )
 
-            self.backend_agent = Agent(
-                task="",
-                llm=ChatGoogle(model="gemini-flash-latest"),
-                browser_session=browser_session,
-                use_vision=False,
-            )
+            if self.backend == "browser-use":
+                self.backend_agent = Agent(
+                    task="",
+                    llm=ChatGoogle(model="gemini-flash-latest"),
+                    browser_session=browser_session,
+                    use_vision=False,
+                )
 
-            await self.backend_agent.browser_session.start()
+                await self.backend_agent.browser_session.start()
+
+                tabs = await self.backend_agent.browser_session.get_tabs()
+
+                for tab in tabs[::-1]:
+                    if tab.target_id not in self.page_to_target_id:
+                        self.page_to_target_id.append(tab.target_id)
 
             shutil.rmtree(self.temp_downloads_dir, ignore_errors=True)
             os.makedirs(self.temp_downloads_dir, exist_ok=True)
@@ -136,11 +179,6 @@ class Browser:
             )
             logger.info(f"CDP download behavior set to: {self.temp_downloads_dir}")
 
-            tabs = await self.backend_agent.browser_session.get_tabs()
-
-            for tab in tabs[::-1]:
-                if tab.target_id not in self.page_to_target_id:
-                    self.page_to_target_id.append(tab.target_id)
             self.previous_total_pages = len(self.context.pages)
 
             logger.debug("Browser started successfully")
@@ -150,6 +188,13 @@ class Browser:
             raise e
 
     async def stop(self, force: bool = False):
+
+        if self.sct is not None:
+            self.sct.close()
+            self.sct = None
+
+        if self.channel == "rdp":
+            return
 
         if self._download_cdp_session is not None:
             try:
@@ -185,7 +230,9 @@ class Browser:
 
     async def get_current_page(
         self,
-    ) -> playwright.async_api.Page | patchright.async_api.Page:
+    ) -> playwright.async_api.Page | patchright.async_api.Page | None:
+        if self.channel == "rdp":
+            return None
         if self.context is None:
             raise ValueError("Context is not set")
 
@@ -199,7 +246,12 @@ class Browser:
 
     async def handle_new_tabs(self, max_wait_time: float) -> tuple[bool, float]:
 
-        if self.context is None or self.backend_agent is None:
+        if self.channel == "rdp":
+            return False, 0
+
+        if self.context is None or (
+            self.backend == "browser-use" and self.backend_agent is None
+        ):
             return False, 0
 
         total_time = 0
@@ -214,20 +266,31 @@ class Browser:
         if len(pages) == self.previous_total_pages:
             return False, total_time
 
-        tabs = await self.backend_agent.browser_session.get_tabs()
+        if self.backend_agent is not None:
+            tabs = await self.backend_agent.browser_session.get_tabs()
 
-        for tab in tabs[::-1]:
-            if tab.target_id not in self.page_to_target_id:
-                self.page_to_target_id.append(tab.target_id)
+            for tab in tabs[::-1]:
+                if tab.target_id not in self.page_to_target_id:
+                    self.page_to_target_id.append(tab.target_id)
+
+            tab_id = self.page_to_target_id[-1][-4:]
+            action_model = self.backend_agent.ActionModel(
+                **{"switch": {"tab_id": tab_id}}
+            )
+            await self.backend_agent.multi_act([action_model])
+
         self.previous_total_pages = len(pages)
 
-        tab_id = self.page_to_target_id[-1][-4:]
-        action_model = self.backend_agent.ActionModel(**{"switch": {"tab_id": tab_id}})
-        await self.backend_agent.multi_act([action_model])
         return True, total_time
 
     async def close_current_tab(self):
-        if self.context is None or self.backend_agent is None:
+
+        if self.channel == "rdp":
+            return None
+
+        if self.context is None or (
+            self.backend == "browser-use" and self.backend_agent is None
+        ):
             return None
 
         pages = self.context.pages
@@ -236,19 +299,26 @@ class Browser:
             logger.warning("Atleast one tab should be open, skipping close current tab")
             return False
 
-        if len(self.page_to_target_id) > 1:
-            tab_id_after_close = self.page_to_target_id[-2][-4:]
-            action_model = self.backend_agent.ActionModel(
-                **{"switch": {"tab_id": tab_id_after_close}}
-            )
-            await self.backend_agent.multi_act([action_model])
-            self.page_to_target_id.pop()
+        if self.backend_agent is not None:
+            if len(self.page_to_target_id) > 1:
+                tab_id_after_close = self.page_to_target_id[-2][-4:]
+                action_model = self.backend_agent.ActionModel(
+                    **{"switch": {"tab_id": tab_id_after_close}}
+                )
+                await self.backend_agent.multi_act([action_model])
+                self.page_to_target_id.pop()
 
         last_page = pages[-1]
         await last_page.close()
 
     async def switch_tab(self, tab_index: int):
-        if self.context is None or self.backend_agent is None:
+
+        if self.channel == "rdp":
+            return None
+
+        if self.context is None or (
+            self.backend == "browser-use" and self.backend_agent is None
+        ):
             return None
 
         pages = self.context.pages
@@ -257,16 +327,25 @@ class Browser:
             logger.warning("Atleast one tab should be open, skipping close current tab")
             return False
 
-        tab_id = self.page_to_target_id[tab_index][-4:]
         page = pages[tab_index]
 
         await page.bring_to_front()
 
-        action_model = self.backend_agent.ActionModel(**{"switch": {"tab_id": tab_id}})
-        await self.backend_agent.multi_act([action_model])
+        if self.backend_agent is not None:
+            tab_id = self.page_to_target_id[tab_index][-4:]
+
+            action_model = self.backend_agent.ActionModel(
+                **{"switch": {"tab_id": tab_id}}
+            )
+            await self.backend_agent.multi_act([action_model])
 
     async def get_locator_from_command(self, command: str) -> Locator | None:
-        if self.context is None or self.backend_agent is None:
+        if self.channel == "rdp":
+            return None
+
+        if self.context is None or (
+            self.backend == "browser-use" and self.backend_agent is None
+        ):
             return None
         page = await self.get_current_page()
         if page is None:
@@ -274,10 +353,9 @@ class Browser:
         locator: Locator = eval(f"page.{command}")
         return locator
 
-    def get_xpath_from_index(self, index: int) -> str:
-        raise NotImplementedError("Not implemented")
-
     async def go_to_url(self, url: str, retry_count: int = 0):
+        if self.channel == "rdp":
+            return
         try:
             page = await self.get_current_page()
             if page is None:
@@ -312,21 +390,40 @@ class Browser:
             return None
 
     async def get_browser_state_summary(
-        self, include_full_page: bool = False
-    ) -> BrowserStateSummary:
-        if self.backend_agent is None:
+        self, include_full_page: bool = False, remove_empty_nodes: bool = False
+    ) -> BrowserState:
+        if self.channel == "rdp":
+            return BrowserState(
+                url="about:blank",
+                screenshot=await self.get_screenshot(full_page=include_full_page),
+                title="",
+                axtree="",
+            )
+
+        if self.backend == "browser-use" and self.backend_agent is None:
             raise ValueError("Backend agent is not set")
 
-        browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
-            include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
-            include_recent_events=False,
-            cached=False,
-            include_full_page=include_full_page,
-        )
+        if self.backend_agent is not None:
+            browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
+                include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
+                include_recent_events=False,
+                cached=False,
+                include_full_page=include_full_page,
+            )
 
-        return browser_state_summary
+            return BrowserState(
+                url=browser_state_summary.url,
+                screenshot=browser_state_summary.screenshot,
+                title=browser_state_summary.title,
+                axtree=browser_state_summary.dom_state.llm_representation(
+                    remove_empty_nodes=remove_empty_nodes
+                ),
+            )
+        raise ValueError("Unknown error getting browser state summary")
 
     async def get_current_page_url(self) -> str:
+        if self.channel == "rdp":
+            return "about:blank"
         try:
             page = await self.get_current_page()
             if page is None:
@@ -337,6 +434,8 @@ class Browser:
             return "about:blank"
 
     async def get_current_page_title(self) -> str:
+        if self.channel == "rdp":
+            return "Unknown page title"
         try:
             page = await self.get_current_page()
             if page is None:
@@ -347,6 +446,8 @@ class Browser:
             return "Unknown page title"
 
     async def handle_random_download(self, download: Download):
+        if self.channel == "rdp":
+            return
         self.active_downloads += 1
         self.all_active_downloads_done.clear()
 
@@ -360,6 +461,8 @@ class Browser:
             self.all_active_downloads_done.set()
 
     async def handle_random_url_downloads(self, resp: Response):
+        if self.channel == "rdp":
+            return
         try:
             content_type = (resp.headers.get("content-type") or "").lower()
             content_disposition = (
@@ -400,6 +503,8 @@ class Browser:
             self.all_active_downloads_done.set()
 
     async def log_request(self, req: Request):
+        if self.channel == "rdp":
+            return
         try:
             body = req.post_data  # this is None for GET/HEAD
             # Rebuild cookies exactly like curl -b
@@ -424,6 +529,8 @@ class Browser:
             pass
 
     async def log_response(self, response: Response):
+        if self.channel == "rdp":
+            return
         try:
             body = await response.json()
         except Exception:
@@ -464,13 +571,40 @@ class Browser:
     async def clear_network_calls(self):
         self.network_calls.clear()
 
-    async def get_screenshot(self, full_page: bool = False) -> str | None:
+    async def get_screenshot(
+        self, full_page: bool = False, get_bytes: bool = False
+    ) -> str | bytes | None:
+        if self.channel == "rdp" or self.backend == "computer-vision":
+            try:
+                await asyncio.sleep(0.1)
+
+                def _capture() -> bytes:
+                    with mss.mss() as sct:
+                        monitor = sct.monitors[1]
+                        shot = sct.grab(monitor)
+                        png_bytes = mss.tools.to_png(shot.rgb, shot.size, output=None)
+                        if png_bytes is None:
+                            raise RuntimeError("Failed to encode PNG")
+                        return png_bytes
+
+                loop = asyncio.get_event_loop()
+                png_bytes = await loop.run_in_executor(None, _capture)
+                if get_bytes:
+                    return png_bytes
+                return base64.b64encode(png_bytes).decode("utf-8")
+            except Exception as e:
+                logger.error(f"Error taking screenshot: {e}", exc_info=True)
+                return None
+
         try:
             page = await self.get_current_page()
             if page is None:
                 return None
 
             screenshot_bytes = await page.screenshot(full_page=full_page)
+
+            if get_bytes:
+                return screenshot_bytes
             screenshot_base64 = base64.b64encode(screenshot_bytes).decode("utf-8")
             return screenshot_base64
         except Exception as e:

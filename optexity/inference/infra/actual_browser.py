@@ -12,6 +12,7 @@ import aiohttp
 from playwright.async_api import ProxySettings
 
 from optexity.inference.infra.utils import _download_extension, _extract_extension
+from optexity.schema.automation import RDPParameter
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,63 @@ logger = logging.getLogger(__name__)
 OsEmulation = Literal["windows", "linux"] | None
 DISPLAY = os.environ.get("DISPLAY", ":99")
 IN_DOCKER = os.path.exists("/.dockerenv")
+
+
+def get_display() -> str:
+    """DISPLAY for X11: use env if set, else :0 on macOS (XQuartz), :99 elsewhere."""
+    return os.environ.get("DISPLAY") or (
+        ":0" if platform.system() == "Darwin" else ":99"
+    )
+
+
+async def _ensure_xquartz_running() -> bool:
+    """On macOS, start XQuartz if needed so xfreerdp has an X server (RDP).
+
+    Returns True if this call started XQuartz (caller should quit it on teardown).
+    """
+    if platform.system() != "Darwin":
+        return False
+    check = await asyncio.create_subprocess_exec(
+        "pgrep",
+        "-x",
+        "Xquartz",
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    await check.wait()
+    if check.returncode == 0:
+        return False
+    logger.info("XQuartz is not running; starting it for RDP")
+    start = await asyncio.create_subprocess_exec(
+        "open",
+        "-a",
+        "XQuartz",
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await start.communicate()
+    if start.returncode != 0:
+        msg = stderr.decode(errors="replace").strip() or "unknown error"
+        raise RuntimeError(f"Failed to start XQuartz: {msg}")
+    for _ in range(60):
+        await asyncio.sleep(0.5)
+        again = await asyncio.create_subprocess_exec(
+            "pgrep",
+            "-x",
+            "Xquartz",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await again.wait()
+        if again.returncode == 0:
+            await asyncio.sleep(1.0)
+            return True
+    raise RuntimeError("XQuartz did not become ready in time")
+
+
+# Fixed xfreerdp client window size
+_RDP_WINDOW_WIDTH = 1440
+_RDP_WINDOW_HEIGHT = 900
 
 
 def find_chrome_binary(channel: Literal["chrome", "chromium"]) -> str:
@@ -85,6 +143,7 @@ class ActualBrowser:
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
         os_emulation: OsEmulation = None,
+        rdp_parameter: RDPParameter | None = None,
     ):
         # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
@@ -101,6 +160,12 @@ class ActualBrowser:
         self.channel: Literal[
             "chrome", "chromium", "cloakbrowser", "browser-use", "rdp"
         ] = channel
+        self.rdp_parameter = rdp_parameter
+        self._xquartz_started_for_rdp = False
+
+        if self.channel == "rdp":
+            assert self.rdp_parameter is not None, "rdp_parameter is required for rdp"
+
         self.extensions = [
             # {
             #     "name": "optexity recorder",
@@ -143,7 +208,7 @@ class ActualBrowser:
             "--disable-extensions-http-throttling",
             # ---- window / ui
             "--disable-popup-blocking",
-            "--window-size=1920,1080",
+            "--window-size=1440,900",
             # "--start-fullscreen",
             # ---- performance / stability
             "--disable-gpu",
@@ -168,7 +233,7 @@ class ActualBrowser:
 
             args += [
                 f"--user-data-dir={self.user_data_dir}",
-                *(["--no-sandbox"] if IN_DOCKER else []),
+                *(["--no-sandbox"] if settings.IN_DOCKER else []),
                 # ---- privacy / security
                 "--disable-save-password-bubble",
                 "--use-mock-keychain",
@@ -207,10 +272,57 @@ class ActualBrowser:
         return args
 
     async def start(self):
-        if settings.USE_PLAYWRIGHT_BROWSER:
-            await self.start_playwright_browser()
+        if self.channel == "rdp":
+            await self.start_rdp_browser()
         else:
-            await self.start_native_browser()
+            if settings.USE_PLAYWRIGHT_BROWSER:
+                await self.start_playwright_browser()
+            else:
+                await self.start_native_browser()
+
+    async def start_rdp_browser(self):
+        try:
+            assert self.rdp_parameter is not None, "rdp_parameter is required for rdp"
+            logger.debug("Starting RDP Session")
+
+            if not self.rdp_parameter.host:
+                raise ValueError("host is required for rdp")
+
+            shared_drive_path = os.path.join("/tmp", settings.SHARED_DRIVE_PATH)
+            os.makedirs(shared_drive_path, exist_ok=True)
+            drives = [{"name": "shared", "path": shared_drive_path}]
+            rp = self.rdp_parameter
+            w, h = _RDP_WINDOW_WIDTH, _RDP_WINDOW_HEIGHT
+            args = [
+                f"/v:{rp.host}",
+                f"/u:{rp.username}",
+                f"/p:{rp.password}",
+                f"/w:{w}",
+                f"/h:{h}",
+                "/cert:ignore",
+                "+clipboard",
+                "+auto-reconnect",
+                "+auto-reconnect-max-retries:100",
+                "/network:auto",
+                "/smart-sizing",
+            ]
+            for d in drives:
+                args.append(f"/drive:{d['name']},{d['path']}")
+
+            self._xquartz_started_for_rdp = await _ensure_xquartz_running()
+            env = {**os.environ, "DISPLAY": get_display()}
+            self.proc = await asyncio.create_subprocess_exec(
+                "xfreerdp",
+                *args,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                preexec_fn=os.setsid,  # critical: isolate process group
+                env=env,
+            )
+
+        except Exception as e:
+            logger.error(f"Error starting actual browser: {e}")
+            raise e
 
     async def start_native_browser(self):
         try:
@@ -225,7 +337,7 @@ class ActualBrowser:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
 
             self.chrome_path = find_chrome_binary(self.channel)
-            env = {**os.environ, "DISPLAY": DISPLAY}
+            env = {**os.environ, "DISPLAY": get_display()}
 
             self.proc = await asyncio.create_subprocess_exec(
                 self.chrome_path,
@@ -269,7 +381,7 @@ class ActualBrowser:
                         self.playwright.chromium.launch_persistent_context
                     )
 
-                env = {**os.environ, "DISPLAY": DISPLAY}
+                env = {**os.environ, "DISPLAY": get_display()}
                 self.context = await launch_persistent_context_async(
                     # humanize=True,
                     channel=self.channel,
@@ -289,6 +401,28 @@ class ActualBrowser:
             logger.error(f"Error starting actual browser: {e}")
             raise e
 
+    async def goto_url(self, url: str) -> None:
+        """Navigate the first browser tab to *url* via CDP. No-op in RDP mode."""
+        if self.channel == "rdp":
+            return
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"http://localhost:{self.port}/json/list") as r:
+                tabs = await r.json()
+
+        ws_url = tabs[0]["webSocketDebuggerUrl"]
+
+        import json as _json
+
+        async with aiohttp.ClientSession() as session:
+            async with session.ws_connect(ws_url) as ws:
+                await ws.send_str(
+                    _json.dumps(
+                        {"id": 1, "method": "Page.navigate", "params": {"url": url}}
+                    )
+                )
+                await ws.receive()  # wait for response before closing
+
     async def _wait_for_cdp(self, timeout=10):
         logger.debug("Waiting for CDP")
         url = f"http://localhost:{self.port}/json/version"
@@ -307,6 +441,10 @@ class ActualBrowser:
         raise RuntimeError("Chrome CDP not reachable")
 
     async def check_browser_alive(self, timeout=10):
+        ## TODO: check if rdp session is alive
+        if self.channel == "rdp":
+            return True
+
         if settings.USE_PLAYWRIGHT_BROWSER:
             try:
                 if self.context is None:
@@ -322,7 +460,10 @@ class ActualBrowser:
             await self._wait_for_cdp(timeout)
 
     async def stop(self, graceful=True):
-        if settings.USE_PLAYWRIGHT_BROWSER:
+        if self.channel == "rdp":
+            await self.kill_subprocess(graceful)
+            await self._quit_xquartz_if_started_for_rdp()
+        elif settings.USE_PLAYWRIGHT_BROWSER:
             if (
                 self.channel == "browser-use"
                 and self.context is not None
@@ -332,14 +473,14 @@ class ActualBrowser:
             else:
                 await self.stop_playwright_browser(graceful)
         else:
-            await self.stop_native_browser(graceful)
+            await self.kill_subprocess(graceful)
 
         if not self.is_dedicated:
             shutil.rmtree(self.user_data_dir, ignore_errors=True)
 
             self.cdp_url = None
 
-    async def stop_native_browser(self, graceful=True):
+    async def kill_subprocess(self, graceful=True):
         if not self.proc or self.proc.returncode is not None:
             return
 
@@ -355,6 +496,25 @@ class ActualBrowser:
             os.killpg(pgid, signal.SIGKILL)
 
         self.proc = None
+
+    async def _quit_xquartz_if_started_for_rdp(self) -> None:
+        if not self._xquartz_started_for_rdp or platform.system() != "Darwin":
+            return
+        self._xquartz_started_for_rdp = False
+        logger.debug("Quitting XQuartz (started for RDP)")
+        proc = await asyncio.create_subprocess_exec(
+            "osascript",
+            "-e",
+            'tell application "XQuartz" to quit',
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            logger.warning(
+                "Could not quit XQuartz via AppleScript: %s",
+                stderr.decode(errors="replace").strip() or "unknown",
+            )
 
     async def stop_playwright_browser(self, graceful=True):
         if self.context is not None:

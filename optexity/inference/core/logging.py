@@ -339,6 +339,43 @@ async def save_latest_memory_state_locally(
                 "No screenshot found for step %s", automation_state.step_index
             )
 
+        if browser_state.comparison_screenshot:
+            await save_screenshot(
+                browser_state.comparison_screenshot,
+                step_directory / "comparison_screenshot.png",
+            )
+
+        if browser_state.comparison_result:
+            async with aiofiles.open(
+                step_directory / "comparison_result.json", "w"
+            ) as f:
+                await f.write(json.dumps(browser_state.comparison_result, indent=4))
+
+        if browser_state.validation_ocr_results:
+            async with aiofiles.open(
+                step_directory / "validation_ocr_results.json", "w"
+            ) as f:
+                await f.write(
+                    json.dumps(browser_state.validation_ocr_results, indent=4)
+                )
+
+        if browser_state.ocr_annotated:
+            await save_screenshot(
+                browser_state.ocr_annotated, step_directory / "ocr_annotated.png"
+            )
+        if browser_state.ocr_canvas:
+            await save_screenshot(
+                browser_state.ocr_canvas, step_directory / "ocr_canvas.png"
+            )
+
+        for index, ocr_image_sent_to_ocr in enumerate(
+            browser_state.ocr_image_sent_to_ocr
+        ):
+            await save_screenshot(
+                ocr_image_sent_to_ocr,
+                step_directory / f"ocr_image_sent_to_ocr_{index + 1}.png",
+            )
+
         state_dict = {
             "title": browser_state.title,
             "url": browser_state.url,

@@ -1,10 +1,16 @@
+import base64
 import logging
 import traceback
 
 import aiofiles
 import httpx
 
+from optexity.inference.core.interaction.utils import (
+    find_keyword_in_results,
+    get_coordinates_from_ocr_result,
+)
 from optexity.inference.core.run_two_fa import run_two_fa_action
+from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.extraction_action import (
@@ -12,13 +18,13 @@ from optexity.schema.actions.extraction_action import (
     LLMExtraction,
     LocatorExtraction,
     NetworkCallExtraction,
+    OCRCoordinatesExtraction,
     PDFExtraction,
     PythonScriptExtraction,
     ScreenshotExtraction,
     StateExtraction,
 )
 from optexity.schema.memory import (
-    BrowserState,
     Memory,
     NetworkRequest,
     NetworkResponse,
@@ -28,6 +34,7 @@ from optexity.schema.memory import (
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
+ocr = AWSTextract()
 
 
 async def run_extraction_action(
@@ -79,6 +86,13 @@ async def run_extraction_action(
         await run_two_fa_action(extraction_action.two_fa_action, memory, task)
     elif extraction_action.pdf:
         await handle_pdf_extraction(extraction_action.pdf, memory, task)
+    elif extraction_action.ocr_coordinates:
+        await handle_ocr_coordinates_extraction(
+            extraction_action.ocr_coordinates,
+            memory,
+            browser,
+            extraction_action.unique_identifier,
+        )
     elif extraction_action.locator:
         await handle_locator_extraction(
             extraction_action.locator,
@@ -168,17 +182,11 @@ async def handle_llm_extraction(
     task: Task,
     unique_identifier: str | None = None,
 ):
-    browser_state_summary = await browser.get_browser_state_summary(
-        include_full_page=llm_extraction.include_full_page
+    browser_state = await browser.get_browser_state_summary(
+        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree,
+        include_full_page=llm_extraction.include_full_page,
     )
-    memory.browser_states[-1] = BrowserState(
-        url=browser_state_summary.url,
-        screenshot=browser_state_summary.screenshot,
-        title=browser_state_summary.title,
-        axtree=browser_state_summary.dom_state.llm_representation(
-            remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-        ),
-    )
+    memory.browser_states[-1] = browser_state
 
     # TODO: fix this double calling of screenshot and axtree
     if "axtree" in llm_extraction.source:
@@ -211,6 +219,7 @@ async def handle_llm_extraction(
         prompt=prompt,
         response_schema=llm_extraction.build_model(),
         screenshot=screenshot,
+        recording_screenshot=llm_extraction.recording_screenshot,
         system_instruction=system_instruction,
     )
     response_dict = response.model_dump()
@@ -437,3 +446,63 @@ async def handle_pdf_extraction(
     )
 
     return output_data
+
+
+async def handle_ocr_coordinates_extraction(
+    ocr_extraction: OCRCoordinatesExtraction,
+    memory: Memory,
+    browser: "Browser",
+    unique_identifier: str | None = None,
+):
+    """Run OCR once on the screenshot, match all names from source_variable, store x/y as parallel lists."""
+
+    # Get the list of text elements to find
+    source_var = ocr_extraction.source_variable
+    if source_var in memory.variables.generated_variables:
+        names = memory.variables.generated_variables[source_var]
+    else:
+        logger.error(f"Source variable '{source_var}' not found in generated variables")
+        return
+
+    # Get screenshot and store in memory for match_text_in_screenshot
+    screenshot = await browser.get_screenshot()
+    if screenshot is None:
+        logger.error("Screenshot is None, cannot run OCR")
+        return
+
+    results, base64_image_sent_to_ocr = ocr.ocr(screenshot)
+
+    annotated, canvas = ocr.visualize(screenshot, results)
+    memory.browser_states[-1].ocr_annotated = base64.b64encode(annotated).decode(
+        "utf-8"
+    )
+    memory.browser_states[-1].ocr_canvas = base64.b64encode(canvas).decode("utf-8")
+    memory.browser_states[-1].ocr_image_sent_to_ocr.append(base64_image_sent_to_ocr)
+
+    # Use match_text_in_screenshot in batch mode (single OCR call)
+    names_str = [str(n) for n in names]
+
+    coords_x: list[int] = []
+    coords_y: list[int] = []
+
+    for name in names_str:
+        result = find_keyword_in_results(results, name)
+        if result is not None:
+            x, y = get_coordinates_from_ocr_result(result)
+            coords_x.append(x)
+            coords_y.append(y)
+            logger.info(f"OCR matched '{name}' at ({x}, {y})")
+        else:
+            coords_x.append(0)
+            coords_y.append(0)
+            logger.warning(f"OCR could not find '{name}' on screen")
+
+    # Store in generated variables
+    memory.variables.generated_variables[ocr_extraction.output_x_variable] = coords_x
+    memory.variables.generated_variables[ocr_extraction.output_y_variable] = coords_y
+
+    # Also store in output_data
+    result_data = {name: [coords_x[i], coords_y[i]] for i, name in enumerate(names_str)}
+    memory.variables.output_data.append(
+        OutputData(unique_identifier=unique_identifier, json_data=result_data)
+    )
