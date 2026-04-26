@@ -553,17 +553,20 @@ async def handle_vision_extraction(
 
     Stores -1, -1 if the model cannot locate the element.
     """
+    output_vars = vision_extraction.output_variable_names
+    fallback_coords = [-1] * len(output_vars)
+
     screenshot = await browser.get_screenshot()
     if screenshot is None:
         logger.error("[vision_extraction] screenshot is None")
-        memory.variables.generated_variables[vision_extraction.output_x_variable] = [-1]
-        memory.variables.generated_variables[vision_extraction.output_y_variable] = [-1]
+        for var, val in zip(output_vars, fallback_coords):
+            memory.variables.generated_variables[var] = [val]
         return
 
     memory.browser_states[-1].computer_use_screenshots.append(screenshot)
     model = get_llm_model(GeminiModels.GEMINI_2_5_COMPUTER_USE, True)
 
-    x, y = -1, -1
+    coords = fallback_coords
     try:
         coordinates, token_usage = model.get_computer_use_model_response(
             prompt=vision_extraction.prompt,
@@ -571,19 +574,20 @@ async def handle_vision_extraction(
         )
         memory.token_usage += token_usage
         if coordinates:
-            x, y = coordinates[0], coordinates[1]
+            coords = list(coordinates[: len(output_vars)])
+            if len(coords) < len(output_vars):
+                coords += [-1] * (len(output_vars) - len(coords))
     except Exception as e:
         logger.error(f"[vision_extraction] computer use model failed: {e}")
 
-    logger.info(f"[vision_extraction] '{vision_extraction.prompt}' → ({x}, {y})")
-    memory.variables.generated_variables[vision_extraction.output_x_variable] = [x]
-    memory.variables.generated_variables[vision_extraction.output_y_variable] = [y]
+    logger.info(
+        f"[vision_extraction] '{vision_extraction.prompt}' → {dict(zip(output_vars, coords))}"
+    )
+    json_data = {}
+    for var, val in zip(output_vars, coords):
+        memory.variables.generated_variables[var] = [val]
+        json_data[var] = val
+
     memory.variables.output_data.append(
-        OutputData(
-            unique_identifier=unique_identifier,
-            json_data={
-                vision_extraction.output_x_variable: x,
-                vision_extraction.output_y_variable: y,
-            },
-        )
+        OutputData(unique_identifier=unique_identifier, json_data=json_data)
     )

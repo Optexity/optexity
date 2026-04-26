@@ -267,13 +267,27 @@ class Gemini(LLMModel):
             fname = function_call.name
             args = dict(function_call.args)
             logger.info(f"[computer_use] function_call: {fname}, args: {args}")
-            if "x" not in args or "y" not in args:
-                logger.warning(
-                    f"[computer_use] missing x/y in args for '{fname}': {args}"
-                )
-                return None
-            actual_x = self.denormalize_x(args["x"], screen_width)
-            actual_y = self.denormalize_y(args["y"], screen_height)
 
-            return (actual_x, actual_y)
+            if "x" in args and "y" in args:
+                actual_x = self.denormalize_x(args["x"], screen_width)
+                actual_y = self.denormalize_y(args["y"], screen_height)
+                return (actual_x, actual_y)
+
+            if (
+                "x_start" in args
+                and "y_start" in args
+                and "x_end" in args
+                and "y_end" in args
+            ):
+                x1 = self.denormalize_x(args["x_start"], screen_width)
+                y1 = self.denormalize_y(args["y_start"], screen_height)
+                x2 = self.denormalize_x(args["x_end"], screen_width)
+                y2 = self.denormalize_y(args["y_end"], screen_height)
+                logger.info(
+                    f"[computer_use] '{fname}' returned bounding box ({x1},{y1},{x2},{y2})"
+                )
+                return (x1, y1, x2, y2)
+
+            logger.warning(f"[computer_use] unhandled args for '{fname}': {args}")
+            return None
         return None

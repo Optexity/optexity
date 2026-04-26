@@ -9,6 +9,7 @@ from typing import Optional
 import httpx
 import numpy as np
 from pydantic import BaseModel
+from rapidfuzz import fuzz as _fuzz
 
 from optexity.exceptions import KeywordNotFoundOnScreenException
 from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
@@ -258,9 +259,11 @@ async def _validate_keyword(
         if attempt < max_tries - 1:
             await asyncio.sleep(max_timeout_seconds_per_try)
 
-    # LLM fallback — candidates sorted by proximity to recording position
+    # LLM fallback — candidates sorted by fuzzy similarity to keyword
     candidates = sorted(
-        last_results, key=lambda r: _distance(r, recording_x, recording_y)
+        last_results,
+        key=lambda r: _fuzz.partial_ratio(keyword.lower(), r.text.lower()),
+        reverse=True,
     )[:_OCR_CANDIDATE_LIMIT]
 
     if not candidates:

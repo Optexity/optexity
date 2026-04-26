@@ -459,8 +459,7 @@ async def get_coordinates_from_prompt(
 
     model_name = resolve_model_name(task.llm_provider, task.llm_model_name)
     if not model_name.is_computer_use_model():
-        # Fall back to Gemini for computer use if the task's model doesn't support it
-        model_name = GeminiModels.GEMINI_3_FLASH
+        model_name = GeminiModels.GEMINI_2_5_COMPUTER_USE
     model = get_llm_model(model_name, True)
     coordinates, token_usage = model.get_computer_use_model_response(
         prompt=prompt_instructions,

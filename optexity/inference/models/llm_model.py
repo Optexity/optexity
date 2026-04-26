@@ -185,7 +185,7 @@ class LLMModel:
         prompt: str,
         screenshot: Optional[str] = None,
         system_instruction: Optional[str] = None,
-    ) -> tuple[tuple[int, int] | None, TokenUsage]:
+    ) -> tuple[tuple[int, ...] | None, TokenUsage]:
 
         assert (
             self.model_name.is_computer_use_model()

@@ -160,8 +160,7 @@ class OCRCoordinatesExtraction(BaseModel):
 
 class VisionExtraction(BaseModel):
     prompt: str
-    output_x_variable: str
-    output_y_variable: str
+    output_variable_names: list[str]
 
     def replace(self, pattern: str, replacement: str):
         self.prompt = self.prompt.replace(pattern, replacement)
