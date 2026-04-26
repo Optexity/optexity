@@ -149,96 +149,96 @@ async def input_text_coordinates(
 
     try:
         x, y = None, None
-        bbox = (
-            resolve_bounding_box_variables(
-                input_text_action.bounding_box_variables, memory
-            )
-            if input_text_action.bounding_box_variables
-            else None
-        )
-
-        if input_text_action.recording_screenshot and input_text_action.coordinates:
-            x, y = await validate_recording_action(
-                input_text_action,
-                browser,
-                memory,
-                task,
-                max_tries,
-                max_timeout_seconds_per_try,
-            )
-        elif input_text_action.coordinates:
-            x = int(input_text_action.coordinates[0])
-            y = int(input_text_action.coordinates[1])
-
-            if x == -1 and y == -1:
-                result = await resolve_keyword_with_llm_fallback(
-                    keyword=input_text_action.keyword
-                    or input_text_action.prompt_instructions,
-                    recording_x=-1,
-                    recording_y=-1,
-                    prompt_instructions=input_text_action.prompt_instructions,
-                    memory=memory,
-                    task=task,
-                    bounding_box=bbox,
-                )
-                if result is None:
-                    raise KeywordNotFoundOnScreenException(
-                        message=f"Could not locate element on screen for: '{input_text_action.prompt_instructions}'",
-                        keyword=input_text_action.keyword
-                        or input_text_action.prompt_instructions,
-                    )
-                x, y = result
-            elif input_text_action.keyword:
-                result = await resolve_keyword_with_llm_fallback(
-                    keyword=input_text_action.keyword,
-                    recording_x=x,
-                    recording_y=y,
-                    prompt_instructions=input_text_action.prompt_instructions,
-                    memory=memory,
-                    task=task,
-                    bounding_box=bbox,
-                )
-                if result is None:
-                    raise KeywordNotFoundOnScreenException(
-                        message=f"Keyword '{input_text_action.keyword}' not found on screen.",
-                        keyword=input_text_action.keyword,
-                    )
-                x, y = result
-                logger.info(
-                    f"Keyword '{input_text_action.keyword}' matched at ({x}, {y})"
-                )
-        else:
-            data = await get_coordinates_from_prompt(
-                memory, input_text_action.prompt_instructions, browser, task
-            )
-            if data is None:
-                logger.error("No coordinates found")
-                return
-            x, y = data[0], data[1]
-            memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
-            if input_text_action.keyword:
-                result = await resolve_keyword_with_llm_fallback(
-                    keyword=input_text_action.keyword,
-                    recording_x=x,
-                    recording_y=y,
-                    prompt_instructions=input_text_action.prompt_instructions,
-                    memory=memory,
-                    task=task,
-                    bounding_box=bbox,
-                )
-                if result is None:
-                    raise KeywordNotFoundOnScreenException(
-                        message=f"Keyword '{input_text_action.keyword}' not found on screen.",
-                        keyword=input_text_action.keyword,
-                    )
-                x, y = result
-                logger.info(
-                    f"Keyword '{input_text_action.keyword}' matched at ({x}, {y})"
-                )
-
-        logger.debug(f"Typing text at coordinates: {x}, {y}")
 
         if input_text_action.click_before_input:
+            bbox = (
+                resolve_bounding_box_variables(
+                    input_text_action.bounding_box_variables, memory
+                )
+                if input_text_action.bounding_box_variables
+                else None
+            )
+
+            if input_text_action.recording_screenshot and input_text_action.coordinates:
+                x, y = await validate_recording_action(
+                    input_text_action,
+                    browser,
+                    memory,
+                    task,
+                    max_tries,
+                    max_timeout_seconds_per_try,
+                )
+            elif input_text_action.coordinates:
+                x = int(input_text_action.coordinates[0])
+                y = int(input_text_action.coordinates[1])
+
+                if x == -1 and y == -1:
+                    result = await resolve_keyword_with_llm_fallback(
+                        keyword=input_text_action.keyword
+                        or input_text_action.prompt_instructions,
+                        recording_x=-1,
+                        recording_y=-1,
+                        prompt_instructions=input_text_action.prompt_instructions,
+                        memory=memory,
+                        task=task,
+                        bounding_box=bbox,
+                    )
+                    if result is None:
+                        raise KeywordNotFoundOnScreenException(
+                            message=f"Could not locate element on screen for: '{input_text_action.prompt_instructions}'",
+                            keyword=input_text_action.keyword
+                            or input_text_action.prompt_instructions,
+                        )
+                    x, y = result
+                elif input_text_action.keyword:
+                    result = await resolve_keyword_with_llm_fallback(
+                        keyword=input_text_action.keyword,
+                        recording_x=x,
+                        recording_y=y,
+                        prompt_instructions=input_text_action.prompt_instructions,
+                        memory=memory,
+                        task=task,
+                        bounding_box=bbox,
+                    )
+                    if result is None:
+                        raise KeywordNotFoundOnScreenException(
+                            message=f"Keyword '{input_text_action.keyword}' not found on screen.",
+                            keyword=input_text_action.keyword,
+                        )
+                    x, y = result
+                    logger.info(
+                        f"Keyword '{input_text_action.keyword}' matched at ({x}, {y})"
+                    )
+            else:
+                data = await get_coordinates_from_prompt(
+                    memory, input_text_action.prompt_instructions, browser, task
+                )
+                if data is None:
+                    logger.error("No coordinates found")
+                    return
+                x, y = data[0], data[1]
+                memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
+                if input_text_action.keyword:
+                    result = await resolve_keyword_with_llm_fallback(
+                        keyword=input_text_action.keyword,
+                        recording_x=x,
+                        recording_y=y,
+                        prompt_instructions=input_text_action.prompt_instructions,
+                        memory=memory,
+                        task=task,
+                        bounding_box=bbox,
+                    )
+                    if result is None:
+                        raise KeywordNotFoundOnScreenException(
+                            message=f"Keyword '{input_text_action.keyword}' not found on screen.",
+                            keyword=input_text_action.keyword,
+                        )
+                    x, y = result
+                    logger.info(
+                        f"Keyword '{input_text_action.keyword}' matched at ({x}, {y})"
+                    )
+
+            logger.debug(f"Typing text at coordinates: {x}, {y}")
             pyautogui.click(x, y)
             await asyncio.sleep(0.2)
 
@@ -252,12 +252,13 @@ async def input_text_coordinates(
             await asyncio.sleep(0.8)
             pyautogui.press("enter")
 
-        screenshot_base64 = memory.browser_states[-1].screenshot
-        if screenshot_base64:
-            screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
-            memory.browser_states[-1].screenshot = (
-                screenshot_base64  # pyright: ignore[reportAttributeAccessIssue]
-            )
+        if x is not None and y is not None:
+            screenshot_base64 = memory.browser_states[-1].screenshot
+            if screenshot_base64:
+                screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
+                memory.browser_states[-1].screenshot = (
+                    screenshot_base64  # pyright: ignore[reportAttributeAccessIssue]
+                )
 
     except (ElementNotFoundInAxtreeException, KeywordNotFoundOnScreenException) as e:
         raise e

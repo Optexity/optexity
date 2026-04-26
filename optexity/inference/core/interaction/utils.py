@@ -249,7 +249,9 @@ def resolve_bounding_box_variables(
     Returns None if any variable is missing or equals -1.
     """
     try:
-        vals = [int(memory.variables.generated_variables[v]) for v in variables]
+        vals = [
+            int(memory.variables.generated_variables[v.strip("{}")]) for v in variables
+        ]
         if any(v == -1 for v in vals):
             return None
         return (vals[0], vals[1], vals[2], vals[3])
