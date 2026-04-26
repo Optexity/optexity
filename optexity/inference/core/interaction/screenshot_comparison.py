@@ -175,6 +175,9 @@ async def _llm_keyword_fallback(
     memory: Memory,
 ) -> int | None:
     candidates_text = "\n".join(f"{i}: '{r.text}'" for i, r in enumerate(candidates))
+    logger.info(
+        f"[screenshot_comparison] keyword fallback OCR candidates for '{keyword}':\n{candidates_text}"
+    )
     prompt = (
         f"You are verifying a UI automation step. The task is: '{prompt_instructions}'. "
         f"We are looking for: '{keyword}'.\n"
@@ -197,6 +200,9 @@ async def _llm_keyword_fallback(
         candidates[result.matched_index].text
         if result.matched_index is not None
         else None
+    )
+    logger.info(
+        f"[screenshot_comparison] keyword fallback LLM response: matched_index={result.matched_index}, matched_text='{matched_text}'"
     )
     logger.info(
         f"[screenshot_comparison] keyword fallback: '{keyword}' → matched_index={result.matched_index}, matched_text='{matched_text}' "
