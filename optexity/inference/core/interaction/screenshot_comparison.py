@@ -287,6 +287,7 @@ async def _validate_crop(
     task: Task,
     max_tries: int,
     max_timeout_seconds_per_try: float,
+    need_coordinates: bool = True,
 ) -> tuple[int, int]:
     recording_b64 = await _fetch_screenshot(recording_screenshot_url)
     recording_crop = _crop_at(recording_b64, recording_x, recording_y)
@@ -307,6 +308,8 @@ async def _validate_crop(
             memory.browser_states[-1].comparison_result = llm_result.model_dump()
 
         if matches:
+            if not need_coordinates:
+                return recording_x, recording_y
             logger.info(
                 f"[screenshot_comparison] crop matched on attempt {attempt + 1}, "
                 "invoking computer use model for precise coordinates"
@@ -344,6 +347,7 @@ async def validate_recording_action(
     task: Task,
     max_tries: int,
     max_timeout_seconds_per_try: float,
+    need_coordinates: bool = True,
 ) -> tuple[int, int]:
     """
     Validates the current screen matches the recording before performing an action.
@@ -380,4 +384,5 @@ async def validate_recording_action(
             task=task,
             max_tries=max_tries,
             max_timeout_seconds_per_try=max_timeout_seconds_per_try,
+            need_coordinates=need_coordinates,
         )

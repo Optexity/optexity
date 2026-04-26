@@ -248,10 +248,27 @@ def resolve_bounding_box_variables(
 
     Returns None if any variable is missing or equals -1.
     """
+    import re as _re
+
+    _VAR_RE = _re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)(?:\[(\d+)\])?$")
+
+    def _resolve(v: str) -> int:
+        key = v.strip("{}")
+        m = _VAR_RE.match(key)
+        if not m:
+            raise KeyError(key)
+        var_name, idx = m.group(1), m.group(2)
+        val = memory.variables.generated_variables[var_name]
+        if isinstance(val, list):
+            if idx is None:
+                raise ValueError(
+                    f"Variable '{var_name}' is a list — use [{var_name}[0]] syntax"
+                )
+            return int(val[int(idx)])
+        return int(val)
+
     try:
-        vals = [
-            int(memory.variables.generated_variables[v.strip("{}")]) for v in variables
-        ]
+        vals = [_resolve(v) for v in variables]
         if any(v == -1 for v in vals):
             return None
         return (vals[0], vals[1], vals[2], vals[3])

@@ -264,9 +264,14 @@ class Gemini(LLMModel):
                 function_calls.append(part.function_call)
 
         for function_call in function_calls:
-            action_result = {}
             fname = function_call.name
-            args = function_call.args
+            args = dict(function_call.args)
+            logger.info(f"[computer_use] function_call: {fname}, args: {args}")
+            if "x" not in args or "y" not in args:
+                logger.warning(
+                    f"[computer_use] missing x/y in args for '{fname}': {args}"
+                )
+                return None
             actual_x = self.denormalize_x(args["x"], screen_width)
             actual_y = self.denormalize_y(args["y"], screen_height)
 

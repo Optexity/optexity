@@ -556,8 +556,8 @@ async def handle_vision_extraction(
     screenshot = await browser.get_screenshot()
     if screenshot is None:
         logger.error("[vision_extraction] screenshot is None")
-        memory.variables.generated_variables[vision_extraction.output_x_variable] = -1
-        memory.variables.generated_variables[vision_extraction.output_y_variable] = -1
+        memory.variables.generated_variables[vision_extraction.output_x_variable] = [-1]
+        memory.variables.generated_variables[vision_extraction.output_y_variable] = [-1]
         return
 
     model = get_llm_model(GeminiModels.GEMINI_2_5_COMPUTER_USE, True)
@@ -575,8 +575,8 @@ async def handle_vision_extraction(
         logger.error(f"[vision_extraction] computer use model failed: {e}")
 
     logger.info(f"[vision_extraction] '{vision_extraction.prompt}' → ({x}, {y})")
-    memory.variables.generated_variables[vision_extraction.output_x_variable] = x
-    memory.variables.generated_variables[vision_extraction.output_y_variable] = y
+    memory.variables.generated_variables[vision_extraction.output_x_variable] = [x]
+    memory.variables.generated_variables[vision_extraction.output_y_variable] = [y]
     memory.variables.output_data.append(
         OutputData(
             unique_identifier=unique_identifier,
