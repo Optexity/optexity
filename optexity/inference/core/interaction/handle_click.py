@@ -39,6 +39,7 @@ async def handle_click_element(
     browser: Browser,
     max_timeout_seconds_per_try: float,
     max_tries: int,
+    verify_before_step: bool = True,
 ):
 
     if browser.channel == "rdp" or browser.backend == "computer-vision":
@@ -49,6 +50,7 @@ async def handle_click_element(
             task,
             max_tries,
             max_timeout_seconds_per_try,
+            verify_before_step,
         )
         return
 
@@ -125,6 +127,7 @@ async def click_element_coordinates(
     task: Task,
     max_tries: int = 3,
     max_timeout_seconds_per_try: float = 5.0,
+    verify_before_step: bool = True,
 ):
     try:
         x, y = None, None
@@ -137,7 +140,8 @@ async def click_element_coordinates(
         )
 
         if (
-            click_element_action.recording_screenshot
+            verify_before_step
+            and click_element_action.recording_screenshot
             and click_element_action.coordinates
         ):
             x, y = await validate_recording_action(

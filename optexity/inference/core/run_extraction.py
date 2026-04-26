@@ -560,6 +560,7 @@ async def handle_vision_extraction(
         memory.variables.generated_variables[vision_extraction.output_y_variable] = [-1]
         return
 
+    memory.browser_states[-1].computer_use_screenshots.append(screenshot)
     model = get_llm_model(GeminiModels.GEMINI_2_5_COMPUTER_USE, True)
 
     x, y = -1, -1

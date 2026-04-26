@@ -361,6 +361,7 @@ class CloseOverlayPopupAction(AgenticTask):
 class InteractionAction(BaseModel):
     max_tries: int = 10
     max_timeout_seconds_per_try: float = 1.0
+    verify_before_step: bool = True
     click_element: ClickElementAction | None = None
     input_text: InputTextAction | None = None
     select_option: SelectOptionAction | None = None

@@ -376,6 +376,12 @@ async def save_latest_memory_state_locally(
                 step_directory / f"ocr_image_sent_to_ocr_{index + 1}.png",
             )
 
+        for index, cu_screenshot in enumerate(browser_state.computer_use_screenshots):
+            await save_screenshot(
+                cu_screenshot,
+                step_directory / f"computer_use_screenshot_{index + 1}.png",
+            )
+
         state_dict = {
             "title": browser_state.title,
             "url": browser_state.url,

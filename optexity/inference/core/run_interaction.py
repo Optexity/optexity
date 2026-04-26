@@ -76,6 +76,7 @@ async def run_interaction_action(
                 browser,
                 interaction_action.max_timeout_seconds_per_try,
                 interaction_action.max_tries,
+                interaction_action.verify_before_step,
             )
         elif interaction_action.input_text:
             await handle_input_text(
@@ -85,6 +86,7 @@ async def run_interaction_action(
                 browser,
                 interaction_action.max_timeout_seconds_per_try,
                 interaction_action.max_tries,
+                interaction_action.verify_before_step,
             )
         elif interaction_action.select_option:
             await handle_select_option(

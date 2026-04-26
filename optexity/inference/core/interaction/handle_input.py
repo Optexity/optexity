@@ -45,6 +45,7 @@ async def handle_input_text(
     browser: Browser,
     max_timeout_seconds_per_try: float,
     max_tries: int,
+    verify_before_step: bool = True,
 ):
 
     if input_text_action.input_text is None:
@@ -67,6 +68,7 @@ async def handle_input_text(
             task,
             max_tries,
             max_timeout_seconds_per_try,
+            verify_before_step,
         )
         return
 
@@ -133,6 +135,7 @@ async def input_text_coordinates(
     task: Task,
     max_tries: int = 3,
     max_timeout_seconds_per_try: float = 5.0,
+    verify_before_step: bool = True,
 ):
     if input_text_action.input_text is None:
         return
@@ -157,8 +160,12 @@ async def input_text_coordinates(
             else None
         )
 
-        # Screenshot comparison always runs when recording_screenshot is present
-        if input_text_action.recording_screenshot and input_text_action.coordinates:
+        # Screenshot comparison runs when recording_screenshot is present and verify_before_step is True
+        if (
+            verify_before_step
+            and input_text_action.recording_screenshot
+            and input_text_action.coordinates
+        ):
             x, y = await validate_recording_action(
                 input_text_action,
                 browser,

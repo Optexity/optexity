@@ -193,8 +193,13 @@ async def _llm_keyword_fallback(
     )
     result = KeywordMatchResult.model_validate(raw_result.model_dump())
     memory.token_usage += token_usage
+    matched_text = (
+        candidates[result.matched_index].text
+        if result.matched_index is not None
+        else None
+    )
     logger.info(
-        f"[screenshot_comparison] keyword fallback: '{keyword}' → matched_index={result.matched_index} "
+        f"[screenshot_comparison] keyword fallback: '{keyword}' → matched_index={result.matched_index}, matched_text='{matched_text}' "
         f"(debug: {path})"
     )
     return result.matched_index
