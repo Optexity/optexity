@@ -47,11 +47,7 @@ class GeminiModels(Enum):
     GEMINI_3_1_PRO = "gemini-3.1-pro-preview"
 
     def is_computer_use_model(self) -> bool:
-        return self in [
-            GeminiModels.GEMINI_2_5_COMPUTER_USE,
-            GeminiModels.GEMINI_3_FLASH,
-            GeminiModels.GEMINI_3_1_PRO,
-        ]
+        return self in [GeminiModels.GEMINI_2_5_COMPUTER_USE]
 
 
 @unique

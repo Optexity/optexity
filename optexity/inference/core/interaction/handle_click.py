@@ -17,7 +17,8 @@ from optexity.inference.core.interaction.utils import (
     get_coordinates_from_prompt,
     get_index_from_prompt,
     handle_download,
-    resolve_keyword_coordinates,
+    resolve_bounding_box_variables,
+    resolve_keyword_with_llm_fallback,
     update_screenshot_with_highlight,
 )
 from optexity.inference.core.vision.utils import mark_screenshot
@@ -127,12 +128,18 @@ async def click_element_coordinates(
 ):
     try:
         x, y = None, None
+        bbox = (
+            resolve_bounding_box_variables(
+                click_element_action.bounding_box_variables, memory
+            )
+            if click_element_action.bounding_box_variables
+            else None
+        )
 
         if (
             click_element_action.recording_screenshot
             and click_element_action.coordinates
         ):
-            # Recording validation: returns exact (x, y) to click via OCR or crop LLM
             x, y = await validate_recording_action(
                 click_element_action,
                 browser,
@@ -144,15 +151,45 @@ async def click_element_coordinates(
         elif click_element_action.coordinates:
             x = int(click_element_action.coordinates[0])
             y = int(click_element_action.coordinates[1])
-            if click_element_action.keyword:
-                result = await resolve_keyword_coordinates(
-                    click_element_action.keyword, x, y, memory
+
+            if x == -1 and y == -1:
+                # Failed ocr_coordinates extraction — fallback to full OCR + LLM
+                result = await resolve_keyword_with_llm_fallback(
+                    keyword=click_element_action.keyword
+                    or click_element_action.prompt_instructions,
+                    recording_x=-1,
+                    recording_y=-1,
+                    prompt_instructions=click_element_action.prompt_instructions,
+                    memory=memory,
+                    task=task,
+                    bounding_box=bbox,
                 )
-                x_new, y_new = get_coordinates_from_ocr_result(result)
+                if result is None:
+                    raise KeywordNotFoundOnScreenException(
+                        message=f"Could not locate element on screen for: '{click_element_action.prompt_instructions}'",
+                        keyword=click_element_action.keyword
+                        or click_element_action.prompt_instructions,
+                    )
+                x, y = result
+            elif click_element_action.keyword:
+                result = await resolve_keyword_with_llm_fallback(
+                    keyword=click_element_action.keyword,
+                    recording_x=x,
+                    recording_y=y,
+                    prompt_instructions=click_element_action.prompt_instructions,
+                    memory=memory,
+                    task=task,
+                    bounding_box=bbox,
+                )
+                if result is None:
+                    raise KeywordNotFoundOnScreenException(
+                        message=f"Keyword '{click_element_action.keyword}' not found on screen.",
+                        keyword=click_element_action.keyword,
+                    )
+                x, y = result
                 logger.info(
-                    f"Matched keyword '{click_element_action.keyword}' at ({x_new}, {y_new})"
+                    f"Matched keyword '{click_element_action.keyword}' at ({x}, {y})"
                 )
-                x, y = x_new, y_new
         else:
             data = await get_coordinates_from_prompt(
                 memory, click_element_action.prompt_instructions, browser, task
@@ -163,14 +200,24 @@ async def click_element_coordinates(
             x, y = data[0], data[1]
             memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
             if click_element_action.keyword:
-                result = await resolve_keyword_coordinates(
-                    click_element_action.keyword, x, y, memory
+                result = await resolve_keyword_with_llm_fallback(
+                    keyword=click_element_action.keyword,
+                    recording_x=x,
+                    recording_y=y,
+                    prompt_instructions=click_element_action.prompt_instructions,
+                    memory=memory,
+                    task=task,
+                    bounding_box=bbox,
                 )
-                x_new, y_new = get_coordinates_from_ocr_result(result)
+                if result is None:
+                    raise KeywordNotFoundOnScreenException(
+                        message=f"Keyword '{click_element_action.keyword}' not found on screen.",
+                        keyword=click_element_action.keyword,
+                    )
+                x, y = result
                 logger.info(
-                    f"Matched keyword '{click_element_action.keyword}' at ({x_new}, {y_new})"
+                    f"Matched keyword '{click_element_action.keyword}' at ({x}, {y})"
                 )
-                x, y = x_new, y_new
 
         logger.debug(f"Clicking element at coordinates: {x}, {y}")
 

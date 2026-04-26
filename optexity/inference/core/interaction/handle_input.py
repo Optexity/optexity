@@ -18,7 +18,8 @@ from optexity.inference.core.interaction.screenshot_comparison import (
 from optexity.inference.core.interaction.utils import (
     get_coordinates_from_prompt,
     get_index_from_prompt,
-    resolve_keyword_coordinates,
+    resolve_bounding_box_variables,
+    resolve_keyword_with_llm_fallback,
     update_screenshot_with_highlight,
 )
 
@@ -148,6 +149,13 @@ async def input_text_coordinates(
 
     try:
         x, y = None, None
+        bbox = (
+            resolve_bounding_box_variables(
+                input_text_action.bounding_box_variables, memory
+            )
+            if input_text_action.bounding_box_variables
+            else None
+        )
 
         if input_text_action.recording_screenshot and input_text_action.coordinates:
             x, y = await validate_recording_action(
@@ -159,16 +167,45 @@ async def input_text_coordinates(
                 max_timeout_seconds_per_try,
             )
         elif input_text_action.coordinates:
-            x = input_text_action.coordinates[0]
-            y = input_text_action.coordinates[1]
-            if input_text_action.keyword:
-                result = await resolve_keyword_coordinates(
-                    input_text_action.keyword, x, y, memory
+            x = int(input_text_action.coordinates[0])
+            y = int(input_text_action.coordinates[1])
+
+            if x == -1 and y == -1:
+                result = await resolve_keyword_with_llm_fallback(
+                    keyword=input_text_action.keyword
+                    or input_text_action.prompt_instructions,
+                    recording_x=-1,
+                    recording_y=-1,
+                    prompt_instructions=input_text_action.prompt_instructions,
+                    memory=memory,
+                    task=task,
+                    bounding_box=bbox,
                 )
-                x = int(result.bounding_box.x)
-                y = int(result.bounding_box.y + result.bounding_box.height / 2)
+                if result is None:
+                    raise KeywordNotFoundOnScreenException(
+                        message=f"Could not locate element on screen for: '{input_text_action.prompt_instructions}'",
+                        keyword=input_text_action.keyword
+                        or input_text_action.prompt_instructions,
+                    )
+                x, y = result
+            elif input_text_action.keyword:
+                result = await resolve_keyword_with_llm_fallback(
+                    keyword=input_text_action.keyword,
+                    recording_x=x,
+                    recording_y=y,
+                    prompt_instructions=input_text_action.prompt_instructions,
+                    memory=memory,
+                    task=task,
+                    bounding_box=bbox,
+                )
+                if result is None:
+                    raise KeywordNotFoundOnScreenException(
+                        message=f"Keyword '{input_text_action.keyword}' not found on screen.",
+                        keyword=input_text_action.keyword,
+                    )
+                x, y = result
                 logger.info(
-                    f"Keyword '{input_text_action.keyword}' matched '{result.text}' at ({x}, {y})"
+                    f"Keyword '{input_text_action.keyword}' matched at ({x}, {y})"
                 )
         else:
             data = await get_coordinates_from_prompt(
@@ -180,13 +217,23 @@ async def input_text_coordinates(
             x, y = data[0], data[1]
             memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
             if input_text_action.keyword:
-                result = await resolve_keyword_coordinates(
-                    input_text_action.keyword, x, y, memory
+                result = await resolve_keyword_with_llm_fallback(
+                    keyword=input_text_action.keyword,
+                    recording_x=x,
+                    recording_y=y,
+                    prompt_instructions=input_text_action.prompt_instructions,
+                    memory=memory,
+                    task=task,
+                    bounding_box=bbox,
                 )
-                x = int(result.bounding_box.x)
-                y = int(result.bounding_box.y + result.bounding_box.height / 2)
+                if result is None:
+                    raise KeywordNotFoundOnScreenException(
+                        message=f"Keyword '{input_text_action.keyword}' not found on screen.",
+                        keyword=input_text_action.keyword,
+                    )
+                x, y = result
                 logger.info(
-                    f"Keyword '{input_text_action.keyword}' matched '{result.text}' at ({x}, {y})"
+                    f"Keyword '{input_text_action.keyword}' matched at ({x}, {y})"
                 )
 
         logger.debug(f"Typing text at coordinates: {x}, {y}")

@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 import math
 import os
@@ -10,6 +11,7 @@ from typing import Callable, Union
 import aiofiles
 import patchright.async_api
 import playwright.async_api
+from pydantic import BaseModel as _PydanticBaseModel
 from rapidfuzz import fuzz
 
 from optexity.exceptions import (
@@ -19,6 +21,7 @@ from optexity.inference.agents.index_prediction.action_prediction_locator_axtree
     ActionPredictionLocatorAxtree,
 )
 from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
+from optexity.inference.core.vision.ocr.ocr import _cv2_to_bytes, _load_cv2
 from optexity.inference.core.vision.ocr.tesseract import Tesseract
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import (
@@ -199,6 +202,59 @@ async def update_screenshot_with_highlight(
 _index_prediction_cache: dict[tuple, ActionPredictionLocatorAxtree] = {}
 small_ocr = AWSTextract()
 large_ocr = AWSTextract()
+
+_KW_LLM_CANDIDATE_LIMIT = 30
+_CROP_ELEMENT_WIDTH = 113
+_CROP_ELEMENT_HEIGHT = 41
+_CROP_PADDING_FACTOR = 2.0
+
+
+class _KeywordLLMResult(_PydanticBaseModel):
+    matched_index: int | None = None
+
+
+def crop_screenshot_to_bbox(
+    screenshot_b64: str, x1: int, y1: int, x2: int, y2: int
+) -> str:
+    img = _load_cv2(screenshot_b64)
+    h, w = img.shape[:2]
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(w, x2)
+    y2 = min(h, y2)
+    cropped = img[y1:y2, x1:x2]
+    return base64.b64encode(_cv2_to_bytes(cropped)).decode("utf-8")
+
+
+def _crop_for_llm(screenshot_b64: str, x: int, y: int) -> str:
+    img = _load_cv2(screenshot_b64)
+    h, w = img.shape[:2]
+    half_w = _CROP_ELEMENT_WIDTH // 2
+    half_h = _CROP_ELEMENT_HEIGHT // 2
+    pad_x = int(_CROP_ELEMENT_WIDTH * _CROP_PADDING_FACTOR)
+    pad_y = int(_CROP_ELEMENT_HEIGHT * _CROP_PADDING_FACTOR)
+    x1 = max(0, x - half_w - pad_x)
+    y1 = max(0, y - half_h - pad_y)
+    x2 = min(w, x - half_w + _CROP_ELEMENT_WIDTH + pad_x)
+    y2 = min(h, y - half_h + _CROP_ELEMENT_HEIGHT + pad_y)
+    cropped = img[y1:y2, x1:x2]
+    return base64.b64encode(_cv2_to_bytes(cropped)).decode("utf-8")
+
+
+def resolve_bounding_box_variables(
+    variables: list[str], memory: Memory
+) -> tuple[int, int, int, int] | None:
+    """Resolve bounding_box_variables [x1_var, y1_var, x2_var, y2_var] to pixel coords.
+
+    Returns None if any variable is missing or equals -1.
+    """
+    try:
+        vals = [int(memory.variables.generated_variables[v]) for v in variables]
+        if any(v == -1 for v in vals):
+            return None
+        return (vals[0], vals[1], vals[2], vals[3])
+    except (KeyError, ValueError, TypeError, IndexError):
+        return None
 
 
 def _get_index_prediction_agent(task: "Task") -> ActionPredictionLocatorAxtree:
@@ -555,7 +611,13 @@ def _score(entry):
     return (entry[2] + entry[3] * 1.5) / 2.5
 
 
-def find_keyword_in_results(ocr_results: list[OCRResult], keyword: str):
+def find_keyword_in_results(
+    ocr_results: list[OCRResult],
+    keyword: str,
+    score_threshold: float = 0.0,
+) -> OCRResult | None:
+    if not ocr_results:
+        return None
 
     # Build candidate list: original results + joined multi-word results
     num_words = len(keyword.strip().split())
@@ -586,6 +648,11 @@ def find_keyword_in_results(ocr_results: list[OCRResult], keyword: str):
     logger.info(
         f"Best match for keyword '{keyword}': '{best[1].text}' with score {best_score:.1f}"
     )
+    if score_threshold > 0.0 and best_score < score_threshold:
+        logger.info(
+            f"Score {best_score:.1f} below threshold {score_threshold} for keyword '{keyword}'"
+        )
+        return None
     return best[1]
 
 
@@ -636,40 +703,117 @@ def get_coordinates_from_ocr_result(ocr_result: OCRResult):
     )
 
 
-async def resolve_keyword_coordinates(
+async def resolve_keyword_with_llm_fallback(
     keyword: str,
-    x: int,
-    y: int,
+    recording_x: int,
+    recording_y: int,
+    prompt_instructions: str,
     memory: Memory,
-) -> OCRResult:
-    """Find keyword on screen and return the nearest match to (x, y).
+    task: Task,
+    bounding_box: tuple[int, int, int, int] | None = None,
+) -> tuple[int, int] | None:
+    """OCR keyword search with LLM fallback.
 
-    Raises KeywordNotFoundOnScreenException if not found.
+    Flow:
+    1. Run OCR (on bounding_box crop, ROI around recording coords, or full screenshot)
+    2. Exact 100% match → return coords
+    3. No exact match → top 30 by proximity → cropped screenshot + OCR list → LLM index pick
     """
-    from optexity.exceptions import KeywordNotFoundOnScreenException
+    screenshot = memory.browser_states[-1].screenshot if memory.browser_states else None
+    if screenshot is None:
+        logger.error("[keyword_fallback] no screenshot in memory")
+        return None
 
-    matches = await match_all_text_in_screenshot(
-        memory,
-        keyword,
-        BoundingBox(x=x, y=y, width=113, height=41),
-    )
-    if not matches:
-        raise KeywordNotFoundOnScreenException(
-            message=f"Keyword '{keyword}' not found on screen.",
-            keyword=keyword,
+    is_negative_coords = recording_x == -1 and recording_y == -1
+
+    # --- OCR phase ---
+    if bounding_box is not None:
+        x1, y1, x2, y2 = bounding_box
+        cropped = crop_screenshot_to_bbox(screenshot, x1, y1, x2, y2)
+        results, base64_sent = large_ocr.ocr(cropped)
+        # offset bounding boxes back to full-screen coords
+        for r in results:
+            r.bounding_box.x += x1
+            r.bounding_box.y += y1
+        llm_screenshot = cropped
+    elif is_negative_coords:
+        results, base64_sent = large_ocr.ocr(screenshot)
+        llm_screenshot = screenshot
+    else:
+        roi = BoundingBox(
+            x=recording_x,
+            y=recording_y,
+            width=_CROP_ELEMENT_WIDTH,
+            height=_CROP_ELEMENT_HEIGHT,
         )
+        results, base64_sent = small_ocr.ocr(
+            screenshot, region_of_interest=roi, padding_factor=1.0
+        )
+        if not results:
+            results, base64_sent = large_ocr.ocr(screenshot)
+        llm_screenshot = _crop_for_llm(screenshot, recording_x, recording_y)
 
-    if len(matches) == 1:
-        return matches[0]
+    if memory.browser_states:
+        memory.browser_states[-1].ocr_image_sent_to_ocr.append(base64_sent)
 
-    result = min(
-        matches,
-        key=lambda m: (
-            (m.bounding_box.x + m.bounding_box.width / 2 - x) ** 2
-            + (m.bounding_box.y + m.bounding_box.height / 2 - y) ** 2
+    # --- Exact match check ---
+    exact = [r for r in results if r.text.strip().lower() == keyword.strip().lower()]
+    if exact:
+        ref_x = recording_x if not is_negative_coords else 0
+        ref_y = recording_y if not is_negative_coords else 0
+        best = min(
+            exact,
+            key=lambda r: math.sqrt(
+                (r.bounding_box.x + r.bounding_box.width / 2 - ref_x) ** 2
+                + (r.bounding_box.y + r.bounding_box.height / 2 - ref_y) ** 2
+            ),
+        )
+        cx = int(best.bounding_box.x + best.bounding_box.width / 2)
+        cy = int(best.bounding_box.y + best.bounding_box.height / 2)
+        logger.info(f"[keyword_fallback] exact match '{best.text}' at ({cx}, {cy})")
+        return cx, cy
+
+    # --- LLM fallback: top 30 by proximity ---
+    ref_x = recording_x if not is_negative_coords else 0
+    ref_y = recording_y if not is_negative_coords else 0
+    candidates = sorted(
+        results,
+        key=lambda r: math.sqrt(
+            (r.bounding_box.x + r.bounding_box.width / 2 - ref_x) ** 2
+            + (r.bounding_box.y + r.bounding_box.height / 2 - ref_y) ** 2
         ),
+    )[:_KW_LLM_CANDIDATE_LIMIT]
+
+    if not candidates:
+        logger.info(f"[keyword_fallback] no OCR results for '{keyword}'")
+        return None
+
+    candidates_text = "\n".join(f"{i}: '{r.text}'" for i, r in enumerate(candidates))
+    prompt = (
+        f"You are verifying a UI automation step. The task is: '{prompt_instructions}'. "
+        f"We are looking for: '{keyword}'.\n"
+        f"Text elements detected on screen by OCR:\n{candidates_text}\n\n"
+        "Which index best matches the keyword? Consider OCR typos, partial text, ellipsis "
+        "truncation, and case differences (e.g. 'Prince Yadav' and 'Pricne yadav' are the same). "
+        "Return matched_index (0-based) or null if none match."
     )
+
+    model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name, True)
+    raw_result, token_usage = model.get_model_response_with_structured_output(
+        prompt=prompt,
+        response_schema=_KeywordLLMResult,
+        screenshot=llm_screenshot,
+    )
+    result = _KeywordLLMResult.model_validate(raw_result.model_dump())
+    memory.token_usage += token_usage
     logger.info(
-        f"Multiple matches ({len(matches)}) for keyword '{keyword}', picked nearest: '{result.text}' at ({result.bounding_box.x}, {result.bounding_box.y})"
+        f"[keyword_fallback] LLM matched index={result.matched_index} for '{keyword}'"
     )
-    return result
+
+    if result.matched_index is None:
+        return None
+
+    matched = candidates[result.matched_index]
+    cx = int(matched.bounding_box.x + matched.bounding_box.width / 2)
+    cy = int(matched.bounding_box.y + matched.bounding_box.height / 2)
+    return cx, cy

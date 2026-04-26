@@ -30,7 +30,7 @@ _ocr = AWSTextract()
 _CROP_ELEMENT_WIDTH = 113
 _CROP_ELEMENT_HEIGHT = 41
 _CROP_PADDING_FACTOR = 2.0
-_OCR_CANDIDATE_LIMIT = 20
+_OCR_CANDIDATE_LIMIT = 30
 
 
 class ScreenshotMatchResult(BaseModel):

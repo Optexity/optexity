@@ -6,13 +6,19 @@ import aiofiles
 import httpx
 
 from optexity.inference.core.interaction.utils import (
+    crop_screenshot_to_bbox,
     find_keyword_in_results,
     get_coordinates_from_ocr_result,
+    resolve_bounding_box_variables,
 )
 from optexity.inference.core.run_two_fa import run_two_fa_action
 from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
 from optexity.inference.infra.browser import Browser
-from optexity.inference.models import get_llm_model_with_fallback
+from optexity.inference.models import (
+    GeminiModels,
+    get_llm_model,
+    get_llm_model_with_fallback,
+)
 from optexity.schema.actions.extraction_action import (
     ExtractionAction,
     LLMExtraction,
@@ -23,6 +29,7 @@ from optexity.schema.actions.extraction_action import (
     PythonScriptExtraction,
     ScreenshotExtraction,
     StateExtraction,
+    VisionExtraction,
 )
 from optexity.schema.memory import (
     Memory,
@@ -96,6 +103,14 @@ async def run_extraction_action(
     elif extraction_action.locator:
         await handle_locator_extraction(
             extraction_action.locator,
+            memory,
+            browser,
+            task,
+            extraction_action.unique_identifier,
+        )
+    elif extraction_action.vision:
+        await handle_vision_extraction(
+            extraction_action.vision,
             memory,
             browser,
             task,
@@ -454,9 +469,13 @@ async def handle_ocr_coordinates_extraction(
     browser: "Browser",
     unique_identifier: str | None = None,
 ):
-    """Run OCR once on the screenshot, match all names from source_variable, store x/y as parallel lists."""
+    """Run OCR once on the screenshot, match all names from source_variable, store x/y as parallel lists.
 
-    # Get the list of text elements to find
+    - Duplicate names: each gets a different OCR result (position order).
+    - Score < 80: stores -1, -1 (interaction action will fallback to full OCR + LLM).
+    - bounding_box_variables: crops screenshot before OCR; offsets results back to full-screen coords.
+    """
+
     source_var = ocr_extraction.source_variable
     if source_var in memory.variables.generated_variables:
         names = memory.variables.generated_variables[source_var]
@@ -464,13 +483,29 @@ async def handle_ocr_coordinates_extraction(
         logger.error(f"Source variable '{source_var}' not found in generated variables")
         return
 
-    # Get screenshot and store in memory for match_text_in_screenshot
     screenshot = await browser.get_screenshot()
     if screenshot is None:
         logger.error("Screenshot is None, cannot run OCR")
         return
 
-    results, base64_image_sent_to_ocr = ocr.ocr(screenshot)
+    # Apply bounding box crop if specified
+    crop_offset_x, crop_offset_y = 0, 0
+    ocr_screenshot = screenshot
+    if ocr_extraction.bounding_box_variables:
+        bbox = resolve_bounding_box_variables(
+            ocr_extraction.bounding_box_variables, memory
+        )
+        if bbox:
+            crop_offset_x, crop_offset_y = bbox[0], bbox[1]
+            ocr_screenshot = crop_screenshot_to_bbox(screenshot, *bbox)
+
+    results, base64_image_sent_to_ocr = ocr.ocr(ocr_screenshot)
+
+    # Offset bounding boxes back to full-screen coordinates
+    if crop_offset_x or crop_offset_y:
+        for r in results:
+            r.bounding_box.x += crop_offset_x
+            r.bounding_box.y += crop_offset_y
 
     annotated, canvas = ocr.visualize(screenshot, results)
     memory.browser_states[-1].ocr_annotated = base64.b64encode(annotated).decode(
@@ -479,30 +514,75 @@ async def handle_ocr_coordinates_extraction(
     memory.browser_states[-1].ocr_canvas = base64.b64encode(canvas).decode("utf-8")
     memory.browser_states[-1].ocr_image_sent_to_ocr.append(base64_image_sent_to_ocr)
 
-    # Use match_text_in_screenshot in batch mode (single OCR call)
     names_str = [str(n) for n in names]
-
     coords_x: list[int] = []
     coords_y: list[int] = []
+    used_result_ids: set[int] = set()
 
     for name in names_str:
-        result = find_keyword_in_results(results, name)
+        available = [r for r in results if id(r) not in used_result_ids]
+        result = find_keyword_in_results(available, name, score_threshold=80.0)
         if result is not None:
+            used_result_ids.add(id(result))
             x, y = get_coordinates_from_ocr_result(result)
             coords_x.append(x)
             coords_y.append(y)
             logger.info(f"OCR matched '{name}' at ({x}, {y})")
         else:
-            coords_x.append(0)
-            coords_y.append(0)
-            logger.warning(f"OCR could not find '{name}' on screen")
+            coords_x.append(-1)
+            coords_y.append(-1)
+            logger.warning(f"OCR score below threshold for '{name}', storing -1,-1")
 
-    # Store in generated variables
     memory.variables.generated_variables[ocr_extraction.output_x_variable] = coords_x
     memory.variables.generated_variables[ocr_extraction.output_y_variable] = coords_y
 
-    # Also store in output_data
     result_data = {name: [coords_x[i], coords_y[i]] for i, name in enumerate(names_str)}
     memory.variables.output_data.append(
         OutputData(unique_identifier=unique_identifier, json_data=result_data)
+    )
+
+
+async def handle_vision_extraction(
+    vision_extraction: VisionExtraction,
+    memory: Memory,
+    browser: "Browser",
+    task: "Task",
+    unique_identifier: str | None = None,
+):
+    """Use computer use model to locate a UI element and store its (x, y) coordinates.
+
+    Stores -1, -1 if the model cannot locate the element.
+    """
+    screenshot = await browser.get_screenshot()
+    if screenshot is None:
+        logger.error("[vision_extraction] screenshot is None")
+        memory.variables.generated_variables[vision_extraction.output_x_variable] = -1
+        memory.variables.generated_variables[vision_extraction.output_y_variable] = -1
+        return
+
+    model = get_llm_model(GeminiModels.GEMINI_2_5_COMPUTER_USE, True)
+
+    x, y = -1, -1
+    try:
+        coordinates, token_usage = model.get_computer_use_model_response(
+            prompt=vision_extraction.prompt,
+            screenshot=screenshot,
+        )
+        memory.token_usage += token_usage
+        if coordinates:
+            x, y = coordinates[0], coordinates[1]
+    except Exception as e:
+        logger.error(f"[vision_extraction] computer use model failed: {e}")
+
+    logger.info(f"[vision_extraction] '{vision_extraction.prompt}' → ({x}, {y})")
+    memory.variables.generated_variables[vision_extraction.output_x_variable] = x
+    memory.variables.generated_variables[vision_extraction.output_y_variable] = y
+    memory.variables.output_data.append(
+        OutputData(
+            unique_identifier=unique_identifier,
+            json_data={
+                vision_extraction.output_x_variable: x,
+                vision_extraction.output_y_variable: y,
+            },
+        )
     )

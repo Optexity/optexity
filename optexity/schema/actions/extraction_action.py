@@ -3,6 +3,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+_BB_VARS_LENGTH = 4  # [x1_var, y1_var, x2_var, y2_var]
+
 from optexity.schema.actions.two_fa_action import TwoFAAction
 from optexity.utils.utils import build_model
 
@@ -139,8 +141,30 @@ class OCRCoordinatesExtraction(BaseModel):
     source_variable: str
     output_x_variable: str = "coords_x"
     output_y_variable: str = "coords_y"
+    bounding_box_variables: list[str] | None = None
+
+    @model_validator(mode="after")
+    def validate_bounding_box_variables_length(self):
+        if (
+            self.bounding_box_variables is not None
+            and len(self.bounding_box_variables) != _BB_VARS_LENGTH
+        ):
+            raise ValueError(
+                f"bounding_box_variables must have exactly {_BB_VARS_LENGTH} elements: [x1_var, y1_var, x2_var, y2_var]"
+            )
+        return self
 
     def replace(self, pattern: str, replacement: str):
+        return self
+
+
+class VisionExtraction(BaseModel):
+    prompt: str
+    output_x_variable: str
+    output_y_variable: str
+
+    def replace(self, pattern: str, replacement: str):
+        self.prompt = self.prompt.replace(pattern, replacement)
         return self
 
 
@@ -176,6 +200,7 @@ class ExtractionAction(BaseModel):
     pdf: Optional[PDFExtraction] = None
     ocr_coordinates: Optional[OCRCoordinatesExtraction] = None
     locator: Optional[LocatorExtraction] = None
+    vision: Optional[VisionExtraction] = None
 
     @model_validator(mode="after")
     def validate_one_extraction(self):
@@ -190,12 +215,13 @@ class ExtractionAction(BaseModel):
             "pdf": self.pdf,
             "ocr_coordinates": self.ocr_coordinates,
             "locator": self.locator,
+            "vision": self.vision,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of llm, network_call, python_script, screenshot, state, two_fa_action, pdf, ocr_coordinates or locator must be provided"
+                "Exactly one of llm, network_call, python_script, screenshot, state, two_fa_action, pdf, ocr_coordinates, locator or vision must be provided"
             )
 
         return self
