@@ -524,15 +524,27 @@ async def handle_ocr_coordinates_extraction(
     coords_y: list[int] = []
     used_result_ids: set[int] = set()
 
+    logger.info(
+        f"[ocr_coordinates] OCR returned {len(results)} raw results. "
+        f"All texts+y: {[(r.text, round(r.bounding_box.y, 1), id(r)) for r in results]}"
+    )
+
     for name in names_str:
         available = [r for r in results if id(r) not in used_result_ids]
+        logger.info(
+            f"[ocr_coordinates] searching '{name}' in {len(available)}/{len(results)} available results "
+            f"(excluded ids: {used_result_ids})"
+        )
         result = find_keyword_in_results(available, name, score_threshold=80.0)
         if result is not None:
-            used_result_ids.add(id(result))
+            result_id = id(result)
+            used_result_ids.add(result_id)
             x, y = get_coordinates_from_ocr_result(result)
             coords_x.append(x)
             coords_y.append(y)
-            logger.info(f"OCR matched '{name}' at ({x}, {y})")
+            logger.info(
+                f"OCR matched '{name}' at ({x}, {y}) [id={result_id}, bbox_y={result.bounding_box.y:.1f}]"
+            )
         else:
             coords_x.append(-1)
             coords_y.append(-1)
