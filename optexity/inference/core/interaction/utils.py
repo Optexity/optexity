@@ -659,8 +659,8 @@ def find_keyword_in_results(
                 fuzz.partial_ratio(target, candidate_text),
             )
         )
-    # combined score: weight partial higher
-    scored.sort(key=_score, reverse=True)
+    # combined score: weight partial higher; tiebreak by y (topmost row first)
+    scored.sort(key=lambda x: (-_score(x), x[1].bounding_box.y))
     best = scored[0]
     best_score = _score(best)
     logger.info(
