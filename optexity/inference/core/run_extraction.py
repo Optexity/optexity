@@ -498,6 +498,11 @@ async def handle_ocr_coordinates_extraction(
         if bbox:
             crop_offset_x, crop_offset_y = bbox[0], bbox[1]
             ocr_screenshot = crop_screenshot_to_bbox(screenshot, *bbox)
+        else:
+            logger.warning(
+                f"[ocr_coordinates] bounding_box_variables {ocr_extraction.bounding_box_variables} "
+                "could not be resolved (missing, -1, or list without index) — using full screenshot"
+            )
 
     results, base64_image_sent_to_ocr = ocr.ocr(ocr_screenshot)
 
@@ -537,6 +542,15 @@ async def handle_ocr_coordinates_extraction(
     memory.variables.generated_variables[ocr_extraction.output_y_variable] = coords_y
 
     result_data = {name: [coords_x[i], coords_y[i]] for i, name in enumerate(names_str)}
+
+    summary = ", ".join(
+        f"'{n}'→({coords_x[i]},{coords_y[i]})" for i, n in enumerate(names_str)
+    )
+    logger.info(
+        f"[ocr_coordinates] final result: [{summary}] "
+        f"→ {ocr_extraction.output_x_variable}={coords_x}, {ocr_extraction.output_y_variable}={coords_y}"
+    )
+
     memory.variables.output_data.append(
         OutputData(unique_identifier=unique_identifier, json_data=result_data)
     )
