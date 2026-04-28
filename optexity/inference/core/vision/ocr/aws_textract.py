@@ -106,7 +106,9 @@ class AWSTextract(OCR):
             else:
                 words.append(result)
 
-        return lines
+        line_texts = {r.text.lower().strip() for r in lines}
+        deduped_words = [w for w in words if w.text.lower().strip() not in line_texts]
+        return lines + deduped_words
 
 
 if __name__ == "__main__":
