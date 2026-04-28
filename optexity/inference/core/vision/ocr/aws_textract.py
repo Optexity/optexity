@@ -106,9 +106,7 @@ class AWSTextract(OCR):
             else:
                 words.append(result)
 
-        results = lines + words
-
-        return results
+        return lines
 
 
 if __name__ == "__main__":
