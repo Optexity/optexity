@@ -415,8 +415,10 @@ async def handle_download(
         for target, event_name, handler in listener_cleanup:
             try:
                 target.remove_listener(event_name, handler)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(
+                    f"handle_download: failed to remove listener '{event_name}' from {target}: {e}"
+                )
 
     src_path = Path(browser.temp_downloads_dir) / new_file
 
