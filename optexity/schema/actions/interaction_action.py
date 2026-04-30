@@ -103,7 +103,7 @@ class HoverAction(BaseAction):
 
 
 class SelectOptionAction(BaseAction):
-    select_values: list[str]
+    select_values: list[str] | None = None
     expect_download: bool = False
     download_filename: str | None = None
 

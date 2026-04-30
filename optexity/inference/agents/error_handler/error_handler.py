@@ -11,7 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class ErrorHandlerOutput(BaseModel):
-    error_type: Literal["website_not_loaded", "overlay_popup_blocking", "fatal_error"]
+    error_type: Literal[
+        "website_not_loaded",
+        "overlay_popup_blocking",
+        "could_retry_now",
+        "fatal_error",
+    ]
     detailed_reason: str
 
 
@@ -20,12 +25,13 @@ class ErrorHandlerAgent:
         self.model = model
 
     def classify_error(
-        self, command: str, screenshot: str | None
+        self, command: str, axtree: str, screenshot: str | None
     ) -> tuple[str, ErrorHandlerOutput, TokenUsage]:
 
         final_prompt = f"""
         [INPUT]
         Command: {command}
+        Axtree: {axtree}
         [/INPUT]
         """
 
