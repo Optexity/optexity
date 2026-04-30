@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class IndexPredictionOutput(BaseModel):
     index: int = Field(
-        description="The index of the interactive element in the axtree that would achieve the desired outcome. It is always greater than 0."
+        description="The index of the interactive element in the axtree that would achieve the desired outcome. It is either a positive integer or -1 if the element is not found in the axtree."
     )
 
 

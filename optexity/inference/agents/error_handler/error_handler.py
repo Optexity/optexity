@@ -20,12 +20,13 @@ class ErrorHandlerAgent:
         self.model = model
 
     def classify_error(
-        self, command: str, screenshot: str | None
+        self, command: str, axtree: str, screenshot: str | None
     ) -> tuple[str, ErrorHandlerOutput, TokenUsage]:
 
         final_prompt = f"""
         [INPUT]
         Command: {command}
+        Axtree: {axtree}
         [/INPUT]
         """
 

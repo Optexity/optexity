@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import shutil
 import time
 import traceback
@@ -419,11 +420,23 @@ async def sleep_for_page_to_load(browser: Browser, sleep_time: float):
 
 
 def evaluate_condition(condition: str, memory: Memory, task: Task) -> bool:
-    return eval(
-        condition,
-        {},
-        {**task.input_parameters, **memory.variables.generated_variables},
+    # Allow variable references to be optionally wrapped in curly braces,
+    # e.g. "not {is_user_logged_in[0]}" is equivalent to "not is_user_logged_in[0]".
+    # Only strip the braces when the identifier actually exists in scope, so
+    # genuine set/dict literals (e.g. "{1}", "{a, b}") are left untouched.
+    scope = {**task.input_parameters, **memory.variables.generated_variables}
+
+    def _unwrap(match: re.Match) -> str:
+        inner = match.group(1)
+        identifier = match.group(2)
+        if identifier in scope:
+            return inner
+        return match.group(0)
+
+    normalized_condition = re.sub(
+        r"\{(([A-Za-z_]\w*)(?:\[[^{}\[\]]+\])?)\}", _unwrap, condition
     )
+    return eval(normalized_condition, {}, scope)
 
 
 async def handle_if_else_node(

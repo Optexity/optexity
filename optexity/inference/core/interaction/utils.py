@@ -283,37 +283,140 @@ async def handle_download(
 
     before = _snapshot_dir(browser.temp_downloads_dir)
 
-    # page = await browser.get_current_page()
-    # async with page.expect_download() as download_info:
-    await func()
-    # download = await download_info.value
-    # logger.info(f"Suggested filename: {download.suggested_filename}")
+    # ---- Fallback-only signal collection (does not affect the main path) ----
+    # Some sites (e.g. ASP.NET reports) open a popup that performs the
+    # download. The popup may take longer than the primary 30s window to
+    # produce the file, or the download event may fire on the new tab rather
+    # than the current page. We attach lightweight observers here purely so
+    # the fallback below can decide whether a download is genuinely in
+    # flight, in which case we extend the wait. If none of these signals
+    # fire we behave exactly like before (timeout + error log).
+    download_event = asyncio.Event()
+    new_popup_pages: list = []
+    listener_cleanup: list = []
 
-    timeout = 30.0
-    poll_interval = 0.5
-    elapsed = 0.0
-    new_file: str | None = None
+    def _on_download_event(_dl):
+        download_event.set()
 
-    while elapsed < timeout:
-        await asyncio.sleep(poll_interval)
-        elapsed += poll_interval
-        after = _snapshot_dir(browser.temp_downloads_dir)
-        new_files = [
-            name
-            for name in after
-            if name not in before
-            and not name.endswith(".crdownload")
-            and not name.endswith(".tmp")
-        ]
-        if new_files:
-            new_file = max(new_files, key=lambda n: after[n])
-            break
+    def _on_context_page(p):
+        new_popup_pages.append(p)
+        try:
+            p.on("download", _on_download_event)
+            listener_cleanup.append((p, "download", _on_download_event))
+        except Exception as e:
+            logger.debug(
+                f"handle_download: could not attach popup download listener: {e}"
+            )
 
-    if new_file is None:
-        logger.error(
-            f"No new file appeared in {browser.temp_downloads_dir} within {timeout}s after download action"
+    current_page = None
+    try:
+        current_page = await browser.get_current_page()
+    except Exception as e:
+        logger.debug(
+            f"handle_download: could not get current page for fallback listener: {e}"
         )
-        return
+
+    if current_page is not None:
+        try:
+            current_page.on("download", _on_download_event)
+            listener_cleanup.append((current_page, "download", _on_download_event))
+        except Exception as e:
+            logger.debug(
+                f"handle_download: could not attach page download listener: {e}"
+            )
+
+    if browser.context is not None:
+        try:
+            browser.context.on("page", _on_context_page)
+            listener_cleanup.append((browser.context, "page", _on_context_page))
+        except Exception as e:
+            logger.debug(
+                f"handle_download: could not attach context page listener: {e}"
+            )
+
+    try:
+        # page = await browser.get_current_page()
+        # async with page.expect_download() as download_info:
+        await func()
+        # download = await download_info.value
+        # logger.info(f"Suggested filename: {download.suggested_filename}")
+
+        timeout = 30.0
+        poll_interval = 0.5
+        elapsed = 0.0
+        new_file: str | None = None
+
+        while elapsed < timeout:
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+            after = _snapshot_dir(browser.temp_downloads_dir)
+            new_files = [
+                name
+                for name in after
+                if name not in before
+                and not name.endswith(".crdownload")
+                and not name.endswith(".tmp")
+            ]
+            if new_files:
+                new_file = max(new_files, key=lambda n: after[n])
+                break
+
+        # ---- Fallback: extend the wait only if we have evidence a download
+        # is actually in flight. This keeps the working path untouched while
+        # rescuing slow popups / slow servers that today fail at 30s.
+        if new_file is None:
+            after = _snapshot_dir(browser.temp_downloads_dir)
+            in_progress_files = [
+                name
+                for name in after
+                if name not in before
+                and (name.endswith(".crdownload") or name.endswith(".tmp"))
+            ]
+            has_signal = (
+                download_event.is_set()
+                or len(new_popup_pages) > 0
+                or len(in_progress_files) > 0
+            )
+            if has_signal:
+                extra_timeout = 60.0
+                logger.warning(
+                    f"handle_download: primary {timeout}s window elapsed without a "
+                    f"finalized file; extending by {extra_timeout}s "
+                    f"(download_event={download_event.is_set()}, "
+                    f"popups={len(new_popup_pages)}, "
+                    f"in_progress={in_progress_files})"
+                )
+                extra_elapsed = 0.0
+                while extra_elapsed < extra_timeout:
+                    await asyncio.sleep(poll_interval)
+                    extra_elapsed += poll_interval
+                    after = _snapshot_dir(browser.temp_downloads_dir)
+                    new_files = [
+                        name
+                        for name in after
+                        if name not in before
+                        and not name.endswith(".crdownload")
+                        and not name.endswith(".tmp")
+                    ]
+                    if new_files:
+                        new_file = max(new_files, key=lambda n: after[n])
+                        logger.info(
+                            f"handle_download: recovered download via extended wait after "
+                            f"{timeout + extra_elapsed:.1f}s total"
+                        )
+                        break
+
+        if new_file is None:
+            logger.error(
+                f"No new file appeared in {browser.temp_downloads_dir} within {timeout}s after download action"
+            )
+            return
+    finally:
+        for target, event_name, handler in listener_cleanup:
+            try:
+                target.remove_listener(event_name, handler)
+            except Exception:
+                pass
 
     src_path = Path(browser.temp_downloads_dir) / new_file
 
