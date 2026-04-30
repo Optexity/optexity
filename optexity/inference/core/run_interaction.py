@@ -313,6 +313,13 @@ async def handle_assert_locator_presence_error(
             await run_interaction_action(
                 interaction_action, task, memory, browser, retries_left - 1
             )
+        elif response.error_type == "could_retry_now":
+            logger.debug(
+                "Error handler: page looks ready for goal; retrying action without wait or overlay close"
+            )
+            await run_interaction_action(
+                interaction_action, task, memory, browser, retries_left - 1
+            )
         elif response.error_type == "fatal_error":
             logger.error(
                 f"Fatal error running node {memory.automation_state.step_index} after {retries_left} retries: {error.original_error}. Error: {response.detailed_reason}"
