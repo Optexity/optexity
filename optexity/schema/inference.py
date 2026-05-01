@@ -16,6 +16,8 @@ class InferenceRequest(BaseModel):
     is_dedicated: bool = (
         False  ## Only used in local mode. For cloud mode, the task is dedicated is defined on dashboard.
     )
+    task_callback_url: str | None = None
+    task_callback_api_key: str | None = None
 
     @model_validator(mode="after")
     def validate_use_proxy(self):
