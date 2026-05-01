@@ -292,17 +292,20 @@ async def initiate_callback(task: Task):
 
     try:
         logger.info("initiating callback")
-        if task.callback_url is None:
+        if task.callback_url is None and task.task_callback_url is None:
             return
 
         url = urljoin(settings.SERVER_URL, settings.INITIATE_CALLBACK_ENDPOINT)
         headers = {"x-api-key": task.api_key}
 
-        data = {
+        data: dict = {
             "task_id": task.task_id,
             "endpoint_name": task.endpoint_name,
-            "callback_url": task.callback_url.model_dump(),
+            "task_callback_url": task.task_callback_url,
+            "task_callback_api_key": task.task_callback_api_key,
         }
+        if task.callback_url is not None:
+            data["callback_url"] = task.callback_url.model_dump()
 
         async with httpx.AsyncClient(timeout=30.0) as client:
 
