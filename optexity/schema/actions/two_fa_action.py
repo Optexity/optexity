@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class EmailTwoFAAction(BaseModel):
@@ -54,7 +54,10 @@ class SMS2FAAction(BaseModel):
 
 
 class TwoFAAction(BaseModel):
-    action: EmailTwoFAAction | SlackTwoFAAction | SMS2FAAction
+    action: Annotated[
+        EmailTwoFAAction | SlackTwoFAAction | SMS2FAAction,
+        Field(discriminator="type"),
+    ]
     instructions: str | None = None
     output_variable_name: str
     max_wait_time: float = 300.0
