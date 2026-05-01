@@ -1,6 +1,6 @@
 # Optexity
 
-**Build custom browser agents** with AI-powered automation. Record browser interactions, extract data, and run complex workflows via a simple API. You can extract data from websites, fill out forms, do QA testing, and more.
+**Build custom browser agents** with AI-powered automation. Record browser interactions, extract data, and run complex workflows via a simple API. You can extract data from websites, fill out forms, do QA testing, and more
 
 ## Features
 
