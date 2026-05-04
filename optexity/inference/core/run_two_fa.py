@@ -12,12 +12,14 @@ from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.two_fa_action import (
     EmailTwoFAAction,
     SlackTwoFAAction,
+    SMS2FAAction,
     TwoFAAction,
 )
 from optexity.schema.inference import (
     FetchEmailMessagesRequest,
     FetchMessagesResponse,
     FetchSlackMessagesRequest,
+    FetchSMSMessagesRequest,
 )
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
@@ -92,7 +94,7 @@ async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory, task: Ta
 
 
 async def fetch_messages(
-    action: EmailTwoFAAction | SlackTwoFAAction,
+    action: EmailTwoFAAction | SlackTwoFAAction | SMS2FAAction,
     memory: Memory,
     max_wait_time: float,
     task: Task,
@@ -121,6 +123,15 @@ async def fetch_messages(
             slack_workspace_domain=action.slack_workspace_domain,
             channel_name=action.channel_name,
             sender_name=action.sender_name,
+            start_2fa_time=start_2fa_time,
+            end_2fa_time=end_2fa_time,
+            endpoint_name=task.endpoint_name,
+        )
+    elif isinstance(action, SMS2FAAction):
+        url = urljoin(settings.SERVER_URL, settings.FETCH_SMS_MESSAGES_ENDPOINT)
+        body = FetchSMSMessagesRequest(
+            from_number=action.from_number,
+            to_number=action.to_number,
             start_2fa_time=start_2fa_time,
             end_2fa_time=end_2fa_time,
             endpoint_name=task.endpoint_name,

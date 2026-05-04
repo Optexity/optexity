@@ -1,9 +1,9 @@
 ---
 title: Two-Factor Authentication Integration
-description: Fetch 2FA codes from Gmail and Slack for automations
+description: Fetch 2FA codes from Gmail, Slack, and Twilio SMS for automations
 ---
 
-Automatically fetch 2FA verification codes from email or Slack messages—no manual code entry required.
+Automatically fetch 2FA verification codes from email, Slack, or Twilio SMS messages—no manual code entry required.
 
 <Info>
 For TOTP codes from authenticator apps, see [TOTP Integration](/docs/advanced/totp-integration).
@@ -15,10 +15,11 @@ For TOTP codes from authenticator apps, see [TOTP Integration](/docs/advanced/to
 | --------- | --------------- | -------------------- |
 | **Email** | Gmail inbox     | Codes sent via email |
 | **Slack** | Slack workspace | Codes sent via Slack |
+| **SMS**   | Twilio SMS      | Codes sent via text  |
 
-Both methods follow the same pattern:
+All methods follow the same pattern:
 
-1. Fetch messages from the source (email inbox or Slack channel)
+1. Fetch messages from the source (email inbox, Slack channel, or Twilio SMS)
 2. Extract the 2FA code from matching messages
 3. Store the code in the specified `output_variable_name`
 4. Use `{output_variable_name}` in subsequent actions to input the code
@@ -30,6 +31,13 @@ Both methods follow the same pattern:
 1. Go to the [Optexity dashboard](https://app.optexity.com) → **Integrations**
 2. Click the desired integration → **Connect**
 3. Follow the prompts to grant access
+
+### Twilio SMS
+
+1. Log in to your Twilio account and open the Twilio Console
+2. Go to **API Credentials** and copy your **Account SID** and **Auth Token**
+3. Add or select a Twilio phone number that will send or receive verification texts
+4. Connect the Twilio integration in Optexity using the same credentials and phone number
 
 ---
 
@@ -99,9 +107,40 @@ Fetch verification codes from Slack messages:
 
 ---
 
+## SMS 2FA
+
+Fetch verification codes from Twilio SMS messages:
+
+```json
+{
+  "type": "action_node",
+  "extraction_action": {
+    "two_fa_action": {
+      "action": {
+        "type": "sms_two_fa_action",
+        "from_number": "+18777804236",
+        "to_number": "+19897878948"
+      },
+      "output_variable_name": "auth_code"
+    }
+  },
+  "before_sleep_time": 3,
+  "end_sleep_time": 0
+}
+```
+
+### Properties
+
+| Property      | Type  | Required | Description                               |
+| ------------- | ----- | -------- | ----------------------------------------- |
+| `from_number`  | `str` | Yes      | Twilio phone number sending the SMS code  |
+| `to_number`    | `str` | Yes      | Destination phone number receiving the SMS |
+
+---
+
 ## Common Properties
 
-These apply to both Email and Slack 2FA:
+These apply to Email, Slack, and SMS 2FA:
 
 | Property               | Type    | Default | Description                              |
 | ---------------------- | ------- | ------- | ---------------------------------------- |
@@ -126,7 +165,7 @@ Reference the extracted code in subsequent actions:
   "interaction_action": {
     "input_text": {
       "command": "get_by_label(\"Verification Code\")",
-      "input_text": "{auth_code}"
+      "input_text": "{auth_code[0]}"
     }
   }
 }
