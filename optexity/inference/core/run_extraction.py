@@ -1,9 +1,12 @@
+import asyncio
 import logging
 import traceback
 
 import aiofiles
 import httpx
 
+from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
+from optexity.inference.core.run_interaction import _get_error_handler
 from optexity.inference.core.run_two_fa import run_two_fa_action
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import get_llm_model_with_fallback
@@ -17,6 +20,7 @@ from optexity.schema.actions.extraction_action import (
     ScreenshotExtraction,
     StateExtraction,
 )
+from optexity.schema.actions.interaction_action import CloseOverlayPopupAction
 from optexity.schema.memory import (
     BrowserState,
     Memory,
@@ -28,6 +32,22 @@ from optexity.schema.memory import (
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
+
+_LLM_EXTRACTION_MAX_ATTEMPTS = 2  # initial extraction + at most 1 retry
+
+
+def _llm_extraction_uses_axtree_or_screenshot(llm_extraction: LLMExtraction) -> bool:
+    return bool(set(llm_extraction.source) & {"axtree", "screenshot"})
+
+
+def _extraction_response_contains_null(obj) -> bool:
+    if obj is None:
+        return True
+    if isinstance(obj, dict):
+        return any(_extraction_response_contains_null(v) for v in obj.values())
+    if isinstance(obj, list):
+        return any(_extraction_response_contains_null(v) for v in obj)
+    return False
 
 
 async def run_extraction_action(
@@ -168,62 +188,120 @@ async def handle_llm_extraction(
     task: Task,
     unique_identifier: str | None = None,
 ):
-    browser_state_summary = await browser.get_browser_state_summary(
-        include_full_page=llm_extraction.include_full_page
-    )
-    memory.browser_states[-1] = BrowserState(
-        url=browser_state_summary.url,
-        screenshot=browser_state_summary.screenshot,
-        title=browser_state_summary.title,
-        axtree=browser_state_summary.dom_state.llm_representation(
-            remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-        ),
-    )
-
-    # TODO: fix this double calling of screenshot and axtree
-    if "axtree" in llm_extraction.source:
-        axtree = memory.browser_states[-1].axtree
-    else:
-        axtree = None
-
-    if "screenshot" in llm_extraction.source:
-        screenshot = memory.browser_states[-1].screenshot
-    else:
-        screenshot = None
-
     system_instruction = f"""
     You are an expert in extracting information from a website. You will be given an axtree of a webpage.
     Your task is to extract the information from the webpage and return it in the format specified by the instructions. You will be first provided the instructions and then the axtree.
     Instructions: {llm_extraction.extraction_instructions}
     """
 
-    prompt = f"""
+    provider = llm_extraction.llm_provider or task.llm_provider
+    model_name_str = llm_extraction.llm_model_name or task.llm_model_name
+    llm_model = get_llm_model_with_fallback(provider, model_name_str, True)
+
+    response_dict: dict | None = None
+    last_prompt: str = ""
+
+    for attempt in range(_LLM_EXTRACTION_MAX_ATTEMPTS):
+        browser_state_summary = await browser.get_browser_state_summary(
+            include_full_page=llm_extraction.include_full_page
+        )
+        memory.browser_states[-1] = BrowserState(
+            url=browser_state_summary.url,
+            screenshot=browser_state_summary.screenshot,
+            title=browser_state_summary.title,
+            axtree=browser_state_summary.dom_state.llm_representation(
+                remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+            ),
+        )
+
+        if "axtree" in llm_extraction.source:
+            axtree = memory.browser_states[-1].axtree
+        else:
+            axtree = None
+
+        if "screenshot" in llm_extraction.source:
+            screenshot = memory.browser_states[-1].screenshot
+        else:
+            screenshot = None
+
+        prompt = f"""
     [INPUT]
     Axtree: {axtree}
     [/INPUT]
     """
 
-    provider = llm_extraction.llm_provider or task.llm_provider
-    model_name_str = llm_extraction.llm_model_name or task.llm_model_name
-    llm_model = get_llm_model_with_fallback(provider, model_name_str, True)
+        response, token_usage = llm_model.get_model_response_with_structured_output(
+            prompt=prompt,
+            response_schema=llm_extraction.build_model(),
+            screenshot=screenshot,
+            system_instruction=system_instruction,
+        )
+        response_dict = response.model_dump()
+        memory.token_usage += token_usage
+        last_prompt = f"{system_instruction}\n{prompt}"
+        memory.browser_states[-1].final_prompt = last_prompt
 
-    response, token_usage = llm_model.get_model_response_with_structured_output(
-        prompt=prompt,
-        response_schema=llm_extraction.build_model(),
-        screenshot=screenshot,
-        system_instruction=system_instruction,
-    )
-    response_dict = response.model_dump()
+        logger.debug(
+            f"LLM extraction response (attempt {attempt + 1}): {response_dict}"
+        )
+
+        v2_null_retry_eligible = (
+            task.version == "v2"
+            and _llm_extraction_uses_axtree_or_screenshot(llm_extraction)
+            and _extraction_response_contains_null(response_dict)
+        )
+
+        if not v2_null_retry_eligible or attempt == _LLM_EXTRACTION_MAX_ATTEMPTS - 1:
+            break
+
+        browser_state_summary = await browser.get_browser_state_summary(
+            include_full_page=llm_extraction.include_full_page
+        )
+        memory.browser_states[-1] = BrowserState(
+            url=browser_state_summary.url,
+            screenshot=browser_state_summary.screenshot,
+            title=browser_state_summary.title,
+            axtree=browser_state_summary.dom_state.llm_representation(
+                remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+            ),
+        )
+
+        axtree_for_classifier = memory.browser_states[-1].axtree or ""
+        shot = memory.browser_states[-1].screenshot
+        _, eh_response, eh_usage = _get_error_handler(task).classify_error(
+            llm_extraction.extraction_instructions,
+            axtree_for_classifier,
+            shot,
+        )
+        memory.token_usage += eh_usage
+
+        if eh_response.error_type == "fatal_error":
+            logger.debug(
+                "LLM extraction had null fields; classifier fatal_error — keeping result without further retries"
+            )
+            break
+        if eh_response.error_type == "website_not_loaded":
+            logger.debug(
+                "LLM extraction null fields; classifier website_not_loaded — sleeping 5s before retry"
+            )
+            await asyncio.sleep(5)
+        elif eh_response.error_type == "overlay_popup_blocking":
+            logger.debug(
+                "LLM extraction null fields; classifier overlay_popup_blocking — closing overlay then retry"
+            )
+            await handle_agentic_task(CloseOverlayPopupAction(), task, memory, browser)
+        else:
+            logger.debug(
+                "LLM extraction null fields; classifier could_retry_now — immediate retry"
+            )
+
+    assert response_dict is not None
+
     output_data = OutputData(
         unique_identifier=unique_identifier, json_data=response_dict
     )
 
-    logger.debug(f"Response: {response_dict}")
-
-    memory.token_usage += token_usage
     memory.variables.output_data.append(output_data)
-
-    memory.browser_states[-1].final_prompt = f"{system_instruction}\n{prompt}"
 
     if llm_extraction.output_variable_names is not None:
         for output_variable_name in llm_extraction.output_variable_names:
