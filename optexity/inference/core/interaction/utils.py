@@ -341,8 +341,8 @@ async def handle_download(
         # download = await download_info.value
         # logger.info(f"Suggested filename: {download.suggested_filename}")
 
-        timeout = 30.0
-        poll_interval = 0.5
+        timeout = 120.0
+        poll_interval = 2.0
         elapsed = 0.0
         new_file: str | None = None
 
@@ -378,7 +378,7 @@ async def handle_download(
                 or len(in_progress_files) > 0
             )
             if has_signal:
-                extra_timeout = 60.0
+                extra_timeout = 30.0
                 logger.warning(
                     f"handle_download: primary {timeout}s window elapsed without a "
                     f"finalized file; extending by {extra_timeout}s "
