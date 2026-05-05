@@ -164,3 +164,14 @@ def is_local_path(value: str | Path) -> bool:
         return Path(str(value)).expanduser().exists()
     except Exception:
         return False
+
+
+def deep_replace(obj, pattern: str, replacement: str):
+    """Recursively replace pattern in all string values of a dict/list."""
+    if isinstance(obj, str):
+        return obj.replace(pattern, replacement)
+    if isinstance(obj, dict):
+        return {k: deep_replace(v, pattern, replacement) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [deep_replace(item, pattern, replacement) for item in obj]
+    return obj

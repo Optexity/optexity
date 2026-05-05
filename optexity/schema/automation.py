@@ -172,6 +172,8 @@ class ActionNode(BaseModel):
         api_key: str | None = None,
     ):
         for key, values in variables.items():
+            if not isinstance(values, list):
+                continue  # skip non-list values (e.g., api_call response dicts)
 
             for index, value in enumerate(values):
                 pattern = f"{{{key}[{index}]}}"
