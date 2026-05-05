@@ -27,6 +27,7 @@ class ErrorHandlerAgent:
     def classify_error(
         self, command: str, axtree: str, screenshot: str | None
     ) -> tuple[str, ErrorHandlerOutput, TokenUsage]:
+        """The first argument may be a Playwright command or LLM extraction_instructions."""
 
         final_prompt = f"""
         [INPUT]
