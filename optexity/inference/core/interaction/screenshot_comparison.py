@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import cv2
 import httpx
 import numpy as np
 from pydantic import BaseModel
@@ -58,9 +59,47 @@ def _crop_at(screenshot_b64: str, x: int, y: int) -> str:
     return base64.b64encode(_cv2_to_bytes(cropped)).decode("utf-8")
 
 
+_LABEL_HEIGHT = 36
+_LABEL_FONT = cv2.FONT_HERSHEY_SIMPLEX
+_LABEL_FONT_SCALE = 0.7
+_LABEL_FONT_THICKNESS = 2
+_LABEL_BG_COLOR = (30, 30, 30)  # dark gray background
+_LABEL_LEFT_TEXT = "RECORDING (Reference)"
+_LABEL_RIGHT_TEXT = "CURRENT SCREEN (Evaluate this)"
+_DIVIDER_WIDTH = 16
+_DIVIDER_COLOR = (0, 0, 200)  # red in BGR
+
+
+def _add_label(img: np.ndarray, text: str) -> np.ndarray:
+    """Add a labeled header bar above an image."""
+    h, w = img.shape[:2]
+    label_bar = np.full((_LABEL_HEIGHT, w, 3), _LABEL_BG_COLOR, dtype=np.uint8)
+    text_size = cv2.getTextSize(
+        text, _LABEL_FONT, _LABEL_FONT_SCALE, _LABEL_FONT_THICKNESS
+    )[0]
+    text_x = (w - text_size[0]) // 2
+    text_y = (_LABEL_HEIGHT + text_size[1]) // 2
+    cv2.putText(
+        label_bar,
+        text,
+        (text_x, text_y),
+        _LABEL_FONT,
+        _LABEL_FONT_SCALE,
+        (255, 255, 255),
+        _LABEL_FONT_THICKNESS,
+        cv2.LINE_AA,
+    )
+    return np.vstack([label_bar, img])
+
+
 def _build_composite(left_b64: str, right_b64: str) -> str:
     left = _load_cv2(left_b64)
     right = _load_cv2(right_b64)
+
+    # Add labels above each half
+    left = _add_label(left, _LABEL_LEFT_TEXT)
+    right = _add_label(right, _LABEL_RIGHT_TEXT)
+
     target_h = max(left.shape[0], right.shape[0])
 
     def _pad(img: np.ndarray) -> np.ndarray:
@@ -70,7 +109,7 @@ def _build_composite(left_b64: str, right_b64: str) -> str:
             return np.vstack([img, pad])
         return img
 
-    divider = np.full((target_h, 4, 3), 200, dtype=np.uint8)
+    divider = np.full((target_h, _DIVIDER_WIDTH, 3), _DIVIDER_COLOR, dtype=np.uint8)
     combined = np.hstack([_pad(left), divider, _pad(right)])
     return base64.b64encode(_cv2_to_bytes(combined)).decode("utf-8")
 
