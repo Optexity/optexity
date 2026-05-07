@@ -12,6 +12,7 @@ from typing import Literal
 import aiohttp
 from playwright.async_api import ProxySettings
 
+from optexity.inference.infra.ffmpeg_recorder import FFmpegRecorder
 from optexity.inference.infra.utils import _download_extension, _extract_extension
 from optexity.utils.settings import settings
 
@@ -104,6 +105,7 @@ class ActualBrowser:
             "chrome", "chromium", "cloakbrowser", "browser-use", "rdp"
         ] = channel
         self.record_video_dir = record_video_dir
+        self.recorder: FFmpegRecorder | None = None
         self.extensions = [
             # {
             #     "name": "optexity recorder",
@@ -215,6 +217,22 @@ class ActualBrowser:
         else:
             await self.start_native_browser()
 
+        await self._start_recorder()
+
+    async def _start_recorder(self):
+        if self.record_video_dir is None:
+            logger.info(
+                "[recording] record_video_dir is None — skipping ffmpeg recorder"
+            )
+            return
+        if self.channel == "browser-use":
+            logger.info(
+                "[recording] channel='browser-use' runs in the cloud — skipping local ffmpeg recorder"
+            )
+            return
+        self.recorder = FFmpegRecorder(self.record_video_dir)
+        await self.recorder.start()
+
     async def start_native_browser(self):
         try:
             logger.debug("Starting actual browser")
@@ -283,15 +301,6 @@ class ActualBrowser:
                     proxy=self.get_proxy_playwright(),  # type: ignore
                     env=env,
                 )
-                if self.record_video_dir is not None:
-                    context_kwargs["record_video_dir"] = str(self.record_video_dir)
-                    logger.info(
-                        f"[recording] Launching browser context with record_video_dir={self.record_video_dir}"
-                    )
-                else:
-                    logger.warning(
-                        "[recording] Launching browser context WITHOUT record_video_dir — no video will be recorded"
-                    )
                 self.context = await launch_persistent_context_async(**context_kwargs)
                 self.cdp_url = f"http://localhost:{self.port}"
 
@@ -334,6 +343,14 @@ class ActualBrowser:
             await self._wait_for_cdp(timeout)
 
     async def stop(self, graceful=True):
+        # Stop ffmpeg before tearing down the browser so the X display is still
+        # populated while the encoder finalises the trailing frames.
+        if self.recorder is not None:
+            try:
+                await self.recorder.stop()
+            except Exception as e:
+                logger.error(f"[recording] error stopping recorder: {e}")
+
         if settings.USE_PLAYWRIGHT_BROWSER:
             if (
                 self.channel == "browser-use"
@@ -378,37 +395,21 @@ class ActualBrowser:
             self.playwright = None
 
     async def get_video_path(self) -> Path | None:
-        """Return the declared video file path before the context is closed.
+        """Finalise the ffmpeg recorder (if running) and return the mp4 path.
 
-        Must be called BEFORE stop() / context.close() — Playwright finalises the
-        file on close, but the path is declared in advance.
+        Safe to call before browser stop(). Stopping ffmpeg here flushes the
+        moov atom so the file is playable; subsequent calls are idempotent.
         """
-        if self.record_video_dir is None:
+        if self.recorder is None:
             logger.warning(
-                "[recording] get_video_path called but record_video_dir is None — recording was never configured"
-            )
-            return None
-        logger.info(
-            f"[recording] record_video_dir={self.record_video_dir}, context={self.context}, pages={len(self.context.pages) if self.context else 'N/A'}"
-        )
-        if self.context is None or not self.context.pages:
-            logger.warning(
-                "[recording] get_video_path: context is None or has no pages"
+                "[recording] get_video_path: no recorder attached — recording was not configured for this browser"
             )
             return None
         try:
-            page = self.context.pages[0]
-            if page.video is None:
-                logger.warning(
-                    "[recording] get_video_path: page.video is None — Playwright did not attach a video recorder to this page"
-                )
-                return None
-            path_str = await page.video.path()
-            logger.info(f"[recording] get_video_path resolved to: {path_str}")
-            return Path(path_str)
+            return await self.recorder.stop()
         except Exception as e:
-            logger.error(f"[recording] Failed to get video path: {e}")
-            return None
+            logger.error(f"[recording] get_video_path: recorder.stop failed: {e}")
+            return self.recorder.get_video_path()
 
     def get_extension_paths(self) -> list[str]:
         cache_dir = pathlib.Path("/tmp/extensions")

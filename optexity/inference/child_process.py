@@ -272,7 +272,9 @@ async def run_automation_in_process(
         )
         log_system_info("Memory info after automation finished in process")
 
-        # Capture declared video path BEFORE context is closed (Playwright finalises on close)
+        # Stop ffmpeg recorder (if running) and capture the finalised mp4 path
+        # before tearing down the browser. get_video_path is idempotent and
+        # finalises the moov atom so the file is playable.
         video_path: Path | None = None
         if _global_actual_browser is not None:
             logger.info(
