@@ -285,6 +285,13 @@ class ActualBrowser:
                 )
                 if self.record_video_dir is not None:
                     context_kwargs["record_video_dir"] = str(self.record_video_dir)
+                    logger.info(
+                        f"[recording] Launching browser context with record_video_dir={self.record_video_dir}"
+                    )
+                else:
+                    logger.warning(
+                        "[recording] Launching browser context WITHOUT record_video_dir — no video will be recorded"
+                    )
                 self.context = await launch_persistent_context_async(**context_kwargs)
                 self.cdp_url = f"http://localhost:{self.port}"
 
@@ -377,17 +384,30 @@ class ActualBrowser:
         file on close, but the path is declared in advance.
         """
         if self.record_video_dir is None:
+            logger.warning(
+                "[recording] get_video_path called but record_video_dir is None — recording was never configured"
+            )
             return None
+        logger.info(
+            f"[recording] record_video_dir={self.record_video_dir}, context={self.context}, pages={len(self.context.pages) if self.context else 'N/A'}"
+        )
         if self.context is None or not self.context.pages:
+            logger.warning(
+                "[recording] get_video_path: context is None or has no pages"
+            )
             return None
         try:
             page = self.context.pages[0]
             if page.video is None:
+                logger.warning(
+                    "[recording] get_video_path: page.video is None — Playwright did not attach a video recorder to this page"
+                )
                 return None
             path_str = await page.video.path()
+            logger.info(f"[recording] get_video_path resolved to: {path_str}")
             return Path(path_str)
         except Exception as e:
-            logger.error(f"Failed to get video path: {e}")
+            logger.error(f"[recording] Failed to get video path: {e}")
             return None
 
     def get_extension_paths(self) -> list[str]:

@@ -233,7 +233,15 @@ async def save_trajectory_in_server(task: Task, video_path: Path | None = None):
             "task_id": task.task_id,  # form field
         }
 
+        logger.info(
+            f"[save_trajectory] Starting upload for task {task.task_id}, video_path={video_path}"
+        )
+
         tar_bytes = create_tar_in_memory(task.task_directory, task.task_id)
+        trajectory_size = tar_bytes.getbuffer().nbytes
+        logger.info(
+            f"[save_trajectory] Trajectory tar size: {trajectory_size} bytes for task {task.task_id}"
+        )
         files = {
             "compressed_trajectory": (
                 f"{task.task_id}.tar.gz",
@@ -242,32 +250,57 @@ async def save_trajectory_in_server(task: Task, video_path: Path | None = None):
             )
         }
 
-        if video_path is not None and video_path.exists():
+        if video_path is None:
+            logger.warning(
+                f"[save_trajectory] video_path is None — no recording will be uploaded for task {task.task_id}"
+            )
+        elif not video_path.exists():
+            logger.warning(
+                f"[save_trajectory] video_path does not exist: {video_path} — no recording will be uploaded for task {task.task_id}"
+            )
+        else:
+            video_size = video_path.stat().st_size
+            logger.info(
+                f"[save_trajectory] Found recording at {video_path} ({video_size} bytes) for task {task.task_id}"
+            )
             recording_tar = io.BytesIO()
             with tarfile.open(fileobj=recording_tar, mode="w:gz") as tar:
                 tar.add(video_path, arcname=f"{task.task_id}.mp4")
             recording_tar.seek(0)
+            recording_tar_size = recording_tar.getbuffer().nbytes
+            logger.info(
+                f"[save_trajectory] Recording tar size: {recording_tar_size} bytes for task {task.task_id}"
+            )
             files["compressed_recording"] = (
                 f"{task.task_id}_recording.tar.gz",
                 recording_tar,
                 "application/gzip",
             )
             logger.info(
-                f"✓ Recording attached to trajectory upload for task {task.task_id}"
+                f"[save_trajectory] Recording attached to trajectory upload for task {task.task_id}"
             )
 
+        logger.info(
+            f"[save_trajectory] POSTing to {url} with fields: {list(files.keys())} for task {task.task_id}"
+        )
         async with httpx.AsyncClient(timeout=30.0) as client:
 
             response = await client.post(url, headers=headers, data=data, files=files)
 
+            logger.info(
+                f"[save_trajectory] Response status: {response.status_code} for task {task.task_id}"
+            )
             response.raise_for_status()
             return response.json()
     except httpx.HTTPStatusError as e:
         logger.error(
-            f"Failed to save trajectory in server: {e.response.status_code} - {e.response.text}"
+            f"[save_trajectory] HTTP error for task {task.task_id}: {e.response.status_code} - {e.response.text}"
         )
     except Exception as e:
-        logger.error(f"Failed to save trajectory in server: {e}")
+        logger.error(
+            f"[save_trajectory] Unexpected error for task {task.task_id}: {e}",
+            exc_info=True,
+        )
 
 
 async def initiate_callback(task: Task):

@@ -112,10 +112,18 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
 
     if _global_actual_browser is None:
         logger.info("Starting new actual browser")
+        logger.info(
+            f"[recording] USE_PLAYWRIGHT_BROWSER={settings.USE_PLAYWRIGHT_BROWSER}"
+        )
         record_video_dir: Path | None = None
         if settings.USE_PLAYWRIGHT_BROWSER:
             record_video_dir = Path(f"/tmp/optexity_recordings/{task.task_id}")
             record_video_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"[recording] record_video_dir set to {record_video_dir}")
+        else:
+            logger.warning(
+                "[recording] USE_PLAYWRIGHT_BROWSER is False — video recording is disabled"
+            )
         _global_actual_browser = ActualBrowser(
             channel=task.automation.browser_channel,
             unique_child_arn=unique_child_arn,
@@ -267,7 +275,11 @@ async def run_automation_in_process(
         # Capture declared video path BEFORE context is closed (Playwright finalises on close)
         video_path: Path | None = None
         if _global_actual_browser is not None:
+            logger.info(
+                f"[recording] Fetching video path before browser close for task {task.task_id}"
+            )
             video_path = await _global_actual_browser.get_video_path()
+            logger.info(f"[recording] video_path={video_path} for task {task.task_id}")
 
         if _global_actual_browser is not None:
             logger.debug("Stopping actual browser")
