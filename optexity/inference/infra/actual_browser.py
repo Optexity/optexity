@@ -6,6 +6,7 @@ import platform
 import shutil
 import signal
 import time
+from pathlib import Path
 from typing import Literal
 
 import aiohttp
@@ -85,6 +86,7 @@ class ActualBrowser:
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
         os_emulation: OsEmulation = None,
+        record_video_dir: Path | None = None,
     ):
         # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
@@ -101,6 +103,7 @@ class ActualBrowser:
         self.channel: Literal[
             "chrome", "chromium", "cloakbrowser", "browser-use", "rdp"
         ] = channel
+        self.record_video_dir = record_video_dir
         self.extensions = [
             # {
             #     "name": "optexity recorder",
@@ -270,8 +273,7 @@ class ActualBrowser:
                     )
 
                 env = {**os.environ, "DISPLAY": DISPLAY}
-                self.context = await launch_persistent_context_async(
-                    # humanize=True,
+                context_kwargs: dict = dict(
                     channel=self.channel,
                     user_data_dir=self.user_data_dir,
                     headless=self.headless,
@@ -281,6 +283,9 @@ class ActualBrowser:
                     proxy=self.get_proxy_playwright(),  # type: ignore
                     env=env,
                 )
+                if self.record_video_dir is not None:
+                    context_kwargs["record_video_dir"] = str(self.record_video_dir)
+                self.context = await launch_persistent_context_async(**context_kwargs)
                 self.cdp_url = f"http://localhost:{self.port}"
 
                 await self._wait_for_cdp()
@@ -364,6 +369,26 @@ class ActualBrowser:
         if self.playwright is not None:
             await self.playwright.stop()
             self.playwright = None
+
+    async def get_video_path(self) -> Path | None:
+        """Return the declared video file path before the context is closed.
+
+        Must be called BEFORE stop() / context.close() — Playwright finalises the
+        file on close, but the path is declared in advance.
+        """
+        if self.record_video_dir is None:
+            return None
+        if self.context is None or not self.context.pages:
+            return None
+        try:
+            page = self.context.pages[0]
+            if page.video is None:
+                return None
+            path_str = await page.video.path()
+            return Path(path_str)
+        except Exception as e:
+            logger.error(f"Failed to get video path: {e}")
+            return None
 
     def get_extension_paths(self) -> list[str]:
         cache_dir = pathlib.Path("/tmp/extensions")

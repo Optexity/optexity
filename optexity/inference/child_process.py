@@ -4,12 +4,14 @@ import json
 import logging
 import os
 import pathlib
+import shutil
 import signal
 import subprocess
 import sys
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urljoin
 
 import httpx
@@ -110,6 +112,10 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
 
     if _global_actual_browser is None:
         logger.info("Starting new actual browser")
+        record_video_dir: Path | None = None
+        if settings.USE_PLAYWRIGHT_BROWSER:
+            record_video_dir = Path(f"/tmp/optexity_recordings/{task.task_id}")
+            record_video_dir.mkdir(parents=True, exist_ok=True)
         _global_actual_browser = ActualBrowser(
             channel=task.automation.browser_channel,
             unique_child_arn=unique_child_arn,
@@ -121,6 +127,7 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
                 settings.PROXY_PROVIDER if task.use_proxy else None
             ),
             os_emulation=task.automation.os_emulation,
+            record_video_dir=record_video_dir,
         )
         try:
             await _global_actual_browser.start()
@@ -257,8 +264,13 @@ async def run_automation_in_process(
         )
         log_system_info("Memory info after automation finished in process")
 
-        if _global_actual_browser is not None and not task.is_dedicated:
-            logger.debug("Stopping actual browser as not dedicated")
+        # Capture declared video path BEFORE context is closed (Playwright finalises on close)
+        video_path: Path | None = None
+        if _global_actual_browser is not None:
+            video_path = await _global_actual_browser.get_video_path()
+
+        if _global_actual_browser is not None:
+            logger.debug("Stopping actual browser")
             try:
                 await _global_actual_browser.stop(graceful=True)
                 _global_actual_browser = None
@@ -271,7 +283,12 @@ async def run_automation_in_process(
         file_handler.close()
         logging.getLogger(current_module).removeHandler(file_handler)
 
-        await save_trajectory_in_server(task)
+        await save_trajectory_in_server(task, video_path=video_path)
+
+        # Clean up temp recording directory
+        if video_path is not None:
+            shutil.rmtree(video_path.parent, ignore_errors=True)
+
         await delete_local_data(task)
 
 

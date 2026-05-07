@@ -224,7 +224,7 @@ async def save_downloads_in_server(task: Task, memory: Memory):
         logger.error(f"Failed to save downloads in server: {e}")
 
 
-async def save_trajectory_in_server(task: Task):
+async def save_trajectory_in_server(task: Task, video_path: Path | None = None):
     try:
         url = urljoin(settings.SERVER_URL, settings.SAVE_TRAJECTORY_ENDPOINT)
         headers = {"x-api-key": task.api_key}
@@ -241,6 +241,21 @@ async def save_trajectory_in_server(task: Task):
                 "application/gzip",
             )
         }
+
+        if video_path is not None and video_path.exists():
+            recording_tar = io.BytesIO()
+            with tarfile.open(fileobj=recording_tar, mode="w:gz") as tar:
+                tar.add(video_path, arcname=f"{task.task_id}.mp4")
+            recording_tar.seek(0)
+            files["compressed_recording"] = (
+                f"{task.task_id}_recording.tar.gz",
+                recording_tar,
+                "application/gzip",
+            )
+            logger.info(
+                f"✓ Recording attached to trajectory upload for task {task.task_id}"
+            )
+
         async with httpx.AsyncClient(timeout=30.0) as client:
 
             response = await client.post(url, headers=headers, data=data, files=files)
