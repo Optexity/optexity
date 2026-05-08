@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import pathlib
@@ -127,6 +128,53 @@ class ActualBrowser:
         if self.channel == "browser-use" and self.is_dedicated:
             raise ValueError("Browser-use is not supported for dedicated browsers")
 
+    def _seed_print_preferences(self) -> None:
+        """Seed Chrome Preferences so --kiosk-printing silently saves PDFs.
+
+        Why: --kiosk-printing alone uses whatever destination the profile last
+        selected; on a fresh user-data-dir that's nothing, so prints either
+        no-op or fall back to the preview dialog. Pre-writing
+        print_preview_sticky_settings pins destination to "Save as PDF" and
+        savefile.default_directory routes the output into temp_downloads_dir,
+        where handle_download() already polls for new files.
+        """
+        profile_dir = pathlib.Path(self.user_data_dir) / "Default"
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        prefs_path = profile_dir / "Preferences"
+
+        # Read existing prefs if present (dedicated browser case) so we don't
+        # clobber unrelated settings.
+        try:
+            existing = json.loads(prefs_path.read_text()) if prefs_path.exists() else {}
+        except Exception:
+            existing = {}
+
+        download_dir = "/tmp/temp_downloads"
+        os.makedirs(download_dir, exist_ok=True)
+
+        app_state = json.dumps(
+            {
+                "version": 2,
+                "recentDestinations": [
+                    {"id": "Save as PDF", "origin": "local", "account": ""}
+                ],
+                "selectedDestinationId": "Save as PDF",
+            }
+        )
+
+        existing.setdefault("printing", {})
+        existing["printing"]["print_preview_sticky_settings"] = {"appState": app_state}
+        existing.setdefault("savefile", {})
+        existing["savefile"]["default_directory"] = download_dir
+        existing.setdefault("download", {})
+        existing["download"]["default_directory"] = download_dir
+        existing["download"]["prompt_for_download"] = False
+
+        prefs_path.write_text(json.dumps(existing))
+        logger.info(
+            f"Seeded print prefs at {prefs_path} -> save PDFs to {download_dir}"
+        )
+
     def get_args(self) -> list[str]:
         args = [
             # ---- security / isolation (Playwright parity)
@@ -154,10 +202,11 @@ class ActualBrowser:
             f"--remote-debugging-port={self.port}",
             "--remote-debugging-address=127.0.0.1",
             # "--user-data-dir=\"/tmp/optexity_chrome_cdp\"",
-            '--profile-directory="Default"',
+            "--profile-directory=Default",
             # "--disable-blink-features=AutomationControlled",
             "--no-first-run",
             "--no-default-browser-check",
+            "--kiosk-printing",
         ]
 
         if self.os_emulation:
@@ -224,6 +273,8 @@ class ActualBrowser:
             if not self.is_dedicated:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
 
+            self._seed_print_preferences()
+
             self.chrome_path = find_chrome_binary(self.channel)
             env = {**os.environ, "DISPLAY": DISPLAY}
 
@@ -270,6 +321,7 @@ class ActualBrowser:
                     )
 
                 env = {**os.environ, "DISPLAY": DISPLAY}
+                self._seed_print_preferences()
                 self.context = await launch_persistent_context_async(
                     # humanize=True,
                     channel=self.channel,
