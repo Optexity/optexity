@@ -115,15 +115,9 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
         logger.info(
             f"[recording] USE_PLAYWRIGHT_BROWSER={settings.USE_PLAYWRIGHT_BROWSER}"
         )
-        record_video_dir: Path | None = None
-        if settings.USE_PLAYWRIGHT_BROWSER:
-            record_video_dir = Path(f"/tmp/optexity_recordings/{task.task_id}")
-            record_video_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"[recording] record_video_dir set to {record_video_dir}")
-        else:
-            logger.warning(
-                "[recording] USE_PLAYWRIGHT_BROWSER is False — video recording is disabled"
-            )
+        record_video_dir = Path(f"/tmp/optexity_recordings/{task.task_id}")
+        record_video_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"[recording] record_video_dir set to {record_video_dir}")
         _global_actual_browser = ActualBrowser(
             channel=task.automation.browser_channel,
             unique_child_arn=unique_child_arn,

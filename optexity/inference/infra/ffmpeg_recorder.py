@@ -129,9 +129,22 @@ class FFmpegRecorder:
 
             try:
                 await asyncio.wait_for(self.proc.wait(), timeout=timeout)
-                logger.info(
-                    f"[recording] ffmpeg exited gracefully rc={self.proc.returncode}"
-                )
+                rc = self.proc.returncode
+                if rc != 0:
+                    stderr_bytes = b""
+                    if self.proc.stderr:
+                        try:
+                            stderr_bytes = await asyncio.wait_for(
+                                self.proc.stderr.read(), timeout=2.0
+                            )
+                        except Exception:
+                            pass
+                    logger.error(
+                        f"[recording] ffmpeg exited with rc={rc}: "
+                        f"{stderr_bytes.decode(errors='replace')[:500]}"
+                    )
+                else:
+                    logger.info(f"[recording] ffmpeg exited gracefully rc={rc}")
             except asyncio.TimeoutError:
                 logger.warning(
                     f"[recording] ffmpeg did not exit within {timeout}s — sending SIGTERM"
@@ -154,6 +167,11 @@ class FFmpegRecorder:
 
         if self.output_path.exists():
             size = self.output_path.stat().st_size
+            if size == 0:
+                logger.error(
+                    f"[recording] ffmpeg output is zero bytes — recording failed: {self.output_path}"
+                )
+                return None
             logger.info(f"[recording] ffmpeg output: {self.output_path} ({size} bytes)")
             return self.output_path
         logger.error(f"[recording] ffmpeg output missing: {self.output_path}")

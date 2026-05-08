@@ -234,7 +234,7 @@ async def save_trajectory_in_server(task: Task, video_path: Path | None = None):
         }
 
         logger.info(
-            f"[save_trajectory] Starting upload for task {task.task_id}, video_path={video_path}"
+            f"[save_trajectory] ffmpeg Starting upload for task {task.task_id}, video_path={video_path}"
         )
 
         tar_bytes = create_tar_in_memory(task.task_directory, task.task_id)

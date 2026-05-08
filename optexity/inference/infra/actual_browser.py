@@ -13,6 +13,7 @@ import aiohttp
 from playwright.async_api import ProxySettings
 
 from optexity.inference.infra.ffmpeg_recorder import FFmpegRecorder
+from optexity.inference.infra.screenshot_recorder import ScreenshotRecorder
 from optexity.inference.infra.utils import _download_extension, _extract_extension
 from optexity.utils.settings import settings
 
@@ -105,7 +106,7 @@ class ActualBrowser:
             "chrome", "chromium", "cloakbrowser", "browser-use", "rdp"
         ] = channel
         self.record_video_dir = record_video_dir
-        self.recorder: FFmpegRecorder | None = None
+        self.recorder: FFmpegRecorder | ScreenshotRecorder | None = None
         self.extensions = [
             # {
             #     "name": "optexity recorder",
@@ -221,15 +222,22 @@ class ActualBrowser:
 
     async def _start_recorder(self):
         if self.record_video_dir is None:
-            logger.info(
-                "[recording] record_video_dir is None — skipping ffmpeg recorder"
-            )
+            logger.info("[recording] record_video_dir is None — skipping recorder")
             return
+
         if self.channel == "browser-use":
+            if self.cdp_url is None:
+                logger.warning(
+                    "[recording] browser-use cdp_url is None — cannot start screenshot recorder"
+                )
+                return
             logger.info(
-                "[recording] channel='browser-use' runs in the cloud — skipping local ffmpeg recorder"
+                f"[recording] channel='browser-use' — starting ScreenshotRecorder via CDP {self.cdp_url}"
             )
+            self.recorder = ScreenshotRecorder(self.record_video_dir, self.cdp_url)
+            await self.recorder.start()
             return
+
         self.recorder = FFmpegRecorder(self.record_video_dir)
         await self.recorder.start()
 
