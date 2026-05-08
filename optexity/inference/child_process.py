@@ -318,20 +318,31 @@ async def register_with_master():
     my_ip = metadata["Containers"][0]["Networks"][0]["IPv4Addresses"][0]
 
     my_port = None
+    my_stream_port = None
     for binding in metadata["Containers"][0].get("NetworkBindings", []):
         if binding["containerPort"] == settings.CHILD_PORT_OFFSET:
             my_port = binding["hostPort"]
-            break
+        elif binding["containerPort"] == settings.WEBSOCKIFY_PORT:
+            my_stream_port = binding["hostPort"]
 
     if not my_port:
         logger.error("Could not find host port binding")
         raise ValueError("Host port not found in metadata")
 
+    if not my_stream_port:
+        logger.error("Could not find stream port binding")
+        raise ValueError("Stream port not found in metadata")
+
     # Register with master
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
             f"http://{settings.SERVER_URL}/register_child",
-            json={"task_arn": my_task_arn, "private_ip": my_ip, "port": my_port},
+            json={
+                "task_arn": my_task_arn,
+                "private_ip": my_ip,
+                "port": my_port,
+                "stream_port": my_stream_port,
+            },
         )
         response.raise_for_status()
 

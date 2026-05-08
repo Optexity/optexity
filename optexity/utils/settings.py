@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     )
 
     CHILD_PORT_OFFSET: int = 9000
+    WEBSOCKIFY_PORT: int = 8080
     DEPLOYMENT: Literal["dev", "prod"]
     LOCAL_CALLBACK_URL: str | None = None
 
