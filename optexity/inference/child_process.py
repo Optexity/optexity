@@ -266,17 +266,9 @@ async def run_automation_in_process(
         )
         log_system_info("Memory info after automation finished in process")
 
-        # Stop ffmpeg recorder (if running) and capture the finalised mp4 path
-        # before tearing down the browser. get_video_path is idempotent and
-        # finalises the moov atom so the file is playable.
-        video_path: Path | None = None
-        if _global_actual_browser is not None:
-            logger.info(
-                f"[recording] Fetching video path before browser close for task {task.task_id}"
-            )
-            video_path = await _global_actual_browser.get_video_path()
-            logger.info(f"[recording] video_path={video_path} for task {task.task_id}")
-
+        # Stop the browser (and the ffmpeg recorder it owns) so the mp4 at
+        # /tmp/optexity_recordings/{task_id}/recording.mp4 is finalised before
+        # the final trajectory upload below picks it up.
         if _global_actual_browser is not None:
             logger.debug("Stopping actual browser")
             try:
@@ -291,11 +283,11 @@ async def run_automation_in_process(
         file_handler.close()
         logging.getLogger(current_module).removeHandler(file_handler)
 
-        await save_trajectory_in_server(task, video_path=video_path)
+        await save_trajectory_in_server(task)
 
         # Clean up temp recording directory
-        if video_path is not None:
-            shutil.rmtree(video_path.parent, ignore_errors=True)
+        recording_dir = Path(f"/tmp/optexity_recordings/{task.task_id}")
+        shutil.rmtree(recording_dir, ignore_errors=True)
 
         await delete_local_data(task)
 

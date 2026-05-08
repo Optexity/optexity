@@ -224,7 +224,26 @@ async def save_downloads_in_server(task: Task, memory: Memory):
         logger.error(f"Failed to save downloads in server: {e}")
 
 
-async def save_trajectory_in_server(task: Task, video_path: Path | None = None):
+RECORDING_BASE_DIR = Path("/tmp/optexity_recordings")
+
+
+def _resolve_recording_path(task_id: str) -> Path | None:
+    """Resolve the recording mp4 for this task from the well-known base path.
+
+    Returns None when the directory is missing, or when no non-empty mp4 exists
+    yet (e.g. ffmpeg is mid-recording during a checkpoint upload). Picks the
+    largest mp4 in the directory so the most-complete file wins.
+    """
+    task_dir = RECORDING_BASE_DIR / task_id
+    if not task_dir.exists():
+        return None
+    mp4_files = [p for p in task_dir.glob("*.mp4") if p.stat().st_size > 0]
+    if not mp4_files:
+        return None
+    return max(mp4_files, key=lambda p: p.stat().st_size)
+
+
+async def save_trajectory_in_server(task: Task):
     try:
         url = urljoin(settings.SERVER_URL, settings.SAVE_TRAJECTORY_ENDPOINT)
         headers = {"x-api-key": task.api_key}
@@ -233,8 +252,9 @@ async def save_trajectory_in_server(task: Task, video_path: Path | None = None):
             "task_id": task.task_id,  # form field
         }
 
+        video_path = _resolve_recording_path(task.task_id)
         logger.info(
-            f"[save_trajectory] ffmpeg Starting upload for task {task.task_id}, video_path={video_path}"
+            f"[save_trajectory] latest ffmpeg Starting upload for task {task.task_id}, video_path={video_path}"
         )
 
         tar_bytes = create_tar_in_memory(task.task_directory, task.task_id)
@@ -252,11 +272,7 @@ async def save_trajectory_in_server(task: Task, video_path: Path | None = None):
 
         if video_path is None:
             logger.warning(
-                f"[save_trajectory] video_path is None — no recording will be uploaded for task {task.task_id}"
-            )
-        elif not video_path.exists():
-            logger.warning(
-                f"[save_trajectory] video_path does not exist: {video_path} — no recording will be uploaded for task {task.task_id}"
+                f"[save_trajectory] no recording found at {RECORDING_BASE_DIR / task.task_id} — uploading trajectory only for task {task.task_id}"
             )
         else:
             video_size = video_path.stat().st_size
