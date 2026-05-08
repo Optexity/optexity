@@ -12,8 +12,6 @@ from typing import Literal
 import aiohttp
 from playwright.async_api import ProxySettings
 
-from optexity.inference.infra.ffmpeg_recorder import FFmpegRecorder
-from optexity.inference.infra.screenshot_recorder import ScreenshotRecorder
 from optexity.inference.infra.utils import _download_extension, _extract_extension
 from optexity.utils.settings import settings
 
@@ -88,7 +86,6 @@ class ActualBrowser:
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
         os_emulation: OsEmulation = None,
-        record_video_dir: Path | None = None,
     ):
         # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
@@ -105,8 +102,6 @@ class ActualBrowser:
         self.channel: Literal[
             "chrome", "chromium", "cloakbrowser", "browser-use", "rdp"
         ] = channel
-        self.record_video_dir = record_video_dir
-        self.recorder: FFmpegRecorder | ScreenshotRecorder | None = None
         self.extensions = [
             # {
             #     "name": "optexity recorder",
@@ -218,29 +213,6 @@ class ActualBrowser:
         else:
             await self.start_native_browser()
 
-        await self._start_recorder()
-
-    async def _start_recorder(self):
-        if self.record_video_dir is None:
-            logger.info("[recording] record_video_dir is None — skipping recorder")
-            return
-
-        if self.channel == "browser-use":
-            if self.cdp_url is None:
-                logger.warning(
-                    "[recording] browser-use cdp_url is None — cannot start screenshot recorder"
-                )
-                return
-            logger.info(
-                f"[recording] channel='browser-use' — starting ScreenshotRecorder via CDP {self.cdp_url}"
-            )
-            self.recorder = ScreenshotRecorder(self.record_video_dir, self.cdp_url)
-            await self.recorder.start()
-            return
-
-        self.recorder = FFmpegRecorder(self.record_video_dir)
-        await self.recorder.start()
-
     async def start_native_browser(self):
         try:
             logger.debug("Starting actual browser")
@@ -351,14 +323,6 @@ class ActualBrowser:
             await self._wait_for_cdp(timeout)
 
     async def stop(self, graceful=True):
-        # Stop ffmpeg before tearing down the browser so the X display is still
-        # populated while the encoder finalises the trailing frames.
-        if self.recorder is not None:
-            try:
-                await self.recorder.stop()
-            except Exception as e:
-                logger.error(f"[recording] error stopping recorder: {e}")
-
         if settings.USE_PLAYWRIGHT_BROWSER:
             if (
                 self.channel == "browser-use"
@@ -401,23 +365,6 @@ class ActualBrowser:
         if self.playwright is not None:
             await self.playwright.stop()
             self.playwright = None
-
-    async def get_video_path(self) -> Path | None:
-        """Finalise the ffmpeg recorder (if running) and return the mp4 path.
-
-        Safe to call before browser stop(). Stopping ffmpeg here flushes the
-        moov atom so the file is playable; subsequent calls are idempotent.
-        """
-        if self.recorder is None:
-            logger.warning(
-                "[recording] get_video_path: no recorder attached — recording was not configured for this browser"
-            )
-            return None
-        try:
-            return await self.recorder.stop()
-        except Exception as e:
-            logger.error(f"[recording] get_video_path: recorder.stop failed: {e}")
-            return self.recorder.get_video_path()
 
     def get_extension_paths(self) -> list[str]:
         cache_dir = pathlib.Path("/tmp/extensions")

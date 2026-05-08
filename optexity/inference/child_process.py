@@ -4,14 +4,12 @@ import json
 import logging
 import os
 import pathlib
-import shutil
 import signal
 import subprocess
 import sys
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from urllib.parse import urljoin
 
 import httpx
@@ -25,7 +23,6 @@ from optexity.inference.core.logging import (
     complete_task_in_server,
     delete_local_data,
     initiate_callback,
-    save_trajectory_in_server,
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.schema.enums import ExitCodes
@@ -112,12 +109,6 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
 
     if _global_actual_browser is None:
         logger.info("Starting new actual browser")
-        logger.info(
-            f"[recording] USE_PLAYWRIGHT_BROWSER={settings.USE_PLAYWRIGHT_BROWSER}"
-        )
-        record_video_dir = Path(f"/tmp/optexity_recordings/{task.task_id}")
-        record_video_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"[recording] record_video_dir set to {record_video_dir}")
         _global_actual_browser = ActualBrowser(
             channel=task.automation.browser_channel,
             unique_child_arn=unique_child_arn,
@@ -129,7 +120,6 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
                 settings.PROXY_PROVIDER if task.use_proxy else None
             ),
             os_emulation=task.automation.os_emulation,
-            record_video_dir=record_video_dir,
         )
         try:
             await _global_actual_browser.start()
@@ -266,9 +256,6 @@ async def run_automation_in_process(
         )
         log_system_info("Memory info after automation finished in process")
 
-        # Stop the browser (and the ffmpeg recorder it owns) so the mp4 at
-        # /tmp/optexity_recordings/{task_id}/recording.mp4 is finalised before
-        # the final trajectory upload below picks it up.
         if _global_actual_browser is not None:
             logger.debug("Stopping actual browser")
             try:
@@ -282,12 +269,6 @@ async def run_automation_in_process(
         file_handler.flush()
         file_handler.close()
         logging.getLogger(current_module).removeHandler(file_handler)
-
-        await save_trajectory_in_server(task)
-
-        # Clean up temp recording directory
-        recording_dir = Path(f"/tmp/optexity_recordings/{task.task_id}")
-        shutil.rmtree(recording_dir, ignore_errors=True)
 
         await delete_local_data(task)
 

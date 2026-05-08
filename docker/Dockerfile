@@ -16,7 +16,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     freerdp2-x11 \
     x11vnc novnc websockify \
     supervisor wmctrl \
-    ffmpeg \
     python3 python3-pip \
     && pip3 install --break-system-packages fastapi uvicorn \
     && rm -rf /var/lib/apt/lists/*

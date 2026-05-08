@@ -22,7 +22,6 @@ from optexity.inference.core.logging import (
     save_downloads_in_server,
     save_latest_memory_state_locally,
     save_output_data_in_server,
-    save_trajectory_in_server,
     start_task_in_server,
 )
 from optexity.inference.core.run_assertion import run_assertion_action
@@ -307,7 +306,6 @@ async def run_final_logging(
         await save_output_data_in_server(task, memory)
         await save_downloads_in_server(task, memory)
         await save_latest_memory_state_locally(task, memory, None)
-        await save_trajectory_in_server(task)
         await initiate_callback(task)
 
     except Exception as e:
@@ -381,8 +379,6 @@ async def run_action_node(
         raise e
     finally:
         await save_latest_memory_state_locally(task, memory, action_node)
-        if memory.automation_state.step_index % 5 == 0:
-            await save_trajectory_in_server(task)
 
     if action_node.expect_new_tab:
         found_new_tab, total_time = await browser.handle_new_tabs(
