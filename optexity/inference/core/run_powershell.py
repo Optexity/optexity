@@ -1,12 +1,19 @@
 import asyncio
 import logging
+import subprocess
 
 import pyautogui
-import pyperclip
 
 from optexity.schema.actions.powershell_action import PowerShellAction
 
 logger = logging.getLogger(__name__)
+
+
+def _xdotool_type(text: str) -> None:
+    """Type text into the focused X11 window using xdotool. No clipboard needed."""
+    subprocess.run(
+        ["xdotool", "type", "--clearmodifiers", "--delay", "20", text], check=True
+    )
 
 
 async def run_powershell_action(powershell_action: PowerShellAction):
@@ -17,17 +24,13 @@ async def run_powershell_action(powershell_action: PowerShellAction):
     # Execute each command
     for cmd in powershell_action.commands:
         logger.debug(f"Executing command: {cmd}")
-        pyperclip.copy(cmd)
-        await asyncio.sleep(0.2)
-        pyautogui.hotkey("ctrl", "v")
+        _xdotool_type(cmd)
         await asyncio.sleep(0.3)
         pyautogui.press("enter")
         await asyncio.sleep(1)
 
     # Close PowerShell
-    pyperclip.copy("exit")
-    await asyncio.sleep(0.2)
-    pyautogui.hotkey("ctrl", "v")
+    _xdotool_type("exit")
     await asyncio.sleep(0.3)
     pyautogui.press("enter")
 

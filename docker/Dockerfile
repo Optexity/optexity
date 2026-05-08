@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11vnc novnc websockify \
     supervisor wmctrl \
     python3 python3-pip \
-    xclip wl-clipboard \
+    xclip wl-clipboard xdotool \
     && pip3 install --break-system-packages fastapi uvicorn \
     && rm -rf /var/lib/apt/lists/*
 
