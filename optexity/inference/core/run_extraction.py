@@ -16,6 +16,7 @@ from optexity.inference.core.run_two_fa import run_two_fa_action
 from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import (
+    AnthropicModels,
     GeminiModels,
     get_llm_model,
     get_llm_model_with_fallback,
@@ -599,7 +600,7 @@ async def handle_vision_extraction(
         return
 
     memory.browser_states[-1].computer_use_screenshots.append(screenshot)
-    model = get_llm_model(GeminiModels.GEMINI_2_5_COMPUTER_USE, True)
+    model = get_llm_model(AnthropicModels.CLAUDE_SONNET_4_6, True)
 
     coords = fallback_coords
     try:

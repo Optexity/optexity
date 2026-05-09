@@ -16,6 +16,7 @@ from optexity.exceptions import KeywordNotFoundOnScreenException
 from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
 from optexity.inference.core.vision.ocr.ocr import _cv2_to_bytes, _load_cv2
 from optexity.inference.models import (
+    AnthropicModels,
     GeminiModels,
     get_llm_model,
     get_llm_model_with_fallback,
@@ -153,7 +154,7 @@ async def _computer_use_coordinates(
 ) -> tuple[int, int] | None:
     model_name = resolve_model_name(task.llm_provider, task.llm_model_name)
     if not model_name.is_computer_use_model():
-        model_name = GeminiModels.GEMINI_2_5_COMPUTER_USE
+        model_name = AnthropicModels.CLAUDE_SONNET_4_6
     model = get_llm_model(model_name, True)
     coordinates, token_usage = model.get_computer_use_model_response(
         prompt=prompt_instructions,
