@@ -1,9 +1,9 @@
 from typing import Any, List, Literal, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-_BB_VARS_LENGTH = 4  # [x1_var, y1_var, x2_var, y2_var]
+_BB_VARS_LENGTH = 4  # Bounding box variables length: [x1_var, y1_var, x2_var, y2_var]
 
 from optexity.schema.actions.two_fa_action import TwoFAAction
 from optexity.utils.utils import build_model, deep_replace
