@@ -648,6 +648,9 @@ async def handle_api_call_extraction(
         query_params=api_call_extraction.query_params,
         timeout=api_call_extraction.timeout,
     )
+    logger.info(
+        f"API response: status_code={result.get('status_code')}, body={result.get('body')}"
+    )
 
     if api_call_extraction.poll_condition and "error" not in result:
         for attempt in range(1, api_call_extraction.max_poll_attempts):
@@ -669,6 +672,9 @@ async def handle_api_call_extraction(
                 body=api_call_extraction.body,
                 query_params=api_call_extraction.query_params,
                 timeout=api_call_extraction.timeout,
+            )
+            logger.info(
+                f"Poll attempt {attempt} response: status_code={result.get('status_code')}, body={result.get('body')}"
             )
 
             if "error" in result:

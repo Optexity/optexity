@@ -93,17 +93,17 @@ def resolve_api_variables_in_node(action_node, generated_variables: dict) -> Non
 def evaluate_poll_condition(condition: str, response: dict) -> bool:
     """Evaluate a poll condition expression against an API response dict.
 
-    The condition uses dot-path syntax, e.g.:
+    Supports both top-level keys and dot-path syntax:
+        "status_code == 200"
         "body.status == 'completed'"
         "body.progress >= 100"
-        "body.ready == True"
 
-    Dot-paths in the condition are resolved against the response dict
-    before evaluation.
+    All identifiers that match response keys (with or without dot-paths)
+    are resolved before evaluation.
     """
 
-    def _resolve_dot_path(match: re.Match) -> str:
-        """Replace a dot-path identifier with its resolved value."""
+    def _resolve_identifier(match: re.Match) -> str:
+        """Replace an identifier or dot-path with its resolved value."""
         full_path = match.group(0)
         segments = full_path.split(".")
         root = segments[0]
@@ -112,7 +112,13 @@ def evaluate_poll_condition(condition: str, response: dict) -> bool:
         if root not in response:
             return full_path
 
-        resolved = _resolve_path(response, "." + full_path)
+        if len(segments) == 1:
+            # Top-level key like "status_code"
+            resolved = response[root]
+        else:
+            # Dot-path like "body.status"
+            resolved = _resolve_path(response, "." + full_path)
+
         if resolved is None:
             return "None"
         if isinstance(resolved, str):
@@ -121,10 +127,9 @@ def evaluate_poll_condition(condition: str, response: dict) -> bool:
             return repr(resolved)
         return str(resolved)
 
-    # Match dot-path identifiers (word.word... optionally with [N])
-    # but not Python keywords, string literals, or standalone words
+    # Match identifiers: standalone words or dot-paths, optionally with [N]
     resolved_condition = re.sub(
-        r"\b([a-zA-Z_]\w*(?:\.\w+)+(?:\[\d+\])?)", _resolve_dot_path, condition
+        r"\b([a-zA-Z_]\w*(?:\.\w+)*(?:\[\d+\])?)\b", _resolve_identifier, condition
     )
 
     try:
