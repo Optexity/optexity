@@ -1,10 +1,12 @@
 from typing import Any, List, Literal, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+_BB_VARS_LENGTH = 4  # [x1_var, y1_var, x2_var, y2_var]
 
 from optexity.schema.actions.two_fa_action import TwoFAAction
-from optexity.utils.utils import build_model
+from optexity.utils.utils import build_model, deep_replace
 
 
 class LLMExtraction(BaseModel):
@@ -139,8 +141,29 @@ class OCRCoordinatesExtraction(BaseModel):
     source_variable: str
     output_x_variable: str = "coords_x"
     output_y_variable: str = "coords_y"
+    bounding_box_variables: list[str] | None = None
+
+    @model_validator(mode="after")
+    def validate_bounding_box_variables_length(self):
+        if (
+            self.bounding_box_variables is not None
+            and len(self.bounding_box_variables) != _BB_VARS_LENGTH
+        ):
+            raise ValueError(
+                f"bounding_box_variables must have exactly {_BB_VARS_LENGTH} elements: [x1_var, y1_var, x2_var, y2_var]"
+            )
+        return self
 
     def replace(self, pattern: str, replacement: str):
+        return self
+
+
+class VisionExtraction(BaseModel):
+    prompt: str
+    output_variable_names: list[str]
+
+    def replace(self, pattern: str, replacement: str):
+        self.prompt = self.prompt.replace(pattern, replacement)
         return self
 
 
@@ -165,6 +188,35 @@ class LocatorExtraction(BaseModel):
         return self
 
 
+class APICallExtraction(BaseModel):
+    url: str
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = "GET"
+    headers: dict[str, str] = Field(default_factory=dict)
+    body: dict | str | None = None
+    query_params: dict[str, str] = Field(default_factory=dict)
+    output_variable_names: list[str] = Field(default_factory=lambda: ["api_result"])
+    timeout: float = 30.0
+    poll_condition: str | None = None
+    poll_interval: float = 5.0
+    max_poll_attempts: int = 10
+
+    def replace(self, pattern: str, replacement: str):
+        self.url = self.url.replace(pattern, replacement)
+        self.headers = {
+            k: v.replace(pattern, replacement) for k, v in self.headers.items()
+        }
+        if isinstance(self.body, str):
+            self.body = self.body.replace(pattern, replacement)
+        elif isinstance(self.body, dict):
+            self.body = deep_replace(self.body, pattern, replacement)
+        self.query_params = {
+            k: v.replace(pattern, replacement) for k, v in self.query_params.items()
+        }
+        if self.poll_condition:
+            self.poll_condition = self.poll_condition.replace(pattern, replacement)
+        return self
+
+
 class ExtractionAction(BaseModel):
     unique_identifier: str | None = None
     network_call: Optional[NetworkCallExtraction] = None
@@ -176,6 +228,8 @@ class ExtractionAction(BaseModel):
     pdf: Optional[PDFExtraction] = None
     ocr_coordinates: Optional[OCRCoordinatesExtraction] = None
     locator: Optional[LocatorExtraction] = None
+    vision: Optional[VisionExtraction] = None
+    api_call: Optional[APICallExtraction] = None
 
     @model_validator(mode="after")
     def validate_one_extraction(self):
@@ -190,12 +244,14 @@ class ExtractionAction(BaseModel):
             "pdf": self.pdf,
             "ocr_coordinates": self.ocr_coordinates,
             "locator": self.locator,
+            "vision": self.vision,
+            "api_call": self.api_call,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of llm, network_call, python_script, screenshot, state, two_fa_action, pdf, ocr_coordinates or locator must be provided"
+                "Exactly one of llm, network_call, python_script, screenshot, state, two_fa_action, pdf, ocr_coordinates, locator, vision, or api_call must be provided"
             )
 
         return self
@@ -215,5 +271,7 @@ class ExtractionAction(BaseModel):
             self.two_fa_action.replace(pattern, replacement)
         if self.locator:
             self.locator.replace(pattern, replacement)
+        if self.api_call:
+            self.api_call.replace(pattern, replacement)
 
         return self

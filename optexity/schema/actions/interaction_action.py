@@ -31,6 +31,18 @@ class BaseAction(BaseModel):
     skip_prompt: bool = False
     assert_locator_presence: bool = False
     recording_screenshot: str | None = None
+    bounding_box_variables: list[str] | None = None
+
+    @model_validator(mode="after")
+    def validate_bounding_box_variables_length(self):
+        if (
+            self.bounding_box_variables is not None
+            and len(self.bounding_box_variables) != 4
+        ):
+            raise ValueError(
+                "bounding_box_variables must have exactly 4 elements: [x1_var, y1_var, x2_var, y2_var]"
+            )
+        return self
 
     @model_validator(mode="before")
     @classmethod
@@ -103,7 +115,7 @@ class HoverAction(BaseAction):
 
 
 class SelectOptionAction(BaseAction):
-    select_values: list[str] | None = None
+    select_values: list[str]
     expect_download: bool = False
     download_filename: str | None = None
 
@@ -349,6 +361,7 @@ class CloseOverlayPopupAction(AgenticTask):
 class InteractionAction(BaseModel):
     max_tries: int = 10
     max_timeout_seconds_per_try: float = 1.0
+    verify_before_step: bool = True
     click_element: ClickElementAction | None = None
     input_text: InputTextAction | None = None
     select_option: SelectOptionAction | None = None
