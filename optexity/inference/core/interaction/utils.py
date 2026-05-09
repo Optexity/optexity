@@ -27,6 +27,7 @@ from optexity.inference.infra.browser import Browser
 from optexity.inference.models import (
     AnthropicModels,
     GeminiModels,
+    _try_create_model,
     get_llm_model,
     get_llm_model_with_fallback,
     resolve_model_name,
@@ -460,7 +461,7 @@ async def get_coordinates_from_prompt(
 
     model_name = resolve_model_name(task.llm_provider, task.llm_model_name)
     if not model_name.is_computer_use_model():
-        model_name = AnthropicModels.CLAUDE_SONNET_4_6
+        model_name = GeminiModels.GEMINI_2_5_COMPUTER_USE
     model = get_llm_model(model_name, True)
     coordinates, token_usage = model.get_computer_use_model_response(
         prompt=prompt_instructions,
