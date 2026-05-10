@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-28T14:30:01.965771Z"
+exclude-newer = "2026-05-03T12:27:17.810751Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -1542,7 +1542,7 @@ wheels = [
 
 [[package]]
 name = "optexity"
-version = "0.1.5.64"
+version = "0.1.5.65"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
