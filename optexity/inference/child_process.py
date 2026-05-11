@@ -5,7 +5,6 @@ import logging
 import os
 import pathlib
 import signal
-import subprocess
 import sys
 import uuid
 from contextlib import asynccontextmanager

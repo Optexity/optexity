@@ -1,38 +1,38 @@
 repos:
-  # --- Python formatting ---
-  - repo: https://github.com/psf/black
-    rev: 26.1.0
-    hooks:
-      - id: black
-        language_version: python3
+    # --- Python formatting ---
+    - repo: https://github.com/psf/black
+      rev: 26.1.0
+      hooks:
+          - id: black
+            language_version: python3
 
-  # --- Import sorting ---
-  - repo: https://github.com/PyCQA/isort
-    rev: 7.0.0
-    hooks:
-      - id: isort
-        args: ["--profile", "black"]
+    # --- Import sorting ---
+    - repo: https://github.com/PyCQA/isort
+      rev: 7.0.0
+      hooks:
+          - id: isort
+            args: ["--profile", "black"]
 
-  # --- Python linting (CRITICAL) ---
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
-    hooks:
-      - id: ruff
-        args: ["--select=F821,F401"]
+    # --- Python linting (CRITICAL) ---
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.4.4
+      hooks:
+          - id: ruff
+            args: ["--select=F821,F401"]
 
-  # --- Frontend formatting ---
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
-    hooks:
-      - id: prettier
-        files: "\\.(js|jsx|ts|tsx|css|scss|json|html|md|yml|yaml)$"
+    # --- Frontend formatting ---
+    - repo: https://github.com/pre-commit/mirrors-prettier
+      rev: v4.0.0-alpha.8
+      hooks:
+          - id: prettier
+            files: "\\.(js|jsx|ts|tsx|css|scss|json|html|md|yml|yaml)$"
 
-  # --- Security audit (pre-push only) ---
-  - repo: local
-    hooks:
-      - id: uv-audit
-        name: uv audit
-        entry: uv audit --preview-features audit
-        language: system
-        stages: [pre-push]
-        pass_filenames: false
+    # --- Security audit (pre-push only) ---
+    - repo: local
+      hooks:
+          - id: uv-audit
+            name: uv audit
+            entry: uv audit --preview-features audit
+            language: system
+            stages: [pre-push]
+            pass_filenames: false

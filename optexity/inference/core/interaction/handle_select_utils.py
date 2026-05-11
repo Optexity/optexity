@@ -7,7 +7,6 @@ from optexity.inference.agents.select_value_prediction.select_value_prediction i
     SelectValuePredictionAgent,
 )
 from optexity.inference.models import get_llm_model_with_fallback
-from optexity.schema.actions.interaction_action import Locator
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
 

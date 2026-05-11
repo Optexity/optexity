@@ -38,7 +38,6 @@ from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
 from optexity.schema.automation import ActionNode, ForLoopNode, IfElseNode
 from optexity.schema.memory import BrowserState, ForLoopStatus, Memory, OutputData
 from optexity.schema.task import Task
-from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
