@@ -19,7 +19,6 @@ repos:
     hooks:
       - id: ruff
         args: ["--select=F", "--ignore=F401"]   # E=errors, F=undefined names etc.
-      - id: ruff-format          # optional: replaces black eventually
 
   # --- Frontend formatting ---
   - repo: https://github.com/pre-commit/mirrors-prettier
