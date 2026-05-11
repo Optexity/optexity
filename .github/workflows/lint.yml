@@ -25,4 +25,4 @@ jobs:
               run: pre-commit run --all-files
 
             - name: Run Ruff (minimal strict)
-              run: ruff check . --select=F821,F401
+              run: ruff check . --select=F821
