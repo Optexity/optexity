@@ -1,5 +1,4 @@
 import asyncio
-import json
 import sys
 
 from optexity.inference.core.run_automation import run_automation

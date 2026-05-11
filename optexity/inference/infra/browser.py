@@ -14,10 +14,9 @@ from browser_use import Agent, BrowserSession, ChatGoogle
 from browser_use.browser.views import BrowserStateSummary
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import Download, Locator, Page, Request, Response
+from playwright.async_api import Download, Locator, Request, Response
 
 from optexity.schema.memory import Memory, NetworkRequest, NetworkResponse
-from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
