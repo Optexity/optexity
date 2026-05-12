@@ -248,6 +248,10 @@ def resolve_bounding_box_variables(
 ) -> tuple[int, int, int, int] | None:
     """Resolve bounding_box_variables [x1_var, y1_var, x2_var, y2_var] to pixel coords.
 
+    Supports both:
+      - Variable references: "x1[0]", "{x1[0]}", "x1"
+      - Literal integers: "682", "216"
+
     Returns None if any variable is missing or equals -1.
     """
     import re as _re
@@ -256,6 +260,13 @@ def resolve_bounding_box_variables(
 
     def _resolve(v: str) -> int:
         key = v.strip("{}")
+
+        # Try literal integer first (e.g. "682")
+        try:
+            return int(key)
+        except (ValueError, TypeError):
+            pass
+
         m = _VAR_RE.match(key)
         if not m:
             raise KeyError(key)
