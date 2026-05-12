@@ -30,7 +30,11 @@ from optexity.inference.core.run_interaction import (
     handle_download_url_as_pdf,
     run_interaction_action,
 )
-from optexity.inference.core.run_misc import run_fail_state_action, run_sleep_action
+from optexity.inference.core.run_misc import (
+    run_fail_state_action,
+    run_set_variable_action,
+    run_sleep_action,
+)
 from optexity.inference.core.run_powershell import run_powershell_action
 from optexity.inference.core.run_python_script import run_python_script_action
 from optexity.inference.core.variable_resolver import resolve_api_variables_in_node
@@ -382,6 +386,11 @@ async def run_action_node(
             )
         elif action_node.captcha_action:
             await handle_captcha_action(action_node.captcha_action, browser, memory)
+        elif action_node.misc_action:
+            if action_node.misc_action.set_variable:
+                await run_set_variable_action(
+                    action_node.misc_action.set_variable, memory
+                )
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")

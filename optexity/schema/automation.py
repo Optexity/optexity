@@ -9,6 +9,7 @@ from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
 from optexity.schema.actions.misc_action import (
     FailStateAction,
+    MiscAction,
     PythonScriptAction,
     SleepAction,
 )
@@ -90,6 +91,7 @@ class ActionNode(BaseModel):
     sleep_action: SleepAction | None = None
     fail_state_action: FailStateAction | None = None
     captcha_action: CaptchaAction | None = None
+    misc_action: MiscAction | None = None
     before_sleep_time: float = 0.0
     end_sleep_time: float = 5.0
     expect_new_tab: bool = False
@@ -108,12 +110,13 @@ class ActionNode(BaseModel):
             "sleep_action": self.sleep_action,
             "fail_state_action": self.fail_state_action,
             "captcha_action": self.captcha_action,
+            "misc_action": self.misc_action,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, powershell_action, sleep_action, fail_state_action, captcha_action must be provided"
+                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, powershell_action, sleep_action, fail_state_action, captcha_action, misc_action must be provided"
             )
 
         assert (
@@ -162,6 +165,8 @@ class ActionNode(BaseModel):
             self.fail_state_action.replace(pattern, replacement)
         if self.captcha_action:
             self.captcha_action.replace(pattern, replacement)
+        if self.misc_action:
+            self.misc_action.replace(pattern, replacement)
 
         return self
 
