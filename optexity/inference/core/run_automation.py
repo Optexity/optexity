@@ -37,7 +37,10 @@ from optexity.inference.core.run_misc import (
 )
 from optexity.inference.core.run_powershell import run_powershell_action
 from optexity.inference.core.run_python_script import run_python_script_action
-from optexity.inference.core.variable_resolver import resolve_api_variables_in_node
+from optexity.inference.core.variable_resolver import (
+    resolve_api_variables_in_node,
+    resolve_dynamic_indices_in_node,
+)
 from optexity.inference.core.vision.time import wait_for_stable_screen
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
@@ -334,6 +337,9 @@ async def run_action_node(
     # Inject default generated variables (current_time is dynamic per step)
     memory.variables.generated_variables["current_time"] = [str(int(time.time()))]
     memory.variables.generated_variables["task_id"] = [str(task.task_id)]
+
+    # Resolve dynamic indices like {var[some_var]} -> {var[N]} before variable replacement
+    resolve_dynamic_indices_in_node(action_node, memory.variables.generated_variables)
 
     await action_node.replace_variables(task.input_parameters)
     await action_node.replace_variables(
