@@ -627,6 +627,7 @@ def _join_adjacent_ocr_results(
                     width=max_x_end - min_x,
                     height=max_y_end - min_y,
                 ),
+                source_ids=[id(r) for r in group],
             )
         )
 

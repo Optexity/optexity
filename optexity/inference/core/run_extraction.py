@@ -42,6 +42,7 @@ from optexity.schema.memory import (
     OutputData,
     ScreenshotData,
 )
+from optexity.schema.ocr import OCRResult
 from optexity.schema.task import Task
 from optexity.utils.http import make_api_request
 
@@ -540,21 +541,43 @@ async def handle_ocr_coordinates_extraction(
         f"All texts+y: {[(r.text, round(r.bounding_box.y, 1), id(r)) for r in results]}"
     )
 
+    def _center_in_bbox(r: OCRResult, bbox) -> bool:
+        cx = r.bounding_box.x + r.bounding_box.width / 2
+        cy = r.bounding_box.y + r.bounding_box.height / 2
+        return (
+            bbox.x <= cx <= bbox.x + bbox.width and bbox.y <= cy <= bbox.y + bbox.height
+        )
+
     for name in names_str:
         available = [r for r in results if id(r) not in used_result_ids]
         logger.info(
             f"[ocr_coordinates] searching '{name}' in {len(available)}/{len(results)} available results "
-            f"(excluded ids: {used_result_ids})"
+            f"(excluded ids: {len(used_result_ids)})"
         )
         result = find_keyword_in_results(available, name, score_threshold=80.0)
         if result is not None:
             result_id = id(result)
             used_result_ids.add(result_id)
+            # Exclude OCR results that compose this joined candidate
+            if result.source_ids:
+                used_result_ids.update(result.source_ids)
+            # Exclude all raw results whose center falls within the matched bbox
+            # (handles pre-joined results AND individual words at the same row)
+            overlap_excluded = 0
+            for r in results:
+                if id(r) in used_result_ids:
+                    continue
+                if _center_in_bbox(r, result.bounding_box):
+                    used_result_ids.add(id(r))
+                    overlap_excluded += 1
             x, y = get_coordinates_from_ocr_result(result)
             coords_x.append(x)
             coords_y.append(y)
             logger.info(
-                f"OCR matched '{name}' at ({x}, {y}) [id={result_id}, bbox_y={result.bounding_box.y:.1f}]"
+                f"OCR matched '{name}' at ({x}, {y}) [id={result_id}, "
+                f"bbox_y={result.bounding_box.y:.1f}, "
+                f"source_ids={len(result.source_ids)}, "
+                f"bbox_overlap_excluded={overlap_excluded}]"
             )
         else:
             coords_x.append(-1)
