@@ -43,7 +43,7 @@ async def command_based_action_with_retry(
     task: Task,
     max_tries: int,
     max_timeout_seconds_per_try: float,
-):
+) -> str | None:
 
     if action.command is None or action.skip_command:
         return
