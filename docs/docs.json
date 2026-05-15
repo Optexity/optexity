@@ -110,6 +110,13 @@
                     {
                         "group": "Healthcare",
                         "pages": ["/examples/healthcare/peachstate-medicaid"]
+                    },
+                    {
+                        "group": "Example Workflows",
+                        "pages": [
+                            "/examples/example_workflows/if-else-and-email-2fa",
+                            "/examples/example_workflows/pointclickcare-detailed-census-report"
+                        ]
                     }
                 ]
             }

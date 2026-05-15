@@ -81,3 +81,49 @@ Reference the TOTP code like any parameter:
   }
 }
 ```
+
+---
+
+## Complete Example
+
+Here's a complete automation that authenticates with a TOTP-protected service:
+
+```json
+{
+  "url": "https://sample.com/",
+  "parameters": {
+    "input_parameters": {
+      "username": [
+        "provider_username"
+      ]
+    },
+    "secure_parameters": {
+      "auth_code": [
+        {
+          "totp": {
+            "totp_secret": "YUNFZZZH"
+          }
+        }
+      ]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "get_by_test_id(\"totp\")",
+          "prompt_instructions": "Enter the 2FA code",
+          "input_text": "{auth_code[0]}"
+        }
+      }
+    }
+  ]
+}
+```
+
+This example:
+- Uses a direct TOTP secret (`YUNFZZZH`) from `secure_parameters`
+- Accepts a `username` as an `input_parameter`
+- Enters the generated TOTP code into the input field identified by `test_id="totp"`
