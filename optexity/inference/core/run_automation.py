@@ -27,6 +27,7 @@ from optexity.inference.core.logging import (
 )
 from optexity.inference.core.run_assertion import run_assertion_action
 from optexity.inference.core.run_extraction import run_extraction_action
+from optexity.inference.core.run_human_in_loop import run_human_in_loop_action
 from optexity.inference.core.run_interaction import (
     handle_download_url_as_pdf,
     run_interaction_action,
@@ -375,6 +376,10 @@ async def run_action_node(
             )
         elif action_node.captcha_action:
             await handle_captcha_action(action_node.captcha_action, browser, memory)
+        elif action_node.human_in_loop_action:
+            await run_human_in_loop_action(
+                action_node.human_in_loop_action, task, memory
+            )
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")

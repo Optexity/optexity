@@ -51,6 +51,14 @@ tasks_to_kill: set[str] = set()
 running_task_processes: dict[str, asyncio.subprocess.Process] = {}
 _global_actual_browser: ActualBrowser | None = None
 
+# HITL: task_ids whose HITL step has been completed by the human.
+# Written by POST /human_in_loop_completed; read + cleared by GET /hitl_status.
+hitl_completed_tasks: set[str] = set()
+
+# Port this FastAPI server is listening on; set in get_app_with_endpoints so
+# it can be forwarded to worker subprocesses via CHILD_FASTAPI_PORT env var.
+_child_fastapi_port: int = -1
+
 
 def log_system_info(comment: str):
     logger.info("=" * 100 + "\n")
@@ -180,6 +188,7 @@ async def run_automation_in_process(
             str(_cdp_url),
             str(attempts_left),
             preexec_fn=os.setsid,
+            env={**os.environ, "CHILD_FASTAPI_PORT": str(_child_fastapi_port)},
         )
         running_task_processes[task.task_id] = proc
 
@@ -349,9 +358,10 @@ async def register_with_master():
     logger.info(f"Registered with master: {response.json()}")
 
 
-def get_app_with_endpoints(is_aws: bool, child_id: int):
-    global child_process_id
+def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
+    global child_process_id, _child_fastapi_port
     child_process_id = child_id
+    _child_fastapi_port = port
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -391,6 +401,20 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
         """Is task running endpoint."""
         return task_running
 
+    @app.post("/human_in_loop_completed")
+    async def human_in_loop_completed_child(task_id: str = Body(...)):
+        """Called by opcloud when the human has finished the HITL step."""
+        hitl_completed_tasks.add(task_id)
+        return JSONResponse({"success": True})
+
+    @app.get("/hitl_status")
+    async def hitl_status(task_id: str):
+        """Polled by the worker subprocess every 5 seconds during HITL pause."""
+        completed = task_id in hitl_completed_tasks
+        if completed:
+            hitl_completed_tasks.discard(task_id)
+        return {"completed": completed}
+
     @app.post("/kill_task")
     async def kill_task(task_id: str = Body(...)):
         """Kill task endpoint.
@@ -401,6 +425,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
           its process group so the worker exits promptly.
         """
         tasks_to_kill.add(task_id)
+        hitl_completed_tasks.discard(task_id)
         proc = running_task_processes.get(task_id)
         if proc is not None and proc.returncode is None:
             try:
@@ -552,7 +577,9 @@ def main():
 
     args = parser.parse_args()
 
-    app = get_app_with_endpoints(is_aws=args.is_aws, child_id=args.child_process_id)
+    app = get_app_with_endpoints(
+        is_aws=args.is_aws, child_id=args.child_process_id, port=args.port
+    )
 
     # Start the server (this is blocking and manages its own event loop)
     logger.info(f"Starting server on {args.host}:{args.port}")
