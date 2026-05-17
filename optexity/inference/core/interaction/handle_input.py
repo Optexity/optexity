@@ -1,7 +1,10 @@
 import logging
 import re
 
-from optexity.exceptions import ElementNotFoundInAxtreeException
+from optexity.exceptions import (
+    AxtreeIndexActionFailedException,
+    ElementNotFoundInAxtreeException,
+)
 from optexity.inference.agents.input_text_prediction.input_text_prediction import (
     InputTextPredictionAgent,
 )
@@ -151,9 +154,21 @@ async def input_text_index(
                 }
             }
         )
-        await browser.backend_agent.multi_act([action_model])
-    except ElementNotFoundInAxtreeException as e:
-        raise e
+
+        try:
+            results = await browser.backend_agent.multi_act([action_model])
+            if results and results[0].error:
+                raise RuntimeError(
+                    f"browseruse input failed at index {index}: {results[0].error}"
+                )
+        except Exception as e:
+            raise AxtreeIndexActionFailedException(
+                message=f"Failed to input text at axtree index {index}",
+                index=index,
+                original_error=e,
+            )
+    except (ElementNotFoundInAxtreeException, AxtreeIndexActionFailedException):
+        raise
     except Exception as e:
         logger.error(f"Error in input_text_index: {e}")
         return
