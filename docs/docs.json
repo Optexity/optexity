@@ -70,7 +70,7 @@
                 "groups": [
                     {
                         "group": "Schema Reference",
-                        "pages": ["/api-reference/callback"]
+                        "pages": ["/api-reference/callback", "/api-reference/stream-endpoint"]
                     },
                     {
                         "group": "HTTP API",
