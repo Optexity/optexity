@@ -1,4 +1,9 @@
 import logging
+import mimetypes
+import os
+import re
+import tempfile
+from urllib.parse import unquote, urlparse
 
 from optexity.exceptions import ElementNotFoundInAxtreeException
 from optexity.inference.core.interaction.handle_command import (
@@ -15,6 +20,62 @@ from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
 
+_DOWNLOAD_TIMEOUT_MS = 120_000
+
+
+def _derive_suffix(
+    url: str, content_disposition: str | None, content_type: str | None
+) -> str:
+    path = urlparse(url).path
+    basename = os.path.basename(unquote(path))
+    _, ext = os.path.splitext(basename)
+    if ext:
+        return ext
+
+    if content_disposition:
+        match = re.search(
+            r'filename\*?=(?:UTF-8\'\')?"?([^";]+)"?', content_disposition
+        )
+        if match:
+            _, ext = os.path.splitext(unquote(match.group(1)))
+            if ext:
+                return ext
+
+    if content_type:
+        guessed = mimetypes.guess_extension(content_type.split(";")[0].strip())
+        if guessed:
+            return guessed
+
+    return ""
+
+
+async def _download_to_temp_file(url: str, browser: Browser) -> str:
+    logger.debug(f"Downloading upload file from {url}")
+    try:
+        resp = await browser.context.request.get(url, timeout=_DOWNLOAD_TIMEOUT_MS)
+    except Exception as e:
+        raise RuntimeError(f"Failed to download upload file from {url}: {e}") from e
+
+    if not resp.ok:
+        raise RuntimeError(
+            f"Failed to download upload file from {url}: HTTP {resp.status}"
+        )
+
+    headers = resp.headers
+    suffix = _derive_suffix(
+        url, headers.get("content-disposition"), headers.get("content-type")
+    )
+
+    body = await resp.body()
+    with tempfile.NamedTemporaryFile(
+        prefix="optexity_upload_", suffix=suffix, delete=False
+    ) as tmp:
+        tmp.write(body)
+        tmp_path = tmp.name
+
+    logger.debug(f"Downloaded upload file to {tmp_path} ({len(body)} bytes)")
+    return tmp_path
+
 
 async def handle_upload_file(
     upload_file_action: UploadFileAction,
@@ -24,23 +85,35 @@ async def handle_upload_file(
     max_timeout_seconds_per_try: float,
     max_tries: int,
 ):
-    if upload_file_action.command and not upload_file_action.skip_command:
-        last_error = await command_based_action_with_retry(
-            upload_file_action,
-            browser,
-            memory,
-            task,
-            max_tries,
-            max_timeout_seconds_per_try,
-        )
-        if last_error is None:
-            return
+    tmp_path: str | None = None
+    if upload_file_action.file_url:
+        tmp_path = await _download_to_temp_file(upload_file_action.file_url, browser)
+        upload_file_action.file_path = tmp_path
 
-    if not upload_file_action.skip_prompt:
-        logger.debug(
-            f"Executing prompt-based action: {upload_file_action.__class__.__name__}"
-        )
-        await upload_file_index(upload_file_action, browser, memory, task)
+    try:
+        if upload_file_action.command and not upload_file_action.skip_command:
+            last_error = await command_based_action_with_retry(
+                upload_file_action,
+                browser,
+                memory,
+                task,
+                max_tries,
+                max_timeout_seconds_per_try,
+            )
+            if last_error is None:
+                return
+
+        if not upload_file_action.skip_prompt:
+            logger.debug(
+                f"Executing prompt-based action: {upload_file_action.__class__.__name__}"
+            )
+            await upload_file_index(upload_file_action, browser, memory, task)
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError as e:
+                logger.warning(f"Failed to remove temp upload file {tmp_path}: {e}")
 
 
 async def upload_file_index(

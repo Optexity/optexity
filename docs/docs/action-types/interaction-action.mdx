@@ -244,12 +244,35 @@ Close tabs until reaching a specific URL or tab index:
 
 ### Upload File
 
+The file source must be **exactly one** of `file_path` (local file) or `file_url` (public `http(s)://` URL — downloaded to a temp file just before upload, then cleaned up).
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `file_path` | `str \| None` | Absolute or relative local path |
+| `file_url` | `str \| None` | Public `http://` or `https://` URL; downloaded with a 120s timeout. If the download fails (network error or non-2xx response), the automation fails. |
+
+Upload from a local path:
+
 ```json
 {
   "interaction_action": {
     "upload_file": {
       "command": "get_by_label(\"Upload Document\")",
       "file_path": "/path/to/document.pdf",
+      "prompt_instructions": "Upload the document"
+    }
+  }
+}
+```
+
+Upload from a public URL:
+
+```json
+{
+  "interaction_action": {
+    "upload_file": {
+      "command": "get_by_label(\"Upload Document\")",
+      "file_url": "https://example.com/files/document.pdf",
       "prompt_instructions": "Upload the document"
     }
   }
