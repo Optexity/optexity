@@ -98,6 +98,10 @@ Use variable substitution in `download_filename` to create unique filenames.
 
 ## Upload Files
 
+The file source must be **exactly one** of `file_path` or `file_url`. Setting both, or neither, is rejected by the schema.
+
+Upload from a local path:
+
 ```json
 {
   "interaction_action": {
@@ -110,10 +114,25 @@ Use variable substitution in `download_filename` to create unique filenames.
 }
 ```
 
+Upload from a public URL (downloaded to a temp file just before upload, then cleaned up):
+
+```json
+{
+  "interaction_action": {
+    "upload_file": {
+      "command": "get_by_label(\"Upload Document\")",
+      "file_url": "https://example.com/files/document.pdf",
+      "prompt_instructions": "Upload the document"
+    }
+  }
+}
+```
+
 | Property | Description |
 |----------|-------------|
 | `command` / `xpath` | Locator for file input |
-| `file_path` | Absolute or relative path (supports variables) |
+| `file_path` | Absolute or relative local path (supports variables) |
+| `file_url` | Public `http://` or `https://` URL (supports variables). 120s download timeout. The automation fails if the download errors or returns a non-2xx status. The file extension is derived from the URL path, `Content-Disposition`, or `Content-Type` (in that order) so file inputs that check extensions still validate. |
 
 ---
 

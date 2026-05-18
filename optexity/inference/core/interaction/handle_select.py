@@ -2,7 +2,10 @@ import logging
 
 from browser_use.dom.serializer.serializer import DOMTreeSerializer
 
-from optexity.exceptions import ElementNotFoundInAxtreeException
+from optexity.exceptions import (
+    AxtreeIndexActionFailedException,
+    ElementNotFoundInAxtreeException,
+)
 from optexity.inference.agents.select_option_prediction.select_option_prediction import (
     SelectOptionPredictionAgent,
 )
@@ -178,7 +181,11 @@ async def select_option_index(
 
         node = await browser.backend_agent.browser_session.get_element_by_index(index)
         if node is None:
-            return
+            raise AxtreeIndexActionFailedException(
+                message=f"Failed to resolve element at axtree index {index} for select_option",
+                index=index,
+                original_error="get_element_by_index returned None",
+            )
 
         select_option_values = DOMTreeSerializer(node)._extract_select_options(node)
         if select_option_values is None:
@@ -218,19 +225,30 @@ async def select_option_index(
                 logger.debug(
                     f"Playwright select_option succeeded: {playwright_success}"
                 )
+                if not playwright_success:
+                    raise RuntimeError(
+                        f"select_dropdown failed and playwright fallback miss: {results[0].error}"
+                    )
 
-        if select_option_action.expect_download:
-            await handle_download(
-                _actual_select_option,
-                memory,
-                browser,
-                task,
-                select_option_action.download_filename,
+        try:
+            if select_option_action.expect_download:
+                await handle_download(
+                    _actual_select_option,
+                    memory,
+                    browser,
+                    task,
+                    select_option_action.download_filename,
+                )
+            else:
+                await _actual_select_option()
+        except Exception as e:
+            raise AxtreeIndexActionFailedException(
+                message=f"Failed to select option at axtree index {index}",
+                index=index,
+                original_error=e,
             )
-        else:
-            await _actual_select_option()
-    except ElementNotFoundInAxtreeException as e:
-        raise e
+    except (ElementNotFoundInAxtreeException, AxtreeIndexActionFailedException):
+        raise
     except Exception as e:
         logger.error(f"Error in select_option_index: {e}")
         return

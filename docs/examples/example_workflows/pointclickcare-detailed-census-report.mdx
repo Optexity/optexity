@@ -1,0 +1,587 @@
+---
+title: PointClickCare Detailed Census Report Generation
+description: Automate PointClickCare login, facility selection, and detailed census report export as CSV for aggregated data analysis
+---
+
+Use this example to **log into PointClickCare**, handle **TOTP-based two-factor authentication**, select a specific **facility**, navigate to reports, and **generate a Detailed Census report** in CSV format for a specified date range.
+
+This workflow demonstrates how to build a healthcare reporting automation that supports:
+
+- PointClickCare EHR authentication
+- Conditional login and user validation
+- Multi-factor authentication with TOTP (Time-based One-Time Password)
+- Facility selection and validation
+- Dynamic report generation with date range filtering
+- CSV export for data aggregation
+- Resilient error handling for authentication failures
+
+This page is intentionally keyword-rich so you can find it by searching for: **PointClickCare automation**, **census report generation**, **TOTP 2FA**, **facility management**, **healthcare reporting**, **EHR automation**, **CSV export**, **conditional authentication**, **date range filtering**, **aggregated data analysis**.
+
+## Overview
+
+This automation:
+
+- Detects if login is required or if the correct user is already logged in
+- Performs username/password authentication only when needed
+- Detects and handles TOTP-based two-factor authentication
+- Validates facility selection using LLM-based extraction
+- Navigates to the Reports section
+- Selects the Detailed Census report
+- Specifies a custom date range for the report
+- Selects CSV as the output format
+- Triggers the report download
+
+## Minimal example
+
+The core pattern combines:
+
+- Conditional login detection
+- User validation through extraction
+- TOTP 2FA handling
+- Facility selection with LLM-based validation
+
+```json
+{
+  "type": "if_else_node",
+  "condition": "not is_same_user_logged_in[0]",
+  "if_nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "get_by_role(\"textbox\", name=\"Username\")",
+          "input_text": "{username[0]}"
+        }
+      }
+    }
+  ],
+  "else_nodes": []
+}
+```
+
+## Full automation
+
+```json
+{
+  "os_emulation": "windows",
+  "url": "https://accounts.pointclickcare.com",
+  "parameters": {
+    "input_parameters": {
+      "logged_in_user_name": [
+        "regv.principle"
+      ],
+      "username": [
+        "username@example.com"
+      ],
+      "password": [
+        "your_secure_password"
+      ],
+      "facility_name": [
+        "Avir at Abilene - 4BP"
+      ],
+      "start_date": [
+        "03/01/2026"
+      ],
+      "end_date": [
+        "03/13/2026"
+      ],
+      "first_row": [
+        true
+      ],
+      "group_creds_enc": [
+        "your_secure_creds"
+      ]
+    },
+    "secure_parameters": {
+      "auth_code": [
+        {
+          "totp": {
+            "totp_secret": "your_secure_secret""
+          }
+        }
+      ]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 5,
+        "click_element": {
+          "command": "get_by_text(\"PointClickCare EHR\")",
+          "prompt_instructions": "Click on PointClickCare EHR button.",
+          "skip_prompt": true
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "sleep_action": {
+        "sleep_time": 3
+      }
+    },
+    {
+      "type": "action_node",
+      "extraction_action": {
+        "llm": {
+          "extraction_format": {
+            "is_login_page": "bool",
+            "is_same_user_logged_in": "bool"
+          },
+          "extraction_instructions": "Check if its a login page asking for username. If yes then return 'is_login_page' as True, otherwise return False. If not 'is_login_page' then check if this user name you see on the screen matches any of the usernames in the list of (usernames: {logged_in_user_name[0]}). If yes, return 'is_same_user_logged_in' as True, otherwise return False. When 'is_login_page' is True, then return 'is_same_user_logged_in' as False.",
+          "output_variable_names": [
+            "is_login_page",
+            "is_same_user_logged_in"
+          ],
+          "llm_model_name": "gemini-2.5-pro"
+        }
+      },
+      "before_sleep_time": 3,
+      "end_sleep_time": 0
+    },
+    {
+      "type": "if_else_node",
+      "condition": "not is_login_page[0] and not is_same_user_logged_in[0]",
+      "if_nodes": [
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "locator(\"#pccUserLink\")",
+              "prompt_instructions": "Click on user icon to logout."
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "locator(\"#pccUserMenu\").get_by_text(\"Sign Out\")",
+              "prompt_instructions": "Click on Sign Out button to logout."
+            }
+          }
+        }
+      ],
+      "else_nodes": []
+    },
+    {
+      "type": "if_else_node",
+      "condition": "not is_same_user_logged_in[0]",
+      "if_nodes": [
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "go_to_url": {
+              "url": "https://login.pointclickcare.com"
+            }
+          },
+          "before_sleep_time": 3,
+          "end_sleep_time": 3
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "input_text": {
+              "command": "get_by_role(\"textbox\", name=\"Username\")",
+              "prompt_instructions": "Enter the username {username[0]} into the username field.",
+              "input_text": "{username[0]}"
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "get_by_role(\"button\", name=\"Next\")",
+              "prompt_instructions": "Click the 'Next' button to proceed.",
+              "assert_locator_presence": true
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "input_text": {
+              "command": "locator(\"[data-test=\\\"login-password-input\\\"]\")",
+              "prompt_instructions": "Enter the password {password[0]} into the password field.",
+              "assert_locator_presence": true,
+              "input_text": "{password[0]}"
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "locator(\"[data-test=\\\"login-signIn-button\\\"]\")",
+              "prompt_instructions": "Click the 'Sign in' button.",
+              "assert_locator_presence": true
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "sleep_action": {
+            "sleep_time": 5
+          }
+        },
+        {
+          "type": "action_node",
+          "extraction_action": {
+            "llm": {
+              "source": [
+                "axtree",
+                "screenshot"
+              ],
+              "extraction_format": {
+                "login_failed": "bool",
+                "password_reset_needed": "bool"
+              },
+              "extraction_instructions": "If the current page shows that the current password has expired and asks the user for password reset, 'password_reset_needed' should be true. If the current page shows that login failed or shows some administration/browser error, 'login_failed' should be true. If the page is asking for 2FA code means the username and password is working both 'login_failed' and 'password_reset_needed' should be false. If the screen is still loading 'login_failed' should be true, and 'password_reset_needed' should be false.",
+              "output_variable_names": [
+                "login_failed",
+                "password_reset_needed"
+              ]
+            }
+          },
+          "before_sleep_time": 1,
+          "end_sleep_time": 0
+        },
+        {
+          "type": "if_else_node",
+          "condition": "password_reset_needed[0]",
+          "if_nodes": [
+            {
+              "type": "action_node",
+              "fail_state_action": {
+                "failure_message": "Password reset needed for : {username[0]}"
+              }
+            }
+          ],
+          "else_nodes": []
+        },
+        {
+          "type": "if_else_node",
+          "condition": "login_failed[0]",
+          "if_nodes": [
+            {
+              "type": "action_node",
+              "fail_state_action": {
+                "failure_message": "Login failed for : {username[0]}"
+              }
+            }
+          ],
+          "else_nodes": []
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "locator(\".MuiInputBase-input\").first",
+              "prompt_instructions": "Click on first input box of 2fa code.",
+              "assert_locator_presence": true
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "input_text": {
+              "command": "locator(\".MuiInputBase-input\").first",
+              "prompt_instructions": "Enter the password {password[0]} into the password field.",
+              "skip_prompt": true,
+              "input_text": "{auth_code[0]}",
+              "fill_or_type": "type"
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "sleep_action": {
+            "sleep_time": 5
+          }
+        },
+        {
+          "type": "action_node",
+          "extraction_action": {
+            "llm": {
+              "source": [
+                "axtree",
+                "screenshot"
+              ],
+              "extraction_format": {
+                "two_fa_failed": "bool"
+              },
+              "extraction_instructions": "If the current page shows that login failed or shows some administration/browser error, 'two_fa_failed' should be true. If the page is still asking for 2FA code or the screen is still loading 'two_fa_failed' should be true. If we are in logged in view of the portal, means we were able to log in successfully and 'two_fa_failed' should be false. In cases where you are not in a logged in view or screen is loading 'two_fa_failed' should be true.",
+              "output_variable_names": [
+                "two_fa_failed"
+              ]
+            }
+          },
+          "before_sleep_time": 1,
+          "end_sleep_time": 0
+        },
+        {
+          "type": "if_else_node",
+          "condition": "two_fa_failed[0]",
+          "if_nodes": [
+            {
+              "type": "action_node",
+              "fail_state_action": {
+                "failure_message": "2FA failed for : {username[0]}"
+              }
+            }
+          ],
+          "else_nodes": []
+        }
+      ],
+      "else_nodes": []
+    },
+    {
+      "type": "action_node",
+      "extraction_action": {
+        "llm": {
+          "extraction_format": {
+            "is_same_facility_selected": "bool"
+          },
+          "extraction_instructions": "Check if the facility {facility_name[0]} is selected in the facility search dropdown. If yes, return 'is_same_facility_selected' as True, otherwise return False.",
+          "output_variable_names": [
+            "is_same_facility_selected"
+          ]
+        }
+      },
+      "before_sleep_time": 3,
+      "end_sleep_time": 0
+    },
+    {
+      "type": "if_else_node",
+      "condition": "not is_same_facility_selected[0]",
+      "if_nodes": [
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "locator(\"#pccFacLink\")",
+              "prompt_instructions": "Click on facility search dropdown.",
+              "assert_locator_presence": true
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "input_text": {
+              "command": "locator(\"#facSearchFilter\")",
+              "prompt_instructions": "Search for the facility {facility_name[0]}.",
+              "input_text": "{facility_name[0]}"
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "locator(\"#facSearch .pccButton\")",
+              "prompt_instructions": "Click on search button."
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "extraction_action": {
+            "llm": {
+              "source": [
+                "axtree",
+                "screenshot"
+              ],
+              "extraction_format": {
+                "facility_not_found": "bool"
+              },
+              "extraction_instructions": "If the facility search results shows 'no matches found' then 'facility_not_found' should be true. Otherwise if the search results has a list of facilities then 'facility_not_found' should be false. In case of loading screen or when you are unsure about the page 'facility_not_found' should be true.",
+              "output_variable_names": [
+                "facility_not_found"
+              ]
+            }
+          },
+          "before_sleep_time": 3,
+          "end_sleep_time": 0
+        },
+        {
+          "type": "if_else_node",
+          "condition": "facility_not_found[0]",
+          "if_nodes": [
+            {
+              "type": "action_node",
+              "fail_state_action": {
+                "failure_message": "Facility not found : {facility_name[0]}"
+              }
+            }
+          ],
+          "else_nodes": []
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "locator(\"#facList a\", has_text=\"{facility_name[0]}\").first",
+              "prompt_instructions": "Click on the facility with name as '{facility_name[0]}' from the list only if it is there in search results else return '-1'."
+            }
+          }
+        }
+      ],
+      "else_nodes": []
+    },
+    {
+      "type": "action_node",
+      "extraction_action": {
+        "llm": {
+          "source": [
+            "axtree",
+            "screenshot"
+          ],
+          "extraction_format": {
+            "reports_link_missing": "bool"
+          },
+          "extraction_instructions": "Check if the page has a 'Reports' tab/link on the top. If yes, return 'reports_link_missing' as false, otherwise return true.",
+          "output_variable_names": [
+            "reports_link_missing"
+          ]
+        }
+      },
+      "before_sleep_time": 3,
+      "end_sleep_time": 0
+    },
+    {
+      "type": "if_else_node",
+      "condition": "reports_link_missing[0]",
+      "if_nodes": [
+        {
+          "type": "action_node",
+          "fail_state_action": {
+            "failure_message": "Reports link missing for : {username[0]}, {facility_name[0]}"
+          }
+        }
+      ],
+      "else_nodes": []
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"link\", name=\"Reports\")",
+          "prompt_instructions": "Navigate to the 'Reports' section.",
+          "assert_locator_presence": true
+        }
+      },
+      "before_sleep_time": 3
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"link\", name=\"Detailed Census\")",
+          "prompt_instructions": "Click on the 'Detailed Census' report link."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_text(\"Date Range from\")",
+          "prompt_instructions": "Select the 'Date Range from' option to specify a custom date range."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "locator(\"#ESOLstartdate_dummy\")",
+          "prompt_instructions": "Click the start date field to prepare for input."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator(\"#ESOLstartdate_dummy\")",
+          "prompt_instructions": "Enter the start date {start_date[0]} for the report.",
+          "input_text": "{start_date[0]}"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "locator(\"#ESOLenddate_dummy\")",
+          "prompt_instructions": "Click the end date field to prepare for input."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator(\"#ESOLenddate_dummy\")",
+          "prompt_instructions": "Enter the end date {end_date[0]} for the report.",
+          "input_text": "{end_date[0]}"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "select_option": {
+          "command": "get_by_role(\"combobox\")",
+          "prompt_instructions": "Select CSV as the output format for the report.",
+          "select_values": [
+            "CSV"
+          ]
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"button\", name=\"Run Report\")",
+          "prompt_instructions": "Click the 'Run Report' button to generate the census report.",
+          "assert_locator_presence": true,
+          "expect_download": true,
+          "download_filename": "f6df2027-4961-4330-9c39-6b0924d4bf4f"
+        }
+      },
+      "before_sleep_time": 3
+    }
+  ]
+}
+```
+
+## What this workflow demonstrates
+
+| Capability | Description |
+|---|---|
+| Conditional authentication | Logs in only if required or if different user is logged in |
+| TOTP 2FA handling | Automatically generates and submits TOTP codes for two-factor authentication |
+| Facility validation | Uses LLM-based extraction to confirm correct facility selection |
+| Dynamic report generation | Specifies custom date ranges for census reports |
+| Format selection | Automatically selects CSV export format |
+| Error resilience | Handles password resets, login failures, and 2FA errors |
+| Facility search | Searches for and selects specific facilities by name |
+| Report download | Triggers and monitors report file downloads |
+
+## When to use this
+
+| Goal | Why this helps |
+|---|---|
+| Automate PointClickCare reporting | Generate census reports programmatically without manual navigation |
+| Aggregate healthcare data | Export CSV files for downstream analysis and integration |
+| Schedule recurring reports | Run reports on specific date ranges automatically |
+| Support multiple facilities | Handle facility selection dynamically across locations |
+| Reduce manual errors | Automate authentication and report generation steps |
+| Improve operational efficiency | Eliminate repetitive report generation tasks |
+| Enable data pipelines | Export data directly for ETL and analytics workflows |

@@ -71,7 +71,7 @@
                 "groups": [
                     {
                         "group": "Schema Reference",
-                        "pages": ["/api-reference/callback"]
+                        "pages": ["/api-reference/callback", "/api-reference/stream-endpoint"]
                     },
                     {
                         "group": "HTTP API",
@@ -111,6 +111,13 @@
                     {
                         "group": "Healthcare",
                         "pages": ["/examples/healthcare/peachstate-medicaid"]
+                    },
+                    {
+                        "group": "Example Workflows",
+                        "pages": [
+                            "/examples/example_workflows/if-else-and-email-2fa",
+                            "/examples/example_workflows/pointclickcare-detailed-census-report"
+                        ]
                     }
                 ]
             }
