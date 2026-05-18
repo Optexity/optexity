@@ -479,6 +479,44 @@
             "embedding_hint": "2FA MFA two-factor authentication TOTP email OTP login security"
         },
         {
+            "id": "docs-action-types-human-in-loop",
+            "path": "docs/action-types/human-in-loop.mdx",
+            "title": "Human-in-the-Loop",
+            "summary": "Documents the human_in_loop_action node, which pauses an automation so a human can take over the live browser session and then resumes it. Covers the HITL flow (agent pauses, email sent, human opens session, clicks Done, agent resumes), the max_wait_time property, the 10-minute hard task timeout constraint, a complete automation example, timeout behavior table, and best practices (natural breakpoints, realistic wait times, no concurrent HITL nodes).",
+            "gist": "Pause an automation for human browser takeover, then resume. max_wait_time must be under 600 s.",
+            "keywords": [
+                "human-in-the-loop",
+                "HITL",
+                "human input",
+                "pause",
+                "resume",
+                "live session",
+                "max_wait_time",
+                "HumanInLoopTimeoutException",
+                "timeout"
+            ],
+            "document_type": "guide",
+            "tags": ["action-types", "human-in-the-loop", "HITL", "pause", "resume"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-agentic-tasks",
+                        "context": "Agentic task nodes that can precede a human handoff."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["human_in_loop_action", "HumanInLoopTimeoutException"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about pausing an automation for human input, HITL nodes, live browser handoff, or the max_wait_time property.",
+            "embedding_hint": "human in the loop HITL pause resume live session browser handoff max_wait_time timeout"
+        },
+        {
             "id": "docs-advanced-aws-secrets-manager",
             "path": "docs/advanced/aws-secrets-manager.mdx",
             "title": "AWS Secrets Manager Integration",

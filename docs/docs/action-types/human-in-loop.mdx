@@ -9,7 +9,7 @@ The `human_in_loop_action` lets you pause an automation at any point so a human 
 
 - **Use when**: A step requires human judgment, sensitive credentials, or manual verification that cannot be automated.
 - **How it works**: The agent pauses, the task owner receives a magic-link email to a live browser stream, the human completes the step, then clicks a "Done" button to resume the agent.
-- **Timeout**: If no completion signal arrives within `max_wait_time` seconds, the task fails with a `HumanInLoopTimeoutException`.
+- **Timeout**: If no completion signal arrives within `max_wait_time` seconds, the task fails with a `HumanInLoopTimeoutException`. The hard task timeout is **10 minutes**, so `max_wait_time` must be less than `600`.
 
 ## Properties
 
@@ -91,8 +91,14 @@ If `max_wait_time` elapses without a completion signal, the agent raises `HumanI
 | Scenario                        | Suggested `max_wait_time` |
 | ------------------------------- | ------------------------- |
 | Quick manual entry (~1 min)     | `120`                     |
-| Short review (~5 min)           | `300`                     |
-| Async approval (up to 30 min)   | `1800`                    |
+| Short review (~3 min)           | `180`                     |
+| Longer step (~8 min)            | `480`                     |
+
+<Warning>
+  The hard task timeout is **10 minutes (600 seconds)**. Setting `max_wait_time`
+  to `600` or above will cause the task to time out before the HITL window
+  closes. Always keep `max_wait_time` below `600`.
+</Warning>
 
 ## Best Practices
 

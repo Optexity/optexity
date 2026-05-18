@@ -10,7 +10,7 @@ class SleepAction(BaseModel):
 
 
 class HumanInLoopAction(BaseModel):
-    max_wait_time: float = Field(gt=0)
+    max_wait_time: float = Field(gt=0, le=600)
 
 
 ## State Jump Actions

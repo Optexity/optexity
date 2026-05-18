@@ -182,6 +182,14 @@ Group related questions with `<AccordionGroup>`:
 </AccordionGroup>
 ```
 
+## Docs Manifest
+
+Every time you add a new documentation page, you **must** update `docs-manifest.json` in the repo root of the `docs/` folder. Add a new entry to the `documents` array with the following fields populated: `id`, `path`, `title`, `summary`, `gist`, `keywords`, `document_type`, `tags`, `relationships`, `entities`, `reading_priority`, `when_to_use`, and `embedding_hint`. Use the existing entries as a model for each field.
+
+The `id` must be a kebab-case slug derived from the file path (e.g. `docs/action-types/foo.mdx` → `docs-action-types-foo`). The `path` is relative to the `docs/` folder root.
+
+Failing to update the manifest means the new page will not be discoverable by the LLM navigation layer.
+
 ## Checklist Before Publishing
 
 - [ ] Page starts with what users can accomplish
