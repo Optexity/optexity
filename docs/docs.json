@@ -36,7 +36,8 @@
                         "pages": [
                             "/docs/action-types/interaction-action",
                             "/docs/action-types/extraction-action",
-                            "/docs/action-types/agentic-tasks"
+                            "/docs/action-types/agentic-tasks",
+                            "/docs/action-types/human-in-loop"
                         ]
                     },
                     {
