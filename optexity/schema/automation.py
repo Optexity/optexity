@@ -401,6 +401,7 @@ class Automation(BaseModel):
     ] = "chromium"
     backend: Literal["browser-use", "computer-vision"] = "browser-use"
     os_emulation: Literal["windows", "linux"] | None = None
+    allow_cookies: bool = False
     max_retries: int = 0
     expected_downloads: int = 0
     remove_empty_nodes_in_axtree: bool = True

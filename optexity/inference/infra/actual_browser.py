@@ -86,6 +86,7 @@ class ActualBrowser:
         use_proxy: bool = False,
         proxy_session_id: str | None = None,
         os_emulation: OsEmulation = None,
+        allow_cookies: bool = False,
     ):
         # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
@@ -102,28 +103,28 @@ class ActualBrowser:
         self.channel: Literal[
             "chrome", "chromium", "cloakbrowser", "browser-use", "rdp"
         ] = channel
-        self.extensions = [
-            # {
-            #     "name": "optexity recorder",
-            #     "id": "pbaganbicadeoacahamnbgohafchgakp",
-            #     "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dpbaganbicadeoacahamnbgohafchgakp%26uc",
-            # },
-            {
-                "name": "I still don't care about cookies",
-                "id": "edibdbjcniadpccecjdfdjjppcpchdlm",
-                "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dedibdbjcniadpccecjdfdjjppcpchdlm%26uc",
-            },
-            # {
-            #     "name": "popupoff",
-            #     "id": "kiodaajmphnkcajieajajinghpejdjai",
-            #     "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dkiodaajmphnkcajieajajinghpejdjai%26uc",
-            # },
-            {
-                "name": "ublock origin",
-                "id": "ddkjiahejlhfcafbddmgiahcphecmpfh",
-                "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dddkjiahejlhfcafbddmgiahcphecmpfh%26uc",
-            },
-        ]
+        # Optional extensions (uncomment to load):
+        # {
+        #     "name": "optexity recorder",
+        #     "id": "pbaganbicadeoacahamnbgohafchgakp",
+        #     "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dpbaganbicadeoacahamnbgohafchgakp%26uc",
+        # },
+        # {
+        #     "name": "popupoff",
+        #     "id": "kiodaajmphnkcajieajajinghpejdjai",
+        #     "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dkiodaajmphnkcajieajajinghpejdjai%26uc",
+        # },
+        _cookie_blocker = {
+            "name": "I still don't care about cookies",
+            "id": "edibdbjcniadpccecjdfdjjppcpchdlm",
+            "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dedibdbjcniadpccecjdfdjjppcpchdlm%26uc",
+        }
+        _ublock = {
+            "name": "ublock origin",
+            "id": "ddkjiahejlhfcafbddmgiahcphecmpfh",
+            "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dddkjiahejlhfcafbddmgiahcphecmpfh%26uc",
+        }
+        self.extensions = [_cookie_blocker, _ublock] if not allow_cookies else [_ublock]
 
         if self.channel == "browser-use" and self.is_dedicated:
             raise ValueError("Browser-use is not supported for dedicated browsers")
