@@ -41,6 +41,10 @@ class ChildProcessIdRequest(BaseModel):
     new_unique_child_arn: str
 
 
+class HumanInLoopCompletedBody(BaseModel):
+    task_id: str
+
+
 child_process_id = -1
 unique_child_arn: str = str(uuid.uuid4())
 task_running = False
@@ -402,9 +406,9 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
         return task_running
 
     @app.post("/human_in_loop_completed")
-    async def human_in_loop_completed_child(task_id: str = Body(...)):
+    async def human_in_loop_completed_child(body: HumanInLoopCompletedBody = Body(...)):
         """Called by opcloud when the human has finished the HITL step."""
-        hitl_completed_tasks.add(task_id)
+        hitl_completed_tasks.add(body.task_id)
         return JSONResponse({"success": True})
 
     @app.get("/hitl_status")

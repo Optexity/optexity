@@ -1,4 +1,4 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class PythonScriptAction(BaseModel):
@@ -10,7 +10,7 @@ class SleepAction(BaseModel):
 
 
 class HumanInLoopAction(BaseModel):
-    max_wait_time: float
+    max_wait_time: float = Field(gt=0)
 
 
 ## State Jump Actions

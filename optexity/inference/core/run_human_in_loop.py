@@ -22,8 +22,7 @@ async def run_human_in_loop_action(
     """
     Pause the automation for human takeover.
 
-    1. Notifies opcloud (which emails the task owner with an OTP link to the
-       live stream).
+    1. Notifies opcloud (which emails the task owner a link to the live stream).
     2. Polls child_process.py's /hitl_status endpoint every 2 seconds until
        the human signals completion or max_wait_time elapses.
     3. Raises HumanInLoopTimeoutException if no completion signal arrives in
@@ -38,9 +37,9 @@ async def run_human_in_loop_action(
 
     elapsed = 0.0
     interval = 2.0
-    while elapsed < human_in_loop_action.max_wait_time:
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        while elapsed < human_in_loop_action.max_wait_time:
+            try:
                 resp = await client.get(status_url, params={"task_id": task.task_id})
                 if resp.json().get("completed"):
                     logger.info(
@@ -49,11 +48,13 @@ async def run_human_in_loop_action(
                         elapsed,
                     )
                     return
-        except Exception as e:
-            logger.warning("HITL status poll error for task %s: %s", task.task_id, e)
+            except Exception as e:
+                logger.warning(
+                    "HITL status poll error for task %s: %s", task.task_id, e
+                )
 
-        await asyncio.sleep(interval)
-        elapsed += interval
+            await asyncio.sleep(interval)
+            elapsed += interval
 
     raise HumanInLoopTimeoutException(
         f"Human-in-loop timeout: no completion signal received after "
@@ -71,10 +72,7 @@ async def _notify_human_in_loop(task: Task, memory: Memory) -> None:
         task.task_id,
         memory.unique_child_arn,
     )
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(url, headers=headers, json=body)
-            response.raise_for_status()
-            logger.debug("HITL notify response: %s", response.text)
-    except Exception as e:
-        logger.error("Error notifying opcloud of HITL for task %s: %s", task.task_id, e)
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.post(url, headers=headers, json=body)
+        response.raise_for_status()
+        logger.debug("HITL notify response: %s", response.text)

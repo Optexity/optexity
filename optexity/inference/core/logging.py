@@ -5,7 +5,7 @@ import json
 import logging
 import shutil
 import tarfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -428,48 +428,3 @@ async def delete_local_data(task: Task):
         shutil.rmtree(task.task_directory, ignore_errors=True)
     except Exception as e:
         logger.error(f"Failed to delete local data: {e}")
-
-
-# if this not getting used any where we can remove it.
-async def human_in_loop_in_server(task: Task, child_fastapi_port: int) -> bool:
-    """
-    Initiate HITL: tells opcloud to send an OTP email to the task owner, then
-    polls child_process.py /hitl_status every 5 seconds until the human signals
-    completion or HITL_MAX_WAIT_MINUTES elapses.
-
-    Returns True when the human completes the step, False on timeout or error.
-    The caller (agent) should block on this call to achieve a hard pause.
-    """
-    notify_url = urljoin(settings.SERVER_URL, settings.HUMAN_IN_LOOP_ENDPOINT)
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                notify_url,
-                json={"task_id": task.task_id},
-                headers={"x-api-key": task.api_key},
-            )
-            resp.raise_for_status()
-    except Exception as e:
-        logger.error(f"Failed to notify opcloud of HITL for task {task.task_id}: {e}")
-        return False
-
-    status_url = f"http://localhost:{child_fastapi_port}/hitl_status"
-    deadline = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.HITL_MAX_WAIT_MINUTES
-    )
-    while datetime.now(timezone.utc) < deadline:
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(status_url, params={"task_id": task.task_id})
-                if resp.json().get("completed"):
-                    logger.info(f"HITL completed for task {task.task_id}")
-                    return True
-        except Exception as e:
-            logger.warning(f"HITL status poll failed for task {task.task_id}: {e}")
-        await asyncio.sleep(5)
-
-    logger.warning(
-        f"HITL timed out after {settings.HITL_MAX_WAIT_MINUTES} min "
-        f"for task {task.task_id}"
-    )
-    return False
