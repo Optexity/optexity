@@ -9,6 +9,7 @@ from optexity.inference.core.interaction.handle_agentic_task import handle_agent
 from optexity.inference.core.run_interaction import _get_error_handler
 from optexity.inference.core.run_two_fa import run_two_fa_action
 from optexity.inference.infra.browser import Browser
+from optexity.inference.infra.browser_health import fetch_browser_state_for_classifier
 from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.extraction_action import (
     ExtractionAction,
@@ -202,17 +203,16 @@ async def handle_llm_extraction(
     last_prompt: str = ""
 
     for attempt in range(_LLM_EXTRACTION_MAX_ATTEMPTS):
-        browser_state_summary = await browser.get_browser_state_summary(
-            include_full_page=llm_extraction.include_full_page
+        browser_state_summary = await fetch_browser_state_for_classifier(
+            browser,
+            memory,
+            task,
+            include_full_page=llm_extraction.include_full_page,
         )
-        memory.browser_states[-1] = BrowserState(
-            url=browser_state_summary.url,
-            screenshot=browser_state_summary.screenshot,
-            title=browser_state_summary.title,
-            axtree=browser_state_summary.dom_state.llm_representation(
-                remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-            ),
-        )
+        if browser_state_summary is None:
+            raise RuntimeError(
+                "Failed to fetch browser state (axtree/screenshot) for LLM extraction"
+            )
 
         if "axtree" in llm_extraction.source:
             axtree = memory.browser_states[-1].axtree
@@ -254,17 +254,17 @@ async def handle_llm_extraction(
         if not v2_null_retry_eligible or attempt == _LLM_EXTRACTION_MAX_ATTEMPTS - 1:
             break
 
-        browser_state_summary = await browser.get_browser_state_summary(
-            include_full_page=llm_extraction.include_full_page
+        browser_state_summary = await fetch_browser_state_for_classifier(
+            browser,
+            memory,
+            task,
+            include_full_page=llm_extraction.include_full_page,
         )
-        memory.browser_states[-1] = BrowserState(
-            url=browser_state_summary.url,
-            screenshot=browser_state_summary.screenshot,
-            title=browser_state_summary.title,
-            axtree=browser_state_summary.dom_state.llm_representation(
-                remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-            ),
-        )
+        if browser_state_summary is None:
+            logger.warning(
+                "Could not refresh browser state before LLM extraction retry; stopping retries"
+            )
+            break
 
         axtree_for_classifier = memory.browser_states[-1].axtree or ""
         shot = memory.browser_states[-1].screenshot

@@ -373,6 +373,48 @@ class ActualBrowser:
         else:
             # TODO: handle goto url using cdp methods
             await self._wait_for_cdp(timeout)
+            return True
+
+    async def check_browser_session_healthy(self, timeout: float = 10) -> bool:
+        """Stricter than check_browser_alive: verifies pages/context are usable."""
+        if not await self.check_browser_alive(timeout):
+            return False
+
+        if settings.USE_PLAYWRIGHT_BROWSER:
+            try:
+                if self.context is None:
+                    return False
+                if self.channel == "browser-use":
+                    return True
+                pages = self.context.pages
+                if not pages:
+                    return False
+                await pages[0].evaluate("() => true", timeout=timeout * 1000)
+                return True
+            except Exception as e:
+                logger.debug("Browser session health check failed: %s", e)
+                return False
+
+        if self.cdp_url is None:
+            return False
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.cdp_url}/json/list",
+                    timeout=aiohttp.ClientTimeout(total=timeout),
+                ) as r:
+                    if r.status != 200:
+                        return False
+                    targets = await r.json()
+            page_targets = [
+                t
+                for t in targets
+                if t.get("type") == "page" and t.get("webSocketDebuggerUrl")
+            ]
+            return len(page_targets) > 0
+        except Exception as e:
+            logger.debug("CDP browser session health check failed: %s", e)
+            return False
 
     async def stop(self, graceful=True):
         if settings.USE_PLAYWRIGHT_BROWSER:
