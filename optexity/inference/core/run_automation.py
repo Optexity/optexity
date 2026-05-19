@@ -51,19 +51,12 @@ logger = logging.getLogger(__name__)
 
 # TODO: give a warning where any variable of type {variable_name[index]} is used but variable_name is not in the memory in generated variables or in input variables
 
-DRIVER_CLOSED_MARKERS = (
-    "Connection closed",
-    "Target closed",
-    "Browser closed",
-    "no close frame",
-    "has been closed",
-    "Target crashed",
+from optexity.inference.infra.browser_health import (
+    get_child_process_id_from_env,
+    is_browser_session_poisoned_error,
+    is_driver_closed_error,
+    request_browser_restart,
 )
-
-
-def is_driver_closed_error(e: Exception) -> bool:
-    msg = str(e)
-    return any(m in msg for m in DRIVER_CLOSED_MARKERS)
 
 
 async def run_automation(
@@ -168,6 +161,10 @@ async def run_automation(
             logger.error(f"Driver closed error: {e}, restarting browser")
             if browser is not None:
                 await browser.stop(force=True)
+        if is_browser_session_poisoned_error(e):
+            child_process_id = get_child_process_id_from_env()
+            if child_process_id is not None:
+                request_browser_restart(child_process_id, str(e))
         logger.error(f"Error running automation: {traceback.format_exc()}")
         task.error = str(e)
         task.status = "failed"

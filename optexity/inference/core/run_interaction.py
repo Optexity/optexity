@@ -21,6 +21,7 @@ from optexity.inference.core.interaction.handle_keypress import handle_key_press
 from optexity.inference.core.interaction.handle_select import handle_select_option
 from optexity.inference.core.interaction.handle_upload import handle_upload_file
 from optexity.inference.infra.browser import Browser
+from optexity.inference.infra.browser_health import fetch_browser_state_for_classifier
 from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.interaction_action import (
     CloseOverlayPopupAction,
@@ -282,15 +283,14 @@ async def handle_assert_locator_presence_error(
     )
     logger.debug(f"Handling {error_type} error: {error.command}")
     if retries_left > 1:
-        browser_state_summary = await browser.get_browser_state_summary()
-        memory.browser_states[-1] = BrowserState(
-            url=browser_state_summary.url,
-            screenshot=browser_state_summary.screenshot,
-            title=browser_state_summary.title,
-            axtree=browser_state_summary.dom_state.llm_representation(
-                remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-            ),
+        browser_state_summary = await fetch_browser_state_for_classifier(
+            browser, memory, task
         )
+        if browser_state_summary is None:
+            logger.error(
+                "Could not fetch browser state for error classifier; re-raising original error"
+            )
+            raise error
 
         final_prompt, response, token_usage = _get_error_handler(task).classify_error(
             error.command,
