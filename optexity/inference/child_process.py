@@ -252,7 +252,7 @@ async def run_automation_in_process(
                         task, None, child_process_id, unique_child_arn
                     )
                     await initiate_callback(task)
-            returncode = -1
+                returncode = -1
         finally:
             running_task_processes.pop(task.task_id, None)
 
@@ -303,11 +303,12 @@ async def run_automation_in_process(
 
         if (
             task.is_dedicated
-            and returncode == ExitCodes.WORKER_CRASHED.value
+            and returncode in (ExitCodes.WORKER_CRASHED.value, -1)
             and _global_actual_browser is not None
         ):
+            reason = "timeout" if returncode == -1 else "worker crash"
             await restart_global_actual_browser(
-                f"dedicated browser restart after worker crash on task {task.task_id}"
+                f"dedicated browser restart after {reason} on task {task.task_id}"
             )
 
         if _global_actual_browser is not None and not task.is_dedicated:
