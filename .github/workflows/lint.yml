@@ -26,3 +26,21 @@ jobs:
 
             - name: Run Ruff (minimal strict)
               run: ruff check . --select=F821
+
+            # Catches broken imports that static linters miss
+            # (e.g. `from typing import BaseException` — typing has no such
+            # name, but ruff F401/F821 are happy because the symbol is bound
+            # locally by the import). Only fails on ImportError / SyntaxError;
+            # runtime/config errors at import time are reported but not fatal.
+            - name: Install uv
+              uses: astral-sh/setup-uv@v3
+
+            - name: Install package
+              run: uv sync --frozen
+
+            - name: Import smoke test
+              # `run_local` is an orphan dev script with stale example imports;
+              # not used anywhere. Drop the skip once it's cleaned up or removed.
+              run: |
+                  uv run python .github/scripts/import_smoke.py optexity \
+                      --skip optexity.inference.run_local
