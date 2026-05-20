@@ -137,19 +137,7 @@ async def run_automation(
 
         full_automation = []
 
-        for node in automation.nodes:
-            if isinstance(node, ForLoopNode):
-                await handle_for_loop_node(node, memory, task, browser, full_automation)
-            elif isinstance(node, IfElseNode):
-                await handle_if_else_node(node, memory, task, browser, full_automation)
-            else:
-                full_automation.append(node.model_dump())
-                await run_action_node(
-                    node,
-                    task,
-                    memory,
-                    browser,
-                )
+        await _run_nodes(automation.nodes, task, memory, browser, full_automation)
 
         task.status = "success"
     except AssertionError as e:
@@ -584,6 +572,23 @@ async def handle_for_loop_node(
     memory.update_system_info()
 
 
+async def _run_nodes(
+    nodes,
+    task: Task,
+    memory: Memory,
+    browser: Browser,
+    full_automation: list,
+):
+    """Dispatch a list of nodes (ActionNode, ForLoopNode, or IfElseNode) for execution."""
+    for node in nodes:
+        if isinstance(node, ForLoopNode):
+            await handle_for_loop_node(node, memory, task, browser, full_automation)
+        elif isinstance(node, IfElseNode):
+            await handle_if_else_node(node, memory, task, browser, full_automation)
+        else:
+            full_automation.append(node.model_dump())
+            await run_action_node(node, task, memory, browser)
+
+
 async def run_post_processing_nodes(task: Task, memory: Memory, browser: Browser):
-    for node in task.automation.post_processing_nodes:
-        await run_action_node(node, task, memory, browser)
+    await _run_nodes(task.automation.post_processing_nodes, task, memory, browser, [])
