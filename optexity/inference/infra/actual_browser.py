@@ -389,7 +389,7 @@ class ActualBrowser:
                 pages = self.context.pages
                 if not pages:
                     return False
-                await pages[0].evaluate("() => true", timeout=timeout * 1000)
+                await asyncio.wait_for(pages[0].evaluate("() => true"), timeout=timeout)
                 return True
             except Exception as e:
                 logger.debug("Browser session health check failed: %s", e)

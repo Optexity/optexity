@@ -113,10 +113,20 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
         system_info.total_system_memory_used / system_info.total_system_memory > 0.6
     )
 
+    # Drain any pending restart flag first so it can't leak into a subsequent task
+    # if the global browser was already nulled out (e.g. by the outer-finally restart
+    # after WORKER_CRASHED / timeout, or by the retry path in _run_attempt).
+    restart_reason = consume_browser_restart_request(child_process_id)
+    if restart_reason and _global_actual_browser is None:
+        logger.info(
+            "Discarding stale browser restart request (browser already absent): %s",
+            restart_reason[:500],
+        )
+        restart_reason = None
+
     if _global_actual_browser is not None:
 
         restart_browser = False
-        restart_reason = consume_browser_restart_request(child_process_id)
         if restart_reason:
             logger.info(
                 "Worker requested browser restart before task: %s", restart_reason[:500]
