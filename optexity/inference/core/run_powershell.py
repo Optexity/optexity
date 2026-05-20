@@ -25,10 +25,11 @@ async def run_powershell_action(powershell_action: PowerShellAction):
         await asyncio.sleep(1)
 
     # Close PowerShell
-    pyperclip.copy("exit")
-    await asyncio.sleep(0.2)
-    pyautogui.hotkey("ctrl", "v")
-    await asyncio.sleep(0.3)
-    pyautogui.press("enter")
+    if powershell_action.exit_after_commands:
+        pyperclip.copy("exit")
+        await asyncio.sleep(0.2)
+        pyautogui.hotkey("ctrl", "v")
+        await asyncio.sleep(0.3)
+        pyautogui.press("enter")
 
     logger.debug("PowerShell action completed successfully")
