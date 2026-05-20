@@ -124,7 +124,7 @@ class ActualBrowser:
             "id": "ddkjiahejlhfcafbddmgiahcphecmpfh",
             "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dddkjiahejlhfcafbddmgiahcphecmpfh%26uc",
         }
-        self.extensions = [_cookie_blocker, _ublock] if not allow_cookies else [_ublock]
+        self.extensions = [_cookie_blocker] if not allow_cookies else []
 
         if self.channel == "browser-use" and self.is_dedicated:
             raise ValueError("Browser-use is not supported for dedicated browsers")
