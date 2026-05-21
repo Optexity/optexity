@@ -72,6 +72,10 @@ async def command_based_action_with_retry(
                 await locator.scroll_into_view_if_needed(
                     timeout=max_timeout_seconds_per_try * 1000
                 )
+                await locator.evaluate(
+                    "el => el.scrollIntoView({ block: 'center', inline: 'center' })"
+                )
+                await locator.focus()
                 await asyncio.sleep(0.05)
 
                 try:
