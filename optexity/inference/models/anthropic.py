@@ -17,11 +17,12 @@ logger = logging.getLogger(__name__)
 MAX_TOKENS = 4096
 
 # Computer Use tool configuration — must match the dimensions of the screenshot
-# captured by Browser.get_screenshot() in RDP mode (see _RDP_WINDOW_WIDTH/HEIGHT
-# in inference/infra/actual_browser.py). Coordinates returned by the model are
-# in this space and dispatched directly to pyautogui.
-COMPUTER_USE_DISPLAY_WIDTH_PX = 1440
-COMPUTER_USE_DISPLAY_HEIGHT_PX = 900
+# captured by Browser.get_screenshot() in RDP mode. Browser.get_screenshot()
+# grabs the full Xvfb monitor (1920x1080), and openbox forces freerdp to fill
+# that area, so the model's coordinate space and the dispatch coordinate space
+# (Xvfb absolute pixels, used by pyautogui) align 1:1 at 1920x1080.
+COMPUTER_USE_DISPLAY_WIDTH_PX = 1920
+COMPUTER_USE_DISPLAY_HEIGHT_PX = 1080
 COMPUTER_USE_TOOL_TYPE = "computer_20251124"
 COMPUTER_USE_BETA = "computer-use-2025-11-24"
 

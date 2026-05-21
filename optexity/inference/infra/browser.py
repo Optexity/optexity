@@ -578,27 +578,10 @@ class Browser:
             try:
                 await asyncio.sleep(0.1)
 
-                # Crop to the freerdp window region (positioned at Xvfb (0,0)
-                # with size _RDP_WINDOW_WIDTH x _RDP_WINDOW_HEIGHT). The full
-                # Xvfb monitor is larger (e.g. 1920x1080), but Claude/Gemini
-                # Computer Use and the single-turn click predictor all reason
-                # in 1440x900 coordinate space — anything outside that region
-                # would only confuse the model's spatial reasoning.
-                from optexity.inference.infra.actual_browser import (
-                    _RDP_WINDOW_HEIGHT,
-                    _RDP_WINDOW_WIDTH,
-                )
-
-                crop_region = {
-                    "left": 0,
-                    "top": 0,
-                    "width": _RDP_WINDOW_WIDTH,
-                    "height": _RDP_WINDOW_HEIGHT,
-                }
-
                 def _capture() -> bytes:
                     with mss.mss() as sct:
-                        shot = sct.grab(crop_region)
+                        monitor = sct.monitors[1]
+                        shot = sct.grab(monitor)
                         png_bytes = mss.tools.to_png(shot.rgb, shot.size, output=None)
                         if png_bytes is None:
                             raise RuntimeError("Failed to encode PNG")
