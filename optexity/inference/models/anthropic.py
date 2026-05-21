@@ -16,7 +16,28 @@ logger = logging.getLogger(__name__)
 
 MAX_TOKENS = 4096
 
+# Computer Use tool configuration — must match the dimensions of the screenshot
+# captured by Browser.get_screenshot() in RDP mode (see _RDP_WINDOW_WIDTH/HEIGHT
+# in inference/infra/actual_browser.py). Coordinates returned by the model are
+# in this space and dispatched directly to pyautogui.
+COMPUTER_USE_DISPLAY_WIDTH_PX = 1440
+COMPUTER_USE_DISPLAY_HEIGHT_PX = 900
+COMPUTER_USE_TOOL_TYPE = "computer_20251124"
+COMPUTER_USE_BETA = "computer-use-2025-11-24"
+
 _SPACE_PLACEHOLDER = "_._"
+
+
+def _computer_use_tool_spec() -> dict:
+    """Return the Computer Use tool config used for both the single-turn
+    coordinate predictor and the multi-turn agentic loop."""
+    return {
+        "type": COMPUTER_USE_TOOL_TYPE,
+        "name": "computer",
+        "display_width_px": COMPUTER_USE_DISPLAY_WIDTH_PX,
+        "display_height_px": COMPUTER_USE_DISPLAY_HEIGHT_PX,
+        "display_number": 1,
+    }
 
 
 def _sanitize_schema_keys(obj):
@@ -212,22 +233,14 @@ class Anthropic(LLMModel):
                 "model": self.model_name.value,
                 "max_tokens": MAX_TOKENS,
                 "messages": [{"role": "user", "content": content}],
-                "tools": [
-                    {
-                        "type": "computer_20251124",
-                        "name": "computer",
-                        "display_width_px": 1440,
-                        "display_height_px": 900,
-                        "display_number": 1,
-                    }
-                ],
+                "tools": [_computer_use_tool_spec()],
             }
             if system_instruction:
                 kwargs["system"] = system_instruction
 
             response = self.client.beta.messages.create(
                 **kwargs,
-                betas=["computer-use-2025-11-24"],
+                betas=[COMPUTER_USE_BETA],
             )
 
             for block in response.content:
@@ -248,3 +261,44 @@ class Anthropic(LLMModel):
             logger.error(f"ValidationError in Anthropic computer use response: {e}")
 
         return coordinates, token_usage
+
+    def run_computer_use_turn(
+        self,
+        messages: list[dict],
+        system_instruction: Optional[str] = None,
+    ) -> tuple[list, str, TokenUsage]:
+        """One turn of a multi-turn Computer Use conversation.
+
+        The caller owns the `messages` list and is responsible for appending the
+        assistant response and the corresponding tool_result user message before
+        the next call. This method does a single round-trip and returns the raw
+        content blocks plus stop_reason so the caller can decide whether to
+        continue.
+
+        Returns
+        -------
+        tuple[list, str, TokenUsage]
+            (content_blocks, stop_reason, token_usage)
+        """
+        kwargs: dict = {
+            "model": self.model_name.value,
+            "max_tokens": MAX_TOKENS,
+            "messages": messages,
+            "tools": [_computer_use_tool_spec()],
+        }
+        if system_instruction:
+            kwargs["system"] = system_instruction
+
+        response = self.client.beta.messages.create(
+            **kwargs,
+            betas=[COMPUTER_USE_BETA],
+        )
+
+        token_usage = TokenUsage()
+        if response.usage is not None:
+            token_usage = self.get_token_usage(
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+            )
+
+        return response.content, response.stop_reason, token_usage

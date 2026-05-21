@@ -39,9 +39,9 @@ Use `agentic_task` when AI should autonomously accomplish a goal:
 |----------|------|---------|-------------|
 | `task` | `str` | Required | Natural language goal description |
 | `max_steps` | `int` | Required | Maximum actions the agent can take |
-| `backend` | `"browser_use" \| "browserbase"` | Required | Agent backend |
-| `use_vision` | `bool` | `False` | Include screenshots for agent |
-| `keep_alive` | `bool` | `True` | Keep browser session after task |
+| `backend` | `"browser_use" \| "browserbase"` | Required | Agent backend (ignored when `browser_channel="rdp"` — see below) |
+| `use_vision` | `bool` | `False` | Include screenshots for agent (browser_use only) |
+| `keep_alive` | `bool` | `True` | Keep browser session after task (browser_use only) |
 
 ### max_steps Guidelines
 
@@ -92,6 +92,80 @@ Enable `use_vision` for visual elements without good text labels:
 | Image-based navigation | Text-based navigation |
 | Visual verification | Speed-critical tasks |
 | Elements without ARIA labels | Cost minimization |
+
+---
+
+## Computer Use (Desktop / RDP)
+
+For automations running against a remote desktop (`browser_channel: "rdp"`), an `agentic_task` automatically runs as **Computer Use** — the LLM drives the *whole machine* via screenshots and synthetic mouse/keyboard input, not just a browser. Use it for desktop-level tasks where a static action list isn't tractable: closing every open window on a freshly-launched RDP session, dismissing OS-level prompts, recovering from an unknown UI state.
+
+<Info>
+On RDP, `agentic_task.backend` is **ignored** — there is no browser CDP to drive, so the only meaningful agent is Computer Use. Claude is the only supported provider today; Gemini support will be added later.
+</Info>
+
+### Example: reset RDP machine state
+
+```json
+{
+  "browser_channel": "rdp",
+  "url": "...",
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "Close every visible window on the desktop by clicking each window's close button. If a 'Save changes?' or similar dialog appears, choose 'Don't save'. Do not force-kill anything — close windows through their normal UI. When the desktop is empty, stop.",
+          "max_steps": 30,
+          "backend": "browser_use"
+        }
+      }
+    }
+  ]
+}
+```
+
+(`backend` is required by the schema but ignored under RDP — pick any valid value.)
+
+### How it works
+
+1. The action takes a screenshot of the Xvfb display (1440×900 — same dimensions used by the existing RDP click predictor) and sends it to the model with the user-provided `task` and a system prompt encouraging graceful interactions.
+2. The model responds with one or more `tool_use` blocks (mouse moves, clicks, key presses, scrolls, screenshots, etc.) — Optexity dispatches every action via `pyautogui` against the Xvfb display.
+3. A fresh screenshot is captured and sent back as the `tool_result`; the loop continues.
+4. The loop exits when the model emits `stop_reason: end_turn` or when `max_steps` is reached (the latter logs a warning and exits cleanly — the automation does **not** fail).
+5. The model's final text reply (the summary it writes before stopping) is appended to `memory.variables.output_data` with `unique_identifier="computer_use_summary"` so downstream steps and callbacks can read what happened.
+
+### Configuration
+
+| Property | Notes |
+|----------|-------|
+| `task` | Plain English. Describe the goal, any guardrails ("don't force-kill", "click Cancel on dialogs"), and the stop condition ("when the desktop is empty"). |
+| `max_steps` | Each step is one round-trip to the model plus any dispatched actions. 30 is a reasonable default for desktop resets; raise for longer workflows. There is no wall-clock timeout — `max_steps` is the only fuse. |
+| `backend` | Ignored under RDP. Schema still requires a value — pass `"browser_use"`. |
+| `use_vision` / `keep_alive` | Not used in RDP mode. |
+
+Computer Use under RDP currently runs against Claude Sonnet (`claude-sonnet-4-6`). The model is not user-configurable yet.
+
+### Authentication
+
+Computer Use uses the existing model layer, which reads `ANTHROPIC_API_KEY` from the environment of the inference worker. No per-action key is supported.
+
+### Per-step logs
+
+Each turn writes the model's response and the dispatched actions into the automation step's log directory:
+
+```
+{task_directory}/logs/step_{n}/computer_use_turn_{i}/
+├── response.json              # Claude's content blocks
+└── dispatched_actions.json    # Actions executed + is_error flags
+```
+
+These are invaluable when diagnosing "why did Claude click there?" — open the response next to the screenshot you took beforehand.
+
+### Caveats
+
+- **Token cost grows per turn.** Each step re-sends the whole conversation including the latest screenshot. A 30-step run can use significant Claude tokens; profile before scheduling at high volume.
+- **The model decides everything.** There are no deterministic shortcuts (no `wmctrl -c`-style force closes). If you want a deterministic reset, write a `python_script_action` instead.
+- **Window focus is the agent's problem.** If the freerdp window loses focus, the agent must click into it itself — Optexity does not auto-focus before each dispatch.
 
 ---
 

@@ -2,6 +2,9 @@ import logging
 
 from browser_use import Agent, BrowserSession, ChatGoogle, Tools
 
+from optexity.inference.core.interaction.handle_computer_use import (
+    run_computer_use_agent,
+)
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import (
     AgenticTask,
@@ -19,6 +22,12 @@ async def handle_agentic_task(
     memory: Memory,
     browser: Browser,
 ):
+    # On RDP there's no browser CDP — agentic tasks run as Computer Use
+    # against the Xvfb display. The agentic_task.backend field is ignored
+    # in this case; provider (Claude/Gemini) comes from agentic_task.model.
+    if browser.channel == "rdp":
+        await run_computer_use_agent(agentic_task_action, task, memory, browser)
+        return
 
     if agentic_task_action.backend == "browser_use":
 

@@ -15,7 +15,7 @@ ENV SCREEN_HEIGHT=900
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo git wget curl nano htop zsh tmux \
-    xvfb openbox x11-utils \
+    xvfb openbox x11-utils x11-xserver-utils \
     freerdp2-x11 \
     x11vnc novnc websockify \
     supervisor wmctrl \
