@@ -39,7 +39,7 @@ Use `agentic_task` when AI should autonomously accomplish a goal:
 |----------|------|---------|-------------|
 | `task` | `str` | Required | Natural language goal description |
 | `max_steps` | `int` | Required | Maximum actions the agent can take |
-| `backend` | `"browser_use" \| "browserbase"` | Required | Agent backend (ignored when `browser_channel="rdp"` — see below) |
+| `backend` | `"browser_use" \| "browserbase"` | `"browser_use"` | Agent backend (ignored when `browser_channel="rdp"` — see below) |
 | `use_vision` | `bool` | `False` | Include screenshots for agent (browser_use only) |
 | `keep_alive` | `bool` | `True` | Keep browser session after task (browser_use only) |
 
@@ -115,8 +115,7 @@ On RDP, `agentic_task.backend` is **ignored** — there is no browser CDP to dri
       "interaction_action": {
         "agentic_task": {
           "task": "Close every visible window on the desktop by clicking each window's close button. If a 'Save changes?' or similar dialog appears, choose 'Don't save'. Do not force-kill anything — close windows through their normal UI. When the desktop is empty, stop.",
-          "max_steps": 30,
-          "backend": "browser_use"
+          "max_steps": 30
         }
       }
     }
@@ -124,7 +123,7 @@ On RDP, `agentic_task.backend` is **ignored** — there is no browser CDP to dri
 }
 ```
 
-(`backend` is required by the schema but ignored under RDP — pick any valid value.)
+(`backend` is optional under RDP — it's ignored either way, so the default `"browser_use"` is fine.)
 
 ### How it works
 
@@ -140,7 +139,7 @@ On RDP, `agentic_task.backend` is **ignored** — there is no browser CDP to dri
 |----------|-------|
 | `task` | Plain English. Describe the goal, any guardrails ("don't force-kill", "click Cancel on dialogs"), and the stop condition ("when the desktop is empty"). |
 | `max_steps` | Each step is one round-trip to the model plus any dispatched actions. 30 is a reasonable default for desktop resets; raise for longer workflows. There is no wall-clock timeout — `max_steps` is the only fuse. |
-| `backend` | Ignored under RDP. Schema still requires a value — pass `"browser_use"`. |
+| `backend` | Optional. Ignored under RDP. Defaults to `"browser_use"` if omitted. |
 | `use_vision` / `keep_alive` | Not used in RDP mode. |
 
 Computer Use under RDP currently runs against Claude Sonnet (`claude-sonnet-4-6`). The model is not user-configurable yet.

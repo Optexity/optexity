@@ -340,7 +340,7 @@ class KeyPressAction(BaseAction):
 class AgenticTask(BaseModel):
     task: str
     max_steps: int
-    backend: Literal["browser_use", "browserbase"]
+    backend: Literal["browser_use", "browserbase"] = "browser_use"
     use_vision: bool = False
     keep_alive: bool = True
 
