@@ -486,8 +486,11 @@ def _image_block(b64_png: str) -> dict:
 
 
 async def _capture_image_block(browser: Browser) -> list[dict]:
-    # Brief settle so the post-action UI catches up before the screenshot.
-    await asyncio.sleep(0.1)
+    # Settle delay before the post-action screenshot. Tuned for RDP, where
+    # the worker → freerdp → host → redraw → back round-trip can easily take
+    # several hundred ms; sub-second settles risk capturing the pre-action
+    # frame and confusing the model into "I must have missed, try again".
+    await asyncio.sleep(2.0)
     screenshot = await browser.get_screenshot()
     if not screenshot:
         raise RuntimeError("get_screenshot returned None")
