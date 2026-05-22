@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Maps our model names to tokencost-recognized names for cost calculation
 _TOKENCOST_MODEL_MAP: dict[str, str] = {
     # Anthropic
+    "claude-opus-4-7": "claude-opus-4-1",
     "claude-opus-4-6": "claude-opus-4-1",
     "claude-sonnet-4-6": "claude-sonnet-4-20250514",
     "claude-haiku-4-5-20251001": "claude-3-5-haiku-20241022",
@@ -63,12 +64,14 @@ class OpenAIModels(Enum):
 
 @unique
 class AnthropicModels(Enum):
+    CLAUDE_OPUS_4_7 = "claude-opus-4-7"
     CLAUDE_OPUS_4_6 = "claude-opus-4-6"
     CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
     CLAUDE_HAIKU_4_5 = "claude-haiku-4-5-20251001"
 
     def is_computer_use_model(self) -> bool:
         return self in [
+            AnthropicModels.CLAUDE_OPUS_4_7,
             AnthropicModels.CLAUDE_SONNET_4_6,
             AnthropicModels.CLAUDE_OPUS_4_6,
         ]
@@ -76,12 +79,14 @@ class AnthropicModels(Enum):
 
 @unique
 class AnthropicModels(Enum):
+    CLAUDE_OPUS_4_7 = "claude-opus-4-7"
     CLAUDE_OPUS_4_6 = "claude-opus-4-6"
     CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
     CLAUDE_HAIKU_4_5 = "claude-haiku-4-5-20251001"
 
     def is_computer_use_model(self) -> bool:
         return self in [
+            AnthropicModels.CLAUDE_OPUS_4_7,
             AnthropicModels.CLAUDE_SONNET_4_6,
             AnthropicModels.CLAUDE_OPUS_4_6,
         ]

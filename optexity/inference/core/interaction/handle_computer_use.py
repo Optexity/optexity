@@ -42,7 +42,14 @@ from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CLAUDE_COMPUTER_USE_MODEL = AnthropicModels.CLAUDE_SONNET_4_6
+# Opus 4.7 is the only Anthropic model with 1:1 coordinate scaling (up to
+# 2576px long edge — see Anthropic Computer Use docs, "Handle coordinate
+# scaling for higher resolutions"). Earlier models (Sonnet 4.6, Opus 4.6)
+# are subject to the 1568px / ~1.15MP image constraint, which causes the
+# API to internally downsample our 1440x900 screenshots and return coords
+# in the downsampled space — a documented source of misclicks if the host
+# doesn't scale coords back up. We use 4.7 to skip that whole pipeline.
+DEFAULT_CLAUDE_COMPUTER_USE_MODEL = AnthropicModels.CLAUDE_OPUS_4_7
 
 # Claude's `key` action uses xdotool key names; pyautogui has its own set.
 # Translate the common ones — anything not in this map is passed through
@@ -251,14 +258,29 @@ async def _run_claude_loop(
 
 
 def _resolve_claude_model() -> Anthropic:
-    """Instantiate the default Claude Computer Use model via the existing layer."""
-    model = get_llm_model(
-        DEFAULT_CLAUDE_COMPUTER_USE_MODEL, use_structured_output=False
-    )
+    """Instantiate the default Claude Computer Use model via the existing layer.
+
+    Raises a RuntimeError with an actionable message if the configured default
+    (Opus 4.7) is not accessible from the current API key — the underlying
+    get_llm_model also raises, but its error wording is generic.
+    """
+    try:
+        model = get_llm_model(
+            DEFAULT_CLAUDE_COMPUTER_USE_MODEL, use_structured_output=False
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"computer_use: failed to instantiate "
+            f"{DEFAULT_CLAUDE_COMPUTER_USE_MODEL.value} "
+            f"(check ANTHROPIC_API_KEY and that the account has access to this "
+            f"model): {e}"
+        ) from e
+
     if not isinstance(model, Anthropic):
         raise RuntimeError(
             f"computer_use: resolved model is not Anthropic: {type(model).__name__}"
         )
+    logger.info(f"computer_use: using model {DEFAULT_CLAUDE_COMPUTER_USE_MODEL.value}")
     return model
 
 
