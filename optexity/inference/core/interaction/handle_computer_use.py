@@ -21,8 +21,10 @@ Constraints honoured:
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 import pyautogui
@@ -117,6 +119,8 @@ async def _run_claude_loop(
         logger.error("computer_use: failed to capture initial screenshot")
         return
 
+    _save_screenshot_b64(initial_screenshot, step_directory / "initial_screenshot.png")
+
     messages: list[dict] = [
         {
             "role": "user",
@@ -209,6 +213,22 @@ async def _run_claude_loop(
             )
 
         _write_json(turn_directory / "dispatched_actions.json", dispatched)
+
+        # Persist the screenshots we sent back to Claude as tool_results.
+        # Pure diagnostic — lets us open the PNG and visually compare against
+        # the coords Claude returned next turn ("did the click land where the
+        # model intended? was the model targeting the right button?").
+        for idx, tr in enumerate(tool_results):
+            content = tr.get("content")
+            if isinstance(content, list):
+                for sub in content:
+                    if isinstance(sub, dict) and sub.get("type") == "image":
+                        b64 = sub.get("source", {}).get("data")
+                        if b64:
+                            _save_screenshot_b64(
+                                b64, turn_directory / f"post_action_{idx}.png"
+                            )
+                            break
 
         messages.append({"role": "user", "content": tool_results})
 
@@ -549,3 +569,13 @@ def _write_json(path, payload) -> None:
             json.dump(payload, f, indent=2, default=str)
     except Exception as e:
         logger.warning(f"computer_use: failed to write {path}: {e}")
+
+
+def _save_screenshot_b64(b64_png: str, path: Path) -> None:
+    """Persist a base64-encoded PNG to disk for offline debugging."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(base64.b64decode(b64_png))
+    except Exception as e:
+        logger.warning(f"computer_use: failed to write screenshot {path}: {e}")
