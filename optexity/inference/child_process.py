@@ -26,6 +26,7 @@ from optexity.inference.core.logging import (
     save_trajectory_in_server,
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
+from optexity.inference.infra.browser_health import consume_browser_restart_request
 from optexity.schema.enums import ExitCodes
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import SystemInfo
@@ -94,6 +95,17 @@ def log_system_info(comment: str):
     logger.info("=" * 100 + "\n")
 
 
+async def restart_global_actual_browser(reason: str) -> None:
+    global _global_actual_browser
+    logger.warning("Restarting actual browser: %s", reason)
+    if _global_actual_browser is not None:
+        try:
+            await _global_actual_browser.stop(graceful=True)
+        except Exception as e:
+            logger.warning("Error stopping browser during restart: %s", e)
+        _global_actual_browser = None
+
+
 async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int):
     global _global_actual_browser
     system_info = SystemInfo()
@@ -101,12 +113,34 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
         system_info.total_system_memory_used / system_info.total_system_memory > 0.6
     )
 
+    # Drain any pending restart flag first so it can't leak into a subsequent task
+    # if the global browser was already nulled out (e.g. by the outer-finally restart
+    # after WORKER_CRASHED / timeout, or by the retry path in _run_attempt).
+    restart_reason = consume_browser_restart_request(child_process_id)
+    if restart_reason and _global_actual_browser is None:
+        logger.info(
+            "Discarding stale browser restart request (browser already absent): %s",
+            restart_reason[:500],
+        )
+        restart_reason = None
+
     if _global_actual_browser is not None:
 
         restart_browser = False
+        if restart_reason:
+            logger.info(
+                "Worker requested browser restart before task: %s", restart_reason[:500]
+            )
+            restart_browser = True
+
         if not await _global_actual_browser.check_browser_alive():
             logger.info("CDP is not alive, restarting browser")
             restart_browser = True
+
+        if task.is_dedicated and not restart_browser:
+            if not await _global_actual_browser.check_browser_session_healthy():
+                logger.info("Dedicated browser session unhealthy, restarting browser")
+                restart_browser = True
 
         if memory_exceeded:
             logger.info("Memory exceeded, restarting browser")
@@ -117,8 +151,9 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             restart_browser = True
 
         if restart_browser:
-            await _global_actual_browser.stop(graceful=True)
-            _global_actual_browser = None
+            await restart_global_actual_browser(
+                restart_reason or "setup_browser health check"
+            )
 
     if _global_actual_browser is None:
         logger.info("Starting new actual browser")
@@ -193,7 +228,11 @@ async def run_automation_in_process(
             str(_cdp_url),
             str(attempts_left),
             preexec_fn=os.setsid,
-            env={**os.environ, "CHILD_FASTAPI_PORT": str(_child_fastapi_port)},
+            env={
+                **os.environ,
+                "CHILD_FASTAPI_PORT": str(_child_fastapi_port),
+                "CHILD_PROCESS_ID": str(child_process_id),
+            },
         )
         running_task_processes[task.task_id] = proc
 
@@ -223,7 +262,7 @@ async def run_automation_in_process(
                         task, None, child_process_id, unique_child_arn
                     )
                     await initiate_callback(task)
-            returncode = -1
+                returncode = -1
         finally:
             running_task_processes.pop(task.task_id, None)
 
@@ -263,13 +302,24 @@ async def run_automation_in_process(
 
         return await _run_attempt(attempt_index + 1)
 
+    returncode: int | None = None
     try:
-        return await _run_attempt(0)
+        returncode = await _run_attempt(0)
     finally:
         logger.info(
             f"---------- Automation for task {task.task_id} finished ----------\n"
         )
         log_system_info("Memory info after automation finished in process")
+
+        if (
+            task.is_dedicated
+            and returncode in (ExitCodes.WORKER_CRASHED.value, -1)
+            and _global_actual_browser is not None
+        ):
+            reason = "timeout" if returncode == -1 else "worker crash"
+            await restart_global_actual_browser(
+                f"dedicated browser restart after {reason} on task {task.task_id}"
+            )
 
         if _global_actual_browser is not None and not task.is_dedicated:
             logger.debug("Stopping actual browser as not dedicated")
