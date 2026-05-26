@@ -160,6 +160,9 @@ class Memory(BaseModel):
     downloads: list[Path] = Field(default_factory=list)
     final_screenshot: str | None = Field(default=None)
     system_info_tracking: list[SystemInfo] = Field(default_factory=list)
+    # Number of times agentic recovery has fired for this task (RDP only).
+    # Capped per task to bound LLM cost and contain damage from misfires.
+    agentic_recovery_count: int = Field(default=0)
     unique_child_arn: str
 
     model_config = {

@@ -10,6 +10,8 @@ from pathlib import Path
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
+from optexity.exceptions import KeywordNotFoundOnScreenException
+from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
 from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
     _wait_for_file_stable,
@@ -43,7 +45,10 @@ from optexity.inference.core.variable_resolver import (
 )
 from optexity.inference.core.vision.time import wait_for_stable_screen
 from optexity.inference.infra.browser import Browser
-from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
+from optexity.schema.actions.interaction_action import (
+    AgenticTask,
+    DownloadUrlAsPdfAction,
+)
 from optexity.schema.automation import ActionNode, ForLoopNode, IfElseNode
 from optexity.schema.memory import BrowserState, ForLoopStatus, Memory, OutputData
 from optexity.schema.task import Task
@@ -72,6 +77,29 @@ DRIVER_CLOSED_MARKERS = (
 def is_driver_closed_error(e: Exception) -> bool:
     msg = str(e)
     return any(m in msg for m in DRIVER_CLOSED_MARKERS)
+
+
+# Max agentic recovery attempts allowed per task. Bounds LLM cost and damage
+# if the recovery itself starts misfiring.
+MAX_AGENTIC_RECOVERIES_PER_TASK = 3
+
+AGENTIC_RECOVERY_PROMPT = (
+    "A previous automation step failed, most likely because an unexpected "
+    "popup, alert, or dialog is blocking the screen. Inspect the screen and "
+    "take whatever short sequence of actions is needed to return the app to "
+    "a usable state so the automation can continue.\n\n"
+    "Hard rules:\n"
+    "1. NEVER click any 'Delete', 'Remove', or 'Discard permanently' button. "
+    "Deletion is not allowed under any circumstance.\n"
+    "2. For Save dialogs ('Save', 'Don't Save', 'Cancel', 'Discard', 'No', "
+    "'Yes'), decide for yourself which option best returns the app to a "
+    "usable state. Don't pick blindly — read the dialog.\n"
+    "3. Do NOT open new windows, navigate to other screens, or kill "
+    "processes. Stay on the current screen and only dismiss what's "
+    "blocking.\n"
+    "4. If after looking at the screen nothing appears to be blocking, "
+    "stop and reply with a short summary — do not click anything."
+)
 
 
 async def run_automation(
@@ -355,7 +383,7 @@ async def run_action_node(
 
     logger.debug(f"-----Running node new {memory.automation_state.step_index}-----")
 
-    try:
+    async def _dispatch_action_body() -> None:
         if action_node.interaction_action:
             ## Assuming network calls are only made during interaction actions and not during extraction actions
             await browser.clear_network_calls()
@@ -390,6 +418,40 @@ async def run_action_node(
                 await run_set_variable_action(
                     action_node.misc_action.set_variable, memory
                 )
+
+    try:
+        try:
+            await _dispatch_action_body()
+        except KeywordNotFoundOnScreenException as e:
+            # Only intercept on RDP; web flows have their own recovery
+            # paths (browseruse/axtree retries) and shouldn't pay this cost.
+            if browser.channel != "rdp":
+                raise
+            if memory.agentic_recovery_count >= MAX_AGENTIC_RECOVERIES_PER_TASK:
+                logger.error(
+                    f"Agentic recovery cap reached "
+                    f"({memory.agentic_recovery_count}/"
+                    f"{MAX_AGENTIC_RECOVERIES_PER_TASK}); propagating "
+                    f"KeywordNotFoundOnScreenException for keyword "
+                    f"'{e.keyword}'."
+                )
+                raise
+
+            memory.agentic_recovery_count += 1
+            logger.warning(
+                f"Action failed with KeywordNotFoundOnScreenException "
+                f"(keyword='{e.keyword}'); running agentic recovery "
+                f"({memory.agentic_recovery_count}/"
+                f"{MAX_AGENTIC_RECOVERIES_PER_TASK}) before single retry."
+            )
+            recovery_action = AgenticTask(
+                task=AGENTIC_RECOVERY_PROMPT,
+                max_steps=3,
+            )
+            await handle_agentic_task(recovery_action, task, memory, browser)
+            # One retry. If this also fails, the exception propagates to
+            # the outer except below and out of the node.
+            await _dispatch_action_body()
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
