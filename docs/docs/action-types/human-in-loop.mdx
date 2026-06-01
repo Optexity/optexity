@@ -1,0 +1,120 @@
+---
+title: Human in the Loop
+description: Pause an automation and hand control to a human, then resume automatically
+---
+
+The `human_in_loop_action` lets you pause an automation at any point so a human can take over the browser session. Once the human signals they're done, the automation resumes from where it left off.
+
+## Overview
+
+- **Use when**: A step requires human judgment, sensitive credentials, or manual verification that cannot be automated.
+- **How it works**: The agent pauses, the task owner receives a magic-link email to a live browser stream, the human completes the step, then clicks a "Done" button to resume the agent.
+- **Timeout**: If no completion signal arrives within `max_wait_time` seconds, the task fails with a `HumanInLoopTimeoutException`. The hard task timeout is **10 minutes**, so `max_wait_time` must be less than `600`.
+
+## Properties
+
+| Property        | Type    | Unit    | Description                                                  |
+| --------------- | ------- | ------- | ------------------------------------------------------------ |
+| `max_wait_time` | `float` | seconds | Maximum time to wait for human completion before timing out  |
+
+## JSON Example
+
+```json
+{
+  "type": "action_node",
+  "human_in_loop_action": {
+    "max_wait_time": 300
+  }
+}
+```
+
+The example above waits up to **5 minutes** for the human to finish.
+
+## The HITL Flow
+
+When the agent reaches a `human_in_loop_action` node:
+
+1. **Agent pauses** — execution halts at this node.
+2. **Email sent** — Optexity sends a magic-link (OTP) email to the task owner.
+3. **Human takes over** — the link opens the live browser stream at the task-logs page.
+4. **Human signals done** — the task owner clicks the "Done" button in the dashboard.
+5. **Agent resumes** — the agent picks up execution at the next node.
+
+If the human does not click done within `max_wait_time` seconds, the task fails.
+
+## Complete Automation Example
+
+```json
+{
+  "url": "https://secure.example.com/login",
+  "parameters": {
+    "input_parameters": {
+      "username": ["user@example.com"]
+    }
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "get_by_label(\"Username\")",
+          "input_text": "{username[0]}",
+          "prompt_instructions": "Enter the username"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "human_in_loop_action": {
+        "max_wait_time": 300
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"button\", name=\"Submit\")",
+          "prompt_instructions": "Click submit after human completes the step"
+        }
+      }
+    }
+  ]
+}
+```
+
+In this example the agent fills in the username, then pauses for up to 5 minutes so the human can enter a password or complete a sensitive step, then resumes and clicks Submit.
+
+## Timeout Behavior
+
+If `max_wait_time` elapses without a completion signal, the agent raises `HumanInLoopTimeoutException` and the task is marked failed. Choose a value that gives the human enough time to respond — common values:
+
+| Scenario                        | Suggested `max_wait_time` |
+| ------------------------------- | ------------------------- |
+| Quick manual entry (~1 min)     | `120`                     |
+| Short review (~3 min)           | `180`                     |
+| Longer step (~8 min)            | `480`                     |
+
+<Warning>
+  The hard task timeout is **10 minutes (600 seconds)**. Setting `max_wait_time`
+  to `600` or above will cause the task to time out before the HITL window
+  closes. Always keep `max_wait_time` below `600`
+</Warning>
+
+## Best Practices
+
+### Place HITL nodes at natural breakpoints
+
+Put the pause node immediately before the step that requires human action, not after. The agent stops at the HITL node; all prior nodes will have already executed.
+
+### Keep `max_wait_time` realistic
+
+Setting an extremely large timeout (e.g. hours) keeps the cloud worker occupied. If you expect a long human delay, consider splitting the automation into two separate runs instead.
+
+### Only one HITL pause per task at a time
+
+A second `human_in_loop_action` node will not trigger while the first is already active. Design your automation so HITL nodes are sequential, not concurrent.
+
+## Next Steps
+
+- See [Timing & Retries](/docs/advanced/timing-retries) for retry strategies around HITL failures
+- See [Agentic Tasks](/docs/action-types/agentic-tasks) for AI-driven steps that can precede a human handoff

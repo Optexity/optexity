@@ -6,8 +6,12 @@ import pyautogui
 import pyperclip
 
 from optexity.exceptions import (
+    AxtreeIndexActionFailedException,
     ElementNotFoundInAxtreeException,
     KeywordNotFoundOnScreenException,
+)
+from optexity.inference.agents.input_text_prediction.input_text_prediction import (
+    InputTextPredictionAgent,
 )
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
@@ -29,13 +33,60 @@ from optexity.inference.core.interaction.utils import (
 # )
 from optexity.inference.core.vision.utils import mark_screenshot
 from optexity.inference.infra.browser import Browser
+from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.interaction_action import InputTextAction
-from optexity.schema.memory import Memory
+from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
 
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.05
 logger = logging.getLogger(__name__)
+
+_input_text_prediction_cache: dict[tuple, InputTextPredictionAgent] = {}
+
+
+def _get_input_text_prediction_agent(task: Task) -> InputTextPredictionAgent:
+    cache_key = (task.llm_provider, task.llm_model_name)
+    if cache_key not in _input_text_prediction_cache:
+        model = get_llm_model_with_fallback(
+            task.llm_provider, task.llm_model_name, True
+        )
+        _input_text_prediction_cache[cache_key] = InputTextPredictionAgent(model)
+    return _input_text_prediction_cache[cache_key]
+
+
+async def llm_input_text_prediction(
+    prompt_instructions: str, browser: Browser, memory: Memory, task: Task
+) -> str:
+    browser_state_summary = await browser.get_browser_state_summary()
+    memory.browser_states[-1] = BrowserState(
+        url=browser_state_summary.url,
+        screenshot=browser_state_summary.screenshot,
+        title=browser_state_summary.title,
+        axtree=browser_state_summary.dom_state.llm_representation(
+            remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+        ),
+    )
+
+    try:
+        if memory.browser_states[-1].axtree is None:
+            logger.error("Axtree is None, cannot predict action")
+            return None
+        final_prompt, response, token_usage = _get_input_text_prediction_agent(
+            task
+        ).predict_input_text(
+            prompt_instructions,
+            memory.browser_states[-1].axtree,
+            memory.browser_states[-1].screenshot,
+        )
+        memory.token_usage += token_usage
+        memory.browser_states[-1].final_prompt = final_prompt
+        memory.browser_states[-1].llm_response = response.model_dump()
+    except Exception as e:
+        logger.error(f"Error in llm_input_text_prediction: {e}")
+        return None
+
+    return response.input_text
 
 
 async def handle_input_text(
@@ -48,7 +99,22 @@ async def handle_input_text(
     verify_before_step: bool = True,
 ):
 
+    if (
+        input_text_action.input_text is None
+        and not input_text_action.skip_prompt
+        and input_text_action.prompt_instructions is not None
+    ):
+        input_text_action.input_text = await llm_input_text_prediction(
+            input_text_action.prompt_instructions,
+            browser,
+            memory,
+            task,
+        )
+
     if input_text_action.input_text is None:
+        logger.debug(
+            f"Input text is None for action: {input_text_action.__class__.__name__}"
+        )
         return
 
     # {some english chars [0]}
@@ -120,9 +186,21 @@ async def input_text_index(
                 }
             }
         )
-        await browser.backend_agent.multi_act([action_model])
-    except ElementNotFoundInAxtreeException as e:
-        raise e
+
+        try:
+            results = await browser.backend_agent.multi_act([action_model])
+            if results and results[0].error:
+                raise RuntimeError(
+                    f"browseruse input failed at index {index}: {results[0].error}"
+                )
+        except Exception as e:
+            raise AxtreeIndexActionFailedException(
+                message=f"Failed to input text at axtree index {index}",
+                index=index,
+                original_error=e,
+            )
+    except (ElementNotFoundInAxtreeException, AxtreeIndexActionFailedException):
+        raise
     except Exception as e:
         logger.error(f"Error in input_text_index: {e}")
         return

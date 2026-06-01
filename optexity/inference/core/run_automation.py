@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import shutil
 import time
 import traceback
@@ -28,6 +29,7 @@ from optexity.inference.core.logging import (
 )
 from optexity.inference.core.run_assertion import run_assertion_action
 from optexity.inference.core.run_extraction import run_extraction_action
+from optexity.inference.core.run_human_in_loop import run_human_in_loop_action
 from optexity.inference.core.run_interaction import (
     handle_download_url_as_pdf,
     run_interaction_action,
@@ -64,20 +66,12 @@ logger = logging.getLogger(__name__)
 
 # TODO: give a warning where any variable of type {variable_name[index]} is used but variable_name is not in the memory in generated variables or in input variables
 
-DRIVER_CLOSED_MARKERS = (
-    "Connection closed",
-    "Target closed",
-    "Browser closed",
-    "no close frame",
-    "has been closed",
-    "Target crashed",
+from optexity.inference.infra.browser_health import (
+    get_child_process_id_from_env,
+    is_browser_session_poisoned_error,
+    is_driver_closed_error,
+    request_browser_restart,
 )
-
-
-def is_driver_closed_error(e: Exception) -> bool:
-    msg = str(e)
-    return any(m in msg for m in DRIVER_CLOSED_MARKERS)
-
 
 # Max agentic recovery attempts allowed per task. Bounds LLM cost and damage
 # if the recovery itself starts misfiring.
@@ -204,6 +198,10 @@ async def run_automation(
             logger.error(f"Driver closed error: {e}, restarting browser")
             if browser is not None:
                 await browser.stop(force=True)
+        if is_browser_session_poisoned_error(e):
+            child_process_id = get_child_process_id_from_env()
+            if child_process_id is not None:
+                request_browser_restart(child_process_id, str(e))
         logger.error(f"Error running automation: {traceback.format_exc()}")
         task.error = str(e)
         task.status = "failed"
@@ -418,6 +416,10 @@ async def run_action_node(
                 await run_set_variable_action(
                     action_node.misc_action.set_variable, memory
                 )
+        elif action_node.human_in_loop_action:
+            await run_human_in_loop_action(
+                action_node.human_in_loop_action, task, memory
+            )
 
     try:
         try:
@@ -500,11 +502,23 @@ async def sleep_for_page_to_load(browser: Browser, sleep_time: float):
 
 
 def evaluate_condition(condition: str, memory: Memory, task: Task) -> bool:
-    return eval(
-        condition,
-        {},
-        {**task.input_parameters, **memory.variables.generated_variables},
+    # Allow variable references to be optionally wrapped in curly braces,
+    # e.g. "not {is_user_logged_in[0]}" is equivalent to "not is_user_logged_in[0]".
+    # Only strip the braces when the identifier actually exists in scope, so
+    # genuine set/dict literals (e.g. "{1}", "{a, b}") are left untouched.
+    scope = {**task.input_parameters, **memory.variables.generated_variables}
+
+    def _unwrap(match: re.Match) -> str:
+        inner = match.group(1)
+        identifier = match.group(2)
+        if identifier in scope:
+            return inner
+        return match.group(0)
+
+    normalized_condition = re.sub(
+        r"\{(([A-Za-z_]\w*)(?:\[[^{}\[\]]+\])?)\}", _unwrap, condition
     )
+    return eval(normalized_condition, {}, scope)
 
 
 async def handle_if_else_node(

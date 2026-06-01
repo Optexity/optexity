@@ -1,9 +1,11 @@
 ---
 title: If Else Node
-description: Conditional execution in automations
+description: Conditional branching based on extracted data or runtime conditions
 ---
 
 Use `if_else_node` for conditional execution based on runtime conditions—handling different page states, optional elements, or branching logic.
+
+To determine condition logic, use **extraction actions** to capture data from the page and store it as variables. These variables are then referenced in `if_else_node` conditions to make branching decisions based on the extracted data.
 
 ## Structure
 
@@ -36,6 +38,8 @@ Use `if_else_node` for conditional execution based on runtime conditions—handl
 }
 ```
 
+**Note:** Variables like `has_captcha` are extracted from the page using an extraction action (see [Using Extraction Nodes to Set Conditions](#using-extraction-nodes-to-set-conditions) below).
+
 ## Properties
 
 | Property | Type | Description |
@@ -43,6 +47,22 @@ Use `if_else_node` for conditional execution based on runtime conditions—handl
 | `condition` | `str` | Python-like expression to evaluate |
 | `if_nodes` | `list[action_node \| if_else_node \| for_loop_node]` | Actions when condition is true |
 | `else_nodes` | `list[...]` | Actions when condition is false (optional) |
+
+## Using Extraction Nodes to Set Conditions
+
+**Extraction nodes** allow you to capture data from the page and store it as variables. These variables can then be referenced in `if_else_node` conditions to make branching decisions based on the extracted data.
+
+### How It Works
+
+1. **Extract data** using an `extraction_action` and specify `output_variable_names` to create a variable
+2. **Reference the variable** in an `if_else_node` condition using the syntax `variable_name[0]`
+3. **Branch logic** executes different paths based on the extracted value
+
+### Variable Naming and Syntax
+
+- Variables are referenced using array index syntax: `variable_name[0]`
+- The `[0]` accesses the first (or only) element of the extracted value
+- Multiple extractions create arrays: `variable_name[0]`, `variable_name[1]`, etc.
 
 ## Condition Syntax
 
@@ -80,25 +100,74 @@ Conditions are Python-like expressions that can reference parameters:
 
 ## Examples
 
+### Extract and Check Page State
+
+```json
+[
+  {
+    "type": "action_node",
+    "extraction_action": {
+      "llm": {
+        "extraction_format": {
+          "is_login_page": "bool"
+        },
+        "extraction_instructions": "Check if the current page is a login page asking for username or password. If yes, return 'is_login_page' as true, otherwise return false",
+        "output_variable_names": [
+          "is_login_page"
+        ],
+        "llm_model_name": "gemini-2.5-pro"
+      }
+    },
+    "before_sleep_time": 3,
+    "end_sleep_time": 0
+  },
+  {
+    "type": "if_else_node",
+    "condition": "is_login_page[0]",
+    "if_nodes": [
+      {
+        "type": "action_node",
+        "interaction_action": {
+          "input_text": {
+            "command": "get_by_label(\"Username\")",
+            "input_text": "{username[0]}"
+          }
+        }
+      }
+    ],
+    "else_nodes": [
+      {
+        "type": "action_node",
+        "interaction_action": {
+          "click_element": {
+            "command": "get_by_role(\"button\", name=\"Next\")"
+          }
+        }
+      }
+    ]
+  }
+]
+```
+
 ### Handle Optional 2FA
 
 ```json
-{
-  "type": "if_else_node",
-  "condition": "requires_2fa[0] == 'true'",
-  "if_nodes": [
-    {
-      "type": "action_node",
-      "interaction_action": {
-        "input_text": {
-          "command": "get_by_label(\"Verification Code\")",
-          "input_text": "{auth_code[0]}"
+  {
+    "type": "if_else_node",
+    "condition": "requires_2fa[0] == 'true'",
+    "if_nodes": [
+      {
+        "type": "action_node",
+        "interaction_action": {
+          "input_text": {
+            "command": "get_by_label(\"Verification Code\")",
+            "input_text": "{auth_code[0]}"
+          }
         }
       }
-    }
-  ],
-  "else_nodes": []
-}
+    ],
+    "else_nodes": []
+  }
 ```
 
 ### Branch Based on Extracted Value

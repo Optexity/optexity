@@ -1,0 +1,513 @@
+---
+title: Live Stream Endpoint
+description: Stream the live browser view of a running task into your own dashboard
+---
+
+## GET /api/v1/tasks/{task_id}/stream
+
+Returns a short-lived WebSocket URL that streams the live browser view of a running task. Pair it with a noVNC client (e.g. `@novnc/novnc`) to embed the live screen in your own dashboard.
+
+## Description
+
+While a task is running, its browser is rendered in a headed Chromium inside the worker container and exposed over VNC via `websockify`. This endpoint resolves a task to a WebSocket URL (`wss://...`) you can pass directly to a noVNC `RFB` client to render the live view in a `<canvas>`.
+
+The URL is only valid while the task is actively running. Once the task finishes (success / failure / cancellation) the upstream WebSocket closes and the endpoint returns an error.
+
+## Authentication
+
+Requires an API key in the `x-api-key` header. The same key used for `POST /api/v1/inference` works here.
+
+## Parameters
+
+### Path Parameters
+
+- **`task_id`** `string` _required_
+
+    UUID of the task whose live stream you want. Obtain this from the `task_id` field in your task creation response or task listing.
+
+### Headers
+
+- **`x-api-key`** `string` _required_
+
+    Your Optexity API key.
+
+## Code Examples
+
+### Fetch the stream URL
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET \
+  "https://inference-api.optexity.com/api/v1/tasks/<task_id>/stream" \
+  -H "x-api-key: $OPTEXITY_API_KEY"
+```
+
+```python Python
+import os
+import requests
+
+task_id = "bf982ff9-f0af-4598-97be-2eb99c917eb0"
+resp = requests.get(
+    f"https://inference-api.optexity.com/api/v1/tasks/{task_id}/stream",
+    headers={"x-api-key": os.environ["OPTEXITY_API_KEY"]},
+)
+resp.raise_for_status()
+stream_url = resp.json()["stream_url"]
+print(stream_url)
+```
+
+```javascript JavaScript
+const taskId = "bf982ff9-f0af-4598-97be-2eb99c917eb0";
+const res = await fetch(
+    `https://inference-api.optexity.com/api/v1/tasks/${taskId}/stream`,
+    { headers: { "x-api-key": process.env.OPTEXITY_API_KEY } },
+);
+if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+}
+const { stream_url } = await res.json();
+console.log(stream_url);
+```
+
+</CodeGroup>
+
+## Success Response (200 OK)
+
+```json
+{
+    "stream_url": "wss://stream.optexity.com/tasks/<task_id>/websockify?token=..."
+}
+```
+
+**Response Fields:**
+
+| Field        | Type   | Description                                                                                                                              |
+| ------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `stream_url` | string | A `wss://` WebSocket URL that speaks the [noVNC](https://github.com/novnc/noVNC) wire protocol. Pass it directly to a `RFB` constructor. |
+
+The URL is short-lived (it embeds a signed token) and is only useful while the task is running. Re-fetch a fresh URL each time you (re)connect.
+
+## Error Responses
+
+### 401 Unauthorized
+
+```json
+{ "detail": "Invalid or missing API key" }
+```
+
+### 404 Not Found
+
+```json
+{ "detail": "Task <task_id> not found" }
+```
+
+Returned when the task UUID doesn't exist or doesn't belong to your account.
+
+### 409 Conflict
+
+```json
+{ "detail": "Stream not available: task is not running" }
+```
+
+Returned when the task is queued, completed, failed, or cancelled — there is no live browser to stream.
+
+## Frontend Integration
+
+Use `@novnc/novnc`'s `RFB` class. It attaches to a plain `<div>` and renders the live view into a `<canvas>` inside it. The full reference implementation is in `LiveStreamViewer.jsx` in the Optexity dashboard.
+
+<Info>
+Install with `npm install @novnc/novnc`.
+</Info>
+
+### Reference implementations
+
+<CodeGroup>
+
+```jsx React
+import { useEffect, useRef, useState } from "react";
+import RFB from "@novnc/novnc";
+
+const INFERENCE_API_BASE_URL = "https://inference-api.optexity.com";
+
+async function getStreamUrl(taskId, apiKey) {
+    const res = await fetch(
+        `${INFERENCE_API_BASE_URL}/api/v1/tasks/${taskId}/stream`,
+        { headers: { "x-api-key": apiKey } },
+    );
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return res.json();
+}
+
+export function LiveStreamViewer({ taskId, apiKey }) {
+    const containerRef = useRef(null);
+    const rfbRef = useRef(null);
+    const [state, setState] = useState("loading");
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const { stream_url } = await getStreamUrl(taskId, apiKey);
+                if (cancelled || !containerRef.current) return;
+
+                setState("connecting");
+
+                const rfb = new RFB(containerRef.current, stream_url, {
+                    wsProtocols: ["binary"],
+                    credentials: {},
+                });
+                rfb.viewOnly = true;
+                rfb.scaleViewport = true;
+                rfb.resizeSession = false;
+
+                rfb.addEventListener("connect", () => setState("connected"));
+                rfb.addEventListener("disconnect", (e) => {
+                    setState(e.detail?.clean ? "disconnected" : "error");
+                    if (!e.detail?.clean) setError("Connection lost");
+                });
+                rfb.addEventListener("credentialsrequired", () =>
+                    rfb.sendCredentials({}),
+                );
+                rfb.addEventListener("securityfailure", () => {
+                    setError("Security negotiation failed");
+                    setState("error");
+                });
+
+                rfbRef.current = rfb;
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err.message);
+                    setState("error");
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            if (rfbRef.current) {
+                rfbRef.current.disconnect();
+                rfbRef.current = null;
+            }
+        };
+    }, [taskId, apiKey]);
+
+    return (
+        <div>
+            {state !== "connected" && (
+                <div>
+                    {state === "loading" && "Initializing stream…"}
+                    {state === "connecting" && "Connecting to browser…"}
+                    {state === "disconnected" && "Stream ended"}
+                    {state === "error" && (error || "Stream error")}
+                </div>
+            )}
+            <div
+                ref={containerRef}
+                style={{
+                    width: "100%",
+                    height: "600px",
+                    display: state === "connected" ? "block" : "none",
+                }}
+            />
+        </div>
+    );
+}
+```
+
+```html Vanilla JS
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Optexity Live Stream</title>
+    <style>
+        #status { padding: 12px; font-family: system-ui; }
+        #stream { width: 100%; height: 600px; display: none; }
+    </style>
+</head>
+<body>
+    <div id="status">Initializing stream…</div>
+    <div id="stream"></div>
+
+    <script type="module">
+        import RFB from "https://cdn.jsdelivr.net/npm/@novnc/novnc@1.5.0/lib/rfb.js";
+
+        const INFERENCE_API_BASE_URL = "https://inference-api.optexity.com";
+        const TASK_ID = "<your_task_id>";
+        const API_KEY = "<your_api_key>";
+
+        const statusEl = document.getElementById("status");
+        const streamEl = document.getElementById("stream");
+
+        function setStatus(text, visible = true) {
+            statusEl.textContent = text;
+            statusEl.style.display = visible ? "block" : "none";
+        }
+
+        async function getStreamUrl(taskId, apiKey) {
+            const res = await fetch(
+                `${INFERENCE_API_BASE_URL}/api/v1/tasks/${taskId}/stream`,
+                { headers: { "x-api-key": apiKey } },
+            );
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || `HTTP ${res.status}`);
+            }
+            return res.json();
+        }
+
+        let rfb = null;
+
+        (async () => {
+            try {
+                const { stream_url } = await getStreamUrl(TASK_ID, API_KEY);
+                setStatus("Connecting to browser…");
+
+                rfb = new RFB(streamEl, stream_url, {
+                    wsProtocols: ["binary"],
+                    credentials: {},
+                });
+                rfb.viewOnly = true;
+                rfb.scaleViewport = true;
+                rfb.resizeSession = false;
+
+                rfb.addEventListener("connect", () => {
+                    setStatus("", false);
+                    streamEl.style.display = "block";
+                });
+                rfb.addEventListener("disconnect", (e) => {
+                    streamEl.style.display = "none";
+                    setStatus(e.detail?.clean ? "Stream ended" : "Connection lost");
+                });
+                rfb.addEventListener("credentialsrequired", () =>
+                    rfb.sendCredentials({}),
+                );
+                rfb.addEventListener("securityfailure", () =>
+                    setStatus("Security negotiation failed"),
+                );
+            } catch (err) {
+                setStatus(`Stream error: ${err.message}`);
+            }
+        })();
+
+        window.addEventListener("beforeunload", () => rfb?.disconnect());
+    </script>
+</body>
+</html>
+```
+
+```vue Vue 3
+<script setup>
+import { ref, onMounted, onBeforeUnmount } from "vue";
+import RFB from "@novnc/novnc";
+
+const INFERENCE_API_BASE_URL = "https://inference-api.optexity.com";
+
+const props = defineProps({
+    taskId: { type: String, required: true },
+    apiKey: { type: String, required: true },
+});
+
+const container = ref(null);
+const state = ref("loading");
+const error = ref(null);
+let rfb = null;
+
+async function getStreamUrl(taskId, apiKey) {
+    const res = await fetch(
+        `${INFERENCE_API_BASE_URL}/api/v1/tasks/${taskId}/stream`,
+        { headers: { "x-api-key": apiKey } },
+    );
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return res.json();
+}
+
+onMounted(async () => {
+    try {
+        const { stream_url } = await getStreamUrl(props.taskId, props.apiKey);
+        if (!container.value) return;
+
+        state.value = "connecting";
+
+        rfb = new RFB(container.value, stream_url, {
+            wsProtocols: ["binary"],
+            credentials: {},
+        });
+        rfb.viewOnly = true;
+        rfb.scaleViewport = true;
+        rfb.resizeSession = false;
+
+        rfb.addEventListener("connect", () => (state.value = "connected"));
+        rfb.addEventListener("disconnect", (e) => {
+            state.value = e.detail?.clean ? "disconnected" : "error";
+            if (!e.detail?.clean) error.value = "Connection lost";
+        });
+        rfb.addEventListener("credentialsrequired", () =>
+            rfb.sendCredentials({}),
+        );
+        rfb.addEventListener("securityfailure", () => {
+            error.value = "Security negotiation failed";
+            state.value = "error";
+        });
+    } catch (err) {
+        error.value = err.message;
+        state.value = "error";
+    }
+});
+
+onBeforeUnmount(() => {
+    rfb?.disconnect();
+    rfb = null;
+});
+</script>
+
+<template>
+    <div>
+        <div v-if="state !== 'connected'">
+            <template v-if="state === 'loading'">Initializing stream…</template>
+            <template v-else-if="state === 'connecting'">Connecting to browser…</template>
+            <template v-else-if="state === 'disconnected'">Stream ended</template>
+            <template v-else-if="state === 'error'">{{ error || "Stream error" }}</template>
+        </div>
+        <div
+            ref="container"
+            :style="{
+                width: '100%',
+                height: '600px',
+                display: state === 'connected' ? 'block' : 'none',
+            }"
+        />
+    </div>
+</template>
+```
+
+```typescript Angular
+import {
+    Component,
+    ElementRef,
+    Input,
+    OnDestroy,
+    OnInit,
+    ViewChild,
+} from "@angular/core";
+// @ts-ignore — @novnc/novnc ships ESM without bundled types
+import RFB from "@novnc/novnc";
+
+const INFERENCE_API_BASE_URL = "https://inference-api.optexity.com";
+
+type StreamState = "loading" | "connecting" | "connected" | "disconnected" | "error";
+
+@Component({
+    selector: "live-stream-viewer",
+    template: `
+        <div *ngIf="state !== 'connected'">
+            <ng-container [ngSwitch]="state">
+                <span *ngSwitchCase="'loading'">Initializing stream…</span>
+                <span *ngSwitchCase="'connecting'">Connecting to browser…</span>
+                <span *ngSwitchCase="'disconnected'">Stream ended</span>
+                <span *ngSwitchCase="'error'">{{ error || "Stream error" }}</span>
+            </ng-container>
+        </div>
+        <div
+            #container
+            [style.width]="'100%'"
+            [style.height]="'600px'"
+            [style.display]="state === 'connected' ? 'block' : 'none'"
+        ></div>
+    `,
+})
+export class LiveStreamViewerComponent implements OnInit, OnDestroy {
+    @Input() taskId!: string;
+    @Input() apiKey!: string;
+    @ViewChild("container", { static: true })
+    container!: ElementRef<HTMLDivElement>;
+
+    state: StreamState = "loading";
+    error: string | null = null;
+    private rfb: any = null;
+    private cancelled = false;
+
+    async ngOnInit() {
+        try {
+            const res = await fetch(
+                `${INFERENCE_API_BASE_URL}/api/v1/tasks/${this.taskId}/stream`,
+                { headers: { "x-api-key": this.apiKey } },
+            );
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || `HTTP ${res.status}`);
+            }
+            const { stream_url } = await res.json();
+            if (this.cancelled) return;
+
+            this.state = "connecting";
+
+            this.rfb = new RFB(this.container.nativeElement, stream_url, {
+                wsProtocols: ["binary"],
+                credentials: {},
+            });
+            this.rfb.viewOnly = true;
+            this.rfb.scaleViewport = true;
+            this.rfb.resizeSession = false;
+
+            this.rfb.addEventListener("connect", () => (this.state = "connected"));
+            this.rfb.addEventListener("disconnect", (e: any) => {
+                this.state = e.detail?.clean ? "disconnected" : "error";
+                if (!e.detail?.clean) this.error = "Connection lost";
+            });
+            this.rfb.addEventListener("credentialsrequired", () =>
+                this.rfb.sendCredentials({}),
+            );
+            this.rfb.addEventListener("securityfailure", () => {
+                this.error = "Security negotiation failed";
+                this.state = "error";
+            });
+        } catch (err: any) {
+            if (!this.cancelled) {
+                this.error = err.message;
+                this.state = "error";
+            }
+        }
+    }
+
+    ngOnDestroy() {
+        this.cancelled = true;
+        this.rfb?.disconnect();
+        this.rfb = null;
+    }
+}
+```
+
+</CodeGroup>
+
+### Key `RFB` options
+
+| Option           | Recommended | Why                                                                                                          |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------ |
+| `viewOnly`       | `true`      | Read-only preview — disables input forwarding so a dashboard viewer can't accidentally take over the browser. |
+| `scaleViewport`  | `true`      | Scales the remote framebuffer to fit your container without resizing the actual browser.                     |
+| `resizeSession`  | `false`     | Don't try to negotiate a different remote display size — the worker runs at a fixed 1920×1080.               |
+| `wsProtocols`    | `["binary"]` | Required for `websockify`'s binary subprotocol.                                                              |
+| `credentials`    | `{}`        | The stream is auth'd via the signed token in the URL — no VNC password is needed.                            |
+
+### Lifecycle tips
+
+- Fetch a **fresh** `stream_url` on every (re)connect attempt — the token is short-lived.
+- Call `rfb.disconnect()` on component unmount to release the underlying WebSocket.
+- Handle the `disconnect` event: `e.detail.clean === true` typically means the task finished gracefully (show "Stream ended"); `clean === false` is a genuine network/auth failure (show retry).
+- The endpoint returns `409` while the task is queued — poll task status first and only call `/stream` once the task is `running`.
+
+## Related
+
+- [Inference Endpoint](/api-reference/inference-endpoint) — Submitting tasks
+- [noVNC](https://github.com/novnc/noVNC) — Upstream client library

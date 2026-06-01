@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class EmailTwoFAAction(BaseModel):
@@ -41,8 +41,23 @@ class SlackTwoFAAction(BaseModel):
             self.sender_name = self.sender_name.replace(pattern, replacement)
 
 
+class SMS2FAAction(BaseModel):
+    type: Literal["sms_two_fa_action"]
+    from_number: str
+    to_number: str
+
+    def replace(self, pattern: str, replacement: str):
+        if self.from_number:
+            self.from_number = self.from_number.replace(pattern, replacement)
+        if self.to_number:
+            self.to_number = self.to_number.replace(pattern, replacement)
+
+
 class TwoFAAction(BaseModel):
-    action: EmailTwoFAAction | SlackTwoFAAction
+    action: Annotated[
+        EmailTwoFAAction | SlackTwoFAAction | SMS2FAAction,
+        Field(discriminator="type"),
+    ]
     instructions: str | None = None
     output_variable_name: str
     max_wait_time: float = 300.0

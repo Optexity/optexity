@@ -9,6 +9,7 @@ from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
 from optexity.schema.actions.misc_action import (
     FailStateAction,
+    HumanInLoopAction,
     MiscAction,
     PythonScriptAction,
     SleepAction,
@@ -92,6 +93,7 @@ class ActionNode(BaseModel):
     fail_state_action: FailStateAction | None = None
     captcha_action: CaptchaAction | None = None
     misc_action: MiscAction | None = None
+    human_in_loop_action: HumanInLoopAction | None = None
     before_sleep_time: float = 0.0
     end_sleep_time: float = 5.0
     expect_new_tab: bool = False
@@ -111,12 +113,13 @@ class ActionNode(BaseModel):
             "fail_state_action": self.fail_state_action,
             "captcha_action": self.captcha_action,
             "misc_action": self.misc_action,
+            "human_in_loop_action": self.human_in_loop_action,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, powershell_action, sleep_action, fail_state_action, captcha_action, misc_action must be provided"
+                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, powershell_action, sleep_action, fail_state_action, captcha_action, misc_action, human_in_loop_action must be provided"
             )
 
         assert (
@@ -167,6 +170,8 @@ class ActionNode(BaseModel):
             self.captcha_action.replace(pattern, replacement)
         if self.misc_action:
             self.misc_action.replace(pattern, replacement)
+        if self.human_in_loop_action:
+            pass
 
         return self
 
@@ -401,6 +406,7 @@ class Automation(BaseModel):
     ] = "chromium"
     backend: Literal["browser-use", "computer-vision"] = "browser-use"
     os_emulation: Literal["windows", "linux"] | None = None
+    allow_cookies: bool = False
     max_retries: int = 0
     expected_downloads: int = 0
     remove_empty_nodes_in_axtree: bool = True

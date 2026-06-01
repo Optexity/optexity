@@ -28,7 +28,9 @@ class Settings(BaseSettings):
     FETCH_EMAIL_MESSAGES_ENDPOINT: str = "api/v1/fetch_email_messages"
     FETCH_SLACK_MESSAGES_ENDPOINT: str = "api/v1/fetch_slack_messages"
     GET_COORDINATES_ENDPOINT: str = "api/v1/get_coordinates"
+    FETCH_SMS_MESSAGES_ENDPOINT: str = "api/v1/fetch_sms_messages"
     INTEGRATION_SECRETS_ENDPOINT: str = "api/v1/integration-secrets/{type}/encrypt"
+    HUMAN_IN_LOOP_ENDPOINT: str = "api/v1/human_in_loop"
 
     FERNET_SECRET_KEY: str | None = None  # required when using integration secrets
 
@@ -37,6 +39,7 @@ class Settings(BaseSettings):
     )
 
     CHILD_PORT_OFFSET: int = 9000
+    WEBSOCKIFY_PORT: int = 8080
     DEPLOYMENT: Literal["dev", "prod"]
     LOCAL_CALLBACK_URL: str | None = None
 

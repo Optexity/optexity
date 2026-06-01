@@ -22,6 +22,7 @@ from optexity.inference.core.interaction.handle_keypress import handle_key_press
 from optexity.inference.core.interaction.handle_select import handle_select_option
 from optexity.inference.core.interaction.handle_upload import handle_upload_file
 from optexity.inference.infra.browser import Browser
+from optexity.inference.infra.browser_health import fetch_browser_state_for_classifier
 from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.interaction_action import (
     CloseOverlayPopupAction,
@@ -298,23 +299,40 @@ async def handle_assert_locator_presence_error(
     )
     logger.debug(f"Handling {error_type} error: {error.command}")
     if retries_left > 1:
-        browser_state = await browser.get_browser_state_summary(
-            remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+        browser_state_summary = await fetch_browser_state_for_classifier(
+            browser, memory, task
         )
-        memory.browser_states[-1] = browser_state
+        if browser_state_summary is None:
+            logger.error(
+                "Could not fetch browser state for error classifier; re-raising original error"
+            )
+            raise error
+
         final_prompt, response, token_usage = _get_error_handler(task).classify_error(
-            error.command, memory.browser_states[-1].screenshot
+            error.command,
+            memory.browser_states[-1].axtree,
+            memory.browser_states[-1].screenshot,
         )
+
         memory.token_usage += token_usage
 
         if response.error_type == "website_not_loaded":
+            logger.debug(f"Website not loaded, retrying after 5 seconds")
             await asyncio.sleep(5)
             await run_interaction_action(
                 interaction_action, task, memory, browser, retries_left - 1
             )
         elif response.error_type == "overlay_popup_blocking":
+            logger.debug(f"Overlay popup blocking, closing overlay popup and retrying")
             close_overlay_popup_action = CloseOverlayPopupAction()
             await handle_agentic_task(close_overlay_popup_action, task, memory, browser)
+            await run_interaction_action(
+                interaction_action, task, memory, browser, retries_left - 1
+            )
+        elif response.error_type == "could_retry_now":
+            logger.debug(
+                "Error handler: page looks ready for goal; retrying action without wait or overlay close"
+            )
             await run_interaction_action(
                 interaction_action, task, memory, browser, retries_left - 1
             )

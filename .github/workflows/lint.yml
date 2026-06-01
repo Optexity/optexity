@@ -7,6 +7,7 @@ on:
 jobs:
     lint:
         runs-on: ubuntu-latest
+
         steps:
             - name: Checkout repo
               uses: actions/checkout@v4
@@ -16,8 +17,12 @@ jobs:
               with:
                   python-version: "3.11"
 
-            - name: Install pre-commit
-              run: pip install pre-commit
+            - name: Install dependencies
+              run: |
+                  pip install pre-commit ruff
 
             - name: Run pre-commit
               run: pre-commit run --all-files
+
+            - name: Run Ruff (minimal strict)
+              run: ruff check . --select=F821

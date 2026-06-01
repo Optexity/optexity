@@ -231,11 +231,26 @@ class ScrollAction(BaseModel):
 
 
 class UploadFileAction(BaseAction):
-    file_path: str
+    file_path: str | None = None
+    file_url: str | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_source(self):
+        if bool(self.file_path) == bool(self.file_url):
+            raise ValueError(
+                "UploadFileAction: exactly one of file_path or file_url must be set"
+            )
+        if self.file_url and not self.file_url.startswith(("http://", "https://")):
+            raise ValueError(
+                "UploadFileAction.file_url must be an http:// or https:// URL"
+            )
+        return self
 
     def replace(self, pattern: str, replacement: str):
         if self.file_path:
             self.file_path = self.file_path.replace(pattern, replacement).strip('"')
+        if self.file_url:
+            self.file_url = self.file_url.replace(pattern, replacement).strip('"')
 
 
 class GoToUrlAction(BaseModel):

@@ -14,5 +14,5 @@ Your output must be a single numerical index from the axtree if the element foun
 """
 
 can_return_negative_index_prompt = """
-If the element found in the axtree is not the same as the element in the goal, you should return `-1`.
+If the element found in the axtree is not the same as the element in the goal, you should return `-1`. For example, if the goal is to click on the "Continue" button, and the axtree does not contain a button with the text "Continue" or "Next", you should return `-1`. But if the goal is to click on the "Login" button, and the axtree contains a button with the text "Get Started" instead of "Login" because the website changed slightly, you should return the index of the "Get Started" button. But do not output any index if the element in the axtree is not matching the goal, just return `-1`, this is most likely because we are on the wrong page to fulfill our goal.
 """

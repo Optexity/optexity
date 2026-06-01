@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import pathlib
@@ -144,6 +145,7 @@ class ActualBrowser:
         proxy_session_id: str | None = None,
         os_emulation: OsEmulation = None,
         rdp_parameter: RDPParameter | None = None,
+        allow_cookies: bool = False,
     ):
         # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
@@ -166,31 +168,78 @@ class ActualBrowser:
         if self.channel == "rdp":
             assert self.rdp_parameter is not None, "rdp_parameter is required for rdp"
 
-        self.extensions = [
-            # {
-            #     "name": "optexity recorder",
-            #     "id": "pbaganbicadeoacahamnbgohafchgakp",
-            #     "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dpbaganbicadeoacahamnbgohafchgakp%26uc",
-            # },
-            {
-                "name": "I still don't care about cookies",
-                "id": "edibdbjcniadpccecjdfdjjppcpchdlm",
-                "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dedibdbjcniadpccecjdfdjjppcpchdlm%26uc",
-            },
-            # {
-            #     "name": "popupoff",
-            #     "id": "kiodaajmphnkcajieajajinghpejdjai",
-            #     "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dkiodaajmphnkcajieajajinghpejdjai%26uc",
-            # },
-            {
-                "name": "ublock origin",
-                "id": "ddkjiahejlhfcafbddmgiahcphecmpfh",
-                "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dddkjiahejlhfcafbddmgiahcphecmpfh%26uc",
-            },
-        ]
+        # Optional extensions (uncomment to load):
+        # {
+        #     "name": "optexity recorder",
+        #     "id": "pbaganbicadeoacahamnbgohafchgakp",
+        #     "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dpbaganbicadeoacahamnbgohafchgakp%26uc",
+        # },
+        # {
+        #     "name": "popupoff",
+        #     "id": "kiodaajmphnkcajieajajinghpejdjai",
+        #     "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dkiodaajmphnkcajieajajinghpejdjai%26uc",
+        # },
+        _cookie_blocker = {
+            "name": "I still don't care about cookies",
+            "id": "edibdbjcniadpccecjdfdjjppcpchdlm",
+            "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dedibdbjcniadpccecjdfdjjppcpchdlm%26uc",
+        }
+        _ublock = {
+            "name": "ublock origin",
+            "id": "ddkjiahejlhfcafbddmgiahcphecmpfh",
+            "url": "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=133&acceptformat=crx3&x=id%3Dddkjiahejlhfcafbddmgiahcphecmpfh%26uc",
+        }
+        self.extensions = [_cookie_blocker, _ublock] if not allow_cookies else [_ublock]
 
         if self.channel == "browser-use" and self.is_dedicated:
             raise ValueError("Browser-use is not supported for dedicated browsers")
+
+    def _seed_print_preferences(self) -> None:
+        """Seed Chrome Preferences so --kiosk-printing silently saves PDFs.
+
+        Why: --kiosk-printing alone uses whatever destination the profile last
+        selected; on a fresh user-data-dir that's nothing, so prints either
+        no-op or fall back to the preview dialog. Pre-writing
+        print_preview_sticky_settings pins destination to "Save as PDF" and
+        savefile.default_directory routes the output into temp_downloads_dir,
+        where handle_download() already polls for new files.
+        """
+        profile_dir = pathlib.Path(self.user_data_dir) / "Default"
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        prefs_path = profile_dir / "Preferences"
+
+        # Read existing prefs if present (dedicated browser case) so we don't
+        # clobber unrelated settings.
+        try:
+            existing = json.loads(prefs_path.read_text()) if prefs_path.exists() else {}
+        except Exception:
+            existing = {}
+
+        download_dir = "/tmp/temp_downloads"
+        os.makedirs(download_dir, exist_ok=True)
+
+        app_state = json.dumps(
+            {
+                "version": 2,
+                "recentDestinations": [
+                    {"id": "Save as PDF", "origin": "local", "account": ""}
+                ],
+                "selectedDestinationId": "Save as PDF",
+            }
+        )
+
+        existing.setdefault("printing", {})
+        existing["printing"]["print_preview_sticky_settings"] = {"appState": app_state}
+        existing.setdefault("savefile", {})
+        existing["savefile"]["default_directory"] = download_dir
+        existing.setdefault("download", {})
+        existing["download"]["default_directory"] = download_dir
+        existing["download"]["prompt_for_download"] = False
+
+        prefs_path.write_text(json.dumps(existing))
+        logger.info(
+            f"Seeded print prefs at {prefs_path} -> save PDFs to {download_dir}"
+        )
 
     def get_args(self) -> list[str]:
         args = [
@@ -219,10 +268,11 @@ class ActualBrowser:
             f"--remote-debugging-port={self.port}",
             "--remote-debugging-address=127.0.0.1",
             # "--user-data-dir=\"/tmp/optexity_chrome_cdp\"",
-            '--profile-directory="Default"',
+            "--profile-directory=Default",
             # "--disable-blink-features=AutomationControlled",
             "--no-first-run",
             "--no-default-browser-check",
+            "--kiosk-printing",
         ]
 
         if self.os_emulation:
@@ -336,6 +386,8 @@ class ActualBrowser:
             if not self.is_dedicated:
                 shutil.rmtree(self.user_data_dir, ignore_errors=True)
 
+            self._seed_print_preferences()
+
             self.chrome_path = find_chrome_binary(self.channel)
             env = {**os.environ, "DISPLAY": get_display()}
 
@@ -382,6 +434,7 @@ class ActualBrowser:
                     )
 
                 env = {**os.environ, "DISPLAY": get_display()}
+                self._seed_print_preferences()
                 self.context = await launch_persistent_context_async(
                     # humanize=True,
                     channel=self.channel,
@@ -458,6 +511,48 @@ class ActualBrowser:
         else:
             # TODO: handle goto url using cdp methods
             await self._wait_for_cdp(timeout)
+            return True
+
+    async def check_browser_session_healthy(self, timeout: float = 10) -> bool:
+        """Stricter than check_browser_alive: verifies pages/context are usable."""
+        if not await self.check_browser_alive(timeout):
+            return False
+
+        if settings.USE_PLAYWRIGHT_BROWSER:
+            try:
+                if self.context is None:
+                    return False
+                if self.channel == "browser-use":
+                    return True
+                pages = self.context.pages
+                if not pages:
+                    return False
+                await asyncio.wait_for(pages[0].evaluate("() => true"), timeout=timeout)
+                return True
+            except Exception as e:
+                logger.debug("Browser session health check failed: %s", e)
+                return False
+
+        if self.cdp_url is None:
+            return False
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.cdp_url}/json/list",
+                    timeout=aiohttp.ClientTimeout(total=timeout),
+                ) as r:
+                    if r.status != 200:
+                        return False
+                    targets = await r.json()
+            page_targets = [
+                t
+                for t in targets
+                if t.get("type") == "page" and t.get("webSocketDebuggerUrl")
+            ]
+            return len(page_targets) > 0
+        except Exception as e:
+            logger.debug("CDP browser session health check failed: %s", e)
+            return False
 
     async def stop(self, graceful=True):
         if self.channel == "rdp":

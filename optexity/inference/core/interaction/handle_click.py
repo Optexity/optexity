@@ -3,6 +3,7 @@ import logging
 import pyautogui
 
 from optexity.exceptions import (
+    AxtreeIndexActionFailedException,
     ElementNotFoundInAxtreeException,
     KeywordNotFoundOnScreenException,
 )
@@ -101,20 +102,31 @@ async def click_element_index(
             action_model = browser.backend_agent.ActionModel(
                 **{"click": {"index": index, "button": click_element_action.button}}
             )
-            await browser.backend_agent.multi_act([action_model])
+            results = await browser.backend_agent.multi_act([action_model])
+            if results and results[0].error:
+                raise RuntimeError(
+                    f"browseruse click failed at index {index}: {results[0].error}"
+                )
 
-        if click_element_action.expect_download:
-            await handle_download(
-                _actual_click_element,
-                memory,
-                browser,
-                task,
-                click_element_action.download_filename,
+        try:
+            if click_element_action.expect_download:
+                await handle_download(
+                    _actual_click_element,
+                    memory,
+                    browser,
+                    task,
+                    click_element_action.download_filename,
+                )
+            else:
+                await _actual_click_element()
+        except Exception as e:
+            raise AxtreeIndexActionFailedException(
+                message=f"Failed to click element at axtree index {index}",
+                index=index,
+                original_error=e,
             )
-        else:
-            await _actual_click_element()
-    except ElementNotFoundInAxtreeException as e:
-        raise e
+    except (ElementNotFoundInAxtreeException, AxtreeIndexActionFailedException):
+        raise
     except Exception as e:
         logger.error(f"Error in click_element_index: {e}")
         return

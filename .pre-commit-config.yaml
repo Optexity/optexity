@@ -1,25 +1,33 @@
 repos:
+    # --- Python formatting ---
     - repo: https://github.com/psf/black
-      rev: 26.1.0 # check latest version
+      rev: 26.1.0
       hooks:
           - id: black
             language_version: python3
 
+    # --- Import sorting ---
     - repo: https://github.com/PyCQA/isort
-      rev: 7.0.0 # check latest version
+      rev: 7.0.0
       hooks:
           - id: isort
-            name: isort (python imports)
             args: ["--profile", "black"]
 
-    # --- Frontend formatters ---
+    # --- Python linting (CRITICAL) ---
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.4.4
+      hooks:
+          - id: ruff
+            args: ["--select=F821"]
+
+    # --- Frontend formatting ---
     - repo: https://github.com/pre-commit/mirrors-prettier
       rev: v4.0.0-alpha.8
       hooks:
           - id: prettier
             files: "\\.(js|jsx|ts|tsx|css|scss|json|html|md|yml|yaml)$"
 
-    # --- Supply-chain: dependency vulnerability audit (pre-push) ---
+    # --- Security audit (pre-push only) ---
     - repo: local
       hooks:
           - id: uv-audit

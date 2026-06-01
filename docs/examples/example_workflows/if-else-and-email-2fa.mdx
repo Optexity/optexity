@@ -1,0 +1,372 @@
+---
+title: CoverMyMeds request lookup with login and email 2FA
+description: Automate CoverMyMeds request retrieval using conditional login, email-based two-factor authentication, and request key lookup
+---
+
+Use this example to **log into CoverMyMeds**, handle optional **email-based two-factor authentication (2FA)**, and retrieve a patient authorization request using a **request key**, patient last name, and date of birth.
+
+This workflow demonstrates how to build a resilient payer / prior authorization automation that supports:
+
+- Existing authenticated sessions
+- Conditional username/password login
+- Email-based 2FA verification
+- Request key retrieval flows
+- Patient validation using demographics
+- Browser state extraction for downstream workflows
+
+This page is intentionally keyword-rich so you can find it by searching for: **CoverMyMeds automation**, **prior authorization workflow**, **email 2FA**, **request key lookup**, **payer portal automation**, **browser state extraction**, **authorization request retrieval**, **conditional login**, **session reuse**, **CMM workflow**.
+
+## Overview
+
+This automation:
+
+- Detects whether login is required
+- Performs username/password authentication only when needed
+- Detects whether email-based 2FA is required
+- Retrieves a verification code from email
+- Navigates to the Requests section
+- Opens a request using:
+  - Request key
+  - Patient last name
+  - Date of birth
+- Extracts browser state information after the request is loaded
+
+## Minimal example
+
+The core pattern combines:
+
+- Conditional login detection
+- Conditional email 2FA handling
+- Request lookup by key
+
+```json
+{
+  "type": "if_else_node",
+  "condition": "is_login_page[0]",
+  "if_nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "get_by_role(\"textbox\", name=\"Username*\")",
+          "input_text": "{username[0]}"
+        }
+      }
+    }
+  ],
+  "else_nodes": []
+}
+```
+
+## Full automation
+
+```json
+{
+  "url": "https://account.covermymeds.com/",
+  "parameters": {
+    "input_parameters": {
+      "username": [
+        "demo.user@example.com"
+      ],
+      "password": [
+        "demo_password_123"
+      ],
+      "sender_email": [
+        "no-reply@example-health.com"
+      ],
+      "cmm_key": [
+        "ABCD-EFGH"
+      ],
+      "patient_last_name": [
+        "SMITH"
+      ],
+      "dob": [
+        "01/15/1985"
+      ],
+      "agent_id": [
+        "demo-agent-001"
+      ],
+      "encounter_id": [
+        "encounter-10001"
+      ],
+      "skip_key_fetch": [
+        false
+      ],
+      "agent_run_log_id": [
+        "run-log-5001"
+      ],
+      "integration_name": [
+        "covermymeds"
+      ]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "extraction_action": {
+        "llm": {
+          "extraction_format": {
+            "is_login_page": "bool"
+          },
+          "extraction_instructions": "Check if its a login page asking for username. If yes then return 'is_login_page' as True, otherwise return False",
+          "output_variable_names": [
+            "is_login_page"
+          ],
+          "llm_model_name": "gemini-2.5-pro"
+        }
+      },
+      "before_sleep_time": 3,
+      "end_sleep_time": 0
+    },
+    {
+      "type": "if_else_node",
+      "condition": "is_login_page[0]",
+      "if_nodes": [
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "input_text": {
+              "command": "get_by_role(\"textbox\", name=\"Username*\")",
+              "prompt_instructions": "Enter the username {username[0]} into the 'Username' field.",
+              "input_text": "{username[0]}"
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "input_text": {
+              "command": "get_by_role(\"textbox\", name=\"Password*\")",
+              "prompt_instructions": "Enter the password {password[0]} into the 'Password' field.",
+              "input_text": "{password[0]}"
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "get_by_role(\"button\", name=\"Log in\")",
+              "prompt_instructions": "Click the 'Log in' button to submit your credentials."
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "extraction_action": {
+            "llm": {
+              "extraction_format": {
+                "is_email_page": "bool"
+              },
+              "extraction_instructions": "Check if its a login page asking for sending an email for 2fa. If yes then return 'is_email_page' as True, otherwise return False",
+              "output_variable_names": [
+                "is_email_page"
+              ],
+              "llm_model_name": "gemini-2.5-pro"
+            }
+          },
+          "before_sleep_time": 3,
+          "end_sleep_time": 0
+        },
+        {
+          "type": "if_else_node",
+          "condition": "is_email_page[0]",
+          "if_nodes": [
+            {
+              "type": "action_node",
+              "interaction_action": {
+                "click_element": {
+                  "command": "get_by_role(\"button\", name=\"Send me an email\")",
+                  "prompt_instructions": "Click the 'Send me an email' button to trigger the two-factor authentication email."
+                }
+              }
+            },
+            {
+              "type": "action_node",
+              "interaction_action": {
+                "click_element": {
+                  "command": "get_by_role(\"button\", name=\"Enter a verification code\")",
+                  "prompt_instructions": "Click 'Enter a verification code instead' to reveal the code input field."
+                }
+              }
+            },
+            {
+              "type": "action_node",
+              "extraction_action": {
+                "two_fa_action": {
+                  "action": {
+                    "type": "email_two_fa_action",
+                    "receiver_email_address": "demo.agent@example.com",
+                    "sender_email_address": "{sender_email[0]}"
+                  },
+                  "output_variable_name": "auth_code"
+                }
+              },
+              "before_sleep_time": 3,
+              "end_sleep_time": 0
+            },
+            {
+              "type": "action_node",
+              "interaction_action": {
+                "input_text": {
+                  "command": "get_by_role(\"textbox\", name=\"Enter Code\")",
+                  "prompt_instructions": "Enter the verification code {auth_code[0]} received via email.",
+                  "input_text": "{auth_code[0]}"
+                }
+              }
+            },
+            {
+              "type": "action_node",
+              "interaction_action": {
+                "click_element": {
+                  "command": "get_by_role(\"button\", name=\"Verify\")",
+                  "prompt_instructions": "Click the 'Verify' button to complete the two-factor authentication."
+                }
+              }
+            }
+          ],
+          "else_nodes": []
+        },
+        {
+          "type": "action_node",
+          "sleep_action": {
+            "sleep_time": 5
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "get_by_role(\"button\", name=\"Account\")",
+              "prompt_instructions": "Click on the 'Account' button in the main navigation menu."
+            }
+          }
+        }
+      ],
+      "else_nodes": []
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"link\", name=\"Requests\")",
+          "prompt_instructions": "Click on the 'Requests' link from the account menu."
+        }
+      }
+    },
+    {
+      "type": "if_else_node",
+      "condition": "not skip_key_fetch[0]",
+      "if_nodes": [
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "get_by_role(\"link\", name=\"Enter Key\")",
+              "prompt_instructions": "Click the 'Enter Key' link to access a request using a key."
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "max_tries": 3,
+            "input_text": {
+              "command": "get_by_role(\"textbox\", name=\"Request Key*\\\" / \\\"\")",
+              "prompt_instructions": "Enter the request key '{cmm_key[0]}' into the 'Request Key' field.",
+              "input_text": "{cmm_key[0]}"
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "max_tries": 3,
+            "input_text": {
+              "command": "get_by_role(\"textbox\", name=\"Last Name*\\\" / \\\"\")",
+              "prompt_instructions": "Enter the patient's last name '{patient_last_name[0]}' into the 'Last Name' field.",
+              "input_text": "{patient_last_name[0]}"
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "agentic_task": {
+              "task": "Enter the patient's date of birth '{dob[0]}' into the 'Date of Birth' field in mm/dd/yyyy format. Make sure it is entered completely and correctly.",
+              "max_steps": 5,
+              "backend": "browser_use",
+              "use_vision": true
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "get_by_role(\"button\", name=\"View Request\")",
+              "prompt_instructions": "Click the 'View Request' button to find the patient's record."
+            }
+          }
+        },
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "get_by_role(\"link\", name=\"Skip\", exact=True)",
+              "prompt_instructions": "Click the 'Skip' link to proceed without entering a diagnosis.",
+              "skip_prompt": true
+            }
+          }
+        }
+      ],
+      "else_nodes": []
+    },
+    {
+      "type": "action_node",
+      "extraction_action": {
+        "state": {}
+      },
+      "before_sleep_time": 5,
+      "end_sleep_time": 0
+    }
+  ]
+}
+```
+
+## What this workflow demonstrates
+
+| Capability | Description |
+|---|---|
+| Conditional login | Logs in only if the session is unauthenticated |
+| Email 2FA handling | Retrieves and submits verification codes automatically |
+| Request lookup | Opens CoverMyMeds requests using a request key |
+| Patient validation | Uses patient demographics for secure access |
+| Agentic form interaction | Handles DOB fields using browser automation + vision |
+| Session reuse | Supports already-authenticated sessions |
+| Browser state extraction | Captures cookies and storage state after request access |
+
+## What the final state extraction returns
+
+The `state` extraction appends browser context information such as:
+
+| Key | Description |
+|---|---|
+| `page_url` | Current request page URL |
+| `page_title` | Current browser page title |
+| `local_storage` | Browser localStorage values |
+| `session_storage` | Browser sessionStorage values |
+| `cookies` | Browser cookies |
+| `document_cookie` | `document.cookie` values from the page |
+
+## When to use this
+
+| Goal | Why this helps |
+|---|---|
+| Automate prior authorization retrieval | Access requests directly using request keys |
+| Reduce manual 2FA handling | Automatically retrieve email verification codes |
+| Support unstable sessions | Re-login only when required |
+| Capture authenticated browser state | Reuse tokens and sessions downstream |
+| Build reusable payer automations | Parameterized inputs make workflows reusable across patients |
+| Improve resiliency | Conditional branching prevents unnecessary failures |

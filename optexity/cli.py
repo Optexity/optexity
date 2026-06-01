@@ -142,7 +142,9 @@ def run_record(args: argparse.Namespace) -> None:
 def run_inference(args: argparse.Namespace) -> None:
     from optexity.inference.child_process import get_app_with_endpoints
 
-    app = get_app_with_endpoints(is_aws=args.is_aws, child_id=args.child_process_id)
+    app = get_app_with_endpoints(
+        is_aws=args.is_aws, child_id=args.child_process_id, port=args.port
+    )
     run(
         app,
         host=args.host,

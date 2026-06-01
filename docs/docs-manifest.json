@@ -1,0 +1,1783 @@
+{
+    "version": "1.0",
+    "generated_at": "2026-05-15",
+    "description": "Navigation manifest for the Optexity documentation set. An LLM should read this first to decide which documents to open for any given query.",
+    "documents": [
+        {
+            "id": "examples-example-workflows-if-else-and-email-2fa",
+            "path": "examples/example_workflows/if-else-and-email-2fa.mdx",
+            "title": "CoverMyMeds Request Lookup with Login and Email 2FA",
+            "summary": "Example workflow for accessing CoverMyMeds requests with conditional login, email-based two-factor authentication, request key lookup, and browser state extraction. Demonstrates detecting whether login is required, handling optional email 2FA, reusing authenticated sessions, validating by patient last name and date of birth, and continuing into the Requests area after authentication.",
+            "gist": "Conditional CoverMyMeds request lookup with login, email 2FA, and request key retrieval.",
+            "keywords": [
+                "CoverMyMeds",
+                "email 2FA",
+                "request key",
+                "prior authorization",
+                "conditional login",
+                "session reuse",
+                "browser state extraction",
+                "patient last name",
+                "date of birth"
+            ],
+            "document_type": "guide",
+            "tags": ["examples", "workflows", "2FA", "authentication", "healthcare"],
+            "relationships": {
+                "depends_on": [
+                    "docs-building-automations-if-else-node",
+                    "docs-advanced-two-fa-integration"
+                ],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "Example uses browser state extraction after the request is loaded."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["CoverMyMeds"],
+                "apis": [],
+                "data_models": ["if_else_node", "two_fa_action", "state extraction output"]
+            },
+            "reading_priority": 4,
+            "when_to_use": "Select when the query is about conditional login flows, email-based 2FA handling, CoverMyMeds request retrieval, request key lookup, or reusing authenticated browser sessions.",
+            "embedding_hint": "CoverMyMeds conditional login email 2FA request key prior authorization browser state extraction"
+        },
+        {
+            "id": "examples-example-workflows-pointclickcare-detailed-census-report",
+            "path": "examples/example_workflows/pointclickcare-detailed-census-report.mdx",
+            "title": "PointClickCare Detailed Census Report Generation",
+            "summary": "Example workflow for automating PointClickCare login, facility selection, and detailed census report generation. Demonstrates conditional authentication, TOTP-based two-factor authentication, facility validation using LLM-based extraction, dynamic report generation with date range filtering, CSV export, and resilient error handling for authentication failures.",
+            "gist": "Automate PointClickCare login with TOTP 2FA, facility selection, and CSV census report generation.",
+            "keywords": [
+                "PointClickCare",
+                "census report",
+                "TOTP 2FA",
+                "facility management",
+                "healthcare reporting",
+                "EHR automation",
+                "CSV export",
+                "conditional authentication",
+                "date range filtering",
+                "aggregated data analysis"
+            ],
+            "document_type": "guide",
+            "tags": [
+                "examples",
+                "workflows",
+                "2FA",
+                "TOTP",
+                "authentication",
+                "healthcare",
+                "reporting"
+            ],
+            "relationships": {
+                "depends_on": [
+                    "docs-building-automations-if-else-node",
+                    "docs-advanced-totp-integration"
+                ],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "Example uses LLM-based extraction for login and facility validation."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["PointClickCare"],
+                "apis": [],
+                "data_models": [
+                    "if_else_node",
+                    "extraction_action",
+                    "interaction_action",
+                    "report generation"
+                ]
+            },
+            "reading_priority": 4,
+            "when_to_use": "Select when the query is about TOTP 2FA handling, healthcare reporting, facility selection, or CSV report generation.",
+            "embedding_hint": "TOTP 2FA facility selection census report CSV export conditional authentication healthcare reporting"
+        },
+        {
+            "id": "api-reference-callback",
+            "path": "api-reference/callback.mdx",
+            "title": "Callback Reference",
+            "summary": "Complete reference for the callback payload Optexity sends to a user-configured endpoint when an automation task completes. Documents all top-level fields: status, task_id, recording_id, output_data, error, final_screenshot, and downloads. Includes a full example JSON payload.",
+            "gist": "Full schema of the HTTP POST payload sent to your callback URL on task completion.",
+            "keywords": [
+                "callback",
+                "webhook",
+                "payload",
+                "task_id",
+                "status",
+                "output_data",
+                "downloads",
+                "final_screenshot",
+                "schema"
+            ],
+            "document_type": "reference",
+            "tags": ["api", "callback", "webhook", "schema"],
+            "relationships": {
+                "depends_on": [],
+                "references": [],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-advanced-callbacks",
+                        "context": "Callbacks guide links here for the complete payload schema."
+                    },
+                    {
+                        "doc_id": "docs-advanced-orchestration",
+                        "context": "Orchestration guide references callback payload structure."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Optexity cloud"],
+                "apis": ["callback endpoint"],
+                "data_models": ["callback payload", "output_data", "downloads"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about the shape or fields of the callback/webhook payload received after a task completes, or when debugging what fields are returned in a callback.",
+            "embedding_hint": "callback webhook payload schema task completion output_data downloads"
+        },
+        {
+            "id": "api-reference-inference-endpoint",
+            "path": "api-reference/inference-endpoint.mdx",
+            "title": "Inference Endpoint",
+            "summary": "HTTP API reference for the POST /inference endpoint used to submit automation tasks. Covers authentication (local vs cloud API key), request body parameters (endpoint_name, input_parameters, secure_parameters, unique_parameter_names), code examples in cURL/Python/JavaScript, response codes (202/400/404/401/500), and a 6-step execution flow explanation.",
+            "gist": "POST /inference endpoint: auth, request params, code examples, error codes, execution flow.",
+            "keywords": [
+                "inference",
+                "POST /inference",
+                "API",
+                "endpoint_name",
+                "input_parameters",
+                "secure_parameters",
+                "unique_parameter_names",
+                "API key",
+                "authentication",
+                "202",
+                "HTTP"
+            ],
+            "document_type": "api",
+            "tags": ["api", "inference", "http", "authentication", "request", "response"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-getting-started-running-first-inference",
+                        "context": "Inference endpoint doc links to the getting started guide."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-quickstart",
+                        "context": "Quickstart uses this endpoint to run the automation."
+                    },
+                    {
+                        "doc_id": "docs-getting-started-running-first-inference",
+                        "context": "Running first inference guide uses the /inference endpoint."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Optexity cloud", "inference server"],
+                "apis": ["POST /inference"],
+                "data_models": ["InferenceRequest", "input_parameters", "secure_parameters"]
+            },
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about how to call the inference API, what parameters the /inference endpoint accepts, how authentication works for API calls, or what HTTP error codes mean.",
+            "embedding_hint": "POST /inference HTTP API authentication endpoint_name input_parameters error codes"
+        },
+        {
+            "id": "docs-action-types-agentic-tasks",
+            "path": "docs/action-types/agentic-tasks.mdx",
+            "title": "Agentic Tasks",
+            "summary": "Explains the AgenticTask action type, which uses an AI agent for complex browser interactions that static actions cannot handle. Covers the schema properties (task, max_steps, backend, use_vision, keep_alive), max_steps guidelines by task complexity, writing effective task descriptions, vision mode, the CloseOverlayPopup action, variable substitution in tasks, and combining agentic with static actions.",
+            "gist": "AI-driven browser agent action for tasks too complex for static actions; covers schema, max_steps, task phrasing, vision mode.",
+            "keywords": [
+                "agentic",
+                "AI agent",
+                "AgenticTask",
+                "max_steps",
+                "use_vision",
+                "keep_alive",
+                "CloseOverlayPopup",
+                "browser agent",
+                "task description"
+            ],
+            "document_type": "guide",
+            "tags": ["action-types", "agent", "AI", "vision", "automation"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-action-node"],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-parameters",
+                        "context": "Variable substitution in agentic task strings uses parameters syntax."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-action-node",
+                        "context": "Action node doc lists agentic_task as a supported action type."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Optexity inference engine"],
+                "apis": [],
+                "data_models": ["AgenticTask", "CloseOverlayPopup"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about using AI/LLM-driven agents within an automation, when to use agentic vs static actions, setting max_steps, or the AgenticTask schema.",
+            "embedding_hint": "agentic AI agent task complex browser interaction max_steps vision mode"
+        },
+        {
+            "id": "docs-action-types-assertion-action",
+            "path": "docs/action-types/assertion-action.mdx",
+            "title": "Assertion Action",
+            "summary": "Stub document for the Assertion Action type. Contains only a title and description with no content body.",
+            "gist": "Empty stub for assertion action documentation.",
+            "keywords": ["assertion", "assert", "verification", "action-types"],
+            "document_type": "guide",
+            "tags": ["action-types", "assertion", "stub"],
+            "relationships": {
+                "depends_on": [],
+                "references": [],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["assertion_action"]
+            },
+            "reading_priority": 5,
+            "when_to_use": "Do not select — contains no content. For assertion examples, see docs-building-automations-quickstart or examples-qa-testing-supabase-login instead.",
+            "embedding_hint": "assertion action stub placeholder"
+        },
+        {
+            "id": "docs-action-types-extraction-action",
+            "path": "docs/action-types/extraction-action.mdx",
+            "title": "Extraction Actions",
+            "summary": "Comprehensive guide to all extraction action types: llm (AI-based page extraction), locator (Playwright-based with LLM fallback), network_call (capture AJAX/API responses), screenshot (save visual snapshot), state (URL/title/cookies/storage), and two_fa_action (2FA code extraction). Each type includes its JSON schema, properties table, and when-to-use guidance. Also covers timing defaults and source selection for LLM extraction.",
+            "gist": "All extraction types (llm, locator, network_call, screenshot, state, 2FA) with schemas and when to use each.",
+            "keywords": [
+                "extraction",
+                "llm extraction",
+                "locator extraction",
+                "network_call",
+                "screenshot",
+                "state extraction",
+                "cookies",
+                "2FA extraction",
+                "output_variable_name",
+                "extraction_format",
+                "extraction_instructions"
+            ],
+            "document_type": "guide",
+            "tags": ["action-types", "extraction", "data", "scraping", "2FA"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-action-node"],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-two-factor-auth",
+                        "context": "two_fa_action extraction subtype is detailed in the 2FA action doc."
+                    },
+                    {
+                        "doc_id": "docs-advanced-locators",
+                        "context": "Locator-based extraction uses Playwright locators documented in the locators guide."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-action-node",
+                        "context": "Action node lists extraction_action as a supported action type."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-quickstart",
+                        "context": "Quickstart shows extraction action usage."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": [
+                    "extraction_action",
+                    "llm",
+                    "locator",
+                    "network_call",
+                    "state",
+                    "two_fa_action",
+                    "extraction_format"
+                ]
+            },
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about extracting data from web pages, capturing API responses, taking screenshots, reading cookies/storage, or the extraction action schema.",
+            "embedding_hint": "extract data web page llm network_call screenshot state cookies 2FA output_variable_name"
+        },
+        {
+            "id": "docs-action-types-interaction-action",
+            "path": "docs/action-types/interaction-action.mdx",
+            "title": "Interaction Actions",
+            "summary": "Reference for all browser interaction action types: click_element, input_text, select_option, check, upload_file, go_to_url, go_back, close_tabs_until, download_url_as_pdf, key_press, agentic_task, and close_overlay_popup. Documents common element-targeting properties (command, xpath, prompt_instructions, max_tries, max_timeout_seconds_per_try, assert_locator_presence) and per-action specifics including double-click, fill vs type mode, fuzzy matching for selects, and retry configuration.",
+            "gist": "All browser interaction types (click, type, select, upload, navigate, download) with full property schemas.",
+            "keywords": [
+                "interaction",
+                "click",
+                "input_text",
+                "select_option",
+                "check",
+                "upload",
+                "go_to_url",
+                "go_back",
+                "key_press",
+                "download_url_as_pdf",
+                "prompt_instructions",
+                "command",
+                "xpath",
+                "max_tries",
+                "assert_locator_presence"
+            ],
+            "document_type": "guide",
+            "tags": ["action-types", "interaction", "browser", "click", "input", "navigation"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-action-node"],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-locators",
+                        "context": "Interaction actions use locator strategies documented in the locators guide."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-action-node",
+                        "context": "Action node doc references interaction_action as the primary action type."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-quickstart",
+                        "context": "Quickstart demonstrates click and input_text interaction actions."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Playwright"],
+                "apis": [],
+                "data_models": [
+                    "interaction_action",
+                    "click_element",
+                    "input_text",
+                    "select_option",
+                    "upload_file"
+                ]
+            },
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about clicking elements, typing text, selecting dropdowns, navigating pages, uploading files, or any browser interaction action schema.",
+            "embedding_hint": "click input text select option upload navigate browser interaction Playwright"
+        },
+        {
+            "id": "docs-action-types-python-script-action",
+            "path": "docs/action-types/python-script-action.mdx",
+            "title": "Python Script Action",
+            "summary": "Stub document for the Python Script Action type. Contains only a title and description with no content body.",
+            "gist": "Empty stub for python_script_action documentation.",
+            "keywords": ["python", "script", "python_script_action", "custom code"],
+            "document_type": "guide",
+            "tags": ["action-types", "python", "stub"],
+            "relationships": {
+                "depends_on": [],
+                "references": [],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["python_script_action"]
+            },
+            "reading_priority": 5,
+            "when_to_use": "Do not select — contains no content. For python_script_action usage, see examples-data-extraction-i94 which demonstrates it in a real automation.",
+            "embedding_hint": "python script action stub placeholder"
+        },
+        {
+            "id": "docs-action-types-sleep-action",
+            "path": "docs/action-types/sleep-action.mdx",
+            "title": "Sleep Action",
+            "summary": "Documents the sleep_action type for inserting fixed delays into automations. Covers the sleep_time property (float, in seconds) with a JSON example, and guidance on when to use sleep_action vs end_sleep_time on an action node.",
+            "gist": "Fixed-duration pause action via sleep_time; guidance on sleep_action vs end_sleep_time.",
+            "keywords": ["sleep", "pause", "wait", "sleep_action", "sleep_time", "delay", "timing"],
+            "document_type": "guide",
+            "tags": ["action-types", "timing", "sleep", "delay"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-action-node"],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-timing-retries",
+                        "context": "Timing guide provides broader context on sleep times and timing controls."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-action-node",
+                        "context": "Action node doc mentions sleep as one of the action node examples."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["sleep_action"]
+            },
+            "reading_priority": 4,
+            "when_to_use": "Select when the query is specifically about the sleep_action type or how to insert a fixed-duration pause between automation steps.",
+            "embedding_hint": "sleep pause wait delay fixed duration sleep_time"
+        },
+        {
+            "id": "docs-action-types-two-factor-auth",
+            "path": "docs/action-types/two-factor-auth.mdx",
+            "title": "Two-Factor Authentication (Action Type)",
+            "summary": "Covers 2FA handling as an action within automations, focusing on three methods: Email 2FA (Gmail), TOTP from authenticator apps, and API-based 2FA from custom endpoints. Documents the 2FA flow (start timer, fetch code, enter code), schema for each method, secure parameter passing for TOTP secrets, timing considerations, and a complete login example with email 2FA.",
+            "gist": "Action-level 2FA guide: Email, TOTP, and API 2FA with flow, schema, and full login example.",
+            "keywords": [
+                "2FA",
+                "two-factor",
+                "TOTP",
+                "authenticator",
+                "email 2FA",
+                "OTP",
+                "secure_parameters",
+                "totp_secret"
+            ],
+            "document_type": "guide",
+            "tags": ["action-types", "2FA", "security", "authentication", "TOTP"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-parameters"],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-totp-integration",
+                        "context": "TOTP integration guide provides standalone TOTP setup details."
+                    },
+                    {
+                        "doc_id": "docs-advanced-two-fa-integration",
+                        "context": "Two-FA integration guide covers Email/Slack/SMS 2FA via integrations."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "Extraction action doc lists two_fa_action as an extraction subtype."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Gmail", "TOTP authenticator apps"],
+                "apis": [],
+                "data_models": ["two_fa_action", "totp_secret"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about handling 2FA/MFA within an automation step, especially for TOTP codes or email OTP codes used in a login flow.",
+            "embedding_hint": "2FA MFA two-factor authentication TOTP email OTP login security"
+        },
+        {
+            "id": "docs-action-types-human-in-loop",
+            "path": "docs/action-types/human-in-loop.mdx",
+            "title": "Human-in-the-Loop",
+            "summary": "Documents the human_in_loop_action node, which pauses an automation so a human can take over the live browser session and then resumes it. Covers the HITL flow (agent pauses, email sent, human opens session, clicks Done, agent resumes), the max_wait_time property, the 10-minute hard task timeout constraint, a complete automation example, timeout behavior table, and best practices (natural breakpoints, realistic wait times, no concurrent HITL nodes).",
+            "gist": "Pause an automation for human browser takeover, then resume. max_wait_time must be under 600 s.",
+            "keywords": [
+                "human-in-the-loop",
+                "HITL",
+                "human input",
+                "pause",
+                "resume",
+                "live session",
+                "max_wait_time",
+                "HumanInLoopTimeoutException",
+                "timeout"
+            ],
+            "document_type": "guide",
+            "tags": ["action-types", "human-in-the-loop", "HITL", "pause", "resume"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-agentic-tasks",
+                        "context": "Agentic task nodes that can precede a human handoff."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["human_in_loop_action", "HumanInLoopTimeoutException"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about pausing an automation for human input, HITL nodes, live browser handoff, or the max_wait_time property.",
+            "embedding_hint": "human in the loop HITL pause resume live session browser handoff max_wait_time timeout"
+        },
+        {
+            "id": "docs-advanced-aws-secrets-manager",
+            "path": "docs/advanced/aws-secrets-manager.mdx",
+            "title": "AWS Secrets Manager Integration",
+            "summary": "Guides users through integrating AWS Secrets Manager as a secure parameter source. Covers creating secrets in AWS, creating an IAM user with the minimum GetSecretValue policy, configuring environment variables, and using secrets in automation via secure_parameters. Also covers generating TOTP codes from TOTP secrets stored in AWS, and how to revoke access.",
+            "gist": "AWS Secrets Manager as secure_parameters source: IAM setup, env vars, TOTP from AWS, revocation.",
+            "keywords": [
+                "AWS",
+                "Secrets Manager",
+                "secure_parameters",
+                "IAM",
+                "GetSecretValue",
+                "TOTP",
+                "secret_name",
+                "region_name",
+                "credentials"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "security", "AWS", "secrets", "TOTP"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-parameters"],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-totp-integration",
+                        "context": "TOTP from AWS follows the same TOTP pattern documented in totp-integration."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-parameters",
+                        "context": "Parameters doc mentions AWS Secrets Manager as a secure_parameters provider."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["AWS Secrets Manager", "IAM"],
+                "apis": ["GetSecretValue"],
+                "data_models": ["secure_parameters"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about storing credentials in AWS Secrets Manager, using AWS secrets as secure_parameters, or generating TOTP codes from AWS-stored secrets.",
+            "embedding_hint": "AWS Secrets Manager IAM credentials secure_parameters TOTP"
+        },
+        {
+            "id": "docs-advanced-best-practices",
+            "path": "docs/advanced/best-practices.mdx",
+            "title": "Best Practices",
+            "summary": "Comprehensive best practices guide covering design principles, locator strategy priority order, naming conventions for variables, timing guidelines for various page types, error handling patterns for optional elements, security guidelines (no hardcoded credentials, use 1Password), performance tips (minimize waits, prefer static over agentic), debugging approaches, and a pre-deployment checklist.",
+            "gist": "Best practices: locators, naming, timing, security, performance, debugging, and pre-deployment checklist.",
+            "keywords": [
+                "best practices",
+                "locator strategy",
+                "naming conventions",
+                "timing",
+                "security",
+                "performance",
+                "debugging",
+                "pre-deployment",
+                "optional elements"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "best-practices", "security", "performance", "debugging"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-locators",
+                        "context": "Best practices references locator priority order covered in the locators guide."
+                    },
+                    {
+                        "doc_id": "docs-advanced-onepassword",
+                        "context": "Security section recommends 1Password for credentials."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-advanced-locators",
+                        "context": "Locators guide cross-references best practices for locator selection."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["1Password"],
+                "apis": [],
+                "data_models": []
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about reliability, best practices, debugging failed automations, locator selection strategy, or security recommendations for automation authoring.",
+            "embedding_hint": "best practices reliability locators naming timing security performance debugging checklist"
+        },
+        {
+            "id": "docs-advanced-callbacks",
+            "path": "docs/advanced/callbacks.mdx",
+            "title": "Callbacks",
+            "summary": "Explains how to receive HTTP POST notifications when automations complete. Covers local development setup via the LOCAL_CALLBACK_URL environment variable, production configuration through the Optexity dashboard, the callback payload structure (task_id, status, output_data, downloads), and authentication options (API key, Basic Auth). Links to the Callback Reference for the complete schema.",
+            "gist": "HTTP callback setup for automation completion: local dev vs production, payload overview, authentication.",
+            "keywords": [
+                "callback",
+                "webhook",
+                "LOCAL_CALLBACK_URL",
+                "production",
+                "authentication",
+                "API key",
+                "Basic Auth",
+                "notification",
+                "task completion"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "callbacks", "webhook", "integration"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "api-reference-callback",
+                        "context": "Links to callback reference for the complete payload schema."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-advanced-orchestration",
+                        "context": "Orchestration guide builds on callbacks for event-driven workflow triggering."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Optexity dashboard"],
+                "apis": [],
+                "data_models": ["callback payload"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about setting up callbacks/webhooks, receiving notifications on task completion, configuring LOCAL_CALLBACK_URL, or authenticating callback requests.",
+            "embedding_hint": "callback webhook notification task completion LOCAL_CALLBACK_URL authentication"
+        },
+        {
+            "id": "docs-advanced-downloads-files",
+            "path": "docs/advanced/downloads-files.mdx",
+            "title": "Downloads and File Handling",
+            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, saving pages as PDF (download_url_as_pdf), iterating multiple downloads with for_loop_node, and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, and best practices.",
+            "gist": "File download and upload patterns: click-to-download, PDF save, multi-file loops, upload with file_path.",
+            "keywords": [
+                "download",
+                "upload",
+                "expect_download",
+                "file_path",
+                "download_url_as_pdf",
+                "PDF",
+                "for_loop",
+                "/tmp/optexity",
+                "file handling"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "files", "downloads", "upload", "PDF"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-for-loop-node",
+                        "context": "Multiple downloads use for_loop_node."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": []
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about downloading files, uploading files, saving pages as PDF, handling multiple file downloads, or the file storage path during task execution.",
+            "embedding_hint": "download upload file PDF expect_download /tmp/optexity for_loop"
+        },
+        {
+            "id": "docs-advanced-locators",
+            "path": "docs/advanced/locators.mdx",
+            "title": "Locators",
+            "summary": "Comprehensive guide to element location strategies: Playwright command-based locators (role, label, text, test ID, CSS selector, chaining, iframes), XPath locators with common patterns and fragility warnings, and prompt_instructions as AI natural-language fallback. Includes a locator selection flowchart, dynamic element locators using variables, and the assert_locator_presence property for optional elements.",
+            "gist": "Element location strategies: Playwright locators (role/label/text), XPath, and AI prompt_instructions fallback.",
+            "keywords": [
+                "locators",
+                "Playwright",
+                "get_by_role",
+                "get_by_label",
+                "get_by_text",
+                "XPath",
+                "prompt_instructions",
+                "AI fallback",
+                "assert_locator_presence",
+                "iframe",
+                "CSS selector"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "locators", "Playwright", "XPath", "element-selection"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-best-practices",
+                        "context": "Locator selection strategy aligns with best practices priority order."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "Locator-based extraction uses Playwright locators."
+                    },
+                    {
+                        "doc_id": "docs-action-types-interaction-action",
+                        "context": "All interaction actions use locators to find elements."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Playwright"],
+                "apis": [],
+                "data_models": ["command", "xpath", "prompt_instructions"]
+            },
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about finding elements on a page, Playwright locator syntax, when to use XPath vs role-based locators, AI fallback locators, or handling iframes and dynamic elements.",
+            "embedding_hint": "Playwright locator get_by_role get_by_label XPath prompt_instructions AI fallback element selection"
+        },
+        {
+            "id": "docs-advanced-onepassword",
+            "path": "docs/advanced/onepassword.mdx",
+            "title": "1Password Integration",
+            "summary": "Guides users through integrating 1Password as a secure credential vault for automation parameters. Covers creating items in 1Password, obtaining a service account token, setting the ONEPASSWORD_SERVICE_ACCOUNT_TOKEN environment variable, and using 1Password as a secure_parameters source. Also covers retrieving TOTP secrets stored in 1Password for generating one-time codes at runtime, and revoking access.",
+            "gist": "1Password vault as secure_parameters source: service account setup, env vars, TOTP retrieval, revocation.",
+            "keywords": [
+                "1Password",
+                "secure_parameters",
+                "service account",
+                "vault",
+                "ONEPASSWORD_SERVICE_ACCOUNT_TOKEN",
+                "TOTP",
+                "credentials",
+                "secrets"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "security", "1Password", "secrets", "TOTP"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-parameters"],
+                "references": [],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-parameters",
+                        "context": "Parameters doc describes secure_parameters with 1Password as a provider."
+                    },
+                    {
+                        "doc_id": "docs-advanced-best-practices",
+                        "context": "Best practices recommends 1Password for secrets."
+                    },
+                    {
+                        "doc_id": "docs-advanced-totp-integration",
+                        "context": "TOTP integration recommends 1Password as preferred storage for TOTP secrets."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["1Password"],
+                "apis": [],
+                "data_models": ["secure_parameters"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about storing credentials securely using 1Password, setting up 1Password integration, or fetching TOTP codes from 1Password vaults.",
+            "embedding_hint": "1Password vault credentials secure_parameters service account TOTP"
+        },
+        {
+            "id": "docs-advanced-orchestration",
+            "path": "docs/advanced/orchestration.mdx",
+            "title": "Orchestration",
+            "summary": "Describes a callback-based orchestration architecture for chaining multiple Optexity automations together. Shows a minimal FastAPI + httpx + asyncio example where a callback handler triggers subsequent automations. Documents the component flow (server → Optexity → task execution → callback), benefits (no polling, scalable), and a warning that the callback URL must be publicly accessible.",
+            "gist": "Event-driven orchestration pattern: callback-triggered automation chaining with FastAPI example.",
+            "keywords": [
+                "orchestration",
+                "callback",
+                "chaining",
+                "FastAPI",
+                "asyncio",
+                "httpx",
+                "event-driven",
+                "workflow",
+                "no polling"
+            ],
+            "document_type": "architecture",
+            "tags": ["advanced", "orchestration", "architecture", "callbacks", "workflow"],
+            "relationships": {
+                "depends_on": ["docs-advanced-callbacks"],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-callbacks",
+                        "context": "Orchestration builds on the callbacks mechanism."
+                    },
+                    {
+                        "doc_id": "api-reference-callback",
+                        "context": "Orchestration uses callback payload to trigger next automation."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["FastAPI", "httpx", "asyncio"],
+                "apis": ["/inference"],
+                "data_models": ["callback payload"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about chaining multiple automations, building event-driven workflows, orchestrating complex multi-step processes, or avoiding polling with callbacks.",
+            "embedding_hint": "orchestration chaining automations event-driven FastAPI callback no polling"
+        },
+        {
+            "id": "docs-advanced-proxy-setup",
+            "path": "docs/advanced/proxy-setup.mdx",
+            "title": "Proxy Setup",
+            "summary": "Explains how to configure HTTP proxies for automations. Covers local development environment variable setup (PROXY_URL, PROXY_USERNAME, PROXY_PASSWORD, PROXY_PROVIDER), production configuration (automatic, no manual setup), enabling proxy per-inference request via use_proxy: true, and the Webshare provider (10 free proxies for testing).",
+            "gist": "Proxy configuration: local env vars, production auto-config, use_proxy flag, Webshare provider.",
+            "keywords": [
+                "proxy",
+                "PROXY_URL",
+                "PROXY_USERNAME",
+                "PROXY_PASSWORD",
+                "PROXY_PROVIDER",
+                "Webshare",
+                "use_proxy",
+                "oxylabs"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "proxy", "networking", "configuration"],
+            "relationships": {
+                "depends_on": [],
+                "references": [],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["Webshare", "Oxylabs"],
+                "apis": [],
+                "data_models": []
+            },
+            "reading_priority": 4,
+            "when_to_use": "Select when the query is about configuring proxies for automations, enabling proxy usage, or setting up Webshare/Oxylabs proxy providers.",
+            "embedding_hint": "proxy PROXY_URL Webshare Oxylabs use_proxy configuration"
+        },
+        {
+            "id": "docs-advanced-timing-retries",
+            "path": "docs/advanced/timing-retries.mdx",
+            "title": "Timing and Retries",
+            "summary": "Complete reference for all timing and retry controls in Optexity automations. Covers before_sleep_time and end_sleep_time at the action node level, max_retries at the automation level, and max_tries/max_timeout_seconds_per_try at the interaction action level. Includes default values by action type, new tab handling via expect_new_tab, common timing patterns for slow-loading pages and dynamic AJAX content, and a troubleshooting table.",
+            "gist": "Timing and retry reference: before/after sleep, automation retries, element retry config, new tab wait, troubleshooting.",
+            "keywords": [
+                "timing",
+                "retries",
+                "before_sleep_time",
+                "end_sleep_time",
+                "max_retries",
+                "max_tries",
+                "max_timeout_seconds_per_try",
+                "expect_new_tab",
+                "sleep",
+                "AJAX",
+                "retry"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "timing", "retries", "performance", "reliability"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-action-node",
+                        "context": "Timing properties are set on action nodes."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-action-types-sleep-action",
+                        "context": "Sleep action doc refers to timing-retries for broader timing context."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["action_node", "interaction_action"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about timing configuration, sleep durations, retry settings, handling slow-loading pages, AJAX content timing, new tab handling, or debugging race conditions.",
+            "embedding_hint": "timing sleep retries before_sleep_time end_sleep_time max_tries AJAX slow page retry"
+        },
+        {
+            "id": "docs-advanced-totp-integration",
+            "path": "docs/advanced/totp-integration.mdx",
+            "title": "TOTP Integration",
+            "summary": "Covers generating Time-Based One-Time Password (TOTP) codes from authenticator apps (Google Authenticator, Authy) in automations. Explains how to provide a TOTP secret directly in secure_parameters or via 1Password (recommended). Includes the JSON schema for both approaches and how to reference the generated code in subsequent action nodes.",
+            "gist": "TOTP code generation in automations: direct totp_secret or via 1Password, with JSON schema.",
+            "keywords": [
+                "TOTP",
+                "one-time password",
+                "authenticator",
+                "Google Authenticator",
+                "Authy",
+                "totp_secret",
+                "digits",
+                "secure_parameters",
+                "1Password"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "TOTP", "2FA", "security", "authentication"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-parameters"],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-onepassword",
+                        "context": "TOTP via 1Password is the recommended approach."
+                    },
+                    {
+                        "doc_id": "docs-advanced-two-fa-integration",
+                        "context": "For email/Slack/SMS 2FA codes (not TOTP), see two-fa-integration."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-action-types-two-factor-auth",
+                        "context": "2FA action doc references TOTP integration for authenticator-based codes."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Google Authenticator", "Authy", "1Password"],
+                "apis": [],
+                "data_models": ["totp", "totp_secret", "secure_parameters"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about using TOTP/authenticator app codes in automations, storing and generating TOTP secrets, or the difference between TOTP and email/SMS 2FA.",
+            "embedding_hint": "TOTP authenticator one-time password totp_secret Google Authenticator Authy secure_parameters"
+        },
+        {
+            "id": "docs-advanced-two-fa-integration",
+            "path": "docs/advanced/two-fa-integration.mdx",
+            "title": "Two-Factor Authentication Integration",
+            "summary": "Covers fetching 2FA verification codes from Gmail, Slack, and Twilio SMS via Optexity integrations. All three methods follow the same pattern: fetch from source, extract code, store in output_variable_name, use code in subsequent actions. Documents setup via the Optexity dashboard Integrations page, JSON schema for each method (email_two_fa_action, slack_two_fa_action, sms_two_fa_action), common polling properties (max_wait_time, check_interval), and Twilio SMS setup.",
+            "gist": "Fetch 2FA codes from Gmail, Slack, or Twilio SMS via dashboard integrations; schema and polling config.",
+            "keywords": [
+                "2FA",
+                "Gmail",
+                "email 2FA",
+                "Slack",
+                "SMS",
+                "Twilio",
+                "two_fa_action",
+                "output_variable_name",
+                "max_wait_time",
+                "check_interval",
+                "integration",
+                "OTP"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "2FA", "email", "Slack", "SMS", "Twilio", "authentication"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-totp-integration",
+                        "context": "For TOTP codes from authenticator apps, see totp-integration."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-action-types-two-factor-auth",
+                        "context": "Action-level 2FA doc references this for email/Slack/SMS integration setup."
+                    },
+                    {
+                        "doc_id": "docs-advanced-totp-integration",
+                        "context": "TOTP doc links here for non-TOTP 2FA methods."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Gmail", "Slack", "Twilio"],
+                "apis": ["Optexity dashboard Integrations"],
+                "data_models": ["email_two_fa_action", "slack_two_fa_action", "sms_two_fa_action"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about fetching 2FA codes from Gmail, Slack, or SMS in automations, setting up email/Slack/Twilio integrations, or configuring polling for 2FA code delivery.",
+            "embedding_hint": "2FA email Gmail Slack SMS Twilio OTP verification code polling max_wait_time"
+        },
+        {
+            "id": "docs-building-automations-action-node",
+            "path": "docs/building-automations/action-node.mdx",
+            "title": "Action Node",
+            "summary": "Documents the action_node as the fundamental building block of Optexity automations. Each action node contains exactly one action type (interaction_action, extraction_action, assertion_action, python_script_action, or sleep_action). Covers timing properties (before_sleep_time, end_sleep_time), new tab handling (expect_new_tab, max_new_tab_wait_time), the fail_state_action for failure messages, and examples for basic click, custom timing, sleep-only, fail state, and new tab nodes.",
+            "gist": "action_node is the atomic unit of an automation; contains one action type plus timing and fail_state_action.",
+            "keywords": [
+                "action_node",
+                "before_sleep_time",
+                "end_sleep_time",
+                "expect_new_tab",
+                "fail_state_action",
+                "timing",
+                "atomic",
+                "node",
+                "action types"
+            ],
+            "document_type": "guide",
+            "tags": ["building-automations", "action-node", "timing", "structure"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-automation-structure"],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-interaction-action",
+                        "context": "Action node contains interaction_action as its primary action type."
+                    },
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "Action node can contain extraction_action."
+                    },
+                    {
+                        "doc_id": "docs-action-types-agentic-tasks",
+                        "context": "Action node can contain agentic_task."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-automation-structure",
+                        "context": "Automation structure lists action_node as one of the three node types."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["action_node", "fail_state_action"]
+            },
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about the structure of an action node, timing properties on nodes, fail_state_action, or how action types fit inside the node container.",
+            "embedding_hint": "action_node atomic building block timing fail_state_action before_sleep end_sleep expect_new_tab"
+        },
+        {
+            "id": "docs-building-automations-automation-structure",
+            "path": "docs/building-automations/automation-structure.mdx",
+            "title": "Automation Structure",
+            "summary": "Defines the top-level schema of an Optexity automation JSON/Python object. Documents all root properties: url, browser_channel (chromium vs chrome), os_emulation (null/windows/linux), max_retries, expected_downloads, parameters, and nodes. Explains the three node types (action_node, for_loop_node, if_else_node), the declarative execution model, and important semantics like max_retries counting total attempts and AssertionError bypassing retries.",
+            "gist": "Top-level automation schema: url, browser_channel, os_emulation, max_retries, parameters, and node types.",
+            "keywords": [
+                "automation",
+                "structure",
+                "schema",
+                "url",
+                "browser_channel",
+                "os_emulation",
+                "max_retries",
+                "expected_downloads",
+                "parameters",
+                "nodes",
+                "declarative"
+            ],
+            "document_type": "reference",
+            "tags": ["building-automations", "schema", "structure", "configuration"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-action-node",
+                        "context": "Automation structure lists action_node as a node type."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-for-loop-node",
+                        "context": "Automation structure lists for_loop_node as a node type."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-if-else-node",
+                        "context": "Automation structure lists if_else_node as a node type."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-parameters",
+                        "context": "Parameters object is a required part of the automation structure."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-action-node",
+                        "context": "Action node exists within the automation structure's nodes array."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["Automation", "Parameters", "browser_channel", "os_emulation"]
+            },
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about the top-level automation schema, browser_channel options, OS emulation, max_retries semantics, or the overall structure of an automation JSON/Python object.",
+            "embedding_hint": "automation schema structure url browser_channel os_emulation max_retries nodes declarative"
+        },
+        {
+            "id": "docs-building-automations-for-loop-node",
+            "path": "docs/building-automations/for-loop-node.mdx",
+            "title": "For Loop Node",
+            "summary": "Documents the for_loop_node for iterating over a list of values in automations. Covers the variable_name property, {variable[index]} substitution syntax, using multiple variables (comma-separated), reset_nodes for returning browser to a known state between iterations, and on_error_in_loop error handling (continue, break, raise). Also covers data source options and limitations (no nested loops, variable must be pre-populated).",
+            "gist": "for_loop_node: iterate a variable list, {var[index]} substitution, reset_nodes, error handling strategies.",
+            "keywords": [
+                "for_loop",
+                "loop",
+                "iteration",
+                "variable_name",
+                "reset_nodes",
+                "on_error_in_loop",
+                "continue",
+                "break",
+                "raise",
+                "{variable[index]}"
+            ],
+            "document_type": "guide",
+            "tags": ["building-automations", "loop", "iteration", "control-flow"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-parameters"],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-automation-structure",
+                        "context": "for_loop_node is one of the three node types in automation structure."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-advanced-downloads-files",
+                        "context": "Multiple downloads pattern uses for_loop_node."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-automation-structure",
+                        "context": "Automation structure lists for_loop_node as a node type."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["for_loop_node"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about iterating over a list in an automation, for_loop_node schema, reset_nodes, error handling within loops, or the {variable[index]} syntax.",
+            "embedding_hint": "for loop iteration variable list reset_nodes on_error_in_loop control flow"
+        },
+        {
+            "id": "docs-building-automations-if-else-node",
+            "path": "docs/building-automations/if-else-node.mdx",
+            "title": "If Else Node",
+            "summary": "Documents the if_else_node for conditional branching in automations. Covers Python-like condition expressions, if_nodes, and optional else_nodes arrays. Explains supported operators (==, !=, is not None, and, or) and variable referencing syntax. Includes detailed guidance on using extraction nodes to capture data and set conditions based on extracted values. Examples cover handling optional 2FA, branching on extracted page state or values, locator-based extraction, and nested conditions.",
+            "gist": "if_else_node: conditional branching with Python-like expressions, operators, extraction-based conditions, examples.",
+            "keywords": [
+                "if_else",
+                "conditional",
+                "branching",
+                "condition",
+                "if_nodes",
+                "else_nodes",
+                "Python-like",
+                "operators",
+                "nested conditions",
+                "extraction",
+                "extracted_values",
+                "output_variable_names",
+                "llm_extraction",
+                "locator_extraction"
+            ],
+            "document_type": "guide",
+            "tags": [
+                "building-automations",
+                "conditional",
+                "control-flow",
+                "branching",
+                "extraction"
+            ],
+            "relationships": {
+                "depends_on": [
+                    "docs-building-automations-parameters",
+                    "docs-action-types-extraction-action"
+                ],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-automation-structure",
+                        "context": "if_else_node is one of the three node types in automation structure."
+                    },
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "Extraction actions produce variables that feed into if_else_node conditions."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-automation-structure",
+                        "context": "Automation structure lists if_else_node as a node type."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["if_else_node", "extraction_action"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about conditional logic in automations, branching based on extracted values or input parameters, using extraction data for conditions, the if_else_node schema, or nested conditions.",
+            "embedding_hint": "conditional if else branching condition Python-like parameters extraction extracted_values llm output_variable_names locator control flow"
+        },
+        {
+            "id": "docs-building-automations-local-setup",
+            "path": "docs/building-automations/local-setup.mdx",
+            "title": "Local Setup",
+            "summary": "Step-by-step guide for setting up the Optexity development environment locally. Covers creating an account at dashboard.optexity.com, obtaining an API key, installing the Chrome Recorder Extension, prerequisites (Python 3.11+, Git), creating a conda/venv environment, installing Optexity via PyPI or source, and setting required environment variables (OPTEXITY_API_KEY, GOOGLE_API_KEY, DEPLOYMENT).",
+            "gist": "Local dev setup: account, API key, recorder extension, Python 3.11 env, pip install, env vars.",
+            "keywords": [
+                "local setup",
+                "installation",
+                "OPTEXITY_API_KEY",
+                "GOOGLE_API_KEY",
+                "conda",
+                "pip install optexity",
+                "recorder extension",
+                "Python 3.11",
+                "dashboard"
+            ],
+            "document_type": "guide",
+            "tags": ["getting-started", "setup", "installation", "environment"],
+            "relationships": {
+                "depends_on": [],
+                "references": [],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-quickstart",
+                        "context": "Quickstart lists local setup as a prerequisite."
+                    },
+                    {
+                        "doc_id": "docs-getting-started-recording-first-inference",
+                        "context": "Recording guide references local setup as a prerequisite."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Optexity dashboard", "Chrome Web Store"],
+                "apis": [],
+                "data_models": []
+            },
+            "reading_priority": 1,
+            "when_to_use": "Select when the query is about how to install Optexity, set up the development environment, get an API key, install the recorder extension, or configure environment variables.",
+            "embedding_hint": "install setup local environment API key recorder extension Python conda pip"
+        },
+        {
+            "id": "docs-building-automations-parameters",
+            "path": "docs/building-automations/parameters.mdx",
+            "title": "Parameters",
+            "summary": "Comprehensive guide to the Optexity parameters system. Covers the three parameter types: input_parameters (provided before execution), generated_parameters (extracted during execution), and secure_parameters (1Password vault or direct secrets). Documents the {variable_name[index]} substitution syntax, where substitution works (input_text, xpath, command, task, etc.), list format requirement, complete login example with all parameter types, and best practices.",
+            "gist": "Three parameter types (input/generated/secure), {var[index]} substitution syntax, 1Password/TOTP in secure_parameters.",
+            "keywords": [
+                "parameters",
+                "input_parameters",
+                "generated_parameters",
+                "secure_parameters",
+                "variable substitution",
+                "{variable[index]}",
+                "1Password",
+                "TOTP",
+                "list format",
+                "parameter syntax"
+            ],
+            "document_type": "guide",
+            "tags": ["building-automations", "parameters", "variables", "security"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-onepassword",
+                        "context": "secure_parameters uses 1Password vault integration."
+                    },
+                    {
+                        "doc_id": "docs-advanced-aws-secrets-manager",
+                        "context": "secure_parameters can also use AWS Secrets Manager."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-automation-structure",
+                        "context": "Automation structure includes parameters as a required property."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-for-loop-node",
+                        "context": "Loop variables are drawn from parameters."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-if-else-node",
+                        "context": "Conditions reference parameters via {var[index]} syntax."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["1Password", "AWS Secrets Manager"],
+                "apis": [],
+                "data_models": [
+                    "Parameters",
+                    "input_parameters",
+                    "generated_parameters",
+                    "secure_parameters"
+                ]
+            },
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about passing data into or out of automations, the {variable[index]} syntax, secure credentials, generated_parameters from extraction, or 1Password/AWS integration for secrets.",
+            "embedding_hint": "parameters input generated secure variables substitution {variable[index]} 1Password credentials"
+        },
+        {
+            "id": "docs-building-automations-quickstart",
+            "path": "docs/building-automations/quickstart.mdx",
+            "title": "Building Automations Quickstart",
+            "summary": "End-to-end tutorial for building a login automation from scratch. Covers installing the Recorder extension, recording interactions in the browser, understanding the automation JSON and Python structure (Automation, Parameters, ActionNode, locators), editing and customizing the automation (parameterizing, prompt_instructions, timing), and running via the /inference API. Includes common patterns for clicks, form filling, dropdown selection, and new tab handling.",
+            "gist": "Full build-your-first-automation walkthrough: record, understand, customize, run via /inference.",
+            "keywords": [
+                "quickstart",
+                "tutorial",
+                "login automation",
+                "record",
+                "Recorder extension",
+                "ActionNode",
+                "Automation",
+                "Parameters",
+                "prompt_instructions",
+                "run automation",
+                "/inference"
+            ],
+            "document_type": "guide",
+            "tags": ["getting-started", "quickstart", "tutorial", "building-automations"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-local-setup"],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-automation-structure",
+                        "context": "Quickstart shows the full automation structure."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-parameters",
+                        "context": "Quickstart demonstrates input_parameters and parameterization."
+                    },
+                    {
+                        "doc_id": "api-reference-inference-endpoint",
+                        "context": "Quickstart calls POST /inference to run the automation."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["Optexity Recorder", "Optexity dashboard"],
+                "apis": ["/inference"],
+                "data_models": ["Automation", "ActionNode", "Parameters"]
+            },
+            "reading_priority": 1,
+            "when_to_use": "Select when the query is about getting started building automations, the full tutorial flow, recording automations, or a complete walkthrough from recording to running via the API.",
+            "embedding_hint": "quickstart tutorial build first automation record login run inference walkthrough"
+        },
+        {
+            "id": "docs-extra",
+            "path": "docs/extra.mdx",
+            "title": "Extra (Variables and Execution Model)",
+            "summary": "Commented-out draft content on Optexity's variable and memory system and sequential execution model. Covers variable flow through input_parameters, generated_parameters, output_data, and browser state, plus retry logic up to max_tries and AI fallback for failed locators via prompt_instructions.",
+            "gist": "Commented-out draft: variable flow and sequential execution model with retry and AI fallback.",
+            "keywords": [
+                "variables",
+                "execution model",
+                "sequential",
+                "retry",
+                "AI fallback",
+                "prompt_instructions",
+                "state tracking",
+                "draft"
+            ],
+            "document_type": "notes",
+            "tags": ["draft", "execution-model", "variables"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-parameters",
+                        "context": "References the parameters/variables system."
+                    },
+                    {
+                        "doc_id": "docs-advanced-locators",
+                        "context": "References AI fallback locators via prompt_instructions."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": []
+            },
+            "reading_priority": 5,
+            "when_to_use": "Avoid selecting this document — it is commented-out draft content. Prefer docs-building-automations-parameters for variable flow and docs-advanced-locators for AI fallback behavior.",
+            "embedding_hint": "draft commented variables execution model sequential retry AI fallback"
+        },
+        {
+            "id": "docs-faqs-agents",
+            "path": "docs/faqs/AGENTS.md",
+            "title": "Accordion Writing Guide (Fragment)",
+            "summary": "Partial fragment of the documentation writing style guide covering only the use of AccordionGroup and Accordion components. Describes when to use accordions (FAQs, advanced config, troubleshooting) and when not to (essential content). This is a partial copy, not a standalone document.",
+            "gist": "Fragment: when and how to use Accordion/AccordionGroup components in docs.",
+            "keywords": [
+                "accordion",
+                "AccordionGroup",
+                "FAQ",
+                "documentation",
+                "style guide",
+                "Mintlify"
+            ],
+            "document_type": "reference",
+            "tags": ["meta", "documentation", "style", "fragment"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "agents",
+                        "context": "This is a fragment of the main AGENTS.md style guide."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["Mintlify"],
+                "apis": [],
+                "data_models": []
+            },
+            "reading_priority": 5,
+            "when_to_use": "Do not select — it is a fragment. Read the root AGENTS.md style guide instead for complete documentation writing guidance.",
+            "embedding_hint": "accordion Mintlify documentation writing fragment"
+        },
+        {
+            "id": "docs-faqs-faqs",
+            "path": "docs/faqs/faqs.mdx",
+            "title": "FAQs",
+            "summary": "Frequently asked questions about Optexity organized into accordion groups covering: General (what is Optexity), Parameters & Credentials (syntax, reuse, secure handling), Control Flow (loops and conditionals), Two-Factor Authentication (TOTP, email OTP), Data & Downloads (file access, extracted data, callbacks), Form Interactions (dropdowns, element existence), Pricing & Access (free tier, cloud browser), and Troubleshooting (CAPTCHA, browser_channel).",
+            "gist": "FAQ covering parameters, 2FA, downloads, form interactions, pricing, CAPTCHA, and control flow.",
+            "keywords": [
+                "FAQ",
+                "frequently asked questions",
+                "CAPTCHA",
+                "pricing",
+                "free tier",
+                "parameters syntax",
+                "2FA",
+                "downloads",
+                "get_downloads",
+                "callbacks",
+                "browser_channel",
+                "TOTP"
+            ],
+            "document_type": "guide",
+            "tags": ["FAQ", "troubleshooting", "general"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-parameters",
+                        "context": "FAQ answers parameter syntax questions."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-for-loop-node",
+                        "context": "FAQ answers loop questions."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-if-else-node",
+                        "context": "FAQ answers conditional questions."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": [],
+                "apis": ["GET /api/v1/get_downloads"],
+                "data_models": []
+            },
+            "reading_priority": 4,
+            "when_to_use": "Select when the query is a general question about Optexity capabilities, pricing, CAPTCHA handling, or common troubleshooting scenarios. Also useful for quick syntax reminders.",
+            "embedding_hint": "FAQ general questions CAPTCHA pricing free tier troubleshooting parameters 2FA downloads"
+        },
+        {
+            "id": "docs-getting-started-recording-first-inference",
+            "path": "docs/getting_started/recording-first-inference.mdx",
+            "title": "Recording Your First Automation",
+            "summary": "Beginner guide to recording a first automation using the Optexity Recorder Chrome extension, using a stock price lookup on stockanalysis.com as the example. Covers the recording process, understanding the resulting JSON structure, adding an LLM extraction action to capture the stock price, and links to a video tutorial. Next step is running the recorded automation.",
+            "gist": "Beginner guide: record a browser automation with the Chrome extension using a stock price example.",
+            "keywords": [
+                "recording",
+                "recorder extension",
+                "Chrome",
+                "stock price",
+                "stockanalysis.com",
+                "first automation",
+                "beginner",
+                "video tutorial",
+                "extraction"
+            ],
+            "document_type": "guide",
+            "tags": ["getting-started", "recording", "beginner", "tutorial"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-local-setup"],
+                "references": [
+                    {
+                        "doc_id": "docs-getting-started-running-first-inference",
+                        "context": "Next step after recording is running the inference."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["Optexity Recorder", "Chrome"],
+                "apis": [],
+                "data_models": []
+            },
+            "reading_priority": 1,
+            "when_to_use": "Select when the query is about how to record a first automation, using the recorder extension, or getting started with Optexity from zero.",
+            "embedding_hint": "record first automation Chrome extension beginner stockanalysis.com video tutorial"
+        },
+        {
+            "id": "docs-getting-started-running-first-inference",
+            "path": "docs/getting_started/running-first-inference.mdx",
+            "title": "Running Your First Inference",
+            "summary": "Guide for starting the Optexity inference child process server and calling the /inference endpoint for the first time. Covers the CLI command (optexity inference --port 9000 --child_process_id 0), the three exposed endpoints (/health, /is_task_running, /inference), the InferenceRequest schema (endpoint_name, input_parameters, unique_parameter_names), a cURL example, and monitoring task execution via the dashboard.",
+            "gist": "Start the local inference server via CLI and call /inference for the first time with cURL.",
+            "keywords": [
+                "inference server",
+                "optexity inference",
+                "child_process_id",
+                "port",
+                "cURL",
+                "/inference",
+                "/health",
+                "InferenceRequest",
+                "unique_parameter_names",
+                "CLI"
+            ],
+            "document_type": "guide",
+            "tags": ["getting-started", "inference", "CLI", "tutorial"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-local-setup"],
+                "references": [
+                    {
+                        "doc_id": "api-reference-inference-endpoint",
+                        "context": "InferenceRequest schema is documented in the API reference."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-getting-started-recording-first-inference",
+                        "context": "Recording guide links to this as the next step."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Optexity inference server"],
+                "apis": ["/inference", "/health", "/is_task_running"],
+                "data_models": ["InferenceRequest"]
+            },
+            "reading_priority": 1,
+            "when_to_use": "Select when the query is about starting the local inference server, the CLI command for running the server, calling /inference for the first time, or the InferenceRequest schema.",
+            "embedding_hint": "run inference server CLI child_process_id cURL /inference first time getting started"
+        },
+        {
+            "id": "docs-inference-inference-api",
+            "path": "docs/inference/inference-api.mdx",
+            "title": "Inference API Reference",
+            "summary": "Internal-facing reference for the Optexity inference child process server architecture. Documents the Settings model (environment variables and configuration), the InferenceRequest and Task data models (lifecycle states: queued → allocated → running → success/failed/cancelled), HTTP endpoints for both local mode (/inference, /health, /is_task_running) and AWS mode (/allocate_task, /set_child_process_id), task deduplication via dedup_key, auto-retry, and a 15-minute health check timeout.",
+            "gist": "Internal inference server architecture: Settings, Task model, lifecycle states, local vs AWS endpoints, dedup.",
+            "keywords": [
+                "inference API",
+                "child process",
+                "Settings",
+                "InferenceRequest",
+                "Task",
+                "task lifecycle",
+                "dedup_key",
+                "is_aws",
+                "allocate_task",
+                "queued",
+                "running",
+                "failed",
+                "health check"
+            ],
+            "document_type": "reference",
+            "tags": ["inference", "API", "architecture", "internal"],
+            "relationships": {
+                "depends_on": [],
+                "references": [],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-getting-started-running-first-inference",
+                        "context": "Running first inference uses the local-mode inference server."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["Optexity inference server", "AWS ECS"],
+                "apis": [
+                    "/inference",
+                    "/health",
+                    "/is_task_running",
+                    "/allocate_task",
+                    "/set_child_process_id"
+                ],
+                "data_models": ["InferenceRequest", "Task", "Settings"]
+            },
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about the internal inference server architecture, task lifecycle states, deduplication behavior, AWS vs local deployment modes, or the Task data model.",
+            "embedding_hint": "inference server architecture task lifecycle dedup_key AWS local Settings InferenceRequest"
+        },
+        {
+            "id": "examples-data-extraction-i94",
+            "path": "examples/data_extraction/i94.mdx",
+            "title": "I94 Data Extraction Example",
+            "summary": "Full walkthrough example for automating the I-94 government travel history lookup. Covers setup using add_example.py, running via the /inference endpoint, and building the automation from scratch (recording base workflow, nationality dropdown selection, adding network_call extraction to capture clean API responses, and scrolling a popup with a Python script action). Includes the complete 10-node automation JSON with input_parameters: first_name, last_name, nationality, date_of_birth, document_number.",
+            "gist": "End-to-end example: I94 travel lookup automation with network_call extraction and Python script action.",
+            "keywords": [
+                "I94",
+                "data extraction",
+                "network_call",
+                "python_script_action",
+                "government",
+                "travel history",
+                "url_pattern",
+                "add_example.py",
+                "nationality"
+            ],
+            "document_type": "guide",
+            "tags": ["examples", "data-extraction", "network-call", "government"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-local-setup"],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "Uses network_call extraction type."
+                    },
+                    {
+                        "doc_id": "docs-getting-started-running-first-inference",
+                        "context": "Uses the /inference endpoint to run the automation."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["I94 government portal"],
+                "apis": ["/inference"],
+                "data_models": []
+            },
+            "reading_priority": 4,
+            "when_to_use": "Select when the query is about data extraction from government portals, network_call extraction pattern, Python script actions in practice, or a complete real-world automation example.",
+            "embedding_hint": "I94 government data extraction network_call python_script real-world example"
+        },
+        {
+            "id": "examples-fetching-cookies",
+            "path": "examples/fetching_cookies/fetching-cookies-and-local-session-storage.mdx",
+            "title": "Fetching Cookies and Local/Session Storage",
+            "summary": "Example showing how to capture browser cookies, localStorage, and sessionStorage after a login using the state extraction action. Includes a minimal state extraction node, a complete login-then-state-extract automation for dev.dashboard.optexity.com, and documents the full output (page_url, page_title, local_storage, session_storage, cookies, document_cookie). Useful for debugging auth flows and reusing session tokens.",
+            "gist": "State extraction example: capture cookies, localStorage, sessionStorage after login.",
+            "keywords": [
+                "cookies",
+                "localStorage",
+                "sessionStorage",
+                "state extraction",
+                "session tokens",
+                "auth",
+                "login",
+                "browser state",
+                "document_cookie"
+            ],
+            "document_type": "guide",
+            "tags": ["examples", "state-extraction", "cookies", "auth", "debugging"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "Uses the state extraction_action type."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": ["state extraction output"]
+            },
+            "reading_priority": 4,
+            "when_to_use": "Select when the query is about capturing browser cookies, session storage, local storage, or authentication tokens from a web page using state extraction.",
+            "embedding_hint": "cookies localStorage sessionStorage state extraction auth tokens browser storage"
+        },
+        {
+            "id": "examples-qa-testing-supabase-login",
+            "path": "examples/qa_testing/supabase-login.mdx",
+            "title": "QA Testing: Supabase Login Example",
+            "summary": "Example demonstrating automated QA testing using Optexity by automating Supabase login and verifying success with an assertion action. Covers recording the base workflow, adding an assertion_action with LLM-based extraction_instructions to verify login, and running via inference. Includes the complete automation JSON.",
+            "gist": "QA testing example: Supabase login automation with assertion_action to verify login success.",
+            "keywords": [
+                "QA testing",
+                "assertion",
+                "Supabase",
+                "login",
+                "verification",
+                "assertion_action",
+                "extraction_instructions",
+                "LLM assertion"
+            ],
+            "document_type": "guide",
+            "tags": ["examples", "QA", "testing", "assertion", "verification"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "Assertion uses LLM extraction for verification."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["Supabase"],
+                "apis": [],
+                "data_models": ["assertion_action"]
+            },
+            "reading_priority": 4,
+            "when_to_use": "Select when the query is about QA testing with Optexity, using assertion_action to verify automation outcomes, or building verification into automations.",
+            "embedding_hint": "QA testing assertion Supabase login verification LLM automation test"
+        },
+        {
+            "id": "examples-healthcare-peachstate-medicaid",
+            "path": "examples/healthcare/peachstate-medicaid.mdx",
+            "title": "Healthcare: Peachstate Medicaid Example",
+            "summary": "Advanced example automating Peachstate Medicaid insurance authorization lookup. Demonstrates building a for_loop_node to iterate over extracted authorization numbers (dynamically generated by LLM extraction), click-extract-go_back iteration patterns, and extracting multiple fields (Auth Nbr, End Date, Auth Type, Status, Units Approved, etc.). Input parameters include username, password, plan_type, member_id, dob.",
+            "gist": "Advanced healthcare automation: for_loop over dynamically extracted auth links with multi-field data extraction.",
+            "keywords": [
+                "healthcare",
+                "Medicaid",
+                "for_loop",
+                "authorization",
+                "LLM extraction",
+                "iteration",
+                "generated_parameters",
+                "output_variable_names",
+                "Peachstate"
+            ],
+            "document_type": "guide",
+            "tags": ["examples", "healthcare", "for-loop", "advanced", "data-extraction"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-for-loop-node",
+                        "context": "Uses for_loop_node for iterating over authorization links."
+                    },
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "Uses LLM extraction to build authorization_numbers list."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["Peachstate Medicaid"],
+                "apis": [],
+                "data_models": []
+            },
+            "reading_priority": 4,
+            "when_to_use": "Select when the query is about advanced for_loop patterns, iterating over dynamically extracted lists, healthcare portal automation, or multi-field data extraction in loops.",
+            "embedding_hint": "healthcare Medicaid for_loop dynamic extraction iteration authorization insurance"
+        }
+    ]
+}

@@ -26,6 +26,7 @@ from optexity.inference.core.logging import (
     save_trajectory_in_server,
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
+from optexity.inference.infra.browser_health import consume_browser_restart_request
 from optexity.schema.enums import ExitCodes
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import SystemInfo
@@ -41,6 +42,10 @@ class ChildProcessIdRequest(BaseModel):
     new_unique_child_arn: str
 
 
+class HumanInLoopCompletedBody(BaseModel):
+    task_id: str
+
+
 child_process_id = -1
 unique_child_arn: str = str(uuid.uuid4())
 task_running = False
@@ -50,6 +55,14 @@ tasks_to_kill: set[str] = set()
 # task_id -> worker subprocess, so /kill_task can signal an in-flight worker.
 running_task_processes: dict[str, asyncio.subprocess.Process] = {}
 _global_actual_browser: ActualBrowser | None = None
+
+# HITL: task_ids whose HITL step has been completed by the human.
+# Written by POST /human_in_loop_completed; read + cleared by GET /hitl_status.
+hitl_completed_tasks: set[str] = set()
+
+# Port this FastAPI server is listening on; set in get_app_with_endpoints so
+# it can be forwarded to worker subprocesses via CHILD_FASTAPI_PORT env var.
+_child_fastapi_port: int = -1
 
 
 def log_system_info(comment: str):
@@ -82,6 +95,17 @@ def log_system_info(comment: str):
     logger.info("=" * 100 + "\n")
 
 
+async def restart_global_actual_browser(reason: str) -> None:
+    global _global_actual_browser
+    logger.warning("Restarting actual browser: %s", reason)
+    if _global_actual_browser is not None:
+        try:
+            await _global_actual_browser.stop(graceful=True)
+        except Exception as e:
+            logger.warning("Error stopping browser during restart: %s", e)
+        _global_actual_browser = None
+
+
 async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int):
     global _global_actual_browser
     system_info = SystemInfo()
@@ -89,12 +113,34 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
         system_info.total_system_memory_used / system_info.total_system_memory > 0.6
     )
 
+    # Drain any pending restart flag first so it can't leak into a subsequent task
+    # if the global browser was already nulled out (e.g. by the outer-finally restart
+    # after WORKER_CRASHED / timeout, or by the retry path in _run_attempt).
+    restart_reason = consume_browser_restart_request(child_process_id)
+    if restart_reason and _global_actual_browser is None:
+        logger.info(
+            "Discarding stale browser restart request (browser already absent): %s",
+            restart_reason[:500],
+        )
+        restart_reason = None
+
     if _global_actual_browser is not None:
 
         restart_browser = False
+        if restart_reason:
+            logger.info(
+                "Worker requested browser restart before task: %s", restart_reason[:500]
+            )
+            restart_browser = True
+
         if not await _global_actual_browser.check_browser_alive():
             logger.info("CDP is not alive, restarting browser")
             restart_browser = True
+
+        if task.is_dedicated and not restart_browser:
+            if not await _global_actual_browser.check_browser_session_healthy():
+                logger.info("Dedicated browser session unhealthy, restarting browser")
+                restart_browser = True
 
         if memory_exceeded:
             logger.info("Memory exceeded, restarting browser")
@@ -105,8 +151,9 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             restart_browser = True
 
         if restart_browser:
-            await _global_actual_browser.stop(graceful=True)
-            _global_actual_browser = None
+            await restart_global_actual_browser(
+                restart_reason or "setup_browser health check"
+            )
 
     if _global_actual_browser is None:
         logger.info("Starting new actual browser")
@@ -122,6 +169,7 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             ),
             os_emulation=task.automation.os_emulation,
             rdp_parameter=task.rdp_parameter,
+            allow_cookies=task.automation.allow_cookies,
         )
         try:
             await _global_actual_browser.start()
@@ -181,6 +229,11 @@ async def run_automation_in_process(
             str(_cdp_url) if _cdp_url is not None else "None",
             str(attempts_left),
             preexec_fn=os.setsid,
+            env={
+                **os.environ,
+                "CHILD_FASTAPI_PORT": str(_child_fastapi_port),
+                "CHILD_PROCESS_ID": str(child_process_id),
+            },
         )
         running_task_processes[task.task_id] = proc
 
@@ -210,7 +263,7 @@ async def run_automation_in_process(
                         task, None, child_process_id, unique_child_arn
                     )
                     await initiate_callback(task)
-            returncode = -1
+                returncode = -1
         finally:
             running_task_processes.pop(task.task_id, None)
 
@@ -250,13 +303,24 @@ async def run_automation_in_process(
 
         return await _run_attempt(attempt_index + 1)
 
+    returncode: int | None = None
     try:
-        return await _run_attempt(0)
+        returncode = await _run_attempt(0)
     finally:
         logger.info(
             f"---------- Automation for task {task.task_id} finished ----------\n"
         )
         log_system_info("Memory info after automation finished in process")
+
+        if (
+            task.is_dedicated
+            and returncode in (ExitCodes.WORKER_CRASHED.value, -1)
+            and _global_actual_browser is not None
+        ):
+            reason = "timeout" if returncode == -1 else "worker crash"
+            await restart_global_actual_browser(
+                f"dedicated browser restart after {reason} on task {task.task_id}"
+            )
 
         if _global_actual_browser is not None and not task.is_dedicated:
             logger.debug("Stopping actual browser as not dedicated")
@@ -319,29 +383,41 @@ async def register_with_master():
     my_ip = metadata["Containers"][0]["Networks"][0]["IPv4Addresses"][0]
 
     my_port = None
+    my_stream_port = None
     for binding in metadata["Containers"][0].get("NetworkBindings", []):
         if binding["containerPort"] == settings.CHILD_PORT_OFFSET:
             my_port = binding["hostPort"]
-            break
+        elif binding["containerPort"] == settings.WEBSOCKIFY_PORT:
+            my_stream_port = binding["hostPort"]
 
     if not my_port:
         logger.error("Could not find host port binding")
         raise ValueError("Host port not found in metadata")
 
+    if not my_stream_port:
+        logger.error("Could not find stream port binding")
+        raise ValueError("Stream port not found in metadata")
+
     # Register with master
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
             f"http://{settings.SERVER_URL}/register_child",
-            json={"task_arn": my_task_arn, "private_ip": my_ip, "port": my_port},
+            json={
+                "task_arn": my_task_arn,
+                "private_ip": my_ip,
+                "port": my_port,
+                "stream_port": my_stream_port,
+            },
         )
         response.raise_for_status()
 
     logger.info(f"Registered with master: {response.json()}")
 
 
-def get_app_with_endpoints(is_aws: bool, child_id: int):
-    global child_process_id
+def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
+    global child_process_id, _child_fastapi_port
     child_process_id = child_id
+    _child_fastapi_port = port
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -381,6 +457,20 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
         """Is task running endpoint."""
         return task_running
 
+    @app.post("/human_in_loop_completed")
+    async def human_in_loop_completed_child(body: HumanInLoopCompletedBody = Body(...)):
+        """Called by opcloud when the human has finished the HITL step."""
+        hitl_completed_tasks.add(body.task_id)
+        return JSONResponse({"success": True})
+
+    @app.get("/hitl_status")
+    async def hitl_status(task_id: str):
+        """Polled by the worker subprocess every 5 seconds during HITL pause."""
+        completed = task_id in hitl_completed_tasks
+        if completed:
+            hitl_completed_tasks.discard(task_id)
+        return {"completed": completed}
+
     @app.post("/kill_task")
     async def kill_task(task_id: str = Body(...)):
         """Kill task endpoint.
@@ -391,6 +481,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int):
           its process group so the worker exits promptly.
         """
         tasks_to_kill.add(task_id)
+        hitl_completed_tasks.discard(task_id)
         proc = running_task_processes.get(task_id)
         if proc is not None and proc.returncode is None:
             try:
@@ -542,7 +633,9 @@ def main():
 
     args = parser.parse_args()
 
-    app = get_app_with_endpoints(is_aws=args.is_aws, child_id=args.child_process_id)
+    app = get_app_with_endpoints(
+        is_aws=args.is_aws, child_id=args.child_process_id, port=args.port
+    )
 
     # Start the server (this is blocking and manages its own event loop)
     logger.info(f"Starting server on {args.host}:{args.port}")
