@@ -204,7 +204,9 @@ class ActualBrowser:
             "--remote-debugging-address=127.0.0.1",
             # "--user-data-dir=\"/tmp/optexity_chrome_cdp\"",
             "--profile-directory=Default",
-            # "--disable-blink-features=AutomationControlled",
+            "--disable-blink-features=AutomationControlled",
+            "--lang=en-US,en",
+            "--accept-lang=en-US,en",
             "--no-first-run",
             "--no-default-browser-check",
             "--kiosk-printing",
@@ -334,6 +336,9 @@ class ActualBrowser:
                     proxy=self.get_proxy_playwright(),  # type: ignore
                     env=env,
                 )
+                from optexity.inference.infra.stealth import STEALTH_SCRIPT
+
+                await self.context.add_init_script(STEALTH_SCRIPT)
                 self.cdp_url = f"http://localhost:{self.port}"
 
                 await self._wait_for_cdp()

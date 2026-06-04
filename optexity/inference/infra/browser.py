@@ -70,6 +70,9 @@ class Browser:
             self.playwright = await async_playwright().start()
             self.browser = await self.playwright.chromium.connect_over_cdp(self.cdp_url)
             self.context = self.browser.contexts[0]
+            from optexity.inference.infra.stealth import STEALTH_SCRIPT
+
+            await self.context.add_init_script(STEALTH_SCRIPT)
             if self.context is None:
                 raise ValueError("Context is not set")
             if len(self.context.pages) == 0:
