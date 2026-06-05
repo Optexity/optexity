@@ -336,9 +336,6 @@ class ActualBrowser:
                     proxy=self.get_proxy_playwright(),  # type: ignore
                     env=env,
                 )
-                from optexity.inference.infra.stealth import STEALTH_SCRIPT
-
-                await self.context.add_init_script(STEALTH_SCRIPT)
                 self.cdp_url = f"http://localhost:{self.port}"
 
                 await self._wait_for_cdp()
