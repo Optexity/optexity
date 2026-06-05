@@ -1,4 +1,10 @@
 STEALTH_SCRIPT = """
+// Only patch the top-level frame. Cross-origin iframes (reCAPTCHA, Stripe, etc.)
+// throw SecurityError on window.top access — we catch that and bail out.
+// Without this guard our Object.defineProperty calls break captcha internals.
+(function() {
+try { if (window.self !== window.top) return; } catch (_) { return; }
+
 // Remove webdriver flag
 Object.defineProperty(navigator, 'webdriver', {
   get: () => undefined,
@@ -23,17 +29,20 @@ if (!window.chrome) {
 }
 
 // Make navigator.plugins non-empty (real browsers have 3+ plugins)
-Object.defineProperty(navigator, 'plugins', {
-  get: () => {
-    const ps = [
-      { name: 'Chrome PDF Plugin', description: 'Portable Document Format', filename: 'internal-pdf-viewer', length: 1 },
-      { name: 'Chrome PDF Viewer', description: '', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', length: 1 },
-      { name: 'Native Client', description: '', filename: 'internal-nacl-plugin', length: 2 }
-    ];
-    ps[Symbol.iterator] = Array.prototype[Symbol.iterator].bind(ps);
-    return ps;
-  }
-});
+try {
+  Object.defineProperty(navigator, 'plugins', {
+    get: () => {
+      const ps = [
+        { name: 'Chrome PDF Plugin', description: 'Portable Document Format', filename: 'internal-pdf-viewer', length: 1 },
+        { name: 'Chrome PDF Viewer', description: '', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', length: 1 },
+        { name: 'Native Client', description: '', filename: 'internal-nacl-plugin', length: 2 }
+      ];
+      ps[Symbol.iterator] = Array.prototype[Symbol.iterator].bind(ps);
+      return ps;
+    },
+    configurable: true
+  });
+} catch(_) {}
 
 // Fix navigator.languages (empty in automation = instant flag)
 Object.defineProperty(navigator, 'languages', {
@@ -49,4 +58,6 @@ try {
       ? Promise.resolve({ state: Notification.permission })
       : origQuery(params);
 } catch(_) {}
+
+})();
 """
