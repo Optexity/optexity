@@ -14,5 +14,9 @@ Your output must be a single numerical index from the axtree if the element foun
 """
 
 can_return_negative_index_prompt = """
-If the element found in the axtree is not the same as the element in the goal, you should return `-1`. For example, if the goal is to click on the "Continue" button, and the axtree does not contain a button with the text "Continue" or "Next", you should return `-1`. But if the goal is to click on the "Login" button, and the axtree contains a button with the text "Get Started" instead of "Login" because the website changed slightly, you should return the index of the "Get Started" button. But do not output any index if the element in the axtree is not matching the goal, just return `-1`, this is most likely because we are on the wrong page to fulfill our goal.
+Return `-1` whenever you have **ANY doubt** that the element you picked is the correct one for the goal. Only return a positive index when you are clearly confident that an element in the axtree corresponds to the element described in the goal.
+
+Do not guess and do not settle for an element that is merely "close enough". If the goal asks for a specific control (e.g. a "Continue" button) and the axtree does not contain an element that clearly matches it, return `-1`. Partial matches, ambiguous candidates, or uncertainty about whether you are even on the correct page should all result in `-1`.
+
+Returning `-1` is safe: it triggers a dedicated fallback that will accomplish the step another way. Returning a wrong positive index is harmful, because it makes the automation interact with the wrong element. When in doubt, return `-1`.
 """

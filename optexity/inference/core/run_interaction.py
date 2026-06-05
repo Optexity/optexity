@@ -9,6 +9,9 @@ from optexity.exceptions import (
     ElementNotFoundInAxtreeException,
 )
 from optexity.inference.agents.error_handler.error_handler import ErrorHandlerAgent
+from optexity.inference.core.interaction.agentic_fallback import (
+    run_axtree_fallback_agent,
+)
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
 from optexity.inference.core.interaction.handle_check import (
     handle_check_element,
@@ -158,7 +161,11 @@ async def run_interaction_action(
             await handle_key_press(interaction_action.key_press, memory, browser)
         elif interaction_action.scroll:
             await handle_scroll(interaction_action.scroll, memory, browser)
-    except (AssertLocatorPresenceException, ElementNotFoundInAxtreeException) as e:
+    except ElementNotFoundInAxtreeException as e:
+        await handle_element_not_found_in_axtree(
+            e, interaction_action, task, memory, browser
+        )
+    except AssertLocatorPresenceException as e:
         await handle_assert_locator_presence_error(
             e, interaction_action, task, memory, browser, retries_left
         )
@@ -266,6 +273,67 @@ async def handle_download_url_as_pdf(
         await f.write(content)
 
     memory.downloads.append(download_path)
+
+
+async def handle_element_not_found_in_axtree(
+    error: ElementNotFoundInAxtreeException,
+    interaction_action: InteractionAction,
+    task: Task,
+    memory: Memory,
+    browser: Browser,
+):
+    """Axtree locator returned -1 (not confident). Hand this single step to a
+    general agentic fallback, then treat the node as completed.
+
+    The deterministic locator is intentionally strict (any doubt -> -1), so a -1
+    means "let the agent figure this step out" rather than "fail". We do not
+    re-predict afterwards: once the agent stops, the node is considered done.
+    """
+    logger.warning(
+        f"Element not found in axtree (-1) for goal '{error.command}' at node "
+        f"{memory.automation_state.step_index}; running agentic fallback."
+    )
+    try:
+        history = await run_axtree_fallback_agent(
+            interaction_action, error, task, memory, browser
+        )
+    except Exception as agent_error:
+        # The agent infrastructure itself failed (not just "couldn't do it").
+        # Surface the original failure rather than silently skipping the step.
+        logger.error(
+            f"Agentic fallback crashed for node {memory.automation_state.step_index}: "
+            f"{agent_error}"
+        )
+        raise error
+
+    # The agent ran. Distinguish "did the step" from "gave up after max_steps":
+    # agent.run() does NOT raise when it simply fails to accomplish the task, so
+    # without this check a failed step would be silently marked completed.
+    step_index = memory.automation_state.step_index
+    succeeded = None
+    try:
+        succeeded = history.is_successful() if history is not None else None
+    except Exception as e:
+        logger.error(
+            f"Could not read agentic fallback result for node {step_index}: {e}"
+        )
+
+    if succeeded is True:
+        logger.info(
+            f"Agentic fallback succeeded for node {step_index}; marking node completed."
+        )
+        return
+
+    # Per design we still continue (resilience), but the failure must be visible
+    # rather than silently swallowed.
+    reason = f"Agentic fallback did not confirm success for goal '{error.command}'"
+    logger.warning(
+        f"{reason} at node {step_index} (is_successful={succeeded}); "
+        f"continuing to next node anyway."
+    )
+    memory.variables.output_data.append(
+        OutputData(unique_identifier="agentic_fallback_unconfirmed", text=reason)
+    )
 
 
 async def handle_assert_locator_presence_error(
