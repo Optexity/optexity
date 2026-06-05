@@ -227,6 +227,11 @@ async def click_locator(
                 )
             else:
                 await page.mouse.click(x, y)
+        try:
+            await locator.hover(timeout=max_timeout_seconds_per_try * 1000)
+            await asyncio.sleep(0.4)
+        except Exception:
+            pass
         if click_element_action.double_click:
             await locator.dblclick(
                 no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000
