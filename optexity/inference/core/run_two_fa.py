@@ -51,7 +51,12 @@ async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory, task: Ta
 
     while elapsed < two_fa_action.max_wait_time:
         messages = await fetch_messages(
-            two_fa_action.action, memory, two_fa_action.max_wait_time, task
+            two_fa_action.action,
+            memory,
+            two_fa_action.max_wait_time,
+            task,
+            two_fa_action.start_2fa_time_offset_minutes,
+            two_fa_action.end_2fa_time_offset_minutes,
         )
         if messages and len(messages) > 0:
             final_prompt, response, token_usage = _get_two_fa_agent(task).extract_code(
@@ -98,11 +103,16 @@ async def fetch_messages(
     memory: Memory,
     max_wait_time: float,
     task: Task,
+    start_2fa_time_offset_minutes: float = 0.0,
+    end_2fa_time_offset_minutes: float = 0.0,
 ):
 
-    start_2fa_time = memory.automation_state.start_2fa_time
-    end_2fa_time = memory.automation_state.start_2fa_time + timedelta(
-        seconds=max_wait_time
+    base_2fa_time = memory.automation_state.start_2fa_time
+    start_2fa_time = base_2fa_time - timedelta(minutes=start_2fa_time_offset_minutes)
+    end_2fa_time = (
+        base_2fa_time
+        + timedelta(seconds=max_wait_time)
+        + timedelta(minutes=end_2fa_time_offset_minutes)
     )
 
     headers = {"x-api-key": task.api_key}
