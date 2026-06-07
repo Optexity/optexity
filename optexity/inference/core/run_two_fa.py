@@ -68,7 +68,7 @@ async def run_two_fa_action(two_fa_action: TwoFAAction, memory: Memory, task: Ta
                 if isinstance(response.code, str):
                     code = response.code
                 elif isinstance(response.code, list):
-                    if len(response.code) > 0:
+                    if len(response.code) > 1:
                         raise ValueError(f"Multiple 2FA codes found, {response.code}")
                     else:
                         code = response.code[0]
