@@ -1,7 +1,8 @@
 import asyncio
 import logging
+import random
 
-from playwright.async_api import Locator
+from playwright.async_api import Locator, Page
 
 from optexity.exceptions import AssertLocatorPresenceException
 from optexity.inference.core.interaction.handle_select_utils import (
@@ -26,6 +27,22 @@ from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
+
+
+async def _humanize_pointer(page: Page, target_x: float, target_y: float) -> None:
+    start_x = target_x + random.uniform(-180, 180)
+    start_y = target_y + random.uniform(-140, 140)
+    mid_x = (start_x + target_x) / 2 + random.uniform(-40, 40)
+    mid_y = (start_y + target_y) / 2 + random.uniform(-40, 40)
+    try:
+        await page.mouse.move(start_x, start_y, steps=random.randint(6, 12))
+        await asyncio.sleep(random.uniform(0.05, 0.18))
+        await page.mouse.move(mid_x, mid_y, steps=random.randint(6, 12))
+        await asyncio.sleep(random.uniform(0.05, 0.18))
+        await page.mouse.move(target_x, target_y, steps=random.randint(8, 16))
+        await asyncio.sleep(random.uniform(0.08, 0.22))
+    except Exception:
+        pass
 
 
 async def command_based_action_with_retry(
@@ -196,27 +213,7 @@ async def click_locator(
             x = float(bbox["x"]) + dx
             y = float(bbox["y"]) + dy
 
-            # TODO: Remove this later
-            # Lightweight visual marker for debugging coordinate clicks.
-            await page.evaluate(
-                """([x, y]) => {
-                    const el = document.createElement('div');
-                    el.id = '__optexity_click_marker';
-                    el.style.position = 'fixed';
-                    el.style.left = `${x - 8}px`;
-                    el.style.top = `${y - 8}px`;
-                    el.style.width = '16px';
-                    el.style.height = '16px';
-                    el.style.border = '2px solid red';
-                    el.style.borderRadius = '50%';
-                    el.style.background = 'rgba(255,0,0,0.25)';
-                    el.style.zIndex = '2147483647';
-                    el.style.pointerEvents = 'none';
-                    document.body.appendChild(el);
-                    setTimeout(() => el.remove(), 800);
-                }""",
-                [x, y],
-            )
+            await _humanize_pointer(page, x, y)
 
             if click_element_action.double_click:
                 await page.mouse.dblclick(
@@ -227,9 +224,16 @@ async def click_locator(
                 )
             else:
                 await page.mouse.click(x, y)
+
+        hover_page = await browser.get_current_page()
+        hover_bbox = await locator.bounding_box()
+        if hover_page is not None and hover_bbox is not None:
+            target_x = float(hover_bbox["x"]) + float(hover_bbox["width"]) / 2
+            target_y = float(hover_bbox["y"]) + float(hover_bbox["height"]) / 2
+            await _humanize_pointer(hover_page, target_x, target_y)
         try:
             await locator.hover(timeout=max_timeout_seconds_per_try * 1000)
-            await asyncio.sleep(0.4)
+            await asyncio.sleep(random.uniform(0.25, 0.85))
         except Exception:
             pass
         if click_element_action.double_click:
@@ -276,7 +280,7 @@ async def input_text_locator(
             return
         for char in input_text_action.input_text:
             await page.keyboard.press(char)
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(random.uniform(0.04, 0.18))
 
     if input_text_action.press_enter:
         await locator.press("Enter")

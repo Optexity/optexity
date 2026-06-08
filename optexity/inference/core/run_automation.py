@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import random
 import re
 import shutil
 import time
@@ -85,7 +86,14 @@ async def run_automation(
         memory.update_system_info()
 
         def _get_browser():
-            return Browser(memory=memory, cdp_url=cdp_url)
+            return Browser(
+                memory=memory,
+                cdp_url=cdp_url,
+                use_proxy=task.use_proxy,
+                proxy_session_id=task.proxy_session_id(
+                    settings.PROXY_PROVIDER if task.use_proxy else None
+                ),
+            )
 
         browser = _get_browser()
         memory.update_system_info()
@@ -134,6 +142,24 @@ async def run_automation(
 
         await browser.go_to_url(task.automation.url, retry_count=3)
         memory.update_system_info()
+
+        warmup_page = await browser.get_current_page()
+        if warmup_page is not None:
+            try:
+                await asyncio.sleep(random.uniform(0.8, 1.6))
+                for x, y in [(420, 300), (780, 480), (650, 620)]:
+                    await warmup_page.mouse.move(
+                        x + random.randint(-30, 30),
+                        y + random.randint(-30, 30),
+                        steps=12,
+                    )
+                    await asyncio.sleep(random.uniform(0.12, 0.30))
+                await warmup_page.mouse.wheel(0, 220)
+                await asyncio.sleep(random.uniform(0.25, 0.55))
+                await warmup_page.mouse.wheel(0, -220)
+                await asyncio.sleep(random.uniform(0.4, 0.9))
+            except Exception as warmup_err:
+                logger.debug(f"page warmup skipped: {warmup_err}")
 
         full_automation = []
 

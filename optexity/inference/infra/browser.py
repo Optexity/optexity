@@ -16,6 +16,7 @@ from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import Download, Locator, Page, Request, Response
 
+from optexity.inference.infra.utils import build_proxy_settings, setup_proxy_auth_cdp
 from optexity.schema.memory import Memory, NetworkRequest, NetworkResponse
 from optexity.utils.settings import settings
 
@@ -29,10 +30,15 @@ class Browser:
         cdp_url: str,
         stealth: bool = True,
         backend: Literal["browser-use", "browserbase"] = "browser-use",
+        use_proxy: bool = False,
+        proxy_session_id: str | None = None,
     ):
 
         self.stealth = stealth
         self.backend = backend
+        self.use_proxy = use_proxy
+        self.proxy_session_id = proxy_session_id
+        self._proxy_auth_cdp_sessions: list = []
 
         self.playwright: (
             playwright.async_api.Playwright | patchright.async_api.Playwright | None
@@ -123,6 +129,18 @@ class Browser:
 
             await self.backend_agent.browser_session.start()
 
+            # Intercept proxy 407 challenges on THIS connection (the one that
+            # actually navigates) so Chrome never shows the native auth popup.
+            if self.use_proxy:
+                proxy = build_proxy_settings(self.use_proxy, self.proxy_session_id)
+                if proxy and proxy.get("username") and proxy.get("password"):
+                    await setup_proxy_auth_cdp(
+                        self.context,
+                        proxy["username"],  # type: ignore[arg-type]
+                        proxy["password"],  # type: ignore[arg-type]
+                        self._proxy_auth_cdp_sessions,
+                    )
+
             shutil.rmtree(self.temp_downloads_dir, ignore_errors=True)
             os.makedirs(self.temp_downloads_dir, exist_ok=True)
 
@@ -150,6 +168,13 @@ class Browser:
             raise e
 
     async def stop(self, force: bool = False):
+
+        for session in self._proxy_auth_cdp_sessions:
+            try:
+                await session.detach()
+            except Exception:
+                pass
+        self._proxy_auth_cdp_sessions.clear()
 
         if self._download_cdp_session is not None:
             try:
