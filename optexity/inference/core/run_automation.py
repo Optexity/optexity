@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import random
 import re
 import shutil
 import time
@@ -58,6 +59,139 @@ from optexity.inference.infra.browser_health import (
     request_browser_restart,
 )
 
+_COUNTRY_TO_LOCALE = {
+    "US": "en-US",
+    "GB": "en-GB",
+    "UK": "en-GB",
+    "CA": "en-CA",
+    "AU": "en-AU",
+    "DE": "de-DE",
+    "FR": "fr-FR",
+    "ES": "es-ES",
+    "IT": "it-IT",
+    "JP": "ja-JP",
+    "IN": "en-IN",
+    "BR": "pt-BR",
+    "MX": "es-MX",
+    "NL": "nl-NL",
+}
+
+_COUNTRY_TO_TZ = {
+    "US": "America/New_York",
+    "GB": "Europe/London",
+    "UK": "Europe/London",
+    "CA": "America/Toronto",
+    "AU": "Australia/Sydney",
+    "DE": "Europe/Berlin",
+    "FR": "Europe/Paris",
+    "ES": "Europe/Madrid",
+    "IT": "Europe/Rome",
+    "JP": "Asia/Tokyo",
+    "IN": "Asia/Kolkata",
+    "BR": "America/Sao_Paulo",
+    "MX": "America/Mexico_City",
+    "NL": "Europe/Amsterdam",
+}
+
+# Country -> reasonable city-center (lat, lon). Used as a fallback when the
+# IP-info probe doesn't return coordinates; the exact city isn't important to
+# reCAPTCHA v3, what matters is that the JS-visible geolocation is consistent
+# with the proxy IP's country.
+_COUNTRY_TO_LATLON: dict[str, tuple[float, float]] = {
+    "US": (40.7128, -74.0060),  # New York
+    "GB": (51.5074, -0.1278),  # London
+    "UK": (51.5074, -0.1278),
+    "CA": (43.6532, -79.3832),  # Toronto
+    "AU": (-33.8688, 151.2093),  # Sydney
+    "DE": (52.5200, 13.4050),  # Berlin
+    "FR": (48.8566, 2.3522),  # Paris
+    "ES": (40.4168, -3.7038),  # Madrid
+    "IT": (41.9028, 12.4964),  # Rome
+    "JP": (35.6762, 139.6503),  # Tokyo
+    "IN": (12.9716, 77.5946),  # Bangalore
+    "BR": (-23.5505, -46.6333),  # São Paulo
+    "MX": (19.4326, -99.1332),  # Mexico City
+    "NL": (52.3676, 4.9041),  # Amsterdam
+}
+
+
+def _country_to_locale(country: object) -> str | None:
+    if not isinstance(country, str):
+        return None
+    return _COUNTRY_TO_LOCALE.get(country.upper())
+
+
+def _deep_find(obj: object, keys: tuple[str, ...]) -> object | None:
+    """Depth-first scan for the first non-empty value at any of ``keys``.
+
+    ip.oxylabs.io/location nests fields under ``providers.{ip2location,maxmind,
+    dbip}.*`` rather than at the top level, so a flat ``.get()`` returns None
+    even when the data is right there. This walker is the cheapest way to
+    accept whichever provider responded without hard-coding the path.
+    """
+    stack: list[object] = [obj]
+    seen_ids: set[int] = set()
+    while stack:
+        cur = stack.pop()
+        if id(cur) in seen_ids:
+            continue
+        seen_ids.add(id(cur))
+        if isinstance(cur, dict):
+            for k in keys:
+                v = cur.get(k)
+                if v not in (None, "", {}):
+                    return v
+            stack.extend(cur.values())
+        elif isinstance(cur, list):
+            stack.extend(cur)
+    return None
+
+
+def _extract_geo_from_ip_info(
+    ip_info: object,
+) -> tuple[str | None, tuple[float, float] | None, str | None]:
+    """Pull (timezone, (lat, lon), country) from an ip.oxylabs.io/location body.
+
+    Falls back to the static PROXY_COUNTRY map when the probe response is
+    unparseable or missing fields — reCAPTCHA v3 only needs the JS-visible
+    overrides to be *consistent* with the proxy IP's country, not perfectly
+    pinpoint-accurate.
+    """
+    tz_id: str | None = None
+    latlon: tuple[float, float] | None = None
+    country: str | None = None
+
+    # 1) try whatever the probe returned (handles both flat and providers.* shapes)
+    tz_candidate = _deep_find(ip_info, ("timezone", "time_zone", "tz"))
+    if isinstance(tz_candidate, str) and "/" in tz_candidate:
+        tz_id = tz_candidate
+
+    lat_candidate = _deep_find(ip_info, ("latitude", "lat"))
+    lon_candidate = _deep_find(ip_info, ("longitude", "lon", "lng"))
+    try:
+        if lat_candidate is not None and lon_candidate is not None:
+            latlon = (float(lat_candidate), float(lon_candidate))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        latlon = None
+
+    country_candidate = _deep_find(ip_info, ("country_code", "countryCode", "country"))
+    if isinstance(country_candidate, str):
+        cc = country_candidate.strip().upper()
+        # ip2location-style returns "US"; some providers return "United States"
+        if len(cc) == 2:
+            country = cc
+
+    # 2) static fallback from the configured proxy country
+    fallback_cc = (settings.PROXY_COUNTRY or "").upper()
+    if country is None and fallback_cc:
+        country = fallback_cc
+    if tz_id is None and country:
+        tz_id = _COUNTRY_TO_TZ.get(country)
+    if latlon is None and country:
+        latlon = _COUNTRY_TO_LATLON.get(country)
+
+    return tz_id, latlon, country
+
 
 async def run_automation(
     task: Task,
@@ -85,7 +219,14 @@ async def run_automation(
         memory.update_system_info()
 
         def _get_browser():
-            return Browser(memory=memory, cdp_url=cdp_url)
+            return Browser(
+                memory=memory,
+                cdp_url=cdp_url,
+                use_proxy=task.use_proxy,
+                proxy_session_id=task.proxy_session_id(
+                    settings.PROXY_PROVIDER if task.use_proxy else None
+                ),
+            )
 
         browser = _get_browser()
         memory.update_system_info()
@@ -132,8 +273,46 @@ async def run_automation(
                 except Exception as e:
                     logger.error(f"Error getting IP info: {e}")
 
+            tz_id, latlon, resolved_country = _extract_geo_from_ip_info(ip_info)
+            country_locale = _country_to_locale(resolved_country)
+            if tz_id or latlon or country_locale:
+                lat, lon = latlon if latlon else (None, None)
+                logger.info(
+                    f"Applying geo overrides: country={resolved_country} tz={tz_id} locale={country_locale} lat={lat} lon={lon}"
+                )
+                await browser.apply_geo_overrides(
+                    timezone_id=tz_id,
+                    locale=country_locale,
+                    latitude=lat,
+                    longitude=lon,
+                )
+
+            # Pre-warm Google trust on the proxy IP so reCAPTCHA v3 sees first-
+            # party Google cookies when the target page loads. Fresh residential
+            # IP + fresh profile + no prior Google contact ≈ guaranteed low v3 score.
+            logger.info("Priming Google trust before target navigation")
+            await browser.prime_google_trust()
+
         await browser.go_to_url(task.automation.url, retry_count=3)
         memory.update_system_info()
+
+        warmup_page = await browser.get_current_page()
+        if warmup_page is not None:
+            try:
+                await asyncio.sleep(random.uniform(0.8, 1.6))
+                for x, y in [(420, 300), (780, 480), (650, 620)]:
+                    await warmup_page.mouse.move(
+                        x + random.randint(-30, 30),
+                        y + random.randint(-30, 30),
+                        steps=12,
+                    )
+                    await asyncio.sleep(random.uniform(0.12, 0.30))
+                await warmup_page.mouse.wheel(0, 220)
+                await asyncio.sleep(random.uniform(0.25, 0.55))
+                await warmup_page.mouse.wheel(0, -220)
+                await asyncio.sleep(random.uniform(0.4, 0.9))
+            except Exception as warmup_err:
+                logger.debug(f"page warmup skipped: {warmup_err}")
 
         full_automation = []
 

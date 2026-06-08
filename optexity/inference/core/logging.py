@@ -227,6 +227,18 @@ async def save_downloads_in_server(task: Task, memory: Memory):
 
 async def save_trajectory_in_server(task: Task):
     try:
+        proxy_debug_lines = (
+            "\n--- proxy_debug ---\n"
+            f"PROXY_URL={settings.PROXY_URL}\n"
+            f"PROXY_PROVIDER={settings.PROXY_PROVIDER}\n"
+            f"PROXY_COUNTRY={settings.PROXY_COUNTRY}\n"
+            f"PROXY_USERNAME={'set' if settings.PROXY_USERNAME else None}\n"
+            f"PROXY_PASSWORD={'set' if settings.PROXY_PASSWORD else None}\n"
+            "-------------------\n"
+        )
+        async with aiofiles.open(task.log_file_path, "a") as f:
+            await f.write(proxy_debug_lines)
+
         url = urljoin(settings.SERVER_URL, settings.SAVE_TRAJECTORY_ENDPOINT)
         headers = {"x-api-key": task.api_key}
 

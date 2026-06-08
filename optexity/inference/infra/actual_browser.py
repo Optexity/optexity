@@ -12,7 +12,11 @@ from typing import Literal
 import aiohttp
 from playwright.async_api import ProxySettings
 
-from optexity.inference.infra.utils import _download_extension, _extract_extension
+from optexity.inference.infra.utils import (
+    _download_extension,
+    _extract_extension,
+    build_proxy_settings,
+)
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -181,7 +185,10 @@ class ActualBrowser:
             # ---- security / isolation (Playwright parity)
             # "--disable-site-isolation-trials",
             # "--disable-web-security",
-            "--disable-features=IsolateOrigins,site-per-process",
+            "--disable-features=IsolateOrigins,site-per-process,AutomationControlled",
+            "--enable-features=NetworkService,NetworkServiceInProcess",
+            "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+            "--webrtc-ip-handling-policy=disable_non_proxied_udp",
             "--allow-running-insecure-content",
             # "--ignore-certificate-errors",
             "--ignore-ssl-errors",
@@ -204,7 +211,9 @@ class ActualBrowser:
             "--remote-debugging-address=127.0.0.1",
             # "--user-data-dir=\"/tmp/optexity_chrome_cdp\"",
             "--profile-directory=Default",
-            # "--disable-blink-features=AutomationControlled",
+            "--disable-blink-features=AutomationControlled",
+            "--lang=en-US,en",
+            "--accept-lang=en-US,en",
             "--no-first-run",
             "--no-default-browser-check",
             "--kiosk-printing",
@@ -238,7 +247,6 @@ class ActualBrowser:
             if self.headless:
                 args.append("--headless=new")
             proxy = self.get_proxy_args_native()
-            print(f"Proxy args: {proxy}")
             args += proxy
 
         if self.os_emulation:
@@ -331,7 +339,11 @@ class ActualBrowser:
                     args=self.get_args(),
                     chromium_sandbox=False,
                     no_viewport=True,
-                    proxy=self.get_proxy_playwright(),  # type: ignore
+                    # Server-only: stripping credentials here prevents Playwright
+                    # from installing its own competing 407 auth handler. The 407
+                    # is intercepted on the navigating connection in browser.py
+                    # (see Browser.start -> setup_proxy_auth_cdp).
+                    proxy=self.get_launch_proxy(),  # type: ignore
                     env=env,
                 )
                 self.cdp_url = f"http://localhost:{self.port}"
@@ -520,28 +532,16 @@ class ActualBrowser:
         return [f"--proxy-server={proxy.get('server')}"]
 
     def get_proxy_playwright(self) -> ProxySettings | None:
+        return build_proxy_settings(self.use_proxy, self.proxy_session_id)
 
-        if self.use_proxy:
-            if settings.PROXY_URL is None:
-                raise ValueError("PROXY_URL is not set")
-            proxy = {"server": settings.PROXY_URL}
-            if settings.PROXY_USERNAME is not None:
-                if settings.PROXY_PROVIDER == "oxylabs":
-                    assert settings.PROXY_USERNAME, "PROXY_USERNAME is not set"
-                    assert settings.PROXY_PASSWORD, "PROXY_PASSWORD is not set"
+    def get_launch_proxy(self) -> ProxySettings | None:
+        """Launch-time proxy with credentials stripped (server only).
 
-                    proxy["username"] = (
-                        f"customer-{settings.PROXY_USERNAME}-cc-{settings.PROXY_COUNTRY}-sessid-{self.proxy_session_id}-sesstime-10"
-                    )
-                elif settings.PROXY_PROVIDER == "brightdata":
-
-                    proxy["username"] = (
-                        f"{settings.PROXY_USERNAME}-session-{self.proxy_session_id}"
-                    )
-
-                else:
-                    proxy["username"] = settings.PROXY_USERNAME
-
-            if settings.PROXY_PASSWORD is not None:
-                proxy["password"] = settings.PROXY_PASSWORD
-            return ProxySettings(**proxy)
+        Proxy 407 auth is handled on the navigating connection in browser.py;
+        keeping credentials out of the launch proxy avoids a competing
+        Playwright-native auth handler that would race ours.
+        """
+        proxy = self.get_proxy_playwright()
+        if proxy is None:
+            return None
+        return ProxySettings(server=proxy["server"])
