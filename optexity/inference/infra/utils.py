@@ -19,6 +19,13 @@ def build_proxy_settings(
     Shared by ActualBrowser (Chrome launch) and Browser (CDP auth interception)
     so the Oxylabs/Brightdata username format stays in one place.
     """
+    logger.info(
+        f"build_proxy_settings called: use_proxy={use_proxy}, session_id={proxy_session_id}, "
+        f"PROXY_URL={settings.PROXY_URL}, PROXY_PROVIDER={settings.PROXY_PROVIDER}, "
+        f"PROXY_COUNTRY={settings.PROXY_COUNTRY}, "
+        f"PROXY_USERNAME={'set' if settings.PROXY_USERNAME else 'None'}, "
+        f"PROXY_PASSWORD={'set' if settings.PROXY_PASSWORD else 'None'}"
+    )
     if not use_proxy:
         return None
 
