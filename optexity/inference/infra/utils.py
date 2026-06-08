@@ -60,10 +60,15 @@ async def setup_proxy_auth_cdp(context, username: str, password: str, sessions: 
     if context is None:
         return
 
+    logger.info(
+        f"setup_proxy_auth_cdp: username={username}, pages={len(context.pages)}"
+    )
+
     async def setup_page(page):
         try:
             cdp = await context.new_cdp_session(page)
             sessions.append(cdp)
+            logger.info(f"CDP Fetch.enable installed for page: {page.url}")
             # patterns=[{"urlPattern":"*"}] mirrors Playwright's own proxy-auth implementation.
             # An empty patterns list leaves the Fetch domain inactive in some Chrome builds,
             # causing authRequired to never fire.
@@ -83,7 +88,13 @@ async def setup_proxy_auth_cdp(context, username: str, password: str, sessions: 
 
             async def on_auth_required(event):
                 source = event.get("authChallenge", {}).get("source", "")
-                logger.debug(f"Proxy auth challenge: source={source}")
+                origin = event.get("authChallenge", {}).get("origin", "")
+                scheme = event.get("authChallenge", {}).get("scheme", "")
+                realm = event.get("authChallenge", {}).get("realm", "")
+                logger.info(
+                    f"CDP authRequired: source={source}, origin={origin}, "
+                    f"scheme={scheme}, realm={realm}, url={event.get('request', {}).get('url', '')}"
+                )
                 if source == "Proxy":
                     try:
                         await cdp.send(

@@ -187,6 +187,8 @@ class ActualBrowser:
             # "--disable-web-security",
             "--disable-features=IsolateOrigins,site-per-process,AutomationControlled",
             "--enable-features=NetworkService,NetworkServiceInProcess",
+            "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+            "--webrtc-ip-handling-policy=disable_non_proxied_udp",
             "--allow-running-insecure-content",
             # "--ignore-certificate-errors",
             "--ignore-ssl-errors",

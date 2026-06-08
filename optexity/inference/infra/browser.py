@@ -133,12 +133,24 @@ class Browser:
             # actually navigates) so Chrome never shows the native auth popup.
             if self.use_proxy:
                 proxy = build_proxy_settings(self.use_proxy, self.proxy_session_id)
+                logger.info(
+                    f"Proxy settings resolved: server={proxy.get('server') if proxy else None}, "
+                    f"username={proxy.get('username') if proxy else None}, "
+                    f"has_password={bool(proxy.get('password')) if proxy else False}"
+                )
                 if proxy and proxy.get("username") and proxy.get("password"):
+                    logger.info("Setting up CDP proxy auth interception")
                     await setup_proxy_auth_cdp(
                         self.context,
                         proxy["username"],  # type: ignore[arg-type]
                         proxy["password"],  # type: ignore[arg-type]
                         self._proxy_auth_cdp_sessions,
+                    )
+                else:
+                    logger.warning(
+                        f"Proxy auth CDP NOT set up: proxy={bool(proxy)}, "
+                        f"has_username={bool(proxy.get('username')) if proxy else False}, "
+                        f"has_password={bool(proxy.get('password')) if proxy else False}"
                     )
 
             shutil.rmtree(self.temp_downloads_dir, ignore_errors=True)
@@ -166,6 +178,96 @@ class Browser:
         except Exception as e:
             logger.error(f"Error starting playwright: {e}")
             raise e
+
+    async def apply_geo_overrides(
+        self,
+        timezone_id: str | None = None,
+        locale: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+    ) -> None:
+        """Align browser timezone/locale/geolocation with the proxy IP via CDP.
+
+        reCAPTCHA v3 cross-checks IP geo against JS-visible timezone/locale; a
+        residential proxy is wasted if the OS still reports the original TZ.
+        Also hooks `context.on("page")` so popups/new tabs inherit the same
+        overrides — v3 frames are often loaded in child targets.
+        """
+        if self.context is None:
+            return
+
+        async def _apply_to_page(page):
+            try:
+                cdp = await self.context.new_cdp_session(page)
+                self._proxy_auth_cdp_sessions.append(cdp)
+                if timezone_id:
+                    await cdp.send(
+                        "Emulation.setTimezoneOverride",
+                        {"timezoneId": timezone_id},
+                    )
+                if locale:
+                    await cdp.send(
+                        "Emulation.setLocaleOverride",
+                        {"locale": locale},
+                    )
+                if latitude is not None and longitude is not None:
+                    await cdp.send(
+                        "Emulation.setGeolocationOverride",
+                        {
+                            "latitude": latitude,
+                            "longitude": longitude,
+                            "accuracy": 50,
+                        },
+                    )
+            except Exception as inner:
+                logger.debug(f"apply_geo_overrides page failed: {inner}")
+
+        try:
+            for page in list(self.context.pages):
+                await _apply_to_page(page)
+            self.context.on(
+                "page", lambda page: asyncio.create_task(_apply_to_page(page))
+            )
+        except Exception as e:
+            logger.warning(f"apply_geo_overrides failed: {e}")
+
+    async def prime_google_trust(self) -> None:
+        """Visit google.com on the proxy IP before the target URL.
+
+        Why: reCAPTCHA v3 scores heavily favor sessions with first-party Google
+        cookies. A fresh Chrome profile + fresh residential IP that has never
+        touched a Google domain scores ~0.1. Loading google.com once on the
+        proxy IP issues NID/__Secure-* cookies that v3 then trusts at the
+        target site. Short, best-effort — failures must not block the task.
+        """
+        if self.context is None:
+            return
+        try:
+            page = await self.get_current_page()
+            if page is None:
+                return
+            try:
+                await page.goto(
+                    "https://www.google.com/",
+                    timeout=20000,
+                    wait_until="domcontentloaded",
+                )
+            except Exception as nav_err:
+                logger.debug(f"google warmup nav skipped: {nav_err}")
+                return
+            try:
+                await asyncio.sleep(1.1)
+                for x, y in [(380, 260), (720, 420), (560, 580)]:
+                    await page.mouse.move(x, y, steps=10)
+                    await asyncio.sleep(0.18)
+                await page.mouse.wheel(0, 280)
+                await asyncio.sleep(0.4)
+                await page.mouse.wheel(0, -180)
+                await asyncio.sleep(0.6)
+            except Exception as interact_err:
+                logger.debug(f"google warmup interact skipped: {interact_err}")
+        except Exception as e:
+            logger.debug(f"prime_google_trust failed: {e}")
 
     async def stop(self, force: bool = False):
 
@@ -302,20 +404,43 @@ class Browser:
     def get_xpath_from_index(self, index: int) -> str:
         raise NotImplementedError("Not implemented")
 
-    async def go_to_url(self, url: str, retry_count: int = 0):
+    async def go_to_url(
+        self, url: str, retry_count: int = 0, timeout_ms: int | None = None
+    ):
+        # Default longer on proxy: target sites cold-load 2-3x slower through a
+        # residential exit. Combined with wait_until="domcontentloaded" we
+        # unblock as soon as the DOM is interactable instead of waiting on the
+        # `load` event, which JaneApp + reCAPTCHA v3 third-party scripts can
+        # delay well past 30s and isn't required for v3 scoring or form input.
+        effective_timeout = timeout_ms or (30000 if self.use_proxy else 15000)
         try:
             page = await self.get_current_page()
             if page is None:
                 logger.error(f"Cannot navigate to {url}: No page available")
                 return None
-            await page.goto(url, timeout=10000)
+            await page.goto(
+                url, timeout=effective_timeout, wait_until="domcontentloaded"
+            )
         except (TimeoutError, PatchrightTimeoutError, PlaywrightTimeoutError) as e:
+            if retry_count > 0:
+                logger.warning(
+                    f"Navigation timeout for {url}: {type(e).__name__}, retrying {retry_count} more times",
+                    extra={
+                        "url": url,
+                        "timeout_ms": effective_timeout,
+                        "retry_count": retry_count,
+                    },
+                )
+                await asyncio.sleep(1.5)
+                return await self.go_to_url(url, retry_count - 1, timeout_ms)
             logger.warning(
                 f"Navigation timeout for {url}: {type(e).__name__}",
-                extra={"url": url, "timeout_ms": 10000, "error_type": type(e).__name__},
+                extra={
+                    "url": url,
+                    "timeout_ms": effective_timeout,
+                    "error_type": type(e).__name__,
+                },
             )
-
-            # For non-critical navigation, continue with warning
             return None
         except Exception as e:
             if retry_count > 0:
@@ -328,7 +453,7 @@ class Browser:
                     },
                 )
                 await asyncio.sleep(retry_count)
-                return await self.go_to_url(url, retry_count - 1)
+                return await self.go_to_url(url, retry_count - 1, timeout_ms)
             logger.error(
                 f"Unexpected error navigating to {url}: {e}",
                 exc_info=True,
