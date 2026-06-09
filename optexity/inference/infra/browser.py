@@ -403,18 +403,12 @@ class Browser:
     async def get_browser_state_summary(
         self, include_full_page: bool = False, remove_empty_nodes: bool = False
     ) -> BrowserState:
-        if self._rdp_remote:
-            return BrowserState(
-                url="about:blank",
-                screenshot=await self.get_screenshot(full_page=include_full_page),
-                title="",
-                axtree="",
-            )
-
         if self.channel == "rdp" or self.backend == "computer-vision":
-            # url-mode RDP / computer-vision: actions run via pyautogui against a
-            # real screen, so there is no axtree. Serve a screenshot-only state
-            # (get_screenshot grabs the monitor via mss in this mode).
+            # RDP (true-rdp via rdp_parameter, or url-mode) and computer-vision act
+            # via pyautogui against a real screen, so there is no axtree. Serve a
+            # screenshot-only state (get_screenshot grabs the monitor via mss).
+            # get_current_page_url/title return "about:blank"/"Unknown page title"
+            # for true-rdp (no local browser) and the real values for url-mode.
             return BrowserState(
                 url=await self.get_current_page_url(),
                 screenshot=await self.get_screenshot(full_page=include_full_page),

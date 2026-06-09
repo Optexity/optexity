@@ -5,8 +5,6 @@ import logging
 import os
 from pathlib import Path
 
-from browser_use.browser.views import BrowserStateSummary
-
 from optexity.inference.infra.browser import Browser
 from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
@@ -74,18 +72,16 @@ def consume_browser_restart_request(child_process_id: int) -> str | None:
 
 
 def update_memory_browser_state_from_summary(
-    browser_state_summary: BrowserStateSummary,
+    browser_state: BrowserState,
     memory: Memory,
     task: Task,
 ) -> None:
-    memory.browser_states[-1] = BrowserState(
-        url=browser_state_summary.url,
-        screenshot=browser_state_summary.screenshot,
-        title=browser_state_summary.title,
-        axtree=browser_state_summary.dom_state.llm_representation(
-            remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-        ),
-    )
+    # Browser.get_browser_state_summary already returns a fully-built BrowserState
+    # (axtree resolved to its llm_representation for browser-use, or "" for
+    # rdp/computer-vision modes that have no dom tree). Store it directly — do not
+    # re-derive dom_state, which BrowserState does not carry. This restores the
+    # behavior from abf9b1f that the origin/main merge regressed.
+    memory.browser_states[-1] = browser_state
 
 
 async def fetch_browser_state_for_classifier(
@@ -94,16 +90,19 @@ async def fetch_browser_state_for_classifier(
     task: Task,
     *,
     include_full_page: bool = False,
-) -> BrowserStateSummary | None:
+) -> BrowserState | None:
     """Fetch full axtree + screenshot; return None and signal restart if session is poisoned."""
     child_process_id = get_child_process_id_from_env()
     try:
-        browser_state_summary = await asyncio.wait_for(
-            browser.get_browser_state_summary(include_full_page=include_full_page),
+        browser_state = await asyncio.wait_for(
+            browser.get_browser_state_summary(
+                include_full_page=include_full_page,
+                remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree,
+            ),
             timeout=BROWSER_STATE_SUMMARY_TIMEOUT_SECONDS,
         )
-        update_memory_browser_state_from_summary(browser_state_summary, memory, task)
-        return browser_state_summary
+        update_memory_browser_state_from_summary(browser_state, memory, task)
+        return browser_state
     except Exception as e:
         logger.warning(
             "Failed to fetch browser state for classifier (include_full_page=%s): %s",
