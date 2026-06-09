@@ -368,6 +368,12 @@ async def save_latest_memory_state_locally(
             async with aiofiles.open(step_directory / "llm_response.json", "w") as f:
                 await f.write(json.dumps(browser_state.llm_response, indent=4))
 
+        if browser_state.llm_predicted_locator:
+            async with aiofiles.open(
+                step_directory / "llm_predicted_locator.txt", "w"
+            ) as f:
+                await f.write(browser_state.llm_predicted_locator)
+
         if node:
             async with aiofiles.open(step_directory / "action_node.json", "w") as f:
                 await f.write(

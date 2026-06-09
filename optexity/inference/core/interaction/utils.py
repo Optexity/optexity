@@ -2,6 +2,7 @@ import asyncio
 import logging
 import math
 import os
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -183,6 +184,224 @@ async def update_screenshot_with_highlight(
     else:
         logger.warning(
             f"Failed to capture highlighted screenshot for element index {index}"
+        )
+
+
+def _quote_locator_value(value: str, max_len: int = 120) -> str:
+    """Quote a value for embedding in a Playwright locator expression."""
+    collapsed = " ".join(value.split())
+    escaped = collapsed.replace("\\", "\\\\").replace('"', '\\"')
+    if len(escaped) > max_len:
+        escaped = escaped[: max_len - 3] + "..."
+    return f'"{escaped}"'
+
+
+def _short_element_text(element) -> str:
+    """A short, stable label for the element, suitable for Playwright's ``has_text``
+    filter. Returns '' when there is no concise text to anchor on."""
+    ax = getattr(element, "ax_node", None)
+    text = (ax.name or "").strip() if ax and ax.name else ""
+    if not text:
+        getter = getattr(element, "get_meaningful_text_for_llm", None)
+        if callable(getter):
+            try:
+                text = (getter() or "").strip()
+            except Exception:
+                text = ""
+    text = " ".join(text.split())
+    return text if 0 < len(text) <= 60 else ""
+
+
+# Tokens emitted by frameworks/build tools that change between renders or builds and
+# therefore make terrible locators (React useId, styled-components / emotion / JSS
+# hashes, Ember/Radix/HeadlessUI generated ids, etc.).
+_DYNAMIC_PREFIX_RE = re.compile(
+    r"^(?::r[0-9a-z]*:?$|react-|ember\d|radix-|headlessui-|jss\d|sc-|css-[a-z0-9]+$|emotion-)",
+    re.IGNORECASE,
+)
+_UUID_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE
+)
+
+
+def _looks_dynamic(value: str) -> bool:
+    """Heuristic: does this attribute value look auto-generated / unstable?
+
+    Flags UUIDs, framework-generated ids, long digit runs (counters/timestamps),
+    and css-module / styled-component hash segments (mixed letter+digit soup or
+    vowel-less consonant runs). Conservative: real semantic names like
+    ``UserRegionsMenu__option`` or ``submit-button`` are kept.
+    """
+    if not value:
+        return True
+    v = value.strip()
+    if _UUID_RE.search(v) or _DYNAMIC_PREFIX_RE.match(v):
+        return True
+    if re.search(r"\d{4,}", v):  # long digit run -> counter / generated id
+        return True
+    for seg in re.split(r"[\s_\-]+", v):
+        if len(seg) < 5:
+            continue
+        digits = sum(c.isdigit() for c in seg)
+        has_alpha = any(c.isalpha() for c in seg)
+        vowels = sum(c in "aeiouAEIOU" for c in seg)
+        if has_alpha and digits >= 2:  # e.g. "3xY7z", "1d3w5wq"
+            return True
+        if has_alpha and vowels == 0 and len(seg) >= 6:  # consonant soup
+            return True
+    return False
+
+
+def _css_attr(tag: str, attr: str, value: str) -> str:
+    """Build a css attribute selector using single quotes for the inner value so it
+    survives being wrapped in a double-quoted ``locator("...")`` expression."""
+    return f"{tag}[{attr}='{value}']"
+
+
+def build_playwright_locator(element) -> str:
+    """Best-effort Playwright locator for a resolved DOM node, usable directly as
+    ``page.<locator>.click()`` / ``.fill(...)`` / ``.select_option(...)``.
+
+    Rather than a fixed preference order, every viable locator (test-id, id, name,
+    aria-label, role+name, placeholder, stable css classes, visible text, xpath) is
+    generated and scored by a heuristic for how *stable / non-dynamic* it is; the
+    highest-scoring candidate is returned. Auto-generated/dynamic values (hashes,
+    UUIDs, framework ids) are dropped so we never anchor on something that changes
+    between renders. Returns e.g.
+    ``locator("li.UserRegionsMenu__option button", has_text="Oregon")``.
+    """
+    attrs = getattr(element, "attributes", None) or {}
+    tag = (getattr(element, "tag_name", "") or "*").lower()
+    text = _short_element_text(element)
+    ax = getattr(element, "ax_node", None)
+    role = (ax.role or "").strip() if ax and ax.role else ""
+    name = (ax.name or "").strip() if ax and ax.name else ""
+
+    # (stability_score, locator_expression)
+    candidates: list[tuple[int, str]] = []
+
+    # Purpose-built test hooks: most stable thing a page can expose.
+    for attr in ("data-testid", "data-test-id", "data-test", "data-cy", "data-qa"):
+        val = (attrs.get(attr) or "").strip()
+        if val and not _looks_dynamic(val):
+            if attr == "data-testid":
+                candidates.append((100, f"get_by_test_id({_quote_locator_value(val)})"))
+            else:
+                candidates.append(
+                    (
+                        98,
+                        f"locator({_quote_locator_value(_css_attr(tag, attr, val), 400)})",
+                    )
+                )
+
+    el_id = (attrs.get("id") or "").strip()
+    if el_id and not _looks_dynamic(el_id):
+        if re.match(r"^[A-Za-z][\w-]*$", el_id):
+            id_sel = f"#{el_id}"
+        else:
+            id_sel = _css_attr(tag, "id", el_id)
+        candidates.append((92, f"locator({_quote_locator_value(id_sel, 400)})"))
+
+    nm = (attrs.get("name") or "").strip()
+    if nm and not _looks_dynamic(nm):
+        candidates.append(
+            (84, f"locator({_quote_locator_value(_css_attr(tag, 'name', nm), 400)})")
+        )
+
+    aria_label = (attrs.get("aria-label") or "").strip()
+    if aria_label and not _looks_dynamic(aria_label):
+        candidates.append((76, f"get_by_label({_quote_locator_value(aria_label)})"))
+
+    if role and name and not _looks_dynamic(name):
+        candidates.append(
+            (
+                72,
+                f"get_by_role({_quote_locator_value(role)}, name={_quote_locator_value(name)})",
+            )
+        )
+
+    placeholder = (attrs.get("placeholder") or "").strip()
+    if placeholder and not _looks_dynamic(placeholder):
+        candidates.append(
+            (64, f"get_by_placeholder({_quote_locator_value(placeholder)})")
+        )
+
+    # Stable (non-hashed) css classes, optionally anchored with visible text.
+    stable_classes = [
+        c for c in (attrs.get("class") or "").split() if c and not _looks_dynamic(c)
+    ]
+    if stable_classes:
+        sel = tag + "".join(f".{c}" for c in stable_classes[:3])
+        score = 50 + min(len(stable_classes), 3) * 3
+        if text:
+            candidates.append(
+                (
+                    score + 6,
+                    f"locator({_quote_locator_value(sel, 400)}, has_text={_quote_locator_value(text)})",
+                )
+            )
+        else:
+            candidates.append((score, f"locator({_quote_locator_value(sel, 400)})"))
+
+    # Pure visible-text match (content can change, so ranked low).
+    if text:
+        if role:
+            candidates.append(
+                (
+                    40,
+                    f"get_by_role({_quote_locator_value(role)}, name={_quote_locator_value(text)})",
+                )
+            )
+        else:
+            candidates.append((38, f"get_by_text({_quote_locator_value(text)})"))
+
+    # Positional xpath: always available, least stable -> last resort.
+    xpath = (getattr(element, "xpath", "") or "").strip()
+    if xpath:
+        candidates.append(
+            (10, f'locator({_quote_locator_value("xpath=" + xpath, 400)})')
+        )
+
+    if not candidates:
+        return "<index-only: no locator available>"
+
+    candidates.sort(key=lambda c: c[0], reverse=True)
+    return candidates[0][1]
+
+
+async def log_interacted_locator(
+    browser: Browser, index: int, method: str, memory: Memory | None = None
+) -> None:
+    """Log (and record on the trajectory) the Playwright-style locator browser-use
+    actually interacted with for the LLM-predicted axtree *index*.
+
+    Runs on the index-based fallback path (after the command/locator-based action
+    failed and we acted on the LLM-predicted index via ``multi_act``). ``method`` is
+    the trailing Playwright call to make the line copy-pasteable, e.g. ``.click()``
+    or ``.fill("foo")``. When ``memory`` is given the full ``page.<locator><method>``
+    expression is stored on the current browser state so it lands in the per-step
+    task log uploaded to S3. Best-effort and never raises.
+    """
+    try:
+        backend_agent = browser.backend_agent
+        if backend_agent is None or backend_agent.browser_session is None:
+            logger.info(
+                f"LLM fallback locator [index {index}]: unavailable (no backend session)"
+            )
+            return
+        element = await backend_agent.browser_session.get_dom_element_by_index(index)
+        if element is None:
+            logger.info(
+                f"LLM fallback locator [index {index}]: unavailable (index not in selector map)"
+            )
+            return
+        expression = f"page.{build_playwright_locator(element)}{method}"
+        logger.info(f"LLM fallback locator [index {index}]: {expression}")
+        if memory is not None and memory.browser_states:
+            memory.browser_states[-1].llm_predicted_locator = expression
+    except Exception as e:
+        logger.debug(
+            f"log_interacted_locator failed for index {index}: {type(e).__name__}: {e}"
         )
 
 

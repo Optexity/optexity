@@ -10,6 +10,7 @@ from optexity.inference.core.interaction.handle_command import (
 from optexity.inference.core.interaction.utils import (
     get_index_from_prompt,
     handle_download,
+    log_interacted_locator,
     update_screenshot_with_highlight,
 )
 from optexity.inference.infra.browser import Browser
@@ -77,6 +78,12 @@ async def click_element_index(
                 **{"click": {"index": index, "button": click_element_action.button}}
             )
             results = await browser.backend_agent.multi_act([action_model])
+            await log_interacted_locator(
+                browser,
+                index,
+                f".click(button={click_element_action.button!r})",
+                memory,
+            )
             if results and results[0].error:
                 raise RuntimeError(
                     f"browseruse click failed at index {index}: {results[0].error}"

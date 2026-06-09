@@ -19,6 +19,7 @@ from optexity.inference.core.interaction.handle_select_utils import (
 from optexity.inference.core.interaction.utils import (
     get_index_from_prompt,
     handle_download,
+    log_interacted_locator,
     update_screenshot_with_highlight,
 )
 from optexity.inference.infra.browser import Browser
@@ -215,6 +216,9 @@ async def select_option_index(
                 }
             )
             results = await browser.backend_agent.multi_act([action_model])
+            await log_interacted_locator(
+                browser, index, f".select_option({matched_values[0]!r})", memory
+            )
             if results and results[0].error:
                 logger.debug(
                     f"Falling back to playwright select_option: {results[0].error}"

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 
 from playwright.async_api import Locator
 
@@ -87,11 +88,38 @@ async def command_based_action_with_retry(
                     logger.error(f"Error in command_based_action_with_retry: {e}")
                     screenshot = await browser.get_screenshot()
 
+                # Capture the axtree for this step's log too (command steps otherwise
+                # have none). Done here, after the highlight overlay is removed and
+                # before the action runs, so — exactly like the screenshot above — it is
+                # a deterministic pre-action snapshot of this (latest) attempt. Skip the
+                # redundant screenshot inside the summary to keep the added time to just
+                # the DOM/AX serialization. Logging-only; never blocks control flow.
+                axtree = None
+                axtree_capture_start = time.perf_counter()
+                try:
+                    summary = await browser.get_browser_state_summary(
+                        include_screenshot=False
+                    )
+                    axtree = summary.dom_state.llm_representation(
+                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+                    )
+                    logger.debug(
+                        f"Command-step axtree capture took "
+                        f"{(time.perf_counter() - axtree_capture_start) * 1000:.0f}ms "
+                        f"({len(axtree) if axtree else 0} chars)"
+                    )
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to capture axtree for command step after "
+                        f"{(time.perf_counter() - axtree_capture_start) * 1000:.0f}ms: "
+                        f"{type(e).__name__}: {e}"
+                    )
+
                 memory.browser_states[-1] = BrowserState(
                     url=await browser.get_current_page_url(),
                     screenshot=screenshot,
                     title=await browser.get_current_page_title(),
-                    axtree=None,
+                    axtree=axtree,
                 )
 
                 if isinstance(action, ClickElementAction):

@@ -6,6 +6,7 @@ from optexity.inference.core.interaction.handle_command import (
 )
 from optexity.inference.core.interaction.utils import (
     get_index_from_prompt,
+    log_interacted_locator,
     update_screenshot_with_highlight,
 )
 from optexity.inference.infra.browser import Browser
@@ -71,6 +72,7 @@ async def check_element_index(
             **{"click": {"index": int(index), "button": "left"}}
         )
         await browser.backend_agent.multi_act([action_model])
+        await log_interacted_locator(browser, index, ".check()", memory)
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:
@@ -132,6 +134,7 @@ async def uncheck_element_index(
             **{"click": {"index": int(index), "button": "left"}}
         )
         await browser.backend_agent.multi_act([action_model])
+        await log_interacted_locator(browser, index, ".uncheck()", memory)
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:

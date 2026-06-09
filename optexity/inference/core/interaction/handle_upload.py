@@ -11,6 +11,7 @@ from optexity.inference.core.interaction.handle_command import (
 )
 from optexity.inference.core.interaction.utils import (
     get_index_from_prompt,
+    log_interacted_locator,
     update_screenshot_with_highlight,
 )
 from optexity.inference.infra.browser import Browser
@@ -137,6 +138,12 @@ async def upload_file_index(
             **{"upload_file": {"index": index, "path": upload_file_action.file_path}}
         )
         await browser.backend_agent.multi_act([action_model])
+        await log_interacted_locator(
+            browser,
+            index,
+            f".set_input_files({upload_file_action.file_path!r})",
+            memory,
+        )
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:
