@@ -29,6 +29,37 @@ from optexity.schema.task import Task
 logger = logging.getLogger(__name__)
 
 
+def _command_locator_expression(action) -> str | None:
+    """Full, copy-pasteable Playwright expression for a command-based action, e.g.
+    ``page.get_by_role("button", name="Save").click(button='left')``. The command IS
+    the locator here (it's eval'd as ``page.{command}``); we append the action's
+    trailing call so command steps record the same shape as the LLM-fallback path."""
+    if not action.command:
+        return None
+    if isinstance(action, ClickElementAction):
+        method = (
+            ".dblclick()"
+            if action.double_click
+            else f".click(button={action.button!r})"
+        )
+    elif isinstance(action, InputTextAction):
+        verb = "type" if action.fill_or_type == "type" else "fill"
+        method = f".{verb}({(action.input_text or '')!r})"
+    elif isinstance(action, SelectOptionAction):
+        method = f".select_option({action.select_values!r})"
+    elif isinstance(action, CheckAction):
+        method = ".check()"
+    elif isinstance(action, UncheckAction):
+        method = ".uncheck()"
+    elif isinstance(action, HoverAction):
+        method = ".hover()"
+    elif isinstance(action, UploadFileAction):
+        method = f".set_input_files({action.file_path!r})"
+    else:
+        method = ""
+    return f"page.{action.command}{method}"
+
+
 async def command_based_action_with_retry(
     action: (
         ClickElementAction
@@ -115,11 +146,15 @@ async def command_based_action_with_retry(
                         f"{type(e).__name__}: {e}"
                     )
 
+                interacted_locator = _command_locator_expression(action)
+                logger.debug(f"Command-step locator: {interacted_locator}")
+
                 memory.browser_states[-1] = BrowserState(
                     url=await browser.get_current_page_url(),
                     screenshot=screenshot,
                     title=await browser.get_current_page_title(),
                     axtree=axtree,
+                    interacted_locator=interacted_locator,
                 )
 
                 if isinstance(action, ClickElementAction):

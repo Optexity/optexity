@@ -12,8 +12,8 @@ from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
 from optexity.inference.core.interaction.utils import (
+    LocatorExtraction,
     get_index_from_prompt,
-    log_interacted_locator,
     update_screenshot_with_highlight,
 )
 from optexity.inference.infra.browser import Browser
@@ -158,7 +158,7 @@ async def input_text_index(
 
         try:
             results = await browser.backend_agent.multi_act([action_model])
-            await log_interacted_locator(
+            await LocatorExtraction.log_interacted_locator(
                 browser,
                 index,
                 f".fill({(input_text_action.input_text or '')!r})",
