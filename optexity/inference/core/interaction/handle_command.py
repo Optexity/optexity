@@ -144,10 +144,20 @@ async def command_based_action_with_retry(
 
                 # Resolve the element this command targets and build the best *stable*
                 # locator for it via the heuristic (not just an echo of the command).
-                interacted_locator = await LocatorExtraction.locator_from_playwright(
-                    locator, _action_method(action), action.command
-                )
-                logger.debug(f"Command-step locator: {interacted_locator}")
+                # Pure logging: guarded so a failure here can never skip the action below.
+                interacted_locator = None
+                try:
+                    interacted_locator = (
+                        await LocatorExtraction.locator_from_playwright(
+                            locator, _action_method(action), action.command
+                        )
+                    )
+                    logger.debug(f"Command-step locator: {interacted_locator}")
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to record command-step locator: "
+                        f"{type(e).__name__}: {e}"
+                    )
 
                 memory.browser_states[-1] = BrowserState(
                     url=await browser.get_current_page_url(),
