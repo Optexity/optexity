@@ -283,11 +283,13 @@ async def handle_element_not_found_in_axtree(
     browser: Browser,
 ):
     """Axtree locator returned -1 (not confident). Hand this single step to a
-    general agentic fallback, then treat the node as completed.
+    general agentic fallback.
 
     The deterministic locator is intentionally strict (any doubt -> -1), so a -1
-    means "let the agent figure this step out" rather than "fail". We do not
-    re-predict afterwards: once the agent stops, the node is considered done.
+    means "let the agent figure this step out" rather than "fail". We hard-fail
+    the automation only when the agent explicitly reports it could not perform
+    the step (is_successful() is False). If the agent succeeds, or simply does
+    not flag a result (None), we treat the node as completed and continue.
     """
     logger.warning(
         f"Element not found in axtree (-1) for goal '{error.command}' at node "
@@ -318,14 +320,24 @@ async def handle_element_not_found_in_axtree(
             f"Could not read agentic fallback result for node {step_index}: {e}"
         )
 
+    if succeeded is False:
+        # The agent explicitly reported it could not perform the step. Record a
+        # breadcrumb, then hard-fail rather than advancing past an unperformed step.
+        reason = f"Agentic fallback reported failure for goal '{error.command}'"
+        logger.error(f"{reason} at node {step_index}; failing automation.")
+        memory.variables.output_data.append(
+            OutputData(unique_identifier="agentic_fallback_failed", text=reason)
+        )
+        raise Exception(f"{reason} at node {step_index}.") from error
+
     if succeeded is True:
         logger.info(
             f"Agentic fallback succeeded for node {step_index}; marking node completed."
         )
         return
 
-    # Per design we still continue (resilience), but the failure must be visible
-    # rather than silently swallowed.
+    # succeeded is None: the agent ran but did not flag a result. Continue, but
+    # leave a breadcrumb so the unconfirmed step is visible rather than silent.
     reason = f"Agentic fallback did not confirm success for goal '{error.command}'"
     logger.warning(
         f"{reason} at node {step_index} (is_successful={succeeded}); "
@@ -337,19 +349,16 @@ async def handle_element_not_found_in_axtree(
 
 
 async def handle_assert_locator_presence_error(
-    error: AssertLocatorPresenceException | ElementNotFoundInAxtreeException,
+    error: AssertLocatorPresenceException,
     interaction_action: InteractionAction,
     task: Task,
     memory: Memory,
     browser: Browser,
     retries_left: int,
 ):
-    error_type = (
-        "assert_locator_presence"
-        if isinstance(error, AssertLocatorPresenceException)
-        else "element_not_found_in_axtree_exception"
-    )
-    logger.debug(f"Handling {error_type} error: {error.command}")
+    # ElementNotFoundInAxtreeException (the -1 case) is routed to the agentic
+    # fallback, so only assert-locator-presence failures reach the classifier here.
+    logger.debug(f"Handling assert_locator_presence error: {error.command}")
     if retries_left > 1:
         browser_state_summary = await fetch_browser_state_for_classifier(
             browser, memory, task

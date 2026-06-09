@@ -13,7 +13,7 @@ from optexity.schema.task import Task
 logger = logging.getLogger(__name__)
 
 # Guardrails for the fallback agent: keep it short and scoped to a single step.
-FALLBACK_MAX_STEPS = 8
+FALLBACK_MAX_STEPS = 12
 # How many steps before/after the current one to include for workflow context.
 WINDOW_RADIUS = 2
 
