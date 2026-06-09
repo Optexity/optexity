@@ -22,7 +22,8 @@ you can check they took effect. The `>> CURRENT <<` step is the one you must com
 Steps marked `[do NOT do — context only]` come after and are shown only for direction:
 <<WORKFLOW_WINDOW>>
 
-**Why the deterministic locator failed (error logs):**
+**Why the deterministic locator failed, plus the recent run log** (tail of
+`optexity.log` — what the automation was doing right up to this failure):
 <<ERROR_LOGS>>
 
 ---

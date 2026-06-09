@@ -2,6 +2,8 @@ import logging
 from functools import lru_cache
 from importlib import resources
 
+import aiofiles
+
 from optexity.exceptions import ElementNotFoundInAxtreeException
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
 from optexity.inference.infra.browser import Browser
@@ -16,6 +18,9 @@ logger = logging.getLogger(__name__)
 FALLBACK_MAX_STEPS = 12
 # How many steps before/after the current one to include for workflow context.
 WINDOW_RADIUS = 2
+# How much of the run log (optexity.log, the same file we ship to S3) to feed the
+# agent. We tail it so a long run doesn't blow up the prompt; bump if needed.
+FALLBACK_LOG_TAIL_CHARS = 20000
 
 
 @lru_cache(maxsize=1)
@@ -181,6 +186,34 @@ def _build_workflow_window(task: Task, interaction_action: InteractionAction) ->
         return "(surrounding workflow steps unavailable)"
 
 
+async def _read_run_log_tail(task: Task) -> str:
+    """Read the tail of the task's runtime log (optexity.log).
+
+    This is the same log we persist to S3; the recent lines capture what the
+    deterministic run was doing right up to the -1 failure, which is the most
+    useful debugging context for the fallback agent.
+    """
+    try:
+        async with aiofiles.open(
+            task.log_file_path, "r", encoding="utf-8", errors="replace"
+        ) as f:
+            content = await f.read()
+    except FileNotFoundError:
+        return "(run log not available)"
+    except Exception as e:
+        logger.error(f"Failed to read run log for agentic fallback: {e}")
+        return "(run log not available)"
+
+    if not content:
+        return "(run log empty)"
+    if len(content) > FALLBACK_LOG_TAIL_CHARS:
+        return (
+            f"...(truncated; showing last {FALLBACK_LOG_TAIL_CHARS} chars)...\n"
+            + content[-FALLBACK_LOG_TAIL_CHARS:]
+        )
+    return content
+
+
 async def run_axtree_fallback_agent(
     interaction_action: InteractionAction,
     error: ElementNotFoundInAxtreeException,
@@ -200,6 +233,9 @@ async def run_axtree_fallback_agent(
     error_logs = str(error.message)
     if getattr(error, "original_error", None) is not None:
         error_logs += f"\nUnderlying error: {error.original_error}"
+
+    run_log = await _read_run_log_tail(task)
+    error_logs += f"\n\n--- Recent run log (optexity.log) ---\n{run_log}"
 
     try:
         current_url = await browser.get_current_page_url() or "(unknown)"
