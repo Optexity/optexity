@@ -86,11 +86,22 @@ class Browser:
         if self.channel == "rdp" or self.backend == "computer-vision":
             self.sct = mss.mss()
 
+    @property
+    def _rdp_remote(self) -> bool:
+        """True only for RDP-into-a-machine mode (xfreerdp, no local CDP browser).
+
+        When browser_channel="rdp" but no rdp_parameter was supplied, we launch a
+        normal CDP browser and open automation.url; actions still run via pyautogui
+        (computer-use) because channel stays "rdp". cdp_url is None only in the
+        xfreerdp case, so it cleanly distinguishes the two modes.
+        """
+        return self.channel == "rdp" and self.cdp_url is None
+
     async def start(self):
         if self.channel == "rdp" or self.backend == "computer-vision":
             self.sct = mss.mss()
 
-        if self.channel == "rdp":
+        if self._rdp_remote:
             await asyncio.sleep(5)
             return
 
@@ -193,7 +204,7 @@ class Browser:
             self.sct.close()
             self.sct = None
 
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return
 
         if self._download_cdp_session is not None:
@@ -231,7 +242,7 @@ class Browser:
     async def get_current_page(
         self,
     ) -> playwright.async_api.Page | patchright.async_api.Page | None:
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return None
         if self.context is None:
             raise ValueError("Context is not set")
@@ -246,7 +257,7 @@ class Browser:
 
     async def handle_new_tabs(self, max_wait_time: float) -> tuple[bool, float]:
 
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return False, 0
 
         if self.context is None or (
@@ -285,7 +296,7 @@ class Browser:
 
     async def close_current_tab(self):
 
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return None
 
         if self.context is None or (
@@ -313,7 +324,7 @@ class Browser:
 
     async def switch_tab(self, tab_index: int):
 
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return None
 
         if self.context is None or (
@@ -340,7 +351,7 @@ class Browser:
             await self.backend_agent.multi_act([action_model])
 
     async def get_locator_from_command(self, command: str) -> Locator | None:
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return None
 
         if self.context is None or (
@@ -354,7 +365,7 @@ class Browser:
         return locator
 
     async def go_to_url(self, url: str, retry_count: int = 0):
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return
         try:
             page = await self.get_current_page()
@@ -392,7 +403,7 @@ class Browser:
     async def get_browser_state_summary(
         self, include_full_page: bool = False, remove_empty_nodes: bool = False
     ) -> BrowserState:
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return BrowserState(
                 url="about:blank",
                 screenshot=await self.get_screenshot(full_page=include_full_page),
@@ -422,7 +433,7 @@ class Browser:
         raise ValueError("Unknown error getting browser state summary")
 
     async def get_current_page_url(self) -> str:
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return "about:blank"
         try:
             page = await self.get_current_page()
@@ -434,7 +445,7 @@ class Browser:
             return "about:blank"
 
     async def get_current_page_title(self) -> str:
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return "Unknown page title"
         try:
             page = await self.get_current_page()
@@ -446,7 +457,7 @@ class Browser:
             return "Unknown page title"
 
     async def handle_random_download(self, download: Download):
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return
         self.active_downloads += 1
         self.all_active_downloads_done.clear()
@@ -461,7 +472,7 @@ class Browser:
             self.all_active_downloads_done.set()
 
     async def handle_random_url_downloads(self, resp: Response):
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return
         try:
             content_type = (resp.headers.get("content-type") or "").lower()
@@ -503,7 +514,7 @@ class Browser:
             self.all_active_downloads_done.set()
 
     async def log_request(self, req: Request):
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return
         try:
             body = req.post_data  # this is None for GET/HEAD
@@ -529,7 +540,7 @@ class Browser:
             pass
 
     async def log_response(self, response: Response):
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return
         try:
             body = await response.json()
