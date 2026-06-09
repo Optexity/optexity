@@ -123,8 +123,27 @@ def _flatten_action_nodes(nodes, out: list) -> None:
             _flatten_action_nodes(node.else_nodes, out)
 
 
+def _describe_node_for_window(node: ActionNode) -> str:
+    """Value-bearing description of a node for the workflow window.
+
+    Reuses the goal builder (which splices in input/select values) so the agent
+    can verify a previous step actually took effect, falling back to a short
+    summary for non-interaction nodes.
+    """
+    ia = node.interaction_action
+    if ia is not None:
+        desc = _describe_goal(ia, "")
+        if desc and desc.strip():
+            return desc
+    return _summarize_action_node(node) or "step"
+
+
 def _build_workflow_window(task: Task, interaction_action: InteractionAction) -> str:
     """Build a small window (prev + current + next steps) around the failing step.
+
+    Previous steps are rendered with their full value-bearing goals so the agent
+    can check whether each already-run prerequisite actually landed on the page.
+    The current step is marked; next steps are kept as light context only.
 
     The current step is located by object identity of its interaction_action.
     This resolves for top-level nodes; loop-expanded nodes are deep-copied at
@@ -147,9 +166,15 @@ def _build_workflow_window(task: Task, interaction_action: InteractionAction) ->
         end = min(len(flat), current_idx + WINDOW_RADIUS + 1)
         lines = []
         for i in range(start, end):
-            summary = _summarize_action_node(flat[i]) or "step"
-            marker = "  >> CURRENT >> " if i == current_idx else "                "
-            lines.append(f"{marker}step {i}: {summary}")
+            if i < current_idx:
+                desc = _describe_node_for_window(flat[i])
+                lines.append(f"  [already ran] step {i}: {desc}")
+            elif i == current_idx:
+                desc = _describe_node_for_window(flat[i])
+                lines.append(f"  >> CURRENT (failed locator) >> step {i}: {desc}")
+            else:
+                summary = _summarize_action_node(flat[i]) or "step"
+                lines.append(f"  [do NOT do — context only] step {i}: {summary}")
         return "\n".join(lines)
     except Exception as e:
         logger.error(f"Failed to build workflow window for agentic fallback: {e}")
