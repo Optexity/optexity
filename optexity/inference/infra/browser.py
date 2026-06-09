@@ -411,6 +411,17 @@ class Browser:
                 axtree="",
             )
 
+        if self.channel == "rdp" or self.backend == "computer-vision":
+            # url-mode RDP / computer-vision: actions run via pyautogui against a
+            # real screen, so there is no axtree. Serve a screenshot-only state
+            # (get_screenshot grabs the monitor via mss in this mode).
+            return BrowserState(
+                url=await self.get_current_page_url(),
+                screenshot=await self.get_screenshot(full_page=include_full_page),
+                title=await self.get_current_page_title(),
+                axtree="",
+            )
+
         if self.backend == "browser-use" and self.backend_agent is None:
             raise ValueError("Backend agent is not set")
 
