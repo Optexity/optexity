@@ -6,6 +6,7 @@ import re
 import shutil
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Callable, Union
 
 import aiofiles
@@ -209,6 +210,51 @@ class LocatorExtraction:
         r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE
     )
 
+    # Pulls the signals build_playwright_locator needs (attributes, tag, implicit
+    # role, accessible name, text, xpath) off a live element via Playwright so the
+    # heuristic can run on command-targeted elements too.
+    _ELEMENT_SIGNALS_JS = """
+    (el) => {
+        const attrs = {};
+        for (const a of el.attributes) attrs[a.name] = a.value;
+        const tag = el.tagName.toLowerCase();
+        const type = (el.getAttribute('type') || '').toLowerCase();
+        let role = el.getAttribute('role') || '';
+        if (!role) {
+            if (tag === 'button') role = 'button';
+            else if (tag === 'a' && el.hasAttribute('href')) role = 'link';
+            else if (tag === 'select') role = 'combobox';
+            else if (tag === 'textarea') role = 'textbox';
+            else if (tag === 'input') {
+                const m = {checkbox:'checkbox', radio:'radio', button:'button',
+                    submit:'button', reset:'button', text:'textbox', search:'searchbox',
+                    email:'textbox', tel:'textbox', url:'textbox', password:'textbox',
+                    number:'spinbutton'};
+                role = m[type] || 'textbox';
+            }
+        }
+        const name = (el.getAttribute('aria-label') || (el.innerText || '').trim()
+            || el.getAttribute('title') || el.getAttribute('alt')
+            || el.getAttribute('placeholder') || '').trim();
+        function xp(node) {
+            const parts = [];
+            while (node && node.nodeType === 1) {
+                let ix = 0, sib = node.previousSibling;
+                while (sib) {
+                    if (sib.nodeType === 1 && sib.nodeName === node.nodeName) ix++;
+                    sib = sib.previousSibling;
+                }
+                parts.unshift(node.nodeName.toLowerCase() + (ix > 0 ? `[${ix + 1}]` : ''));
+                node = node.parentNode;
+                if (!node || node.nodeType === 9) break;
+            }
+            return '/' + parts.join('/');
+        }
+        return {tag, attributes: attrs, role, name: name.slice(0, 200),
+            text: (el.innerText || el.textContent || '').trim().slice(0, 200), xpath: xp(el)};
+    }
+    """
+
     @staticmethod
     def _quote_locator_value(value: str, max_len: int = 120) -> str:
         """Quote a value for embedding in a Playwright locator expression."""
@@ -359,6 +405,34 @@ class LocatorExtraction:
 
         candidates.sort(key=lambda c: c[0], reverse=True)
         return candidates[0][1]
+
+    @classmethod
+    async def locator_from_playwright(
+        cls, locator, method: str, fallback_command: str | None = None
+    ) -> str | None:
+        """Resolve the element a command's Playwright *locator* points to and build the
+        best *stable* locator for it with the heuristic, so the recorded locator is not
+        just an echo of the command. ``method`` is the trailing call (e.g. ``.click()``).
+        Falls back to the raw command if the element can't be read. Never raises.
+        """
+        try:
+            signals = await locator.evaluate(cls._ELEMENT_SIGNALS_JS)
+            element = SimpleNamespace(
+                tag_name=signals.get("tag", ""),
+                attributes=signals.get("attributes") or {},
+                ax_node=SimpleNamespace(
+                    role=signals.get("role") or None, name=signals.get("name") or None
+                ),
+                xpath=signals.get("xpath", ""),
+                get_meaningful_text_for_llm=(lambda t=signals.get("text", ""): t),
+            )
+            return f"page.{cls.build_playwright_locator(element)}{method}"
+        except Exception as e:
+            logger.debug(
+                f"locator_from_playwright failed, falling back to command: "
+                f"{type(e).__name__}: {e}"
+            )
+            return f"page.{fallback_command}{method}" if fallback_command else None
 
     @staticmethod
     def record_interacted_locator(

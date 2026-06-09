@@ -10,6 +10,7 @@ from optexity.inference.core.interaction.handle_select_utils import (
     smart_select,
 )
 from optexity.inference.core.interaction.utils import (
+    LocatorExtraction,
     handle_download,
     highlight_element_and_screenshot,
 )
@@ -29,35 +30,30 @@ from optexity.schema.task import Task
 logger = logging.getLogger(__name__)
 
 
-def _command_locator_expression(action) -> str | None:
-    """Full, copy-pasteable Playwright expression for a command-based action, e.g.
-    ``page.get_by_role("button", name="Save").click(button='left')``. The command IS
-    the locator here (it's eval'd as ``page.{command}``); we append the action's
-    trailing call so command steps record the same shape as the LLM-fallback path."""
-    if not action.command:
-        return None
+def _action_method(action) -> str:
+    """The trailing Playwright call for an action, e.g. ``.click(button='left')`` —
+    appended to the heuristically-derived locator so command steps record the same
+    ``page.<locator><method>`` shape as the LLM-fallback path."""
     if isinstance(action, ClickElementAction):
-        method = (
+        return (
             ".dblclick()"
             if action.double_click
             else f".click(button={action.button!r})"
         )
-    elif isinstance(action, InputTextAction):
+    if isinstance(action, InputTextAction):
         verb = "type" if action.fill_or_type == "type" else "fill"
-        method = f".{verb}({(action.input_text or '')!r})"
-    elif isinstance(action, SelectOptionAction):
-        method = f".select_option({action.select_values!r})"
-    elif isinstance(action, CheckAction):
-        method = ".check()"
-    elif isinstance(action, UncheckAction):
-        method = ".uncheck()"
-    elif isinstance(action, HoverAction):
-        method = ".hover()"
-    elif isinstance(action, UploadFileAction):
-        method = f".set_input_files({action.file_path!r})"
-    else:
-        method = ""
-    return f"page.{action.command}{method}"
+        return f".{verb}({(action.input_text or '')!r})"
+    if isinstance(action, SelectOptionAction):
+        return f".select_option({action.select_values!r})"
+    if isinstance(action, CheckAction):
+        return ".check()"
+    if isinstance(action, UncheckAction):
+        return ".uncheck()"
+    if isinstance(action, HoverAction):
+        return ".hover()"
+    if isinstance(action, UploadFileAction):
+        return f".set_input_files({action.file_path!r})"
+    return ""
 
 
 async def command_based_action_with_retry(
@@ -146,7 +142,11 @@ async def command_based_action_with_retry(
                         f"{type(e).__name__}: {e}"
                     )
 
-                interacted_locator = _command_locator_expression(action)
+                # Resolve the element this command targets and build the best *stable*
+                # locator for it via the heuristic (not just an echo of the command).
+                interacted_locator = await LocatorExtraction.locator_from_playwright(
+                    locator, _action_method(action), action.command
+                )
                 logger.debug(f"Command-step locator: {interacted_locator}")
 
                 memory.browser_states[-1] = BrowserState(
