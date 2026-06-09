@@ -165,8 +165,12 @@ class ActualBrowser:
         self.rdp_parameter = rdp_parameter
         self._xquartz_started_for_rdp = False
 
-        if self.channel == "rdp":
-            assert self.rdp_parameter is not None, "rdp_parameter is required for rdp"
+        # browser_channel="rdp" has two modes:
+        #   * rdp_parameter set  -> RDP (xfreerdp) into the machine.
+        #   * rdp_parameter None -> launch a normal CDP browser and open
+        #     automation.url; actions still run via pyautogui (computer-use).
+        # Either an rdp_parameter or a start URL is needed; the URL requirement
+        # is validated at the Task level.
 
         # Optional extensions (uncomment to load):
         # {
@@ -321,8 +325,26 @@ class ActualBrowser:
 
         return args
 
+    @property
+    def _rdp_remote(self) -> bool:
+        """True only when we RDP (xfreerdp) into a remote machine.
+
+        browser_channel="rdp" without an rdp_parameter means "open a normal
+        browser and navigate to automation.url, but drive it via pyautogui";
+        that path launches a real CDP browser like any other channel.
+        """
+        return self.channel == "rdp" and self.rdp_parameter is not None
+
+    @property
+    def _launch_channel(
+        self,
+    ) -> Literal["chrome", "chromium", "cloakbrowser", "browser-use"]:
+        """Concrete browser to launch. "rdp" is a mode, not a real browser, so
+        url-mode rdp launches plain chromium."""
+        return "chromium" if self.channel == "rdp" else self.channel
+
     async def start(self):
-        if self.channel == "rdp":
+        if self._rdp_remote:
             await self.start_rdp_browser()
         else:
             if settings.USE_PLAYWRIGHT_BROWSER:
@@ -388,7 +410,7 @@ class ActualBrowser:
 
             self._seed_print_preferences()
 
-            self.chrome_path = find_chrome_binary(self.channel)
+            self.chrome_path = find_chrome_binary(self._launch_channel)
             env = {**os.environ, "DISPLAY": get_display()}
 
             self.proc = await asyncio.create_subprocess_exec(
@@ -437,7 +459,7 @@ class ActualBrowser:
                 self._seed_print_preferences()
                 self.context = await launch_persistent_context_async(
                     # humanize=True,
-                    channel=self.channel,
+                    channel=self._launch_channel,
                     user_data_dir=self.user_data_dir,
                     headless=self.headless,
                     args=self.get_args(),
@@ -455,8 +477,10 @@ class ActualBrowser:
             raise e
 
     async def goto_url(self, url: str) -> None:
-        """Navigate the first browser tab to *url* via CDP. No-op in RDP mode."""
-        if self.channel == "rdp":
+        """Navigate the first browser tab to *url* via CDP. No-op when we RDP
+        into a remote machine (no local browser); the url-mode rdp browser does
+        navigate normally."""
+        if self._rdp_remote:
             return
 
         async with aiohttp.ClientSession() as session:
@@ -495,7 +519,7 @@ class ActualBrowser:
 
     async def check_browser_alive(self, timeout=10):
         ## TODO: check if rdp session is alive
-        if self.channel == "rdp":
+        if self._rdp_remote:
             return True
 
         if settings.USE_PLAYWRIGHT_BROWSER:
@@ -555,7 +579,7 @@ class ActualBrowser:
             return False
 
     async def stop(self, graceful=True):
-        if self.channel == "rdp":
+        if self._rdp_remote:
             await self.kill_subprocess(graceful)
             await self._quit_xquartz_if_started_for_rdp()
         elif settings.USE_PLAYWRIGHT_BROWSER:

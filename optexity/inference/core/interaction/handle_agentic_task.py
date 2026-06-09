@@ -22,9 +22,10 @@ async def handle_agentic_task(
     memory: Memory,
     browser: Browser,
 ):
-    # On RDP there's no browser CDP — agentic tasks run as Computer Use
-    # against the Xvfb display. The agentic_task.backend field is ignored
-    # in this case; provider (Claude/Gemini) comes from agentic_task.model.
+    # browser_channel="rdp" always drives via Computer Use (pyautogui against
+    # the display), whether we RDP into a machine or just opened a URL in a
+    # local browser. The agentic_task.backend field is ignored in this case;
+    # provider (Claude/Gemini) comes from agentic_task.model.
     if browser.channel == "rdp":
         await run_computer_use_agent(agentic_task_action, task, memory, browser)
         return
