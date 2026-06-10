@@ -6,6 +6,7 @@ import shutil
 import time
 import traceback
 from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
 
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
@@ -134,6 +135,7 @@ async def run_automation(
 
         await browser.go_to_url(task.automation.url, retry_count=3)
         memory.update_system_info()
+        memory.automation_state.start_2fa_time = datetime.now(timezone.utc)
 
         full_automation = []
 
