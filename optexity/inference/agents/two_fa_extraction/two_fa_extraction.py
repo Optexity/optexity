@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 class TwoFAExtractionOutput(BaseModel):
     code: str | list[str] | None = Field(
-        description="The 2FA code extracted from the messages."
+        description=(
+            "The single most recent 2FA code extracted from the messages, "
+            "or None if no valid code is present."
+        )
     )
 
 
@@ -34,8 +37,8 @@ class TwoFAExtraction:
             [/EXTRACTION INSTRUCTIONS]
             """
         final_prompt += f"""
-        [MESSAGES] 
-        {json.dumps([message.model_dump(include={"message_text"}) for message in messages], indent=2)} 
+        [MESSAGES]
+        {json.dumps([message.model_dump(include={"message_text", "timestamp"}, mode="json") for message in messages], indent=2)}
         [/MESSAGES]
         """
 
