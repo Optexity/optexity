@@ -302,14 +302,16 @@ async def click_locator(
                 await page.mouse.click(x, y)
         if click_element_action.double_click:
             await locator.dblclick(
-                no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000
+                no_wait_after=True,
+                timeout=max_timeout_seconds_per_try * 1000,
+                force=click_element_action.force,
             )
         else:
             await locator.click(
                 button=click_element_action.button,
                 no_wait_after=True,
                 timeout=max_timeout_seconds_per_try * 1000,
-                force=True,
+                force=click_element_action.force,
             )
 
     if click_element_action.expect_download:
