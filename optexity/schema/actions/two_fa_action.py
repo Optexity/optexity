@@ -62,6 +62,8 @@ class TwoFAAction(BaseModel):
     output_variable_name: str
     max_wait_time: float = 300.0
     check_interval: float = 30.0
+    start_2fa_time_offset_minutes: float = 0.0
+    end_2fa_time_offset_minutes: float = 0.0
 
     def replace(self, pattern: str, replacement: str):
         if self.instructions:
