@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 
 from playwright.async_api import Locator
 
@@ -9,6 +10,7 @@ from optexity.inference.core.interaction.handle_select_utils import (
     smart_select,
 )
 from optexity.inference.core.interaction.utils import (
+    LocatorExtraction,
     handle_download,
     highlight_element_and_screenshot,
 )
@@ -26,6 +28,32 @@ from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
+
+
+def _action_method(action) -> str:
+    """The trailing Playwright call for an action, e.g. ``.click(button='left')`` —
+    appended to the heuristically-derived locator so command steps record the same
+    ``page.<locator><method>`` shape as the LLM-fallback path."""
+    if isinstance(action, ClickElementAction):
+        return (
+            ".dblclick()"
+            if action.double_click
+            else f".click(button={action.button!r})"
+        )
+    if isinstance(action, InputTextAction):
+        verb = "type" if action.fill_or_type == "type" else "fill"
+        return f".{verb}({(action.input_text or '')!r})"
+    if isinstance(action, SelectOptionAction):
+        return f".select_option({action.select_values!r})"
+    if isinstance(action, CheckAction):
+        return ".check()"
+    if isinstance(action, UncheckAction):
+        return ".uncheck()"
+    if isinstance(action, HoverAction):
+        return ".hover()"
+    if isinstance(action, UploadFileAction):
+        return f".set_input_files({action.file_path!r})"
+    return ""
 
 
 async def command_based_action_with_retry(
@@ -87,11 +115,56 @@ async def command_based_action_with_retry(
                     logger.error(f"Error in command_based_action_with_retry: {e}")
                     screenshot = await browser.get_screenshot()
 
+                # Capture the axtree for this step's log too (command steps otherwise
+                # have none). Done here, after the highlight overlay is removed and
+                # before the action runs, so — exactly like the screenshot above — it is
+                # a deterministic pre-action snapshot of this (latest) attempt. Skip the
+                # redundant screenshot inside the summary to keep the added time to just
+                # the DOM/AX serialization. Logging-only; never blocks control flow.
+                axtree = None
+                axtree_capture_start = time.perf_counter()
+                try:
+                    summary = await browser.get_browser_state_summary(
+                        include_screenshot=False
+                    )
+                    axtree = summary.dom_state.llm_representation(
+                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+                    )
+                    logger.debug(
+                        f"Command-step axtree capture took "
+                        f"{(time.perf_counter() - axtree_capture_start) * 1000:.0f}ms "
+                        f"({len(axtree) if axtree else 0} chars)"
+                    )
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to capture axtree for command step after "
+                        f"{(time.perf_counter() - axtree_capture_start) * 1000:.0f}ms: "
+                        f"{type(e).__name__}: {e}"
+                    )
+
+                # Resolve the element this command targets and build the best *stable*
+                # locator for it via the heuristic (not just an echo of the command).
+                # Pure logging: guarded so a failure here can never skip the action below.
+                interacted_locator = None
+                try:
+                    interacted_locator = (
+                        await LocatorExtraction.locator_from_playwright(
+                            locator, _action_method(action), action.command
+                        )
+                    )
+                    logger.debug(f"Command-step locator: {interacted_locator}")
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to record command-step locator: "
+                        f"{type(e).__name__}: {e}"
+                    )
+
                 memory.browser_states[-1] = BrowserState(
                     url=await browser.get_current_page_url(),
                     screenshot=screenshot,
                     title=await browser.get_current_page_title(),
-                    axtree=None,
+                    axtree=axtree,
+                    interacted_locator=interacted_locator,
                 )
 
                 if isinstance(action, ClickElementAction):
@@ -229,13 +302,16 @@ async def click_locator(
                 await page.mouse.click(x, y)
         if click_element_action.double_click:
             await locator.dblclick(
-                no_wait_after=True, timeout=max_timeout_seconds_per_try * 1000
+                no_wait_after=True,
+                timeout=max_timeout_seconds_per_try * 1000,
+                force=click_element_action.force,
             )
         else:
             await locator.click(
                 button=click_element_action.button,
                 no_wait_after=True,
                 timeout=max_timeout_seconds_per_try * 1000,
+                force=click_element_action.force,
             )
 
     if click_element_action.expect_download:
