@@ -147,6 +147,7 @@ class ClickElementAction(BaseAction):
     button: Literal["left", "right", "middle"] = "left"
     mouse_click: bool = False
     mouse_click_deviation: dict[str, float | int] | None = None
+    force: bool = False
 
     @model_validator(mode="after")
     def set_download_filename(self):

@@ -309,6 +309,7 @@ async def click_locator(
                 button=click_element_action.button,
                 no_wait_after=True,
                 timeout=max_timeout_seconds_per_try * 1000,
+                force=True,
             )
 
     if click_element_action.expect_download:
