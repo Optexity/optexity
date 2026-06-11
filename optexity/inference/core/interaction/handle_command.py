@@ -142,22 +142,20 @@ async def command_based_action_with_retry(
                         f"{type(e).__name__}: {e}"
                     )
 
-                # Resolve the element this command targets and collect all candidate
-                # locators for it via the heuristic (not just an echo of the command).
+                # Resolve the element this command targets and build the best *stable*
+                # locator for it via the heuristic (not just an echo of the command).
                 # Pure logging: guarded so a failure here can never skip the action below.
-                locator_candidates = None
+                interacted_locator = None
                 try:
-                    locator_candidates = (
+                    interacted_locator = (
                         await LocatorExtraction.locator_from_playwright(
                             locator, _action_method(action), action.command
                         )
                     )
-                    logger.debug(
-                        f"Command-step locator candidates: {locator_candidates}"
-                    )
+                    logger.debug(f"Command-step locator: {interacted_locator}")
                 except Exception as e:
                     logger.debug(
-                        f"Failed to record command-step locators: "
+                        f"Failed to record command-step locator: "
                         f"{type(e).__name__}: {e}"
                     )
 
@@ -166,7 +164,7 @@ async def command_based_action_with_retry(
                     screenshot=screenshot,
                     title=await browser.get_current_page_title(),
                     axtree=axtree,
-                    locator_candidates=locator_candidates,
+                    interacted_locator=interacted_locator,
                 )
 
                 if isinstance(action, ClickElementAction):
@@ -313,7 +311,7 @@ async def click_locator(
                 button=click_element_action.button,
                 no_wait_after=True,
                 timeout=max_timeout_seconds_per_try * 1000,
-                force=True,
+                force=click_element_action.force,
             )
 
     if click_element_action.expect_download:
