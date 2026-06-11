@@ -41,12 +41,11 @@ RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
         && rm /tmp/chrome.deb; \
     fi && apt-get update && apt-get install -y chromium && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --break-system-packages --no-cache-dir playwright patchright "cloakbrowser[geoip]"
+RUN pip3 install --break-system-packages --no-cache-dir playwright patchright
 
 # Install Chromium and Chrome in separate layers
 RUN playwright install --with-deps chromium
 RUN patchright install chromium
-RUN python3 -m cloakbrowser install
 
 # Create non-root user 'optexity' with passwordless sudo
 RUN groupadd -r optexity && \
@@ -78,8 +77,8 @@ RUN echo "CACHE_BREAK: $CACHE_BREAK"
 
 # Copy system config files as root before switching user
 # COPY controller.py /opt/controller.py
-COPY docker/openbox-rc.xml /etc/xdg/openbox/rc.xml
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY openbox-rc.xml /etc/xdg/openbox/rc.xml
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 RUN git config --global --add safe.directory /home/optexity/optexity && \
     cd optexity && git pull && git checkout main && git pull && \
