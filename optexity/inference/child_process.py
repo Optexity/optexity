@@ -306,6 +306,25 @@ async def run_automation_in_process(
     returncode: int | None = None
     try:
         returncode = await _run_attempt(0)
+    except Exception as e:
+        # An exception here means the worker never ran to completion (e.g.
+        # setup_browser failed), so no one has marked the task terminal. Without
+        # this the task is orphaned in "allocated" forever and no callback fires.
+        logger.exception(
+            f"Automation for task {task.task_id} failed before completion: {e}"
+        )
+        task.status = "failed"
+        task.error = f"{type(e).__name__}: {e}"
+        task.completed_at = datetime.now(timezone.utc)
+        try:
+            await complete_task_in_server(
+                task, None, child_process_id, unique_child_arn
+            )
+            await initiate_callback(task)
+        except Exception as report_exc:
+            logger.error(
+                f"Failed to report task {task.task_id} failure to server: {report_exc}"
+            )
     finally:
         logger.info(
             f"---------- Automation for task {task.task_id} finished ----------\n"
