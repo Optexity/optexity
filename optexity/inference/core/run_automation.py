@@ -12,6 +12,11 @@ from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
 from optexity.exceptions import KeywordNotFoundOnScreenException
+from optexity.inference.core.agentic_recovery import (
+    AGENTIC_RECOVERY_MAX_STEPS,
+    MAX_AGENTIC_RECOVERIES_PER_TASK,
+    build_recovery_prompt,
+)
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
 from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
@@ -71,28 +76,6 @@ from optexity.inference.infra.browser_health import (
     is_browser_session_poisoned_error,
     is_driver_closed_error,
     request_browser_restart,
-)
-
-# Max agentic recovery attempts allowed per task. Bounds LLM cost and damage
-# if the recovery itself starts misfiring.
-MAX_AGENTIC_RECOVERIES_PER_TASK = 3
-
-AGENTIC_RECOVERY_PROMPT = (
-    "A previous automation step failed, most likely because an unexpected "
-    "popup, alert, or dialog is blocking the screen. Inspect the screen and "
-    "take whatever short sequence of actions is needed to return the app to "
-    "a usable state so the automation can continue.\n\n"
-    "Hard rules:\n"
-    "1. NEVER click any 'Delete', 'Remove', or 'Discard permanently' button. "
-    "Deletion is not allowed under any circumstance.\n"
-    "2. For Save dialogs ('Save', 'Don't Save', 'Cancel', 'Discard', 'No', "
-    "'Yes'), decide for yourself which option best returns the app to a "
-    "usable state. Don't pick blindly — read the dialog.\n"
-    "3. Do NOT open new windows, navigate to other screens, or kill "
-    "processes. Stay on the current screen and only dismiss what's "
-    "blocking.\n"
-    "4. If after looking at the screen nothing appears to be blocking, "
-    "stop and reply with a short summary — do not click anything."
 )
 
 
@@ -345,6 +328,8 @@ async def run_action_node(
     task: Task,
     memory: Memory,
     browser: Browser,
+    siblings: list | None = None,
+    node_index: int | None = None,
 ):
     memory.update_system_info()
     await asyncio.sleep(action_node.before_sleep_time)
@@ -447,8 +432,10 @@ async def run_action_node(
                 f"{MAX_AGENTIC_RECOVERIES_PER_TASK}) before single retry."
             )
             recovery_action = AgenticTask(
-                task=AGENTIC_RECOVERY_PROMPT,
-                max_steps=3,
+                task=await build_recovery_prompt(
+                    action_node, siblings, node_index, task, memory
+                ),
+                max_steps=AGENTIC_RECOVERY_MAX_STEPS,
             )
             await handle_agentic_task(recovery_action, task, memory, browser)
             # One retry. If this also fails, the exception propagates to
@@ -538,7 +525,7 @@ async def handle_if_else_node(
     else:
         nodes = if_else_node.else_nodes
 
-    for node in nodes:
+    for i, node in enumerate(nodes):
         if isinstance(node, ActionNode):
             full_automation.append(node.model_dump())
             await run_action_node(
@@ -546,6 +533,8 @@ async def handle_if_else_node(
                 task,
                 memory,
                 browser,
+                siblings=nodes,
+                node_index=i,
             )
         elif isinstance(node, IfElseNode):
             await handle_if_else_node(node, memory, task, browser, full_automation)
@@ -578,7 +567,7 @@ async def handle_for_loop_node(
     for index in range(len(values)):
 
         try:
-            for node in for_loop_node.nodes:
+            for i, node in enumerate(for_loop_node.nodes):
                 new_node = deepcopy(node)
                 # split variable names by comma
                 variable_names = for_loop_node.variable_name.split(",")
@@ -608,6 +597,8 @@ async def handle_for_loop_node(
                         task,
                         memory,
                         browser,
+                        siblings=for_loop_node.nodes,
+                        node_index=i,
                     )
             memory.variables.for_loop_status[-1].append(
                 ForLoopStatus(
@@ -648,7 +639,7 @@ async def handle_for_loop_node(
                 raise e
 
         if index < len(values) - 1:
-            for node in for_loop_node.reset_nodes:
+            for i, node in enumerate(for_loop_node.reset_nodes):
                 if isinstance(node, IfElseNode):
                     await handle_if_else_node(
                         node, memory, task, browser, full_automation
@@ -661,6 +652,8 @@ async def handle_for_loop_node(
                         task,
                         memory,
                         browser,
+                        siblings=for_loop_node.reset_nodes,
+                        node_index=i,
                     )
     memory.update_system_info()
 
@@ -673,14 +666,16 @@ async def _run_nodes(
     full_automation: list,
 ):
     """Dispatch a list of nodes (ActionNode, ForLoopNode, or IfElseNode) for execution."""
-    for node in nodes:
+    for i, node in enumerate(nodes):
         if isinstance(node, ForLoopNode):
             await handle_for_loop_node(node, memory, task, browser, full_automation)
         elif isinstance(node, IfElseNode):
             await handle_if_else_node(node, memory, task, browser, full_automation)
         else:
             full_automation.append(node.model_dump())
-            await run_action_node(node, task, memory, browser)
+            await run_action_node(
+                node, task, memory, browser, siblings=nodes, node_index=i
+            )
 
 
 async def run_post_processing_nodes(task: Task, memory: Memory, browser: Browser):
