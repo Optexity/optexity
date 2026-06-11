@@ -27,7 +27,6 @@ dependencies = [
     # browser tooling (runtime)
     "playwright",
     "patchright",
-    "cloakbrowser",
     "browser_use_sdk",
 
     # misc runtime deps

@@ -64,7 +64,8 @@ EXPOSE 8000 8080 9000
 WORKDIR /home/optexity
 
 # Baseline install — cached, provides all heavy dependencies.
-RUN git clone https://github.com/Optexity/optexity.git && \
+RUN pip3 install --break-system-packages --upgrade pip && \
+    git clone https://github.com/Optexity/optexity.git && \
     cd optexity && git checkout main && \
     pip install --break-system-packages -e .
 
