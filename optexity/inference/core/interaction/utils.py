@@ -315,13 +315,14 @@ class LocatorExtraction:
         return f"{tag}[{attr}='{value}']"
 
     @classmethod
-    def build_playwright_locator(cls, element) -> str:
-        """Best-effort Playwright locator for a resolved DOM node, usable directly as
-        ``page.<locator>.click()`` / ``.fill(...)`` / ``.select_option(...)``.
+    def _scored_candidates(cls, element) -> list[tuple[int, str, str]]:
+        """Every viable Playwright locator for the element, scored by a stability
+        heuristic and sorted best-first. Each entry is ``(score, kind, locator)``.
+        Auto-generated/dynamic values are dropped. May be empty.
 
-        Rather than a fixed preference order, every viable locator is generated and
-        scored by a stability heuristic; the highest-scoring candidate is returned.
-        Returns e.g. ``locator("li.UserRegionsMenu__option button", has_text="Oregon")``.
+        NB: the score is a *stability* heuristic only — it does NOT verify the locator
+        is unique on the page. That's why we surface the whole list for human review
+        rather than committing to the top pick.
         """
         quote = cls._quote_locator_value
         attrs = getattr(element, "attributes", None) or {}
@@ -331,18 +332,22 @@ class LocatorExtraction:
         role = (ax.role or "").strip() if ax and ax.role else ""
         name = (ax.name or "").strip() if ax and ax.name else ""
 
-        # (stability_score, locator_expression)
-        candidates: list[tuple[int, str]] = []
+        # (stability_score, kind, locator_expression)
+        candidates: list[tuple[int, str, str]] = []
 
         # Purpose-built test hooks: most stable thing a page can expose.
         for attr in ("data-testid", "data-test-id", "data-test", "data-cy", "data-qa"):
             val = (attrs.get(attr) or "").strip()
             if val and not cls._looks_dynamic(val):
                 if attr == "data-testid":
-                    candidates.append((100, f"get_by_test_id({quote(val)})"))
+                    candidates.append((100, "test-id", f"get_by_test_id({quote(val)})"))
                 else:
                     candidates.append(
-                        (98, f"locator({quote(cls._css_attr(tag, attr, val), 400)})")
+                        (
+                            98,
+                            "test-id",
+                            f"locator({quote(cls._css_attr(tag, attr, val), 400)})",
+                        )
                     )
 
         el_id = (attrs.get("id") or "").strip()
@@ -351,24 +356,28 @@ class LocatorExtraction:
                 id_sel = f"#{el_id}"
             else:
                 id_sel = cls._css_attr(tag, "id", el_id)
-            candidates.append((92, f"locator({quote(id_sel, 400)})"))
+            candidates.append((92, "id", f"locator({quote(id_sel, 400)})"))
 
         nm = (attrs.get("name") or "").strip()
         if nm and not cls._looks_dynamic(nm):
             candidates.append(
-                (84, f"locator({quote(cls._css_attr(tag, 'name', nm), 400)})")
+                (84, "name", f"locator({quote(cls._css_attr(tag, 'name', nm), 400)})")
             )
 
         aria_label = (attrs.get("aria-label") or "").strip()
         if aria_label and not cls._looks_dynamic(aria_label):
-            candidates.append((76, f"get_by_label({quote(aria_label)})"))
+            candidates.append((76, "aria-label", f"get_by_label({quote(aria_label)})"))
 
         if role and name and not cls._looks_dynamic(name):
-            candidates.append((72, f"get_by_role({quote(role)}, name={quote(name)})"))
+            candidates.append(
+                (72, "role+name", f"get_by_role({quote(role)}, name={quote(name)})")
+            )
 
         placeholder = (attrs.get("placeholder") or "").strip()
         if placeholder and not cls._looks_dynamic(placeholder):
-            candidates.append((64, f"get_by_placeholder({quote(placeholder)})"))
+            candidates.append(
+                (64, "placeholder", f"get_by_placeholder({quote(placeholder)})")
+            )
 
         # Stable (non-hashed) css classes, optionally anchored with visible text.
         stable_classes = [
@@ -381,39 +390,60 @@ class LocatorExtraction:
             score = 50 + min(len(stable_classes), 3) * 3
             if text:
                 candidates.append(
-                    (score + 6, f"locator({quote(sel, 400)}, has_text={quote(text)})")
+                    (
+                        score + 6,
+                        "css+text",
+                        f"locator({quote(sel, 400)}, has_text={quote(text)})",
+                    )
                 )
             else:
-                candidates.append((score, f"locator({quote(sel, 400)})"))
+                candidates.append((score, "css", f"locator({quote(sel, 400)})"))
 
         # Pure visible-text match (content can change, so ranked low).
         if text:
             if role:
                 candidates.append(
-                    (40, f"get_by_role({quote(role)}, name={quote(text)})")
+                    (40, "role+text", f"get_by_role({quote(role)}, name={quote(text)})")
                 )
             else:
-                candidates.append((38, f"get_by_text({quote(text)})"))
+                candidates.append((38, "text", f"get_by_text({quote(text)})"))
 
         # Positional xpath: always available, least stable -> last resort.
         xpath = (getattr(element, "xpath", "") or "").strip()
         if xpath:
-            candidates.append((10, f'locator({quote("xpath=" + xpath, 400)})'))
-
-        if not candidates:
-            return "<index-only: no locator available>"
+            candidates.append((10, "xpath", f'locator({quote("xpath=" + xpath, 400)})'))
 
         candidates.sort(key=lambda c: c[0], reverse=True)
-        return candidates[0][1]
+        return candidates
+
+    @classmethod
+    def build_playwright_locator(cls, element) -> str:
+        """The single best (highest-scoring) Playwright locator, for the human-readable
+        log line. The full ranked list (recorded for the UI) comes from
+        ``locator_candidates``."""
+        cands = cls._scored_candidates(element)
+        return cands[0][2] if cands else "<index-only: no locator available>"
+
+    @classmethod
+    def locator_candidates(cls, element, method: str) -> list[dict]:
+        """All viable locators for the element as copy-pasteable ``page.<locator><method>``
+        expressions, best-first, each tagged with its ``kind`` and stability ``score`` —
+        so a human can pick the most reliable one offline in the task-logs UI (the
+        heuristic ranks by stability but does not check uniqueness)."""
+        return [
+            {"locator": f"page.{loc}{method}", "kind": kind, "score": score}
+            for score, kind, loc in cls._scored_candidates(element)
+        ]
 
     @classmethod
     async def locator_from_playwright(
         cls, locator, method: str, fallback_command: str | None = None
-    ) -> str | None:
-        """Resolve the element a command's Playwright *locator* points to and build the
-        best *stable* locator for it with the heuristic, so the recorded locator is not
-        just an echo of the command. ``method`` is the trailing call (e.g. ``.click()``).
-        Falls back to the raw command if the element can't be read. Never raises.
+    ) -> list[dict]:
+        """Resolve the element a command's Playwright *locator* points to and return all
+        candidate locators (best-first) for it via the heuristic, so the recorded
+        candidates are not just an echo of the command. ``method`` is the trailing call
+        (e.g. ``.click()``). Falls back to the raw command if the element can't be read.
+        Never raises.
         """
         try:
             signals = await locator.evaluate(cls._ELEMENT_SIGNALS_JS)
@@ -426,22 +456,32 @@ class LocatorExtraction:
                 xpath=signals.get("xpath", ""),
                 get_meaningful_text_for_llm=(lambda t=signals.get("text", ""): t),
             )
-            return f"page.{cls.build_playwright_locator(element)}{method}"
+            candidates = cls.locator_candidates(element, method)
+            if candidates:
+                return candidates
         except Exception as e:
             logger.debug(
                 f"locator_from_playwright failed, falling back to command: "
                 f"{type(e).__name__}: {e}"
             )
-            return f"page.{fallback_command}{method}" if fallback_command else None
+        if fallback_command:
+            return [
+                {
+                    "locator": f"page.{fallback_command}{method}",
+                    "kind": "command",
+                    "score": 0,
+                }
+            ]
+        return []
 
     @staticmethod
-    def record_interacted_locator(
-        memory: Memory | None, expression: str | None
+    def record_locator_candidates(
+        memory: Memory | None, candidates: list[dict] | None
     ) -> None:
-        """Store the locator interacted with on the current step's browser state so it
-        lands in the per-step task log uploaded to S3."""
-        if expression and memory is not None and memory.browser_states:
-            memory.browser_states[-1].interacted_locator = expression
+        """Store the candidate locators on the current step's browser state so they land
+        in the per-step task log uploaded to S3."""
+        if candidates and memory is not None and memory.browser_states:
+            memory.browser_states[-1].locator_candidates = candidates
 
     @classmethod
     async def log_interacted_locator(
@@ -471,9 +511,13 @@ class LocatorExtraction:
                     f"LLM fallback locator [index {index}]: unavailable (index not in selector map)"
                 )
                 return
-            expression = f"page.{cls.build_playwright_locator(element)}{method}"
-            logger.info(f"LLM fallback locator [index {index}]: {expression}")
-            cls.record_interacted_locator(memory, expression)
+            candidates = cls.locator_candidates(element, method)
+            if candidates:
+                logger.info(
+                    f"LLM fallback locator [index {index}]: {candidates[0]['locator']} "
+                    f"(+{len(candidates) - 1} more candidate(s))"
+                )
+                cls.record_locator_candidates(memory, candidates)
         except Exception as e:
             logger.debug(
                 f"log_interacted_locator failed for index {index}: {type(e).__name__}: {e}"
