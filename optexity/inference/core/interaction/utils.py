@@ -565,11 +565,18 @@ async def get_index_from_prompt(
         memory.browser_states[-1].final_prompt = final_prompt
         memory.browser_states[-1].llm_response = response.model_dump()
 
-        if response.index == -1:
+        # Treat any non-positive index as "not found". -1 is the documented
+        # not-found sentinel, but the model sometimes emits 0 (or another <= 0
+        # value) to mean "no match". browser_use's ActionModel requires
+        # index >= 1, so without this guard a non-positive index crashes the
+        # click (AxtreeIndexActionFailedException) instead of cleanly routing to
+        # the agentic fallback the way -1 does.
+        if response.index <= 0:
             raise ElementNotFoundInAxtreeException(
                 message=f"Element not found in the axtree: {prompt_instructions}",
                 original_error=Exception(
-                    f"Element not found in the axtree: {prompt_instructions}"
+                    f"Index predictor returned non-positive index "
+                    f"{response.index} for: {prompt_instructions}"
                 ),
                 command=prompt_instructions,
             )

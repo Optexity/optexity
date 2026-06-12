@@ -54,6 +54,9 @@ optexity = "optexity.cli:main"
 where = ["."]
 include = ["optexity*"]
 
+[tool.setuptools.package-data]
+"optexity.prompts" = ["*.md"]
+
 [tool.black]
 line-length = 88
 target-version = ["py311"]
