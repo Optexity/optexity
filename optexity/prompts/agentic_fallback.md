@@ -115,6 +115,12 @@ and was refused. That is a genuine failure (see below), not something to retry.
 
 ## If it's a GENUINE FAILURE — do nothing, and report the failure
 
+Conclude this **only after** the prerequisites are correct. An absent target or an
+empty/"no results" state is often caused by a prerequisite carried out with the wrong
+value (e.g. a search run with the wrong query) — that is recoverable, so fix the
+prerequisite and try once more first. It is a genuine failure only when the goal still
+cannot be met **after** the prerequisites are right.
+
 Some failures are correct: the automation is _supposed_ to stop here. **Do not work
 around these.** Tell-tale signs:
 
