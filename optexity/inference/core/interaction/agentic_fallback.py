@@ -21,6 +21,8 @@ WINDOW_RADIUS = 2
 # How much of the run log (optexity.log, the same file we ship to S3) to feed the
 # agent. We tail it so a long run doesn't blow up the prompt; bump if needed.
 FALLBACK_LOG_TAIL_CHARS = 20000
+# Cap a single input-parameter value so a large blob doesn't blow up the prompt.
+INPUT_PARAM_MAX_VALUE_CHARS = 500
 
 
 @lru_cache(maxsize=1)
@@ -214,6 +216,27 @@ async def _read_run_log_tail(task: Task) -> str:
     return content
 
 
+def _render_input_parameters(task: Task) -> str:
+    """Render the automation's (non-secret) input parameters for the agent.
+
+    Shown in ``{key[index]} = "value"`` form so the agent can map a step's
+    placeholder to its real value and fill an empty/missing field. Only
+    ``input_parameters`` are exposed — ``secure_parameters`` (which resolve to
+    real secrets) are deliberately never sent to the fallback agent.
+    """
+    params = task.input_parameters or {}
+    lines: list[str] = []
+    for key, values in params.items():
+        if not isinstance(values, list):
+            continue
+        for i, value in enumerate(values):
+            s = str(value)
+            if len(s) > INPUT_PARAM_MAX_VALUE_CHARS:
+                s = s[:INPUT_PARAM_MAX_VALUE_CHARS] + "…(truncated)"
+            lines.append(f'  - {{{key}[{i}]}} = "{s}"')
+    return "\n".join(lines) if lines else "(no input parameters provided)"
+
+
 async def run_axtree_fallback_agent(
     interaction_action: InteractionAction,
     error: ElementNotFoundInAxtreeException,
@@ -246,6 +269,7 @@ async def run_axtree_fallback_agent(
         _load_fallback_prompt_template()
         .replace("<<GOAL>>", str(goal))
         .replace("<<WORKFLOW_WINDOW>>", workflow_window)
+        .replace("<<INPUT_PARAMETERS>>", _render_input_parameters(task))
         .replace("<<ERROR_LOGS>>", error_logs)
         .replace("<<CURRENT_URL>>", str(current_url))
     )
