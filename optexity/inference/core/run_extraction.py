@@ -436,6 +436,17 @@ async def handle_python_script_extraction(
                 json_data=result,
             )
         )
+        if python_script_extraction.output_variable_names is not None:
+            for output_variable_name in python_script_extraction.output_variable_names:
+                v = result[output_variable_name]
+                if isinstance(v, list):
+                    memory.variables.generated_variables[output_variable_name] = v
+                elif isinstance(v, (str, int, float, bool)):
+                    memory.variables.generated_variables[output_variable_name] = [v]
+                else:
+                    raise ValueError(
+                        f"Output variable {output_variable_name} must be a string, int, float, bool, or a list of strings, ints, floats, or bools. Extracted values: {result[output_variable_name]}"
+                    )
     else:
         logger.warning(
             f"No result from Python script extraction: {python_script_extraction.script}"

@@ -33,7 +33,12 @@ from optexity.inference.core.run_interaction import (
     handle_download_url_as_pdf,
     run_interaction_action,
 )
-from optexity.inference.core.run_misc import run_fail_state_action, run_sleep_action
+from optexity.inference.core.run_misc import (
+    run_fail_state_action,
+    run_llm_query_action,
+    run_set_variable_action,
+    run_sleep_action,
+)
 from optexity.inference.core.run_python_script import run_python_script_action
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
@@ -367,6 +372,12 @@ async def run_action_node(
             await run_human_in_loop_action(
                 action_node.human_in_loop_action, task, memory
             )
+        elif action_node.misc_action:
+            misc = action_node.misc_action
+            if misc.set_variable:
+                await run_set_variable_action(misc.set_variable, memory)
+            elif misc.llm_query:
+                await run_llm_query_action(misc.llm_query, memory, task)
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
