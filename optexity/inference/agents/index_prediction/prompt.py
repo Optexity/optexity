@@ -10,13 +10,25 @@ Your core responsibility is to translate a user's intended action, described thr
 
 **Crucial Task Directives:**
 
-Your output must be a single numerical index from the axtree if the element found in the axtree is the same as the element in the goal. This is because index-based interaction is more reliable than trying to replicate a playwright command, which can fail if the element isn't precisely found.
+You identify the interactive element by its numerical index in the axtree — the element that matches the one described in the goal. Index-based interaction is more reliable than replicating a playwright command, which can fail if the element isn't precisely found.
 """
 
 can_return_negative_index_prompt = """
-Return `-1` whenever you have **ANY doubt** that the element you picked is the correct one for the goal. Only return a positive index when you are clearly confident that an element in the axtree corresponds to the element described in the goal.
+Verify the match before you answer. Do not pick an element just because it is the closest available, or because it shares keywords with the goal text.
 
-Do not guess and do not settle for an element that is merely "close enough". If the goal asks for a specific control (e.g. a "Continue" button) and the axtree does not contain an element that clearly matches it, return `-1`. Partial matches, ambiguous candidates, or uncertainty about whether you are even on the correct page should all result in `-1`.
+Work through this:
 
-Returning `-1` is safe: it triggers a dedicated fallback that will accomplish the step another way. Returning a wrong positive index is harmful, because it makes the automation interact with the wrong element. When in doubt, return `-1`.
+1. **Identify the target.** From the goal, determine the specific element to act on — its kind and its identity (e.g. a result link whose text is the company name, a "Continue" button, a specific menu item).
+2. **Find the matching element.** Look for the axtree element whose **own** visible text / label / role matches that target. Match on the element's own identity, NOT on keyword overlap with the goal sentence. A goal that mentions "search results" does **not** mean the search input box; an element that merely sits near the target is **not** the target.
+3. **Decide:**
+   - If one element **clearly** matches the target, return its index. You do not need to be 100% certain — minor uncertainty about an element that clearly matches is fine; return it.
+   - If **no** element clearly matches, return `-1`. In particular, return `-1` when:
+       * the goal names a specific entity or label and no element's text corresponds to it,
+       * only related or adjacent controls are present (e.g. a search box when a search **result** is wanted), not the target itself,
+       * the page is not the kind the goal expects (e.g. the goal wants a search result but this is a blog/listing page),
+       * the best you can find is only a partial or ambiguous match.
+
+A wrong positive index is harmful — it makes the automation act on the wrong element. `-1` is safe — it routes the step to a dedicated fallback. So when no element clearly corresponds to the target, prefer `-1` over a "close enough" guess. But do **not** return `-1` merely because you feel slightly unsure about an element that clearly matches — that needlessly diverts a recoverable step.
+
+Fill in `reasoning` and `matched_element_text` **before** `index`: name the target, quote the verbatim text/label of the element you matched, and explain the choice. When returning `-1`, set `matched_element_text` to "" and use `reasoning` to say what was missing.
 """

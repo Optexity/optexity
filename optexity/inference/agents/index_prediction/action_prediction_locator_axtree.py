@@ -14,8 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 class IndexPredictionOutputAllowNegative(BaseModel):
+    reasoning: str = Field(
+        description="Brief reasoning: the specific element the goal targets, whether the axtree contains an element whose own text/label/role clearly matches it, and why you chose this index (or -1)."
+    )
+    matched_element_text: str = Field(
+        description='The visible text, label, or role of the element you selected, copied verbatim from the axtree. Set to "" when returning -1 because no element matches.'
+    )
     index: int = Field(
-        description="The index of the interactive element in the axtree that would achieve the desired outcome. It is either a positive integer or -1 if the element is not found in the axtree."
+        description="The index of the interactive element in the axtree that would achieve the desired outcome. It is either a positive integer or -1 if no element in the axtree clearly matches the goal."
     )
 
 
