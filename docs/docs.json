@@ -36,8 +36,15 @@
                         "pages": [
                             "/docs/action-types/interaction-action",
                             "/docs/action-types/extraction-action",
-                            "/docs/action-types/agentic-tasks",
-                            "/docs/action-types/human-in-loop"
+                            {
+                                "group": "Misc Actions",
+                                "pages": [
+                                    "/docs/action-types/python-script-action",
+                                    "/docs/action-types/llm-query-action",
+                                    "/docs/action-types/human-in-loop"
+                                ]
+                            },
+                            "/docs/action-types/agentic-tasks"
                         ]
                     },
                     {
