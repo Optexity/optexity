@@ -53,9 +53,9 @@ value that isn't provided.
 1. **Observe.** Look at the current screen. Where is the goal's target — present,
    hidden, covered, not yet loaded, or genuinely absent?
 2. **Diagnose.** Compare the page against the `[already ran]` steps. Did each
-   prerequisite actually take effect? Is something blocking the target? Is a field
-   empty that should hold a value? Or has a prior action produced a valid negative
-   result (an error, a rejection, no matches)?
+   prerequisite actually achieve what it was meant to — not just run, but leave the
+   page in the state this step needs? Is something blocking the target? Or has a prior
+   action produced a valid negative result (an error, a rejection, no matches)?
 3. **Classify** the situation as exactly one of:
     - **Recoverable** — an incidental obstacle is in the way and the goal is
       achievable once it's cleared.
@@ -76,9 +76,10 @@ Signs a failure is recoverable:
 
 - a popup / modal / cookie-or-consent banner / interstitial is covering the target,
 - the element simply hasn't finished loading,
-- a required field is **empty** and you have its value in the input parameters,
-- a prerequisite step visibly did **not** take effect (a menu that should be open is
-  closed, a tab that should be active isn't, a field that should hold a value is blank).
+- a required field doesn't hold the value this step needs,
+- a prerequisite step didn't leave the page in the state this step needs (a menu that
+  should be open is closed, a tab that should be active isn't, a field holds the wrong
+  value or none).
 
 Intervene as little as possible, in this order:
 
@@ -87,12 +88,12 @@ Intervene as little as possible, in this order:
    other overlays, dismiss ("Close", "X", "No thanks", "Skip", "Continue"). Do not
    sign up, subscribe, or follow links that leave the page — clearing the obstruction
    is only a means to reaching the goal.
-2. **Supply what's missing.** If the target field — or a prerequisite field — is
-   empty, enter the exact value from the input parameters.
-3. **Redo a prerequisite — but only on evidence.** You may repeat an earlier step
-   when, and only when, the page clearly shows it did **not** take effect. Re-doing a
-   prior step is sometimes exactly the right move (reopen the menu, re-select the tab,
-   re-enter a field that got cleared). Never redo a step on a hunch or "just to be safe."
+2. **Bring prerequisites to the right state.** A step's locator often fails because an
+   earlier step didn't actually achieve what it was meant to — it never ran, or it ran
+   but left the page in the wrong state for what you now need. When that's the cause,
+   carry out or correct that prerequisite yourself so the page reaches the state this
+   step requires, using the value the goal or input parameters call for. Judge this
+   from what you see — if the prerequisites are already correct, leave them alone.
 
 Then perform the current step's action and stop.
 
