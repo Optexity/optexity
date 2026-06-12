@@ -21,8 +21,6 @@ WINDOW_RADIUS = 2
 # How much of the run log (optexity.log, the same file we ship to S3) to feed the
 # agent. We tail it so a long run doesn't blow up the prompt; bump if needed.
 FALLBACK_LOG_TAIL_CHARS = 20000
-# Cap a single input-parameter value so a large blob doesn't blow up the prompt.
-INPUT_PARAM_MAX_VALUE_CHARS = 500
 
 
 @lru_cache(maxsize=1)
@@ -230,10 +228,7 @@ def _render_input_parameters(task: Task) -> str:
         if not isinstance(values, list):
             continue
         for i, value in enumerate(values):
-            s = str(value)
-            if len(s) > INPUT_PARAM_MAX_VALUE_CHARS:
-                s = s[:INPUT_PARAM_MAX_VALUE_CHARS] + "…(truncated)"
-            lines.append(f'  - {{{key}[{i}]}} = "{s}"')
+            lines.append(f'  - {{{key}[{i}]}} = "{value}"')
     return "\n".join(lines) if lines else "(no input parameters provided)"
 
 
