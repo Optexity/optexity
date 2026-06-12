@@ -312,13 +312,13 @@ class Browser:
             return None
 
     async def get_browser_state_summary(
-        self, include_full_page: bool = False
+        self, include_full_page: bool = False, include_screenshot: bool = True
     ) -> BrowserStateSummary:
         if self.backend_agent is None:
             raise ValueError("Backend agent is not set")
 
         browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
-            include_screenshot=True,  # always capture even if use_vision=False so that cloud sync is useful (it's fast now anyway)
+            include_screenshot=include_screenshot,  # default True even if use_vision=False so cloud sync is useful (it's fast now anyway); pass False when only the axtree is needed
             include_recent_events=False,
             cached=False,
             include_full_page=include_full_page,

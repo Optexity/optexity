@@ -118,6 +118,7 @@ class BrowserState(BaseModel):
     axtree: str | None = Field(default=None)
     final_prompt: str | None = Field(default=None)
     llm_response: str | dict | None = Field(default=None)
+    locator_candidates: list[dict] | None = Field(default=None)
     system_info: SystemInfo = Field(default_factory=SystemInfo)
 
 

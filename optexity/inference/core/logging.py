@@ -324,6 +324,9 @@ async def save_latest_memory_state_locally(
 ):
 
     try:
+        # Captured here because this runs in run_node's `finally`, i.e. right after the
+        # step's action has completed (or failed) — so it is the action-completion time.
+        completed_at = datetime.now(timezone.utc).isoformat()
         browser_state = memory.browser_states[-1]
         automation_state = memory.automation_state
         step_directory = (
@@ -345,6 +348,8 @@ async def save_latest_memory_state_locally(
             "url": browser_state.url,
             "step_index": automation_state.step_index,
             "try_index": automation_state.try_index,
+            "completed_at": completed_at,
+            "started_at": (task.started_at.isoformat() if task.started_at else None),
             "downloaded_files": [
                 downloaded_file.name for downloaded_file in memory.downloads
             ],
@@ -367,6 +372,12 @@ async def save_latest_memory_state_locally(
         if browser_state.llm_response:
             async with aiofiles.open(step_directory / "llm_response.json", "w") as f:
                 await f.write(json.dumps(browser_state.llm_response, indent=4))
+
+        if browser_state.locator_candidates:
+            async with aiofiles.open(
+                step_directory / "locator_candidates.json", "w"
+            ) as f:
+                await f.write(json.dumps(browser_state.locator_candidates, indent=4))
 
         if node:
             async with aiofiles.open(step_directory / "action_node.json", "w") as f:
