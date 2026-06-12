@@ -1,0 +1,122 @@
+---
+title: LLM Query Action
+description: Run a direct LLM query without browser context
+---
+
+`misc_action.llm_query` sends a prompt directly to an LLM and stores the structured response—no browser state, axtree, or screenshot is involved.
+
+## Overview
+
+- **Use when**: You need to transform, classify, or reason over data already in memory (e.g., reformat an extracted date, classify extracted text, compute a derived value).
+- **Execution**: The action sends `prompt_instructions` to the configured LLM, parses the response according to `output_format`, and stores results in `output_data`. Specified fields are optionally promoted to `generated_variables`.
+- **No browser access**: Unlike `extraction_action.llm`, this action does not read the current page. Reference earlier extracted values via `{variable_name[index]}` in your prompt.
+
+## Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `output_format` | `dict` | Required | Expected output structure as a type-annotated dict |
+| `prompt_instructions` | `str` | Required | The full prompt to send to the LLM |
+| `output_variable_names` | `list[str] \| None` | `None` | Promote response fields to `generated_variables` |
+| `llm_provider` | `"gemini" \| "anthropic" \| "openai"` | `"gemini"` | LLM provider |
+| `llm_model_name` | `str` | `"gemini-2.5-flash"` | Model name |
+
+## JSON Example
+
+```json
+{
+  "type": "action_node",
+  "misc_action": {
+    "llm_query": {
+      "output_format": {
+        "category": "str",
+        "confidence": "str"
+      },
+      "prompt_instructions": "Classify the following support ticket as 'billing', 'technical', or 'other'. Ticket: {ticket_text[0]}",
+      "output_variable_names": ["category"]
+    }
+  }
+}
+```
+
+## Output Format
+
+Define the expected response structure with Python type hints:
+
+```json
+{
+  "output_format": {
+    "summary": "str",
+    "status": "str",
+    "items": "List[str]"
+  }
+}
+```
+
+<Info>
+Only `str` and `List[str]` are supported types in `output_format`.
+</Info>
+
+## Using Variables in Prompts
+
+Reference extracted values from earlier nodes using `{variable_name[index]}`:
+
+```json
+{
+  "misc_action": {
+    "llm_query": {
+      "output_format": { "normalized_date": "str" },
+      "prompt_instructions": "Reformat this date to ISO 8601 (YYYY-MM-DD): {raw_date[0]}",
+      "output_variable_names": ["normalized_date"]
+    }
+  }
+}
+```
+
+After this action, `{normalized_date[0]}` is available in subsequent nodes.
+
+## Storing Output as Variables
+
+Set `output_variable_names` to promote response fields into `generated_variables`:
+
+```json
+{
+  "misc_action": {
+    "llm_query": {
+      "output_format": {
+        "next_url": "str",
+        "has_more_pages": "str"
+      },
+      "prompt_instructions": "Given these pagination links: {page_links[0]}, return the next page URL and whether more pages exist ('true'/'false').",
+      "output_variable_names": ["next_url", "has_more_pages"]
+    }
+  }
+}
+```
+
+<Warning>
+Every key in `output_variable_names` must appear in `output_format`. Validation fails at schema load time if a key is missing.
+</Warning>
+
+## Choosing a Provider and Model
+
+| Provider | Models | Notes |
+|----------|--------|-------|
+| `gemini` | `gemini-2.5-flash`, `gemini-2.5-pro` | Default; cost-effective |
+| `anthropic` | `claude-sonnet-4-6`, `claude-haiku-4-5-20251001` | Strong reasoning |
+| `openai` | `gpt-4o`, `gpt-4o-mini` | OpenAI models |
+
+If `llm_provider` and `llm_model_name` are omitted, the task-level defaults are used.
+
+## LLM Query vs LLM Extraction
+
+| | `misc_action.llm_query` | `extraction_action.llm` |
+|--|------------------------|------------------------|
+| Browser context | None — prompt only | axtree and/or screenshot of current page |
+| Typical use | Transform / classify in-memory data | Extract data from the page the browser is on |
+| Input source | Variables embedded in the prompt | Live page content |
+| Output destination | `output_data` + optional `generated_variables` | `output_data` + optional `generated_variables` |
+
+<Tip>
+Use `misc_action.llm_query` after an extraction step to post-process or validate extracted data without consuming a browser round-trip.
+</Tip>
