@@ -1,0 +1,21 @@
+{
+  "url": "https://www.roboform.com/filling-test-all-fields",
+  "parameters": {
+    "input_parameters": {},
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "Fill all visible text input fields in this form with realistic test data. Skip non-text controls and finish when all text fields are populated.",
+          "max_steps": 45,
+          "backend": "browser_use",
+          "use_vision": false,
+          "keep_alive": true
+        }
+      }
+    }
+  ]
+}

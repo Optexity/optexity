@@ -103,6 +103,11 @@ def main() -> int:
             print(f"  ✗ {e}")
         return 1
 
+    import os
+
+    if not os.getenv("GOOGLE_API_KEY"):
+        print("\nNote: GOOGLE_API_KEY is not set — agentic browser-use runs will fail until it is set.")
+
     print("\n✓ Setup OK. Run inference with THIS python:")
     print("  cd /Users/rreddy/Documents/repana/optexity")
     print("  source .venv/bin/activate")

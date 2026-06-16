@@ -10,7 +10,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"input[name='01___title']\").first",
-          "prompt_instructions": "Fill Title, First Name, and Middle Initial fields with test data.",
+          "prompt_instructions": "Fill Title [13], First Name [14], and Middle Initial [15] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "Mr."
@@ -22,7 +22,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[2]/div[2]/input\").first",
-          "prompt_instructions": "Fill Title, First Name, and Middle Initial fields with test data.",
+          "prompt_instructions": "Fill Title [13], First Name [14], and Middle Initial [15] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "John"
@@ -34,10 +34,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[3]/div[2]/input\").first",
-          "prompt_instructions": "Fill Title, First Name, and Middle Initial fields with test data.",
+          "prompt_instructions": "Fill Title [13], First Name [14], and Middle Initial [15] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "D"
+          "input_text": "A"
         }
       }
     },
@@ -46,7 +46,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[4]/div[2]/input\").first",
-          "prompt_instructions": "Fill Last Name, Full Name, and Company text fields with test data.",
+          "prompt_instructions": "Fill Last Name [16], Full Name [17], and Company [18] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "Doe"
@@ -58,10 +58,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[5]/div[2]/input\").first",
-          "prompt_instructions": "Fill Last Name, Full Name, and Company text fields with test data.",
+          "prompt_instructions": "Fill Last Name [16], Full Name [17], and Company [18] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "John D Doe"
+          "input_text": "John A. Doe"
         }
       }
     },
@@ -70,7 +70,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"input[name='05_company']\").first",
-          "prompt_instructions": "Fill Last Name, Full Name, and Company text fields with test data.",
+          "prompt_instructions": "Fill Last Name [16], Full Name [17], and Company [18] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "Acme Corp"
@@ -82,10 +82,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[7]/div[2]/input\").first",
-          "prompt_instructions": "Fill Position, Address Line 1, and Address Line 2 text fields with test data.",
+          "prompt_instructions": "Fill Position [19], Address Line 1 [20], and Address Line 2 [21] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "QA Engineer"
+          "input_text": "Software Engineer"
         }
       }
     },
@@ -94,10 +94,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[8]/div[2]/input\").first",
-          "prompt_instructions": "Fill Position, Address Line 1, and Address Line 2 text fields with test data.",
+          "prompt_instructions": "Fill Position [19], Address Line 1 [20], and Address Line 2 [21] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "123 Main St"
+          "input_text": "123 Main Street"
         }
       }
     },
@@ -106,10 +106,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[9]/div[2]/input\").first",
-          "prompt_instructions": "Fill Position, Address Line 1, and Address Line 2 text fields with test data.",
+          "prompt_instructions": "Fill Position [19], Address Line 1 [20], and Address Line 2 [21] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "Suite 100"
+          "input_text": "Suite 400"
         }
       }
     },
@@ -118,10 +118,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[10]/div[2]/input\").first",
-          "prompt_instructions": "Fill City, State / Province, and Country text fields with test data.",
+          "prompt_instructions": "Fill City [22], State / Province [23], and Country [24] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "Metropolis"
+          "input_text": "Los Angeles"
         }
       }
     },
@@ -130,10 +130,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[11]/div[2]/input\").first",
-          "prompt_instructions": "Fill City, State / Province, and Country text fields with test data.",
+          "prompt_instructions": "Fill City [22], State / Province [23], and Country [24] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "NY"
+          "input_text": "California"
         }
       }
     },
@@ -142,7 +142,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"input[name='15_country']\").first",
-          "prompt_instructions": "Fill City, State / Province, and Country text fields with test data.",
+          "prompt_instructions": "Fill City [22], State / Province [23], and Country [24] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "United States"
@@ -154,10 +154,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[13]/div[2]/input\").first",
-          "prompt_instructions": "Fill Zip, Home Phone, and Work Telephone text fields with test data.",
+          "prompt_instructions": "Fill Zip [25], Home Phone [26], and Work Telephone [27] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "10001"
+          "input_text": "90001"
         }
       }
     },
@@ -166,7 +166,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[14]/div[2]/input\").first",
-          "prompt_instructions": "Fill Zip, Home Phone, and Work Telephone text fields with test data.",
+          "prompt_instructions": "Fill Zip [25], Home Phone [26], and Work Telephone [27] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "555-0199"
@@ -178,31 +178,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[15]/div[2]/input\").first",
-          "prompt_instructions": "Fill Zip, Home Phone, and Work Telephone text fields with test data.",
-          "skip_command": false,
-          "skip_prompt": true,
-          "input_text": "555-0100"
-        }
-      }
-    },
-    {
-      "type": "action_node",
-      "interaction_action": {
-        "input_text": {
-          "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[16]/div[2]/input\").first",
-          "prompt_instructions": "Fill Fax, Cell Phone, and E-mail text fields with test data.",
-          "skip_command": false,
-          "skip_prompt": true,
-          "input_text": "555-0111"
-        }
-      }
-    },
-    {
-      "type": "action_node",
-      "interaction_action": {
-        "input_text": {
-          "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[17]/div[2]/input\").first",
-          "prompt_instructions": "Fill Fax, Cell Phone, and E-mail text fields with test data.",
+          "prompt_instructions": "Fill Zip [25], Home Phone [26], and Work Telephone [27] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "555-0122"
@@ -213,8 +189,32 @@
       "type": "action_node",
       "interaction_action": {
         "input_text": {
+          "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[16]/div[2]/input\").first",
+          "prompt_instructions": "Fill Fax [28], Cell Phone [29], and E-mail [30] with realistic test data.",
+          "skip_command": false,
+          "skip_prompt": true,
+          "input_text": "555-0133"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[17]/div[2]/input\").first",
+          "prompt_instructions": "Fill Fax [28], Cell Phone [29], and E-mail [30] with realistic test data.",
+          "skip_command": false,
+          "skip_prompt": true,
+          "input_text": "555-0144"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[18]/div[2]/input\").first",
-          "prompt_instructions": "Fill Fax, Cell Phone, and E-mail text fields with test data.",
+          "prompt_instructions": "Fill Fax [28], Cell Phone [29], and E-mail [30] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "john.doe@example.com"
@@ -226,10 +226,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[19]/div[2]/input\").first",
-          "prompt_instructions": "Fill Web Site, User ID, and Password text fields with test data.",
+          "prompt_instructions": "Fill Web Site [31], User ID [32], and Password [33] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "https://example.com"
+          "input_text": "https://www.example.com"
         }
       }
     },
@@ -238,7 +238,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"input[name='30_user_id']\").first",
-          "prompt_instructions": "Fill Web Site, User ID, and Password text fields with test data.",
+          "prompt_instructions": "Fill Web Site [31], User ID [32], and Password [33] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "johndoe123"
@@ -250,7 +250,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[2]/div[2]/div[2]/input\").first",
-          "prompt_instructions": "Fill Web Site, User ID, and Password text fields with test data.",
+          "prompt_instructions": "Fill Web Site [31], User ID [32], and Password [33] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "SuperSecurePass123!"
@@ -262,7 +262,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[2]/div[4]/div[2]/input\").first",
-          "prompt_instructions": "Fill Credit Card Number, Card Verification Code, and Card User Name text fields with test data.",
+          "prompt_instructions": "Fill Credit Card Number [35], Card Verification Code [36], and Card User Name [39] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "4111111111111111"
@@ -274,7 +274,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[2]/div[5]/div[2]/input\").first",
-          "prompt_instructions": "Fill Credit Card Number, Card Verification Code, and Card User Name text fields with test data.",
+          "prompt_instructions": "Fill Credit Card Number [35], Card Verification Code [36], and Card User Name [39] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "123"
@@ -286,10 +286,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"input[name='44cc_uname']\").first",
-          "prompt_instructions": "Fill Credit Card Number, Card Verification Code, and Card User Name text fields with test data.",
+          "prompt_instructions": "Fill Credit Card Number [35], Card Verification Code [36], and Card User Name [39] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "John D Doe"
+          "input_text": "John A Doe"
         }
       }
     },
@@ -298,7 +298,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[2]/div[8]/div[2]/input\").first",
-          "prompt_instructions": "Fill Card Issuing Bank, Card Customer Service Phone, and Sex text fields with test data.",
+          "prompt_instructions": "Fill Card Issuing Bank [40], Card Customer Service Phone [41], Sex [42], and Social Security Number [43] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "Chase Bank"
@@ -310,10 +310,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[2]/div[9]/div[2]/input\").first",
-          "prompt_instructions": "Fill Card Issuing Bank, Card Customer Service Phone, and Sex text fields with test data.",
+          "prompt_instructions": "Fill Card Issuing Bank [40], Card Customer Service Phone [41], Sex [42], and Social Security Number [43] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "800-555-0199"
+          "input_text": "1-800-935-9935"
         }
       }
     },
@@ -322,7 +322,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[2]/div[10]/div[2]/input\").first",
-          "prompt_instructions": "Fill Card Issuing Bank, Card Customer Service Phone, and Sex text fields with test data.",
+          "prompt_instructions": "Fill Card Issuing Bank [40], Card Customer Service Phone [41], Sex [42], and Social Security Number [43] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "Male"
@@ -334,7 +334,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[2]/div[11]/div[2]/input\").first",
-          "prompt_instructions": "Fill Social Security Number, Driver License Number, and Age text fields with test data.",
+          "prompt_instructions": "Fill Social Security Number [43], Driver License Number [44], and Age [48] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "000-12-3456"
@@ -346,10 +346,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[2]/div[12]/div[2]/input\").first",
-          "prompt_instructions": "Fill Social Security Number, Driver License Number, and Age text fields with test data.",
+          "prompt_instructions": "Fill Social Security Number [43], Driver License Number [44], and Age [48] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "D1234567"
+          "input_text": "DL123456789"
         }
       }
     },
@@ -358,7 +358,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[2]/div[14]/div[2]/input\").first",
-          "prompt_instructions": "Fill Social Security Number, Driver License Number, and Age text fields with test data.",
+          "prompt_instructions": "Fill Social Security Number [43], Driver License Number [44], and Age [48] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "30"
@@ -370,10 +370,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"xpath=html/body/div[2]/form/div/div[2]/div[15]/div[2]/input\").first",
-          "prompt_instructions": "Fill Birth Place, Income, and Custom Message text fields with test data.",
+          "prompt_instructions": "Fill Birth Place [49], Income [50], and Custom Message [51] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "New York City"
+          "input_text": "Los Angeles, California"
         }
       }
     },
@@ -382,10 +382,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"input[name='68__income']\").first",
-          "prompt_instructions": "Fill Birth Place, Income, and Custom Message text fields with test data.",
+          "prompt_instructions": "Fill Birth Place [49], Income [50], and Custom Message [51] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "100000"
+          "input_text": "85000"
         }
       }
     },
@@ -394,7 +394,7 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"input[name='71__custom']\").first",
-          "prompt_instructions": "Fill Birth Place, Income, and Custom Message text fields with test data.",
+          "prompt_instructions": "Fill Birth Place [49], Income [50], and Custom Message [51] with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
           "input_text": "Hello World"
@@ -406,10 +406,10 @@
       "interaction_action": {
         "input_text": {
           "command": "locator(\"input[name='72__commnt']\").first",
-          "prompt_instructions": "Fill the Comments text field with test data.",
+          "prompt_instructions": "Fill the Comments [52] text input field with realistic test data.",
           "skip_command": false,
           "skip_prompt": true,
-          "input_text": "This is a test comment for form filling."
+          "input_text": "This is a test comment for form filling verification."
         }
       }
     }
