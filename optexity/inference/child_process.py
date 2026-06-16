@@ -27,6 +27,7 @@ from optexity.inference.core.logging import (
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.inference.infra.browser_health import consume_browser_restart_request
+from optexity.schema.automation import Automation
 from optexity.schema.enums import ExitCodes
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import SystemInfo
@@ -93,6 +94,51 @@ def log_system_info(comment: str):
         )
     )
     logger.info("=" * 100 + "\n")
+
+
+def _load_local_test_automation() -> Automation:
+    with open("test_automation.json", encoding="utf-8") as f:
+        return Automation.model_validate(json.load(f))
+
+
+def _align_task_parameters_with_automation(task: Task, automation: Automation) -> None:
+    """Match task input/secure parameters to the automation schema."""
+    task.automation = automation
+    task.input_parameters = {
+        key: task.input_parameters.get(key, automation.parameters.input_parameters[key])
+        for key in automation.parameters.input_parameters
+    }
+    task.secure_parameters = {
+        key: task.secure_parameters.get(
+            key, automation.parameters.secure_parameters[key]
+        )
+        for key in automation.parameters.secure_parameters
+    }
+
+
+def _build_local_dev_task(inference_request: InferenceRequest) -> Task:
+    """Build a Task locally from test_automation.json (assignment dev workflow)."""
+    automation = _load_local_test_automation()
+    task = Task(
+        task_id=str(uuid.uuid4()),
+        user_id=str(uuid.uuid4()),
+        recording_id=str(uuid.uuid4()),
+        endpoint_name=inference_request.endpoint_name,
+        automation=automation,
+        input_parameters={},
+        secure_parameters={},
+        unique_parameter_names=inference_request.unique_parameter_names,
+        created_at=datetime.now(timezone.utc),
+        status="queued",
+        api_key=settings.OPTEXITY_API_KEY,
+        company_id=str(uuid.uuid4()),
+        use_proxy=inference_request.use_proxy,
+        max_timeout_in_minutes=inference_request.max_timeout_in_minutes,
+        is_dedicated=inference_request.is_dedicated,
+        local_test_override=True,
+    )
+    _align_task_parameters_with_automation(task, automation)
+    return task
 
 
 async def restart_global_actual_browser(reason: str) -> None:
@@ -559,20 +605,36 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
         async def inference(inference_request: InferenceRequest = Body(...)):
             response_data: dict | None = None
             try:
-
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    url = urljoin(settings.SERVER_URL, settings.INFERENCE_ENDPOINT)
-                    headers = {"x-api-key": settings.OPTEXITY_API_KEY}
-                    response = await client.post(
-                        url, json=inference_request.model_dump(), headers=headers
+                test_automation_path = pathlib.Path("test_automation.json")
+                if settings.DEPLOYMENT == "dev" and test_automation_path.exists():
+                    task = _build_local_dev_task(inference_request)
+                    logger.info(
+                        "Local dev mode: using test_automation.json (url=%s, endpoint=%s)",
+                        task.automation.url,
+                        inference_request.endpoint_name,
                     )
-                    response_data = response.json()
-                    response.raise_for_status()
+                else:
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        url = urljoin(settings.SERVER_URL, settings.INFERENCE_ENDPOINT)
+                        headers = {"x-api-key": settings.OPTEXITY_API_KEY}
+                        response = await client.post(
+                            url, json=inference_request.model_dump(), headers=headers
+                        )
+                        response_data = response.json()
+                        response.raise_for_status()
 
-                assert response_data is not None
-                task_data = response_data["task"]
+                    assert response_data is not None
+                    task_data = response_data["task"]
 
-                task = Task.model_validate_json(task_data)
+                    task = Task.model_validate_json(task_data)
+                    if test_automation_path.exists():
+                        _align_task_parameters_with_automation(
+                            task, _load_local_test_automation()
+                        )
+                        logger.info(
+                            "Using local test_automation.json override (url=%s)",
+                            task.automation.url,
+                        )
                 if task.use_proxy and settings.PROXY_URL is None:
                     raise ValueError(
                         "PROXY_URL is not set and is required when use_proxy is True"

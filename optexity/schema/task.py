@@ -119,6 +119,7 @@ class Task(BaseModel):
     api_key: str
     callback_url: CallbackUrl | None = None
     is_dedicated: bool = False
+    local_test_override: bool = False
     company_id: CompanyID
     llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
     llm_model_name: str = "gemini-2.5-flash"

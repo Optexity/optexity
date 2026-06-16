@@ -37,6 +37,12 @@ async def start_task_in_server(task: Task):
         task.started_at = datetime.now(timezone.utc)
         task.status = "running"
 
+        if task.local_test_override:
+            logger.info(
+                "Skipping start_task server sync for local test_automation.json run"
+            )
+            return None
+
         url = urljoin(settings.SERVER_URL, settings.START_TASK_ENDPOINT)
         headers = {"x-api-key": task.api_key}
         body = {
@@ -70,6 +76,12 @@ async def complete_task_in_server(
 ) -> dict | None:
     try:
         task.completed_at = datetime.now(timezone.utc)
+
+        if task.local_test_override:
+            logger.info(
+                "Skipping complete_task server sync for local test_automation.json run"
+            )
+            return None
 
         url = urljoin(settings.SERVER_URL, settings.COMPLETE_TASK_ENDPOINT)
         headers = {"x-api-key": task.api_key}
@@ -105,6 +117,8 @@ async def complete_task_in_server(
 
 async def save_output_data_in_server(task: Task, memory: Memory):
     try:
+        if task.local_test_override:
+            return
         if len(memory.variables.output_data) == 0 and memory.final_screenshot is None:
             return
 
@@ -154,6 +168,8 @@ async def save_output_data_in_server(task: Task, memory: Memory):
 
 async def save_downloads_in_server(task: Task, memory: Memory):
     try:
+        if task.local_test_override:
+            return
         # if len(memory.downloads) == 0:
         #     return
 
@@ -227,6 +243,11 @@ async def save_downloads_in_server(task: Task, memory: Memory):
 
 async def save_trajectory_in_server(task: Task):
     try:
+        if task.local_test_override:
+            logger.info(
+                "Skipping save_trajectory server sync for local test_automation.json run"
+            )
+            return None
         url = urljoin(settings.SERVER_URL, settings.SAVE_TRAJECTORY_ENDPOINT)
         headers = {"x-api-key": task.api_key}
 
