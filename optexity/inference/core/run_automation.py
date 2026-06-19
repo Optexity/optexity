@@ -11,6 +11,7 @@ from pathlib import Path
 
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import expect as playwright_expect
 
 from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
@@ -42,7 +43,12 @@ from optexity.inference.core.run_misc import (
 from optexity.inference.core.run_python_script import run_python_script_action
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
-from optexity.schema.automation import ActionNode, ForLoopNode, IfElseNode
+from optexity.schema.automation import (
+    ActionNode,
+    AssertLocatorNode,
+    ForLoopNode,
+    IfElseNode,
+)
 from optexity.schema.memory import BrowserState, ForLoopStatus, Memory, OutputData
 from optexity.schema.task import Task
 from optexity.utils.settings import settings
@@ -472,6 +478,10 @@ async def handle_if_else_node(
             await handle_if_else_node(node, memory, task, browser, full_automation)
         elif isinstance(node, ForLoopNode):
             await handle_for_loop_node(node, memory, task, browser, full_automation)
+        elif isinstance(node, AssertLocatorNode):
+            await handle_assert_locator_node(
+                node, memory, task, browser, full_automation
+            )
 
     logger.debug(f"Finished handling if else node {if_else_node.condition}")
     memory.update_system_info()
@@ -518,6 +528,11 @@ async def handle_for_loop_node(
 
                 if isinstance(new_node, IfElseNode):
                     await handle_if_else_node(
+                        new_node, memory, task, browser, full_automation
+                    )
+
+                elif isinstance(new_node, AssertLocatorNode):
+                    await handle_assert_locator_node(
                         new_node, memory, task, browser, full_automation
                     )
 
@@ -574,6 +589,11 @@ async def handle_for_loop_node(
                         node, memory, task, browser, full_automation
                     )
 
+                elif isinstance(node, AssertLocatorNode):
+                    await handle_assert_locator_node(
+                        node, memory, task, browser, full_automation
+                    )
+
                 else:
                     full_automation.append(node.model_dump())
                     await run_action_node(
@@ -585,6 +605,56 @@ async def handle_for_loop_node(
     memory.update_system_info()
 
 
+async def handle_assert_locator_node(
+    assert_node: AssertLocatorNode,
+    memory: Memory,
+    task: Task,
+    browser: Browser,
+    full_automation: list,
+):
+    memory.update_system_info()
+    full_automation.append(assert_node.model_dump())
+    logger.debug(
+        f"Handling assert locator node {assert_node.locator} ({assert_node.assertion}) "
+        f"with {len(assert_node.if_nodes)} if-nodes and {len(assert_node.else_nodes)} else-nodes"
+    )
+
+    locator = await browser.get_locator_from_command(assert_node.locator)
+    timeout_ms = assert_node.timeout * 1000
+
+    assertion_passed = False
+    if locator is None:
+        logger.warning(
+            f"Locator {assert_node.locator!r} did not resolve; "
+            f"treating {assert_node.assertion} as failed"
+        )
+    else:
+        try:
+            if assert_node.assertion == "to_be_visible":
+                await playwright_expect(locator).to_be_visible(timeout=timeout_ms)
+            else:
+                await playwright_expect(locator).to_be_hidden(timeout=timeout_ms)
+            assertion_passed = True
+        except (
+            AssertionError,
+            TimeoutError,
+            PatchrightTimeoutError,
+            PlaywrightTimeoutError,
+        ) as e:
+            logger.debug(
+                f"Assert locator {assert_node.locator!r} {assert_node.assertion} "
+                f"failed: {type(e).__name__}"
+            )
+
+    branch = assert_node.if_nodes if assertion_passed else assert_node.else_nodes
+    logger.debug(
+        f"Assert locator result={assertion_passed}; running "
+        f"{'if' if assertion_passed else 'else'} branch ({len(branch)} nodes)"
+    )
+    await _run_nodes(branch, task, memory, browser, full_automation)
+    memory.update_system_info()
+
+
 async def _run_nodes(
     nodes,
     task: Task,
@@ -592,12 +662,16 @@ async def _run_nodes(
     browser: Browser,
     full_automation: list,
 ):
-    """Dispatch a list of nodes (ActionNode, ForLoopNode, or IfElseNode) for execution."""
+    """Dispatch a list of nodes (ActionNode, ForLoopNode, IfElseNode, or AssertLocatorNode) for execution."""
     for node in nodes:
         if isinstance(node, ForLoopNode):
             await handle_for_loop_node(node, memory, task, browser, full_automation)
         elif isinstance(node, IfElseNode):
             await handle_if_else_node(node, memory, task, browser, full_automation)
+        elif isinstance(node, AssertLocatorNode):
+            await handle_assert_locator_node(
+                node, memory, task, browser, full_automation
+            )
         else:
             full_automation.append(node.model_dump())
             await run_action_node(node, task, memory, browser)
