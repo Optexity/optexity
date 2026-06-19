@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 class OpenAI(LLMModel):
 
-    def __init__(self, model_name: OpenAIModels, use_structured_output: bool):
-        super().__init__(model_name, use_structured_output)
+    def __init__(self, model_name: OpenAIModels):
+        super().__init__(model_name)
 
         try:
             from openai import OpenAI as OpenAIClient
@@ -92,20 +92,12 @@ class OpenAI(LLMModel):
         parsed_response = None
 
         try:
-            if self.use_structured_output:
-                response = self.client.beta.chat.completions.parse(
-                    model=self.model_name.value,
-                    messages=messages,
-                    response_format=response_schema,
-                )
-                parsed_response = response.choices[0].message.parsed
-            else:
-                response = self.client.chat.completions.create(
-                    model=self.model_name.value,
-                    messages=messages,
-                )
-                content = response.choices[0].message.content
-                parsed_response = self.parse_from_completion(content, response_schema)
+            response = self.client.beta.chat.completions.parse(
+                model=self.model_name.value,
+                messages=messages,
+                response_format=response_schema,
+            )
+            parsed_response = response.choices[0].message.parsed
 
             if response.usage is not None:
                 token_usage = self.get_token_usage(

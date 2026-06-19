@@ -45,8 +45,8 @@ def _restore_schema_keys(obj):
 
 class Anthropic(LLMModel):
 
-    def __init__(self, model_name: AnthropicModels, use_structured_output: bool):
-        super().__init__(model_name, use_structured_output)
+    def __init__(self, model_name: AnthropicModels):
+        super().__init__(model_name)
 
         try:
             api_key = os.environ["ANTHROPIC_API_KEY"]
@@ -115,28 +115,23 @@ class Anthropic(LLMModel):
             kwargs["system"] = system_instruction
 
         try:
-            if self.use_structured_output:
-                schema = _sanitize_schema_keys(response_schema.model_json_schema())
-                kwargs["tools"] = [
-                    {
-                        "name": "structured_output",
-                        "description": "Return the structured response",
-                        "input_schema": schema,
-                    }
-                ]
-                kwargs["tool_choice"] = {"type": "tool", "name": "structured_output"}
+            schema = _sanitize_schema_keys(response_schema.model_json_schema())
+            kwargs["tools"] = [
+                {
+                    "name": "structured_output",
+                    "description": "Return the structured response",
+                    "input_schema": schema,
+                }
+            ]
+            kwargs["tool_choice"] = {"type": "tool", "name": "structured_output"}
 
-                response = self.client.messages.create(**kwargs)
+            response = self.client.messages.create(**kwargs)
 
-                for block in response.content:
-                    if block.type == "tool_use" and block.name == "structured_output":
-                        restored = _restore_schema_keys(block.input)
-                        parsed_response = response_schema.model_validate(restored)
-                        break
-            else:
-                response = self.client.messages.create(**kwargs)
-                text = response.content[0].text
-                parsed_response = self.parse_from_completion(text, response_schema)
+            for block in response.content:
+                if block.type == "tool_use" and block.name == "structured_output":
+                    restored = _restore_schema_keys(block.input)
+                    parsed_response = response_schema.model_validate(restored)
+                    break
 
             if response.usage is not None:
                 token_usage = self.get_token_usage(

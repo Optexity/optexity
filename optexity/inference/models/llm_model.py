@@ -1,13 +1,11 @@
-import ast
 import logging
-import re
 import time
 from enum import Enum, unique
 from pathlib import Path
 from typing import Optional
 
 import tokencost.costs
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from optexity.schema.token_usage import TokenUsage
 
@@ -66,11 +64,9 @@ class LLMModel:
     def __init__(
         self,
         model_name: GeminiModels | HumanModels | OpenAIModels | AnthropicModels,
-        use_structured_output: bool,
     ):
 
         self.model_name = model_name
-        self.use_structured_output = use_structured_output
 
     def _get_model_response(
         self, prompt: str, system_instruction: Optional[str] = None
@@ -142,43 +138,6 @@ class LLMModel:
             + "\n"
             + last_exception
         )
-
-    def extract_json_objects(self, text):
-        stack = []  # Stack to track `{` positions
-        json_candidates = []  # Potential JSON substrings
-
-        # Iterate through the text to find balanced { }
-        for i, char in enumerate(text):
-            if char == "{":
-                stack.append(i)  # Store index of '{'
-            elif char == "}" and stack:
-                start = stack.pop()  # Get the last unmatched '{'
-                json_candidates.append(text[start : i + 1])  # Extract substring
-
-        return json_candidates
-
-    def parse_from_completion(
-        self, content: str, response_schema: type[BaseModel]
-    ) -> BaseModel:
-        patterns = [r"```json\n(.*?)\n```"]
-        json_blocks = []
-        for pattern in patterns:
-            json_blocks += re.findall(pattern, content, re.DOTALL)
-        json_blocks += self.extract_json_objects(content)
-        for block in json_blocks:
-            block = block.strip()
-            try:
-                response = response_schema.model_validate_json(block)
-                return response
-            except Exception as e:
-                try:
-                    block_dict = ast.literal_eval(block)
-                    response = response_schema.model_validate(block_dict)
-                    return response
-                except Exception as e:
-                    continue
-
-        raise ValidationError("Could not parse response from completion.")
 
     def get_token_usage(
         self,

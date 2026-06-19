@@ -41,9 +41,7 @@ _error_handler_cache: dict[tuple, ErrorHandlerAgent] = {}
 def _get_error_handler(task: "Task") -> ErrorHandlerAgent:
     cache_key = (task.llm_provider, task.llm_model_name)
     if cache_key not in _error_handler_cache:
-        model = get_llm_model_with_fallback(
-            task.llm_provider, task.llm_model_name, True
-        )
+        model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name)
         _error_handler_cache[cache_key] = ErrorHandlerAgent(model)
     return _error_handler_cache[cache_key]
 
