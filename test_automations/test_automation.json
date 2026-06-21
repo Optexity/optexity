@@ -1,0 +1,23 @@
+{
+  "url": "https://arxiv.org/",
+  "parameters": {
+    "input_parameters": {
+      "search_query": [
+        "AI"
+      ]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "Search for 'AI' using the search box. From the search results, click on the first paper's title to open it. Then download the PDF of the paper.",
+          "max_steps": 15,
+          "backend": "browser_use"
+        }
+      }
+    }
+  ]
+}

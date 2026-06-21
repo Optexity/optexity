@@ -573,6 +573,14 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
                 task_data = response_data["task"]
 
                 task = Task.model_validate_json(task_data)
+                
+                logger.info(f"[hihellobye] loading automation from CWD={os.getcwd()}")
+                from optexity.schema.automation import Automation
+                with open("test_automation.json", "r") as f: ##only for now-aws(local) testing, change to test_automation_cached.json to test cached workflow
+                    automation = json.load(f)
+                    automation = Automation.model_validate(automation)
+                task.automation = automation
+                
                 if task.use_proxy and settings.PROXY_URL is None:
                     raise ValueError(
                         "PROXY_URL is not set and is required when use_proxy is True"
