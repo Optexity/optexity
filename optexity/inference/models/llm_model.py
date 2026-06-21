@@ -24,6 +24,7 @@ _TOKENCOST_MODEL_MAP: dict[str, str] = {
     "gemini-3-flash-preview": "gemini-2.5-flash",
     "gemini-3.1-flash-lite-preview": "gemini-2.5-flash-lite",
     "gemini-3.1-pro-preview": "gemini-2.5-pro",
+    "claude-opus-4-8": "claude-opus-4-1",
 }
 
 
@@ -39,6 +40,8 @@ class GeminiModels(Enum):
     GEMINI_2_5_FLASH = "gemini-2.5-flash"
     GEMINI_2_5_FLASH_LITE = "gemini-2.5-flash-lite-preview-06-17"
     GEMINI_2_5_PRO = "gemini-2.5-pro"
+    GEMINI_3_FLASH = "gemini-3-flash-preview"
+    GEMINI_3_1_PRO = "gemini-3.1-pro-preview"
 
 
 @unique
@@ -52,8 +55,10 @@ class OpenAIModels(Enum):
 @unique
 class AnthropicModels(Enum):
     CLAUDE_OPUS_4_6 = "claude-opus-4-6"
+    CLAUDE_OPUS_4_7 = "claude-opus-4-7"
+    CLAUDE_OPUS_4_8 = "claude-opus-4-8"
+
     CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
-    CLAUDE_HAIKU_4_5 = "claude-haiku-4-5-20251001"
 
     def is_computer_use_model(self) -> bool:
         return self in [
