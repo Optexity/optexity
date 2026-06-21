@@ -1542,7 +1542,7 @@ wheels = [
 
 [[package]]
 name = "optexity"
-version = "0.1.5.81"
+version = "0.1.5.91"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
