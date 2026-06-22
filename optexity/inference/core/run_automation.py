@@ -10,8 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
+from patchright.async_api import expect as playwright_expect
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import expect as playwright_expect
 
 from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
