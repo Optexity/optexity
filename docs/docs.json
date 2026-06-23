@@ -28,7 +28,8 @@
                             "/docs/building-automations/parameters",
                             "/docs/building-automations/action-node",
                             "/docs/building-automations/if-else-node",
-                            "/docs/building-automations/for-loop-node"
+                            "/docs/building-automations/for-loop-node",
+                            "/docs/action-types/assertion-action"
                         ]
                     },
                     {
