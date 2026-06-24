@@ -17,9 +17,11 @@ class InferenceRequest(BaseModel):
         False  ## Opt into dedicated mode per-request. In cloud mode a dedicated_service DB row (admin policy) takes precedence over this flag.
     )
     # Dedicated limits used only when is_dedicated is true and no DB policy row
-    # exists. max_parallelism is clamped server-side (see DEDICATED_MAX_REQUEST_PARALLELISM).
+    # exists. max_parallelism is the service-wide cap (clamped server-side, see
+    # DEDICATED_MAX_REQUEST_PARALLELISM); per_login_parallelism is how many
+    # containers a single login may use before its tasks round-robin onto them.
     max_parallelism: int = 1
-    max_unique_logins: int = 1
+    per_login_parallelism: int = 1
 
     @model_validator(mode="after")
     def validate_use_proxy(self):
