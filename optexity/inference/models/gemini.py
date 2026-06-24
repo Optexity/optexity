@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 class Gemini(LLMModel):
 
-    def __init__(self, model_name: GeminiModels, use_structured_output: bool):
-        super().__init__(model_name, use_structured_output)
+    def __init__(self, model_name: GeminiModels):
+        super().__init__(model_name)
 
         self.api_key = os.environ["GOOGLE_API_KEY"]
         try:
@@ -73,31 +73,20 @@ class Gemini(LLMModel):
         token_usage = TokenUsage()
 
         try:
-            if self.use_structured_output:
-                response = self.client.models.generate_content(
-                    model=self.model_name.value,
-                    contents=final_prompt,
-                    config={
-                        "response_mime_type": "application/json",
-                        "system_instruction": system_instruction,
-                        "response_json_schema": response_schema.model_json_schema(),
-                    },
-                )
+            response = self.client.models.generate_content(
+                model=self.model_name.value,
+                contents=final_prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "system_instruction": system_instruction,
+                    "response_json_schema": response_schema.model_json_schema(),
+                },
+            )
 
-                if isinstance(response.parsed, BaseModel):
-                    parsed_response = response.parsed
-                else:
-                    parsed_response = response_schema.model_validate(response.parsed)
+            if isinstance(response.parsed, BaseModel):
+                parsed_response = response.parsed
             else:
-                response = self.client.models.generate_content(
-                    model=self.model_name.value,
-                    contents=final_prompt,
-                    config={"system_instruction": system_instruction},
-                )
-
-                parsed_response: BaseModel = self.parse_from_completion(
-                    str(response.candidates[0].content.parts[0].text), response_schema
-                )
+                parsed_response = response_schema.model_validate(response.parsed)
 
             if response.usage_metadata is not None:
                 token_usage = self.get_token_usage(

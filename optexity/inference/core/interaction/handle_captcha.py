@@ -162,7 +162,7 @@ async def _solve_and_click(
 
     max_retries = int(config.get("max_captcha_retries", 3))
     model_enum = GeminiModels(llm_model_name)
-    llm_model = get_llm_model(model_enum, True)
+    llm_model = get_llm_model(model_enum)
 
     refresh_count = 0
     while refresh_count <= max_retries:

@@ -19,9 +19,7 @@ _select_prediction_cache: dict[tuple, SelectValuePredictionAgent] = {}
 def _get_select_prediction_agent(task: Task) -> SelectValuePredictionAgent:
     cache_key = (task.llm_provider, task.llm_model_name)
     if cache_key not in _select_prediction_cache:
-        model = get_llm_model_with_fallback(
-            task.llm_provider, task.llm_model_name, True
-        )
+        model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name)
         _select_prediction_cache[cache_key] = SelectValuePredictionAgent(model)
     return _select_prediction_cache[cache_key]
 

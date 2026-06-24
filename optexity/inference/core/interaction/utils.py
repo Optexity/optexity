@@ -530,9 +530,7 @@ _index_prediction_cache: dict[tuple, ActionPredictionLocatorAxtree] = {}
 def _get_index_prediction_agent(task: "Task") -> ActionPredictionLocatorAxtree:
     cache_key = (task.llm_provider, task.llm_model_name)
     if cache_key not in _index_prediction_cache:
-        model = get_llm_model_with_fallback(
-            task.llm_provider, task.llm_model_name, True
-        )
+        model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name)
         _index_prediction_cache[cache_key] = ActionPredictionLocatorAxtree(model)
     return _index_prediction_cache[cache_key]
 

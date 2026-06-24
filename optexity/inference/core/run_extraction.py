@@ -197,7 +197,7 @@ async def handle_llm_extraction(
 
     provider = llm_extraction.llm_provider or task.llm_provider
     model_name_str = llm_extraction.llm_model_name or task.llm_model_name
-    llm_model = get_llm_model_with_fallback(provider, model_name_str, True)
+    llm_model = get_llm_model_with_fallback(provider, model_name_str)
 
     response_dict: dict | None = None
     last_prompt: str = ""
@@ -491,7 +491,7 @@ async def handle_pdf_extraction(
 
     provider = pdf_extraction.llm_provider or task.llm_provider
     model_name_str = pdf_extraction.llm_model_name or task.llm_model_name
-    llm_model = get_llm_model_with_fallback(provider, model_name_str, True)
+    llm_model = get_llm_model_with_fallback(provider, model_name_str)
 
     system_instruction = "Extract the information from the PDF file and return it in the format specified by the instructions."
     response, token_usage = llm_model.get_model_response_with_structured_output(
