@@ -121,6 +121,11 @@ class Task(BaseModel):
     task_callback_url: str | None = None
     task_callback_api_key: str | None = None
     is_dedicated: bool = False
+    # Dedicated limits carried with the task when is_dedicated is set via the
+    # request (no DB policy row). Ignored for non-dedicated tasks and when a
+    # dedicated_service DB row governs the service.
+    max_parallelism: int = 1
+    per_login_parallelism: int = 1
     company_id: CompanyID
     llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
     llm_model_name: str = "gemini-2.5-flash"
