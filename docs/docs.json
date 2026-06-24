@@ -97,7 +97,8 @@
                             "POST /api/v1/get_callback_data",
                             "POST /api/v1/add_example",
                             "POST /api/v1/update_example",
-                            "POST /api/v1/validate_api_key"
+                            "POST /api/v1/validate_api_key",
+                            "PATCH /api/v1/update_recording/{recording_id}"
                         ]
                     }
                 ]
