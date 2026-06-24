@@ -380,24 +380,98 @@
             "id": "docs-action-types-python-script-action",
             "path": "docs/action-types/python-script-action.mdx",
             "title": "Python Script Action",
-            "summary": "Stub document for the Python Script Action type. Contains only a title and description with no content body.",
-            "gist": "Empty stub for python_script_action documentation.",
-            "keywords": ["python", "script", "python_script_action", "custom code"],
+            "summary": "Documents python_script_action (async code_fn(page) for browser interaction) and extraction_action.python_script (async code_fn(axtree, browser) for data extraction). Covers script contract, output variable promotion, and when to use each variant.",
+            "gist": "Run custom Python against a live Playwright page (action) or extract structured data via code (extraction). Defines the code_fn contract for both variants.",
+            "keywords": [
+                "python",
+                "script",
+                "python_script_action",
+                "custom code",
+                "execution_code",
+                "code_fn",
+                "playwright",
+                "page",
+                "axtree",
+                "browser",
+                "PythonScriptAction",
+                "PythonScriptExtraction"
+            ],
             "document_type": "guide",
-            "tags": ["action-types", "python", "stub"],
+            "tags": [
+                "action-types",
+                "misc-actions",
+                "python",
+                "browser",
+                "extraction",
+                "custom-code"
+            ],
             "relationships": {
-                "depends_on": [],
-                "references": [],
+                "depends_on": ["docs-building-automations-action-node"],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "python_script extraction variant lives under extraction_action"
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-action-node",
+                        "context": "Action node lists python_script_action as one of the supported action types"
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["playwright"],
+                "apis": [],
+                "data_models": [
+                    "python_script_action",
+                    "PythonScriptAction",
+                    "PythonScriptExtraction"
+                ]
+            },
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about python_script_action, running custom Python code in an automation, the code_fn contract, or extracting data via a Python script in extraction_action.",
+            "embedding_hint": "python script custom code execution_code code_fn page axtree browser playwright interact extract"
+        },
+        {
+            "id": "docs-action-types-llm-query-action",
+            "path": "docs/action-types/llm-query-action.mdx",
+            "title": "LLM Query Action",
+            "summary": "Documents misc_action.llm_query — a direct LLM query that operates on in-memory data without browser context. Covers output_format, prompt_instructions, output_variable_names, provider/model selection, and how it differs from extraction_action.llm.",
+            "gist": "Send a prompt to an LLM and store structured output — no browser round-trip. Used to transform or classify data already extracted.",
+            "keywords": [
+                "llm_query",
+                "llm_query_action",
+                "LLMQueryAction",
+                "misc_action",
+                "prompt",
+                "output_format",
+                "structured output",
+                "classify",
+                "transform",
+                "llm_provider",
+                "llm_model_name"
+            ],
+            "document_type": "guide",
+            "tags": ["action-types", "llm", "misc-action", "structured-output", "classification"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-action-node"],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "extraction_action.llm is the browser-context counterpart to llm_query"
+                    }
+                ],
                 "referenced_by": []
             },
             "entities": {
                 "systems": [],
                 "apis": [],
-                "data_models": ["python_script_action"]
+                "data_models": ["LLMQueryAction", "MiscAction", "LLMAction"]
             },
-            "reading_priority": 5,
-            "when_to_use": "Do not select — contains no content. For python_script_action usage, see examples-data-extraction-i94 which demonstrates it in a real automation.",
-            "embedding_hint": "python script action stub placeholder"
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about misc_action.llm_query, running a direct LLM call without browser state, transforming or classifying extracted data, or structuring an LLM response into generated_variables.",
+            "embedding_hint": "llm query misc action direct prompt classify transform structured output no browser in-memory"
         },
         {
             "id": "docs-action-types-sleep-action",
@@ -496,7 +570,14 @@
                 "timeout"
             ],
             "document_type": "guide",
-            "tags": ["action-types", "human-in-the-loop", "HITL", "pause", "resume"],
+            "tags": [
+                "action-types",
+                "misc-actions",
+                "human-in-the-loop",
+                "HITL",
+                "pause",
+                "resume"
+            ],
             "relationships": {
                 "depends_on": [],
                 "references": [
