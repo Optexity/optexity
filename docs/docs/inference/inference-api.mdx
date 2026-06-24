@@ -99,7 +99,7 @@ When **`is_aws=False`** (local mode, recommended for development):
 - **`POST /inference`**
     - **Body**: `InferenceRequest` JSON.
     - **Behavior**:
-        1. Sends the request to `api.optexity.com` + `INFERENCE_ENDPOINT` with header `x-api-key: OPTEXITY_API_KEY`.
+        1. Sends the request to `inference-api.optexity.com` + `INFERENCE_ENDPOINT` with header `x-api-key: OPTEXITY_API_KEY`.
         2. Expects a response containing a serialized `Task`.
         3. Enqueues that `Task` onto a local `asyncio.Queue`.
         4. Returns `202 Accepted` with:

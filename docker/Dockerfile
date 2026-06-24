@@ -78,8 +78,8 @@ RUN echo "CACHE_BREAK: $CACHE_BREAK"
 
 # Copy system config files as root before switching user
 # COPY controller.py /opt/controller.py
-COPY openbox-rc.xml /etc/xdg/openbox/rc.xml
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/openbox-rc.xml /etc/xdg/openbox/rc.xml
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 RUN git config --global --add safe.directory /home/optexity/optexity && \
     cd optexity && git pull && git checkout main && git pull && \
