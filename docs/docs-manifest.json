@@ -236,25 +236,52 @@
         {
             "id": "docs-action-types-assertion-action",
             "path": "docs/action-types/assertion-action.mdx",
-            "title": "Assertion Action",
-            "summary": "Stub document for the Assertion Action type. Contains only a title and description with no content body.",
-            "gist": "Empty stub for assertion action documentation.",
-            "keywords": ["assertion", "assert", "verification", "action-types"],
+            "title": "Assert Locator Node",
+            "summary": "Documents assert_locator_node — a control-flow node that branches on Playwright locator visibility. Covers the to_be_visible and to_be_hidden assertions, timeout, if_nodes, else_nodes, variable substitution in the locator, and when to prefer assert_locator_node over if_else_node. Includes examples for skipping optional elements, waiting for spinners to disappear, and dynamic locators.",
+            "gist": "Branch on element visibility via Playwright locator — no LLM, no extraction variable needed.",
+            "keywords": [
+                "assert_locator_node",
+                "locator assertion",
+                "to_be_visible",
+                "to_be_hidden",
+                "conditional",
+                "element visibility",
+                "optional element",
+                "Playwright",
+                "if_nodes",
+                "else_nodes",
+                "timeout",
+                "branching"
+            ],
             "document_type": "guide",
-            "tags": ["action-types", "assertion", "stub"],
+            "tags": ["building-automations", "control-flow", "assertion", "locator", "Playwright"],
             "relationships": {
-                "depends_on": [],
-                "references": [],
-                "referenced_by": []
+                "depends_on": ["docs-building-automations-action-node"],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-locators",
+                        "context": "assert_locator_node uses Playwright locator syntax documented in the locators guide."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-if-else-node",
+                        "context": "if_else_node is the alternative when branching on extracted values rather than raw visibility."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-automation-structure",
+                        "context": "assert_locator_node is one of the four node types in automation structure."
+                    }
+                ]
             },
             "entities": {
-                "systems": [],
+                "systems": ["Playwright"],
                 "apis": [],
-                "data_models": ["assertion_action"]
+                "data_models": ["assert_locator_node", "AssertLocatorNode"]
             },
-            "reading_priority": 5,
-            "when_to_use": "Do not select — contains no content. For assertion examples, see docs-building-automations-quickstart or examples-qa-testing-supabase-login instead.",
-            "embedding_hint": "assertion action stub placeholder"
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about checking element presence without an extraction step, to_be_visible / to_be_hidden assertions, handling optional page elements, or the assert_locator_node schema.",
+            "embedding_hint": "assert locator node element visibility to_be_visible to_be_hidden conditional branch Playwright optional element"
         },
         {
             "id": "docs-action-types-extraction-action",
@@ -385,24 +412,98 @@
             "id": "docs-action-types-python-script-action",
             "path": "docs/action-types/python-script-action.mdx",
             "title": "Python Script Action",
-            "summary": "Stub document for the Python Script Action type. Contains only a title and description with no content body.",
-            "gist": "Empty stub for python_script_action documentation.",
-            "keywords": ["python", "script", "python_script_action", "custom code"],
+            "summary": "Documents python_script_action (async code_fn(page) for browser interaction) and extraction_action.python_script (async code_fn(axtree, browser) for data extraction). Covers script contract, output variable promotion, and when to use each variant.",
+            "gist": "Run custom Python against a live Playwright page (action) or extract structured data via code (extraction). Defines the code_fn contract for both variants.",
+            "keywords": [
+                "python",
+                "script",
+                "python_script_action",
+                "custom code",
+                "execution_code",
+                "code_fn",
+                "playwright",
+                "page",
+                "axtree",
+                "browser",
+                "PythonScriptAction",
+                "PythonScriptExtraction"
+            ],
             "document_type": "guide",
-            "tags": ["action-types", "python", "stub"],
+            "tags": [
+                "action-types",
+                "misc-actions",
+                "python",
+                "browser",
+                "extraction",
+                "custom-code"
+            ],
             "relationships": {
-                "depends_on": [],
-                "references": [],
+                "depends_on": ["docs-building-automations-action-node"],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "python_script extraction variant lives under extraction_action"
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-action-node",
+                        "context": "Action node lists python_script_action as one of the supported action types"
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["playwright"],
+                "apis": [],
+                "data_models": [
+                    "python_script_action",
+                    "PythonScriptAction",
+                    "PythonScriptExtraction"
+                ]
+            },
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about python_script_action, running custom Python code in an automation, the code_fn contract, or extracting data via a Python script in extraction_action.",
+            "embedding_hint": "python script custom code execution_code code_fn page axtree browser playwright interact extract"
+        },
+        {
+            "id": "docs-action-types-llm-query-action",
+            "path": "docs/action-types/llm-query-action.mdx",
+            "title": "LLM Query Action",
+            "summary": "Documents misc_action.llm_query — a direct LLM query that operates on in-memory data without browser context. Covers output_format, prompt_instructions, output_variable_names, provider/model selection, and how it differs from extraction_action.llm.",
+            "gist": "Send a prompt to an LLM and store structured output — no browser round-trip. Used to transform or classify data already extracted.",
+            "keywords": [
+                "llm_query",
+                "llm_query_action",
+                "LLMQueryAction",
+                "misc_action",
+                "prompt",
+                "output_format",
+                "structured output",
+                "classify",
+                "transform",
+                "llm_provider",
+                "llm_model_name"
+            ],
+            "document_type": "guide",
+            "tags": ["action-types", "llm", "misc-action", "structured-output", "classification"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-action-node"],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "extraction_action.llm is the browser-context counterpart to llm_query"
+                    }
+                ],
                 "referenced_by": []
             },
             "entities": {
                 "systems": [],
                 "apis": [],
-                "data_models": ["python_script_action"]
+                "data_models": ["LLMQueryAction", "MiscAction", "LLMAction"]
             },
-            "reading_priority": 5,
-            "when_to_use": "Do not select — contains no content. For python_script_action usage, see examples-data-extraction-i94 which demonstrates it in a real automation.",
-            "embedding_hint": "python script action stub placeholder"
+            "reading_priority": 2,
+            "when_to_use": "Select when the query is about misc_action.llm_query, running a direct LLM call without browser state, transforming or classifying extracted data, or structuring an LLM response into generated_variables.",
+            "embedding_hint": "llm query misc action direct prompt classify transform structured output no browser in-memory"
         },
         {
             "id": "docs-action-types-sleep-action",
@@ -501,7 +602,14 @@
                 "timeout"
             ],
             "document_type": "guide",
-            "tags": ["action-types", "human-in-the-loop", "HITL", "pause", "resume"],
+            "tags": [
+                "action-types",
+                "misc-actions",
+                "human-in-the-loop",
+                "HITL",
+                "pause",
+                "resume"
+            ],
             "relationships": {
                 "depends_on": [],
                 "references": [
@@ -1057,8 +1165,8 @@
             "id": "docs-building-automations-automation-structure",
             "path": "docs/building-automations/automation-structure.mdx",
             "title": "Automation Structure",
-            "summary": "Defines the top-level schema of an Optexity automation JSON/Python object. Documents all root properties: url, browser_channel (chromium vs chrome), os_emulation (null/windows/linux), max_retries, expected_downloads, parameters, and nodes. Explains the three node types (action_node, for_loop_node, if_else_node), the declarative execution model, and important semantics like max_retries counting total attempts and AssertionError bypassing retries.",
-            "gist": "Top-level automation schema: url, browser_channel, os_emulation, max_retries, parameters, and node types.",
+            "summary": "Defines the top-level schema of an Optexity automation JSON/Python object. Documents all root properties: url, browser_channel (chromium vs chrome), os_emulation (null/windows/linux), max_retries, expected_downloads, parameters, and nodes. Explains the four node types (action_node, for_loop_node, if_else_node, assert_locator_node), the declarative execution model, and important semantics like max_retries counting total attempts and AssertionError bypassing retries.",
+            "gist": "Top-level automation schema: url, browser_channel, os_emulation, max_retries, parameters, and four node types.",
             "keywords": [
                 "automation",
                 "structure",
