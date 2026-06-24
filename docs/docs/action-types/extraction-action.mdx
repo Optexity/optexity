@@ -198,7 +198,7 @@ Capture data from API requests and responses:
 {
   "extraction_action": {
     "network_call": {
-      "url_pattern": "https://api.example.com/orders"
+      "url_pattern": "https://inference-api.optexity.com/orders"
     }
   }
 }
@@ -227,7 +227,7 @@ Make an outbound REST API call directly from the automation—useful for hitting
 {
   "extraction_action": {
     "api_call": {
-      "url": "https://api.example.com/v1/orders",
+      "url": "https://inference-api.optexity.com/v1/orders",
       "method": "GET"
     }
   }
@@ -268,7 +268,7 @@ Reference fields of the response in later actions with dot-path syntax: `{var.fi
 {
   "extraction_action": {
     "api_call": {
-      "url": "https://api.example.com/v1/customers",
+      "url": "https://inference-api.optexity.com/v1/customers",
       "method": "POST",
       "headers": { "Authorization": "Bearer {api_token}" },
       "body": { "email": "{customer_email}" },
@@ -292,7 +292,7 @@ For asynchronous endpoints, set `poll_condition` to keep re-requesting until the
 {
   "extraction_action": {
     "api_call": {
-      "url": "https://api.example.com/v1/jobs/{job_id}",
+      "url": "https://inference-api.optexity.com/v1/jobs/{job_id}",
       "poll_condition": "body.status == 'completed'",
       "poll_interval": 10.0,
       "max_poll_attempts": 30

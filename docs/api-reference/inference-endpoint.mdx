@@ -19,7 +19,7 @@ The inference endpoint is the primary way to submit automation tasks to an Optex
 </Info>
 
 <Info>
-    Cloud endpoint (`https://api.optexity.com/api/v1/inference`) requires authentication with an API
+    Cloud endpoint (`https://inference-api.optexity.com/api/v1/inference`) requires authentication with an API
     key in the request header. API keys can be found in the Optexity dashboard under the "API Keys"
     section. This requires a paid plan. Contact us at founders@optexity.com to get a paid plan.
 </Info>
@@ -254,7 +254,7 @@ Returned when an unexpected server error occurs.
 ## How It Works
 
 1. The inference server receives the `InferenceRequest`
-2. It forwards the request to the Optexity control plane at `api.optexity.com`
+2. It forwards the request to the Optexity control plane at `inference-api.optexity.com`
 3. The control plane returns a serialized `Task` object containing the full workflow
 4. The task is enqueued locally for background execution
 5. A `202 Accepted` response is returned immediately
