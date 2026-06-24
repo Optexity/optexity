@@ -50,7 +50,10 @@
                     },
                     {
                         "group": "Inference",
-                        "pages": ["/docs/inference/inference-api"]
+                        "pages": [
+                            "/docs/inference/inference-api",
+                            "/docs/inference/dedicated-instances"
+                        ]
                     },
                     {
                         "group": "Advanced",
