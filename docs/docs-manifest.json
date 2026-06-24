@@ -260,13 +260,17 @@
             "id": "docs-action-types-extraction-action",
             "path": "docs/action-types/extraction-action.mdx",
             "title": "Extraction Actions",
-            "summary": "Comprehensive guide to all extraction action types: llm (AI-based page extraction), locator (Playwright-based with LLM fallback), network_call (capture AJAX/API responses), screenshot (save visual snapshot), state (URL/title/cookies/storage), and two_fa_action (2FA code extraction). Each type includes its JSON schema, properties table, and when-to-use guidance. Also covers timing defaults and source selection for LLM extraction.",
-            "gist": "All extraction types (llm, locator, network_call, screenshot, state, 2FA) with schemas and when to use each.",
+            "summary": "Comprehensive guide to all extraction action types: llm (AI-based page extraction), locator (Playwright-based with LLM fallback), network_call (capture AJAX/API responses), api_call (make outbound REST API calls with polling and dot-path response variables), screenshot (save visual snapshot), state (URL/title/cookies/storage), and two_fa_action (2FA code extraction). Each type includes its JSON schema, properties table, and when-to-use guidance. Also covers timing defaults and source selection for LLM extraction.",
+            "gist": "All extraction types (llm, locator, network_call, api_call, screenshot, state, 2FA) with schemas and when to use each.",
             "keywords": [
                 "extraction",
                 "llm extraction",
                 "locator extraction",
                 "network_call",
+                "api_call",
+                "REST API call",
+                "polling",
+                "webhook",
                 "screenshot",
                 "state extraction",
                 "cookies",
@@ -276,7 +280,7 @@
                 "extraction_instructions"
             ],
             "document_type": "guide",
-            "tags": ["action-types", "extraction", "data", "scraping", "2FA"],
+            "tags": ["action-types", "extraction", "data", "scraping", "api", "2FA"],
             "relationships": {
                 "depends_on": ["docs-building-automations-action-node"],
                 "references": [
@@ -308,14 +312,15 @@
                     "llm",
                     "locator",
                     "network_call",
+                    "api_call",
                     "state",
                     "two_fa_action",
                     "extraction_format"
                 ]
             },
             "reading_priority": 2,
-            "when_to_use": "Select when the query is about extracting data from web pages, capturing API responses, taking screenshots, reading cookies/storage, or the extraction action schema.",
-            "embedding_hint": "extract data web page llm network_call screenshot state cookies 2FA output_variable_name"
+            "when_to_use": "Select when the query is about extracting data from web pages, capturing API responses, calling external REST APIs or webhooks, polling async endpoints, taking screenshots, reading cookies/storage, or the extraction action schema.",
+            "embedding_hint": "extract data web page llm network_call api_call REST API webhook polling screenshot state cookies 2FA output_variable_name"
         },
         {
             "id": "docs-action-types-interaction-action",

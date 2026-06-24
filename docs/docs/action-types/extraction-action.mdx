@@ -12,6 +12,7 @@ Extraction actions capture data from web pages during automation—essential for
 | `llm` | AI-powered structured data extraction | Tables, forms, text content |
 | `locator` | Extract text directly via Playwright locator | Single values, fast extraction, no LLM tokens |
 | `network_call` | Capture API/AJAX responses | API data, JSON responses |
+| `api_call` | Call an external REST API directly | Webhooks, triggering jobs, polling for async results |
 | `screenshot` | Save visual snapshot | Receipts, proofs, visual records |
 | `state` | Capture page state (URL, title, storage, cookies) | Debugging auth, navigation validation |
 | `two_fa_action` | Wait for and extract 2FA code | 2FA codes |
@@ -212,6 +213,104 @@ Capture data from API requests and responses:
 | `download_from` | `"request" \| "response"` | `None` | Download as file |
 | `download_filename` | `str \| None` | Auto-generated | Filename for download |
 
+<Tip>
+Use `network_call` to *intercept* requests the page already makes. Use `api_call` (below) to *initiate* your own HTTP request to any external endpoint.
+</Tip>
+
+---
+
+## API Call Extraction
+
+Make an outbound REST API call directly from the automation—useful for hitting webhooks, triggering backend jobs, enriching data from a third-party service, or polling an async endpoint until it's ready. The full response is stored as a variable for use in later actions.
+
+```json
+{
+  "extraction_action": {
+    "api_call": {
+      "url": "https://api.example.com/v1/orders",
+      "method": "GET"
+    }
+  }
+}
+```
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `url` | `str` | Required | Endpoint to call |
+| `method` | `"GET" \| "POST" \| "PUT" \| "PATCH" \| "DELETE"` | `"GET"` | HTTP method |
+| `headers` | `dict[str, str]` | `{}` | Request headers |
+| `body` | `dict \| str \| None` | `None` | Request body. A `dict` is sent as JSON; a `str` is sent as raw content |
+| `query_params` | `dict[str, str]` | `{}` | URL query parameters |
+| `output_variable_names` | `list[str]` | `["api_result"]` | Variable name(s) to store the response under |
+| `timeout` | `float` | `30.0` | Request timeout in seconds |
+| `poll_condition` | `str \| None` | `None` | Expression to re-poll until satisfied (see [Polling](#polling)) |
+| `poll_interval` | `float` | `5.0` | Seconds to wait between poll attempts |
+| `max_poll_attempts` | `int` | `10` | Maximum number of poll attempts |
+
+### Response Shape
+
+The stored variable holds a dict with the following keys:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `status_code` | `int \| null` | HTTP status code (`null` on a connection error or timeout) |
+| `headers` | `dict[str, str]` | Response headers |
+| `body` | `any` | Parsed JSON if the response is JSON, otherwise the raw text |
+| `error` | `str` | Present only on failure—`"timeout"` or `"http_error"` |
+
+### Using the Response
+
+Reference fields of the response in later actions with dot-path syntax: `{var.field}`, `{var.nested.field}`, and `{var.array[0].field}`. Both object keys and array indices are supported.
+
+```json
+{
+  "extraction_action": {
+    "api_call": {
+      "url": "https://api.example.com/v1/customers",
+      "method": "POST",
+      "headers": { "Authorization": "Bearer {api_token}" },
+      "body": { "email": "{customer_email}" },
+      "output_variable_names": ["create_result"]
+    }
+  }
+}
+```
+
+After this action, `{create_result.body.id}` resolves to the new customer's ID, and `{create_result.status_code}` resolves to `201`.
+
+<Info>
+Dot-path resolution (`{var.field}`) applies only to dict-valued variables such as API responses. The existing list-indexing format `{var[0]}` from `llm` extraction is unaffected.
+</Info>
+
+### Polling
+
+For asynchronous endpoints, set `poll_condition` to keep re-requesting until the condition is met (or `max_poll_attempts` is reached). The condition is a Python-style boolean expression evaluated against the response dict, supporting both top-level keys and dot-paths:
+
+```json
+{
+  "extraction_action": {
+    "api_call": {
+      "url": "https://api.example.com/v1/jobs/{job_id}",
+      "poll_condition": "body.status == 'completed'",
+      "poll_interval": 10.0,
+      "max_poll_attempts": 30
+    }
+  }
+}
+```
+
+Example conditions:
+
+| Condition | Meaning |
+|-----------|---------|
+| `status_code == 200` | Stop once the request returns HTTP 200 |
+| `body.status == 'completed'` | Stop once the response body's `status` field is `"completed"` |
+| `body.progress >= 100` | Stop once `progress` reaches 100 |
+
+If the condition is never met within `max_poll_attempts`, the last response is stored and the automation continues.
+
 ---
 
 ## Screenshot Extraction
@@ -330,6 +429,8 @@ Override if needed:
 | Extract a single known element | `locator` |
 | Extract with locator + LLM fallback | `locator` with `extraction_instructions` |
 | Charts, images, visual content | `llm` with `screenshot` |
-| Intercept API data | `network_call` |
+| Intercept API data the page requests | `network_call` |
+| Call an external API / webhook directly | `api_call` |
+| Poll an async endpoint until ready | `api_call` with `poll_condition` |
 | Visual proof/documentation | `screenshot` |
 | Validate navigation | `state` |
