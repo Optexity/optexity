@@ -237,21 +237,19 @@
             "id": "docs-action-types-assertion-action",
             "path": "docs/action-types/assertion-action.mdx",
             "title": "Assert Locator Node",
-            "summary": "Documents assert_locator_node — a control-flow node that branches on Playwright locator visibility. Covers the to_be_visible and to_be_hidden assertions, timeout, if_nodes, else_nodes, variable substitution in the locator, and when to prefer assert_locator_node over if_else_node. Includes examples for skipping optional elements, waiting for spinners to disappear, and dynamic locators.",
-            "gist": "Branch on element visibility via Playwright locator — no LLM, no extraction variable needed.",
+            "summary": "Documents assert_locator_node — a node that checks Playwright locator visibility and stores the result as a boolean in output_variable_name. Covers the to_be_visible and to_be_hidden assertions, timeout, output_variable_name, variable substitution in the locator, and how to branch on the stored boolean with a following if_else_node. Includes examples for dismissing elements only when present, waiting for spinners to disappear, and dynamic locators.",
+            "gist": "Check element visibility via Playwright locator and store it as a boolean variable — no LLM, no extraction needed.",
             "keywords": [
                 "assert_locator_node",
                 "locator assertion",
                 "to_be_visible",
                 "to_be_hidden",
-                "conditional",
+                "boolean variable",
+                "output_variable_name",
                 "element visibility",
                 "optional element",
                 "Playwright",
-                "if_nodes",
-                "else_nodes",
-                "timeout",
-                "branching"
+                "timeout"
             ],
             "document_type": "guide",
             "tags": ["building-automations", "control-flow", "assertion", "locator", "Playwright"],
@@ -264,7 +262,7 @@
                     },
                     {
                         "doc_id": "docs-building-automations-if-else-node",
-                        "context": "if_else_node is the alternative when branching on extracted values rather than raw visibility."
+                        "context": "if_else_node consumes the boolean produced by assert_locator_node to branch on element visibility."
                     }
                 ],
                 "referenced_by": [
@@ -281,7 +279,7 @@
             },
             "reading_priority": 2,
             "when_to_use": "Select when the query is about checking element presence without an extraction step, to_be_visible / to_be_hidden assertions, handling optional page elements, or the assert_locator_node schema.",
-            "embedding_hint": "assert locator node element visibility to_be_visible to_be_hidden conditional branch Playwright optional element"
+            "embedding_hint": "assert locator node element visibility to_be_visible to_be_hidden boolean variable output_variable_name Playwright optional element"
         },
         {
             "id": "docs-action-types-extraction-action",

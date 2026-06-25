@@ -233,6 +233,7 @@ class APICallExtraction(BaseModel):
 
 class ExtractionAction(BaseModel):
     unique_identifier: str | None = None
+    allow_none: bool = False
     network_call: Optional[NetworkCallExtraction] = None
     llm: Optional[LLMExtraction] = None
     python_script: Optional[PythonScriptExtraction] = None

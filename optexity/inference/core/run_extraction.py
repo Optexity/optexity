@@ -53,12 +53,47 @@ def _extraction_response_contains_null(obj) -> bool:
     return False
 
 
+def _enforce_extraction_not_null(
+    extraction_action: ExtractionAction, memory: Memory, vars_before: dict
+) -> None:
+    """Fail the automation if the extraction produced null value(s).
+
+    Only runs when ``allow_none`` is False (the default). It applies a deep null
+    check over the variables this node wrote, so any null anywhere in the
+    extracted value (top-level, list element, or nested field) fails.
+
+    ``api_call`` is intentionally exempt: prod tolerates errored / null api
+    responses (they are stored and can be branched on), so failing here would
+    change current behavior. The response dict still carries ``status_code`` /
+    ``error`` for the automation to handle explicitly.
+
+    Variables are identified by identity diff against ``vars_before`` so only the
+    values (re)written by this extraction node are inspected — making this safe
+    inside for-loops that overwrite the same variable each iteration.
+    """
+    gv = memory.variables.generated_variables
+
+    if extraction_action.api_call is not None:
+        return
+
+    for key, value in gv.items():
+        if vars_before.get(key) is value:
+            continue  # not (re)written by this extraction node
+        if _extraction_response_contains_null(value):
+            raise ValueError(
+                f"Extraction produced null value(s) in variable {key!r} "
+                f"and allow_none is False: {value!r}"
+            )
+
+
 async def run_extraction_action(
     extraction_action: ExtractionAction, memory: Memory, browser: Browser, task: Task
 ):
     logger.debug(
         f"---------Running extraction action {extraction_action.model_dump_json()}---------"
     )
+
+    vars_before = dict(memory.variables.generated_variables)
 
     if extraction_action.llm:
         await handle_llm_extraction(
@@ -116,6 +151,9 @@ async def run_extraction_action(
             memory,
             extraction_action.unique_identifier,
         )
+
+    if not extraction_action.allow_none:
+        _enforce_extraction_not_null(extraction_action, memory, vars_before)
 
 
 async def handle_state_extraction(
@@ -323,6 +361,10 @@ async def handle_llm_extraction(
                 or isinstance(v, bool)
             ):
                 memory.variables.generated_variables[output_variable_name] = [v]
+            elif v is None:
+                # Null is allowed through here; the allow_none policy in
+                # run_extraction_action decides whether it fails the run.
+                memory.variables.generated_variables[output_variable_name] = [None]
             else:
                 raise ValueError(
                     f"Output variable {output_variable_name} must be a string, int, float, bool, or a list of strings, ints, floats, or bools. Extracted values: {response_dict[output_variable_name]}"
@@ -451,6 +493,10 @@ async def handle_python_script_extraction(
                     memory.variables.generated_variables[output_variable_name] = v
                 elif isinstance(v, (str, int, float, bool)):
                     memory.variables.generated_variables[output_variable_name] = [v]
+                elif v is None:
+                    # Null is allowed through here; the allow_none policy in
+                    # run_extraction_action decides whether it fails the run.
+                    memory.variables.generated_variables[output_variable_name] = [None]
                 else:
                     raise ValueError(
                         f"Output variable {output_variable_name} must be a string, int, float, bool, or a list of strings, ints, floats, or bools. Extracted values: {result[output_variable_name]}"

@@ -189,6 +189,14 @@ class ActionNode(BaseModel):
             for index, value in enumerate(values):
                 pattern = f"{{{key}[{index}]}}"
 
+                if value is None:
+                    # A None value (e.g. a failed locator extraction) cannot be
+                    # substituted into a string. Skip it instead of crashing the
+                    # whole flow on an unrelated variable. The raw None is kept in
+                    # generated_variables, so if/else conditions still evaluate it
+                    # natively (falsy) via evaluate_condition().
+                    continue
+
                 str_value = str(value)
 
                 if isinstance(value, SecureParameter):
@@ -397,82 +405,28 @@ class IfElseNode(BaseModel):
 
 
 class AssertLocatorNode(BaseModel):
-    """Branch on a Playwright locator assertion.
+    """Evaluate a Playwright locator assertion and store the boolean result.
 
     The locator is evaluated against `page` via Browser.get_locator_from_command
     (same `eval("page." + command)` style used by interaction actions). If the
-    assertion holds within `timeout` seconds, `if_nodes` run; otherwise
-    `else_nodes` run. Both branches may be empty (no-op).
+    assertion holds within `timeout` seconds the result is True, otherwise False.
+    The boolean is stored in generated_variables under `output_variable_name`
+    (as a single-element list, e.g. {output_variable_name: [True]}) so it can be
+    referenced later via `{output_variable_name[0]}`, e.g. in an if_else_node
+    condition.
     """
 
     type: Literal["assert_locator_node"]
     locator: str
     assertion: Literal["to_be_visible", "to_be_hidden"]
+    output_variable_name: str
     timeout: float = 5.0
-    if_nodes: list[
-        ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef
-    ] = []
-    else_nodes: list[
-        ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef
-    ] = []
 
     def replace(self, pattern: str, replacement: str | int | float | bool | None):
         replacement_str = "" if replacement is None else str(replacement)
         if self.locator:
             self.locator = self.locator.replace(pattern, replacement_str)
-        for node in self.if_nodes:
-            if hasattr(node, "replace"):
-                node.replace(pattern, replacement_str)
-        for node in self.else_nodes:
-            if hasattr(node, "replace"):
-                node.replace(pattern, replacement_str)
         return self
-
-    @model_validator(mode="before")
-    def migrate_old_nodes(cls, data: dict[str, Any]):
-        for key in ["if_nodes", "else_nodes"]:
-            raw_nodes = data.get(key, [])
-            new_nodes = []
-            used_old_format = False
-
-            for item in raw_nodes:
-                if (
-                    isinstance(item, ActionNode)
-                    or isinstance(item, ForLoopNode)
-                    or isinstance(item, IfElseNode)
-                    or isinstance(item, AssertLocatorNode)
-                ):
-                    new_nodes.append(item)
-                    continue
-
-                if isinstance(item, dict) and "type" in item:
-                    new_nodes.append(item)
-                    continue
-
-                used_old_format = True
-
-                if isinstance(item, dict) and "condition" in item:
-                    new_nodes.append({"type": "if_else_node", **item})
-                    continue
-
-                if isinstance(item, dict) and "variable_name" in item:
-                    new_nodes.append({"type": "for_loop_node", **item})
-                    continue
-
-                if isinstance(item, dict) and "locator" in item and "assertion" in item:
-                    new_nodes.append({"type": "assert_locator_node", **item})
-                    continue
-
-                new_nodes.append({"type": "action_node", **item})
-
-            if used_old_format:
-                logger.warning(
-                    "Old node format without 'type' is deprecated. "
-                    "Use the new format: {'type': 'action_node'|'for_loop_node'|'if_else_node'|'assert_locator_node', ...}"
-                )
-
-            data[key] = new_nodes
-        return data
 
 
 class Parameters(BaseModel):
