@@ -58,15 +58,14 @@ def _enforce_extraction_not_null(
 ) -> None:
     """Fail the automation if the extraction produced null value(s).
 
-    Only runs when ``allow_none`` is False (the default). The policy for "null"
-    differs by extraction type:
+    Only runs when ``allow_none`` is False (the default). It applies a deep null
+    check over the variables this node wrote, so any null anywhere in the
+    extracted value (top-level, list element, or nested field) fails.
 
-    - ``api_call``: request-failure semantics — fail only if the call errored or
-      returned no status code. Nulls *inside* an otherwise-successful response
-      body are allowed (they may be legitimate API data).
-    - everything else: a deep null check over the variables this node wrote, so
-      any null anywhere in the extracted value (top-level, list element, or
-      nested field) fails.
+    ``api_call`` is intentionally exempt: prod tolerates errored / null api
+    responses (they are stored and can be branched on), so failing here would
+    change current behavior. The response dict still carries ``status_code`` /
+    ``error`` for the automation to handle explicitly.
 
     Variables are identified by identity diff against ``vars_before`` so only the
     values (re)written by this extraction node are inspected — making this safe
@@ -75,16 +74,6 @@ def _enforce_extraction_not_null(
     gv = memory.variables.generated_variables
 
     if extraction_action.api_call is not None:
-        for var_name in extraction_action.api_call.output_variable_names:
-            result = gv.get(var_name)
-            if isinstance(result, dict) and (
-                result.get("error") is not None or result.get("status_code") is None
-            ):
-                raise ValueError(
-                    f"api_call extraction {var_name!r} failed "
-                    f"(status_code={result.get('status_code')}, "
-                    f"error={result.get('error')!r}) and allow_none is False"
-                )
         return
 
     for key, value in gv.items():
