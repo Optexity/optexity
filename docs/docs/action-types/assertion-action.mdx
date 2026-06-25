@@ -1,11 +1,11 @@
 ---
 title: Assert Locator Node
-description: Branch on Playwright locator visibility — run different steps depending on whether an element is visible or hidden
+description: Check Playwright locator visibility and store the result as a boolean variable
 ---
 
-Use `assert_locator_node` to branch your automation based on whether a specific element is present on the page. It evaluates a Playwright locator within a timeout and executes `if_nodes` if the assertion passes, or `else_nodes` if it does not.
+Use `assert_locator_node` to check whether a specific element is present on the page and store the result. It evaluates a Playwright locator within a timeout and writes a boolean into `output_variable_name` (`true` if the assertion passes, `false` if it does not). You then branch on that variable with an [`if_else_node`](/docs/building-automations/if-else-node).
 
-This is the lowest-overhead way to handle optional elements—no LLM call, no extraction variable, just a direct visibility check.
+This is the lowest-overhead way to capture element presence—no LLM call, no extraction step, just a direct visibility check that becomes a reusable variable.
 
 ## Structure
 
@@ -14,20 +14,12 @@ This is the lowest-overhead way to handle optional elements—no LLM call, no ex
   "type": "assert_locator_node",
   "locator": "get_by_role(\"alert\", name=\"Error\")",
   "assertion": "to_be_visible",
-  "timeout": 5.0,
-  "if_nodes": [
-    {
-      "type": "action_node",
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"Dismiss\")"
-        }
-      }
-    }
-  ],
-  "else_nodes": []
+  "output_variable_name": "error_visible",
+  "timeout": 5.0
 }
 ```
+
+The node above stores `error_visible = [true]` or `error_visible = [false]`. Reference it later as `{error_visible[0]}`.
 
 ## Properties
 
@@ -36,78 +28,91 @@ This is the lowest-overhead way to handle optional elements—no LLM call, no ex
 | `type` | `"assert_locator_node"` | Required | Node discriminator |
 | `locator` | `str` | Required | Playwright locator command (`page.<locator>` style) |
 | `assertion` | `"to_be_visible" \| "to_be_hidden"` | Required | Condition to test |
+| `output_variable_name` | `str` | Required | Variable to store the boolean result, as a single-element list (e.g. `[true]`) |
 | `timeout` | `float` | `5.0` | Seconds to wait for the assertion before treating it as failed |
-| `if_nodes` | `list[node]` | `[]` | Nodes to run when the assertion **passes** |
-| `else_nodes` | `list[node]` | `[]` | Nodes to run when the assertion **fails** (times out) |
 
-Both `if_nodes` and `else_nodes` accept any node type: `action_node`, `if_else_node`, `for_loop_node`, or nested `assert_locator_node`.
+The result is stored as a single-element list, matching the convention used by other variables, so you reference it with index `[0]` (e.g. `{error_visible[0]}`).
 
 ## Assertions
 
-| Assertion | Passes when |
-|-----------|-------------|
+| Assertion | Result is `true` when |
+|-----------|-----------------------|
 | `to_be_visible` | The element exists in the DOM and is visible within `timeout` seconds |
 | `to_be_hidden` | The element is absent or hidden within `timeout` seconds |
 
-If the assertion does not pass within `timeout`, `else_nodes` run (no error is raised).
+If the assertion does not pass within `timeout`, the variable is set to `false` (no error is raised). If the locator does not resolve at all, the result is also `false`.
 
 ## Examples
 
-### Skip a step when an element is absent
+### Dismiss an element only when it appears
 
-Check whether a "Cookie Consent" banner is visible before trying to dismiss it:
+Check whether an error alert is visible, then dismiss it with a following `if_else_node`:
 
 ```json
-{
-  "type": "assert_locator_node",
-  "locator": "get_by_role(\"dialog\", name=\"Cookie Consent\")",
-  "assertion": "to_be_visible",
-  "timeout": 3.0,
-  "if_nodes": [
-    {
-      "type": "action_node",
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"Accept All\")"
+[
+  {
+    "type": "assert_locator_node",
+    "locator": "get_by_role(\"alert\", name=\"Error\")",
+    "assertion": "to_be_visible",
+    "output_variable_name": "error_visible",
+    "timeout": 5.0
+  },
+  {
+    "type": "if_else_node",
+    "condition": "{error_visible[0]}",
+    "if_nodes": [
+      {
+        "type": "action_node",
+        "interaction_action": {
+          "click_element": {
+            "command": "get_by_role(\"button\", name=\"Dismiss\")"
+          }
         }
       }
-    }
-  ],
-  "else_nodes": []
-}
+    ],
+    "else_nodes": []
+  }
+]
 ```
 
-### Assert an element is hidden before proceeding
+### Wait for a spinner to disappear, then branch
 
-Wait up to 10 seconds for a loading spinner to disappear:
+Wait up to 10 seconds for a loading spinner to be hidden, then submit or fail:
 
 ```json
-{
-  "type": "assert_locator_node",
-  "locator": "get_by_test_id(\"loading-spinner\")",
-  "assertion": "to_be_hidden",
-  "timeout": 10.0,
-  "if_nodes": [
-    {
-      "type": "action_node",
-      "interaction_action": {
-        "click_element": {
-          "command": "get_by_role(\"button\", name=\"Submit\")"
+[
+  {
+    "type": "assert_locator_node",
+    "locator": "get_by_test_id(\"loading-spinner\")",
+    "assertion": "to_be_hidden",
+    "output_variable_name": "spinner_gone",
+    "timeout": 10.0
+  },
+  {
+    "type": "if_else_node",
+    "condition": "{spinner_gone[0]}",
+    "if_nodes": [
+      {
+        "type": "action_node",
+        "interaction_action": {
+          "click_element": {
+            "command": "get_by_role(\"button\", name=\"Submit\")"
+          }
         }
       }
-    }
-  ],
-  "else_nodes": [
-    {
-      "type": "action_node",
-      "misc_action": {
-        "fail_state": {
-          "message": "Loading spinner did not disappear within 10 seconds"
+    ],
+    "else_nodes": [
+      {
+        "type": "action_node",
+        "misc_action": {
+          "fail_state": {
+            "message": "Loading spinner did not disappear within 10 seconds"
+          }
         }
       }
-    }
-  ]
-}
+    ]
+  }
+]
 ```
 
 ### Variable substitution in the locator
@@ -119,9 +124,8 @@ Wait up to 10 seconds for a loading spinner to disappear:
   "type": "assert_locator_node",
   "locator": "get_by_text(\"{order_id[0]}\")",
   "assertion": "to_be_visible",
-  "timeout": 5.0,
-  "if_nodes": [ ... ],
-  "else_nodes": [ ... ]
+  "output_variable_name": "order_found",
+  "timeout": 5.0
 }
 ```
 
@@ -129,12 +133,13 @@ Wait up to 10 seconds for a loading spinner to disappear:
 
 | | `assert_locator_node` | `if_else_node` |
 |---|---|---|
+| **Role** | Captures element visibility as a boolean variable | Branches on a Python expression over a variable |
 | **Condition** | Playwright locator visibility | Python expression on a variable |
-| **Requires extraction?** | No | Yes — needs an `extraction_action` with `output_variable_names` first |
-| **Cost** | Zero (no LLM) | Zero (expression eval) + cost of extraction |
-| **Best for** | Element present/absent checks | Comparing extracted values, complex logic |
+| **Requires extraction?** | No | Yes — needs a variable to branch on (e.g. from `assert_locator_node` or an `extraction_action`) |
+| **Cost** | Zero (no LLM) | Zero (expression eval) |
+| **Best for** | Element present/absent checks | Acting on a captured boolean or comparing extracted values |
 
-Use `assert_locator_node` when you only need to know if something is on the page. Use `if_else_node` when you need to compare the *content* of what was extracted.
+`assert_locator_node` produces the boolean; `if_else_node` consumes it. Pair them to run steps conditionally on element presence, or use the variable in any later condition.
 
 ## Locator Syntax
 

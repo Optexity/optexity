@@ -618,7 +618,7 @@ async def handle_assert_locator_node(
     full_automation.append(assert_node.model_dump())
     logger.debug(
         f"Handling assert locator node {assert_node.locator} ({assert_node.assertion}) "
-        f"with {len(assert_node.if_nodes)} if-nodes and {len(assert_node.else_nodes)} else-nodes"
+        f"-> {assert_node.output_variable_name}"
     )
 
     locator = await browser.get_locator_from_command(assert_node.locator)
@@ -648,12 +648,13 @@ async def handle_assert_locator_node(
                 f"failed: {type(e).__name__}"
             )
 
-    branch = assert_node.if_nodes if assertion_passed else assert_node.else_nodes
+    memory.variables.generated_variables[assert_node.output_variable_name] = [
+        assertion_passed
+    ]
     logger.debug(
-        f"Assert locator result={assertion_passed}; running "
-        f"{'if' if assertion_passed else 'else'} branch ({len(branch)} nodes)"
+        f"Assert locator result={assertion_passed}; stored in "
+        f"{assert_node.output_variable_name!r}"
     )
-    await _run_nodes(branch, task, memory, browser, full_automation)
     memory.update_system_info()
 
 
