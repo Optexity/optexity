@@ -421,6 +421,38 @@ Override if needed:
 
 ---
 
+## Null Handling (`allow_none`)
+
+By default, an extraction **fails the automation if it produces a null value**. This surfaces a silently-failed extraction (e.g. an element that wasn't found) immediately, instead of letting a missing value flow into later actions. Set `allow_none: true` on the extraction action to allow nulls through instead.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `allow_none` | `bool` | `false` | When `false`, the automation fails if the extraction yields any null value. When `true`, nulls are kept and the run continues. |
+
+The check is **deep**: a null at the top level, inside a list (e.g. `["a", null]`), or in a nested field all trigger the failure. It applies to value extractions (`llm`, `locator`, `python_script`).
+
+```json
+{
+  "type": "action_node",
+  "extraction_action": {
+    "allow_none": true,
+    "locator": {
+      "command": "get_by_test_id('optional-field')",
+      "output_variable_name": "optional_value",
+      "extraction_format": { "optional_value": "str" }
+    }
+  }
+}
+```
+
+With `allow_none: true`, a failed extraction stores a null value you can branch on with an [`if_else_node`](/docs/building-automations/if-else-node) — a null evaluates as falsy in conditions.
+
+<Info>
+`api_call` is exempt from this check. An errored or null API response is always stored (along with its `status_code` and `error`) so the automation can branch on it explicitly — `allow_none` does not affect `api_call`.
+</Info>
+
+---
+
 ## When to Use Each Type
 
 | Scenario | Recommended |

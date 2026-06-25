@@ -285,7 +285,7 @@
             "id": "docs-action-types-extraction-action",
             "path": "docs/action-types/extraction-action.mdx",
             "title": "Extraction Actions",
-            "summary": "Comprehensive guide to all extraction action types: llm (AI-based page extraction), locator (Playwright-based with LLM fallback), network_call (capture AJAX/API responses), api_call (make outbound REST API calls with polling and dot-path response variables), screenshot (save visual snapshot), state (URL/title/cookies/storage), and two_fa_action (2FA code extraction). Each type includes its JSON schema, properties table, and when-to-use guidance. Also covers timing defaults and source selection for LLM extraction.",
+            "summary": "Comprehensive guide to all extraction action types: llm (AI-based page extraction), locator (Playwright-based with LLM fallback), network_call (capture AJAX/API responses), api_call (make outbound REST API calls with polling and dot-path response variables), screenshot (save visual snapshot), state (URL/title/cookies/storage), and two_fa_action (2FA code extraction). Each type includes its JSON schema, properties table, and when-to-use guidance. Also covers timing defaults, source selection for LLM extraction, and null handling via the allow_none flag (extractions fail by default when they yield null values; api_call is exempt).",
             "gist": "All extraction types (llm, locator, network_call, api_call, screenshot, state, 2FA) with schemas and when to use each.",
             "keywords": [
                 "extraction",
@@ -302,7 +302,9 @@
                 "2FA extraction",
                 "output_variable_name",
                 "extraction_format",
-                "extraction_instructions"
+                "extraction_instructions",
+                "allow_none",
+                "null handling"
             ],
             "document_type": "guide",
             "tags": ["action-types", "extraction", "data", "scraping", "api", "2FA"],
