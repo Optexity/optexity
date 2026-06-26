@@ -179,6 +179,21 @@ class Task(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def validate_rdp_channel(self):
+        # browser_channel="rdp" runs in one of two modes:
+        #   * rdp_parameter set  -> RDP (xfreerdp) into a remote machine.
+        #   * rdp_parameter None -> open automation.url in a normal browser and
+        #     drive it via pyautogui (computer-use).
+        # The second mode needs a start URL to navigate to.
+        if self.automation.browser_channel == "rdp":
+            if self.rdp_parameter is None and not self.automation.url:
+                raise ValueError(
+                    "browser_channel='rdp' requires either an rdp_parameter "
+                    "(to RDP into a machine) or automation.url (to open in a browser)"
+                )
+        return self
+
+    @model_validator(mode="after")
     def set_dependent_paths(self):
 
         self.logs_directory.mkdir(parents=True, exist_ok=True)

@@ -534,14 +534,17 @@ class Automation(BaseModel):
         if self.browser_channel == "rdp":
             for node in self.nodes:
                 if isinstance(node, ActionNode):
-                    if node.interaction_action:
+                    ia = node.interaction_action
+                    if ia:
                         if (
-                            node.interaction_action.click_element is None
-                            and node.interaction_action.input_text is None
-                            and node.interaction_action.key_press is None
+                            ia.click_element is None
+                            and ia.input_text is None
+                            and ia.key_press is None
+                            and ia.agentic_task is None
                         ):
                             raise ValueError(
-                                "Only click_element, input_text, and key_press are allowed for rdp"
+                                "Only click_element, input_text, key_press, and "
+                                "agentic_task are allowed for rdp"
                             )
         return self
 
