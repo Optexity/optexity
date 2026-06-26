@@ -414,33 +414,40 @@ async def run_action_node(
             # paths (browseruse/axtree retries) and shouldn't pay this cost.
             if browser.channel != "rdp":
                 raise
-            if memory.agentic_recovery_count >= MAX_AGENTIC_RECOVERIES_PER_TASK:
+            # Retry the action behind agentic recovery up to
+            # MAX_AGENTIC_RECOVERIES_PER_TASK times. Bounds LLM cost and
+            # contains damage from recovery misfires.
+            keyword = e.keyword
+            recovered = False
+            for attempt in range(1, MAX_AGENTIC_RECOVERIES_PER_TASK + 1):
+                logger.warning(
+                    f"Action failed with KeywordNotFoundOnScreenException "
+                    f"(keyword='{keyword}'); running agentic recovery "
+                    f"({attempt}/{MAX_AGENTIC_RECOVERIES_PER_TASK}) "
+                    f"before retry."
+                )
+                recovery_action = AgenticTask(
+                    task=await build_recovery_prompt(
+                        action_node, siblings, node_index, task, memory
+                    ),
+                    max_steps=AGENTIC_RECOVERY_MAX_STEPS,
+                )
+                await handle_agentic_task(recovery_action, task, memory, browser)
+                try:
+                    await _dispatch_action_body()
+                    recovered = True
+                    break
+                except KeywordNotFoundOnScreenException as retry_exc:
+                    keyword = retry_exc.keyword
+            if not recovered:
                 logger.error(
                     f"Agentic recovery cap reached "
-                    f"({memory.agentic_recovery_count}/"
+                    f"({MAX_AGENTIC_RECOVERIES_PER_TASK}/"
                     f"{MAX_AGENTIC_RECOVERIES_PER_TASK}); propagating "
                     f"KeywordNotFoundOnScreenException for keyword "
-                    f"'{e.keyword}'."
+                    f"'{keyword}'."
                 )
                 raise
-
-            memory.agentic_recovery_count += 1
-            logger.warning(
-                f"Action failed with KeywordNotFoundOnScreenException "
-                f"(keyword='{e.keyword}'); running agentic recovery "
-                f"({memory.agentic_recovery_count}/"
-                f"{MAX_AGENTIC_RECOVERIES_PER_TASK}) before single retry."
-            )
-            recovery_action = AgenticTask(
-                task=await build_recovery_prompt(
-                    action_node, siblings, node_index, task, memory
-                ),
-                max_steps=AGENTIC_RECOVERY_MAX_STEPS,
-            )
-            await handle_agentic_task(recovery_action, task, memory, browser)
-            # One retry. If this also fails, the exception propagates to
-            # the outer except below and out of the node.
-            await _dispatch_action_body()
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
