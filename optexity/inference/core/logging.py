@@ -293,17 +293,20 @@ async def initiate_callback(task: Task):
 
     try:
         logger.info("initiating callback")
-        if task.callback_url is None:
+        if task.callback_url is None and task.task_callback_url is None:
             return
 
         url = urljoin(settings.SERVER_URL, settings.INITIATE_CALLBACK_ENDPOINT)
         headers = {"x-api-key": task.api_key}
 
-        data = {
+        data: dict = {
             "task_id": task.task_id,
             "endpoint_name": task.endpoint_name,
-            "callback_url": task.callback_url.model_dump(),
+            "task_callback_url": task.task_callback_url,
+            "task_callback_api_key": task.task_callback_api_key,
         }
+        if task.callback_url is not None:
+            data["callback_url"] = task.callback_url.model_dump()
 
         async with httpx.AsyncClient(timeout=30.0) as client:
 
@@ -324,6 +327,9 @@ async def save_latest_memory_state_locally(
 ):
 
     try:
+        # Captured here because this runs in run_node's `finally`, i.e. right after the
+        # step's action has completed (or failed) — so it is the action-completion time.
+        completed_at = datetime.now(timezone.utc).isoformat()
         browser_state = memory.browser_states[-1]
         automation_state = memory.automation_state
         step_directory = (
@@ -388,6 +394,8 @@ async def save_latest_memory_state_locally(
             "url": browser_state.url,
             "step_index": automation_state.step_index,
             "try_index": automation_state.try_index,
+            "completed_at": completed_at,
+            "started_at": (task.started_at.isoformat() if task.started_at else None),
             "downloaded_files": [
                 downloaded_file.name for downloaded_file in memory.downloads
             ],
@@ -410,6 +418,12 @@ async def save_latest_memory_state_locally(
         if browser_state.llm_response:
             async with aiofiles.open(step_directory / "llm_response.json", "w") as f:
                 await f.write(json.dumps(browser_state.llm_response, indent=4))
+
+        if browser_state.locator_candidates:
+            async with aiofiles.open(
+                step_directory / "locator_candidates.json", "w"
+            ) as f:
+                await f.write(json.dumps(browser_state.locator_candidates, indent=4))
 
         if node:
             async with aiofiles.open(step_directory / "action_node.json", "w") as f:

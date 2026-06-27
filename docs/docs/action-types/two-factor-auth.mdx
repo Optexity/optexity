@@ -165,7 +165,7 @@ Fetch codes from a custom API endpoint.
 {
     "fetch_2fa_action": {
         "fetch_2fa_api_call_action": {
-            "api_call_url": "https://api.example.com/get-2fa-code",
+            "api_call_url": "https://inference-api.optexity.com/get-2fa-code",
             "api_call_method": "POST",
             "api_call_headers": {
                 "Authorization": "Bearer {api_token[0]}",
@@ -188,6 +188,36 @@ Fetch codes from a custom API endpoint.
 | `api_call_method`  | `"GET" \| "POST"` | HTTP method             |
 | `api_call_headers` | `dict`            | Request headers         |
 | `api_call_body`    | `dict`            | Request body (for POST) |
+
+## Tuning the Fetch Window
+
+When a 2FA code is fetched, Optexity only considers messages that arrived within a time window: from when the 2FA timer started (`start_2fa_timer`) up to the timer start plus the maximum wait time. Clock skew between Optexity and the email/Slack/SMS provider can occasionally push a legitimate code just outside this window, causing it to be missed.
+
+Two optional fields let you widen the window. Both are expressed in **minutes** and default to `0`, so existing automations are unaffected.
+
+```json
+{
+    "fetch_2fa_action": {
+        "fetch_email_2fa_action": {
+            "email_address": "user@example.com",
+            "subject": "Your login verification code",
+            "service": "gmail"
+        },
+        "output_variable_name": "email_code",
+        "start_2fa_time_offset_minutes": 1,
+        "end_2fa_time_offset_minutes": 2
+    }
+}
+```
+
+### Properties
+
+| Property                        | Type    | Default | Description                                                              |
+| ------------------------------- | ------- | ------- | ------------------------------------------------------------------------ |
+| `start_2fa_time_offset_minutes` | `float` | `0`     | Minutes **subtracted** from the window start, to look further back.      |
+| `end_2fa_time_offset_minutes`   | `float` | `0`     | Minutes **added** to the window end, to look further forward.            |
+
+With the example above, the fetch window becomes `[timer start − 1 min, timer start + max wait + 2 min]`. Use small values (1–2 minutes) — they exist to absorb clock skew and slightly late delivery, not to replace the maximum wait time, which still governs how long Optexity keeps polling.
 
 ## Using the 2FA Code
 

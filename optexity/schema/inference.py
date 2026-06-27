@@ -14,8 +14,18 @@ class InferenceRequest(BaseModel):
     max_timeout_in_minutes: int = 10
     use_proxy: bool = False
     is_dedicated: bool = (
-        False  ## Only used in local mode. For cloud mode, the task is dedicated is defined on dashboard.
+        False  ## Opt into dedicated mode per-request. In cloud mode a dedicated_service DB row (admin policy) takes precedence over this flag.
     )
+    task_callback_url: str | None = None
+    task_callback_api_key: str | None = None
+    # Dedicated limits used only when is_dedicated is true and no DB policy row
+    # exists. max_parallelism is the service-wide cap (clamped server-side, see
+    # DEDICATED_MAX_REQUEST_PARALLELISM); per_login_parallelism is how many
+    # containers a single login may use before its tasks round-robin onto them.
+    max_parallelism: int = 1
+    per_login_parallelism: int = 1
+    task_callback_url: str | None = None
+    task_callback_api_key: str | None = None
 
     @model_validator(mode="after")
     def validate_use_proxy(self):

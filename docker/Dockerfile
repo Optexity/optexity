@@ -46,12 +46,11 @@ RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
         && rm /tmp/chrome.deb; \
     fi && apt-get update && apt-get install -y chromium && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --break-system-packages --no-cache-dir playwright patchright "cloakbrowser[geoip]"
+RUN pip3 install --break-system-packages --no-cache-dir playwright patchright
 
 # Install Chromium and Chrome in separate layers
 RUN playwright install --with-deps chromium
 RUN patchright install chromium
-RUN python3 -m cloakbrowser install
 
 # Create non-root user 'optexity' with passwordless sudo
 RUN groupadd -r optexity && \
@@ -71,7 +70,8 @@ EXPOSE 8000 8080 9000
 WORKDIR /home/optexity
 
 # Baseline install — cached, provides all heavy dependencies.
-RUN git clone https://github.com/Optexity/optexity.git && \
+RUN pip3 install --break-system-packages --upgrade pip && \
+    git clone https://github.com/Optexity/optexity.git && \
     cd optexity && git checkout main && \
     pip install --break-system-packages -e .
 

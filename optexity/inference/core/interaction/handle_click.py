@@ -14,7 +14,7 @@ from optexity.inference.core.interaction.screenshot_comparison import (
     validate_recording_action,
 )
 from optexity.inference.core.interaction.utils import (
-    get_coordinates_from_ocr_result,
+    LocatorExtraction,
     get_coordinates_from_prompt,
     get_index_from_prompt,
     handle_download,
@@ -103,6 +103,12 @@ async def click_element_index(
                 **{"click": {"index": index, "button": click_element_action.button}}
             )
             results = await browser.backend_agent.multi_act([action_model])
+            await LocatorExtraction.log_interacted_locator(
+                browser,
+                index,
+                f".click(button={click_element_action.button!r})",
+                memory,
+            )
             if results and results[0].error:
                 raise RuntimeError(
                     f"browseruse click failed at index {index}: {results[0].error}"

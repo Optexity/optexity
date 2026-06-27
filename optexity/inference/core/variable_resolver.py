@@ -24,7 +24,6 @@ _API_VAR_PATTERN = re.compile(r"\{(\w+)(\.\w+(?:\.\w+|\[\d+\])*)\}")
 # Examples that don't:  {var[0]}, {var[index]}, {var.field}
 _DYNAMIC_INDEX_PATTERN = re.compile(r"\{(\w+)\[([A-Za-z_]\w*)\]\}")
 
-
 def _parse_path_segments(path: str) -> list[tuple[str, str | int]]:
     """Parse '.foo.bar[0].baz' into [('attr','foo'), ('attr','bar'), ('index',0), ('attr','baz')]"""
     result = []
