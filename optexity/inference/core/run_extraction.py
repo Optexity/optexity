@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 import traceback
 
@@ -6,35 +7,51 @@ import aiofiles
 import httpx
 
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
+from optexity.inference.core.interaction.utils import (
+    crop_screenshot_to_bbox,
+    find_keyword_in_results,
+    get_coordinates_from_ocr_result,
+    resolve_bounding_box_variables,
+)
 from optexity.inference.core.run_interaction import _get_error_handler
 from optexity.inference.core.run_two_fa import run_two_fa_action
+from optexity.inference.core.vision.ocr.aws_textract import AWSTextract
 from optexity.inference.infra.browser import Browser
 from optexity.inference.infra.browser_health import fetch_browser_state_for_classifier
-from optexity.inference.models import get_llm_model_with_fallback
+from optexity.inference.models import (
+    AnthropicModels,
+    GeminiModels,
+    _try_create_model,
+    get_llm_model,
+    get_llm_model_with_fallback,
+)
 from optexity.schema.actions.extraction_action import (
     APICallExtraction,
     ExtractionAction,
     LLMExtraction,
     LocatorExtraction,
     NetworkCallExtraction,
+    OCRCoordinatesExtraction,
     PDFExtraction,
     PythonScriptExtraction,
     ScreenshotExtraction,
     StateExtraction,
+    VisionExtraction,
 )
 from optexity.schema.actions.interaction_action import CloseOverlayPopupAction
 from optexity.schema.memory import (
-    BrowserState,
     Memory,
     NetworkRequest,
     NetworkResponse,
     OutputData,
     ScreenshotData,
 )
+from optexity.schema.ocr import OCRResult
 from optexity.schema.task import Task
 from optexity.utils.http import make_api_request
 
 logger = logging.getLogger(__name__)
+ocr = AWSTextract()
 
 _LLM_EXTRACTION_MAX_ATTEMPTS = 2  # initial extraction + at most 1 retry
 
@@ -137,9 +154,24 @@ async def run_extraction_action(
         await run_two_fa_action(extraction_action.two_fa_action, memory, task)
     elif extraction_action.pdf:
         await handle_pdf_extraction(extraction_action.pdf, memory, task)
+    elif extraction_action.ocr_coordinates:
+        await handle_ocr_coordinates_extraction(
+            extraction_action.ocr_coordinates,
+            memory,
+            browser,
+            extraction_action.unique_identifier,
+        )
     elif extraction_action.locator:
         await handle_locator_extraction(
             extraction_action.locator,
+            memory,
+            browser,
+            task,
+            extraction_action.unique_identifier,
+        )
+    elif extraction_action.vision:
+        await handle_vision_extraction(
+            extraction_action.vision,
             memory,
             browser,
             task,
@@ -580,6 +612,184 @@ async def handle_pdf_extraction(
     )
 
     return output_data
+
+
+async def handle_ocr_coordinates_extraction(
+    ocr_extraction: OCRCoordinatesExtraction,
+    memory: Memory,
+    browser: "Browser",
+    unique_identifier: str | None = None,
+):
+    """Run OCR once on the screenshot, match all names from source_variable, store x/y as parallel lists.
+
+    - Duplicate names: each gets a different OCR result (position order).
+    - Score < 80: stores -1, -1 (interaction action will fallback to full OCR + LLM).
+    - bounding_box_variables: crops screenshot before OCR; offsets results back to full-screen coords.
+    """
+
+    source_var = ocr_extraction.source_variable
+    if source_var in memory.variables.generated_variables:
+        names = memory.variables.generated_variables[source_var]
+    else:
+        logger.error(f"Source variable '{source_var}' not found in generated variables")
+        return
+
+    screenshot = await browser.get_screenshot()
+    if screenshot is None:
+        logger.error("Screenshot is None, cannot run OCR")
+        return
+
+    # Apply bounding box crop if specified
+    crop_offset_x, crop_offset_y = 0, 0
+    ocr_screenshot = screenshot
+    if ocr_extraction.bounding_box_variables:
+        bbox = resolve_bounding_box_variables(
+            ocr_extraction.bounding_box_variables, memory
+        )
+        if bbox:
+            crop_offset_x, crop_offset_y = bbox[0], bbox[1]
+            ocr_screenshot = crop_screenshot_to_bbox(screenshot, *bbox)
+        else:
+            logger.warning(
+                f"[ocr_coordinates] bounding_box_variables {ocr_extraction.bounding_box_variables} "
+                "could not be resolved (missing, -1, or list without index) — using full screenshot"
+            )
+
+    results, base64_image_sent_to_ocr = ocr.ocr(ocr_screenshot)
+
+    # Offset bounding boxes back to full-screen coordinates
+    if crop_offset_x or crop_offset_y:
+        for r in results:
+            r.bounding_box.x += crop_offset_x
+            r.bounding_box.y += crop_offset_y
+
+    annotated, canvas = ocr.visualize(screenshot, results)
+    memory.browser_states[-1].ocr_annotated = base64.b64encode(annotated).decode(
+        "utf-8"
+    )
+    memory.browser_states[-1].ocr_canvas = base64.b64encode(canvas).decode("utf-8")
+    memory.browser_states[-1].ocr_image_sent_to_ocr.append(base64_image_sent_to_ocr)
+
+    names_str = [str(n) for n in names]
+    coords_x: list[int] = []
+    coords_y: list[int] = []
+    used_result_ids: set[int] = set()
+
+    logger.info(
+        f"[ocr_coordinates] OCR returned {len(results)} raw results. "
+        f"All texts+y: {[(r.text, round(r.bounding_box.y, 1), id(r)) for r in results]}"
+    )
+
+    def _center_in_bbox(r: OCRResult, bbox) -> bool:
+        cx = r.bounding_box.x + r.bounding_box.width / 2
+        cy = r.bounding_box.y + r.bounding_box.height / 2
+        return (
+            bbox.x <= cx <= bbox.x + bbox.width and bbox.y <= cy <= bbox.y + bbox.height
+        )
+
+    for name in names_str:
+        available = [r for r in results if id(r) not in used_result_ids]
+        logger.info(
+            f"[ocr_coordinates] searching '{name}' in {len(available)}/{len(results)} available results "
+            f"(excluded ids: {len(used_result_ids)})"
+        )
+        result = find_keyword_in_results(available, name, score_threshold=80.0)
+        if result is not None:
+            result_id = id(result)
+            used_result_ids.add(result_id)
+            # Exclude OCR results that compose this joined candidate
+            if result.source_ids:
+                used_result_ids.update(result.source_ids)
+            # Exclude all raw results whose center falls within the matched bbox
+            # (handles pre-joined results AND individual words at the same row)
+            overlap_excluded = 0
+            for r in results:
+                if id(r) in used_result_ids:
+                    continue
+                if _center_in_bbox(r, result.bounding_box):
+                    used_result_ids.add(id(r))
+                    overlap_excluded += 1
+            x, y = get_coordinates_from_ocr_result(result)
+            coords_x.append(x)
+            coords_y.append(y)
+            logger.info(
+                f"OCR matched '{name}' at ({x}, {y}) [id={result_id}, "
+                f"bbox_y={result.bounding_box.y:.1f}, "
+                f"source_ids={len(result.source_ids)}, "
+                f"bbox_overlap_excluded={overlap_excluded}]"
+            )
+        else:
+            coords_x.append(-1)
+            coords_y.append(-1)
+            logger.warning(f"OCR score below threshold for '{name}', storing -1,-1")
+
+    memory.variables.generated_variables[ocr_extraction.output_x_variable] = coords_x
+    memory.variables.generated_variables[ocr_extraction.output_y_variable] = coords_y
+
+    result_data = {name: [coords_x[i], coords_y[i]] for i, name in enumerate(names_str)}
+
+    summary = ", ".join(
+        f"'{n}'→({coords_x[i]},{coords_y[i]})" for i, n in enumerate(names_str)
+    )
+    logger.info(
+        f"[ocr_coordinates] final result: [{summary}] "
+        f"→ {ocr_extraction.output_x_variable}={coords_x}, {ocr_extraction.output_y_variable}={coords_y}"
+    )
+
+    memory.variables.output_data.append(
+        OutputData(unique_identifier=unique_identifier, json_data=result_data)
+    )
+
+
+async def handle_vision_extraction(
+    vision_extraction: VisionExtraction,
+    memory: Memory,
+    browser: "Browser",
+    task: "Task",
+    unique_identifier: str | None = None,
+):
+    """Use computer use model to locate a UI element and store its (x, y) coordinates.
+
+    Stores -1, -1 if the model cannot locate the element.
+    """
+    output_vars = vision_extraction.output_variable_names
+    fallback_coords = [-1] * len(output_vars)
+
+    screenshot = await browser.get_screenshot()
+    if screenshot is None:
+        logger.error("[vision_extraction] screenshot is None")
+        for var, val in zip(output_vars, fallback_coords):
+            memory.variables.generated_variables[var] = [val]
+        return
+
+    memory.browser_states[-1].computer_use_screenshots.append(screenshot)
+    model = get_llm_model(GeminiModels.GEMINI_2_5_COMPUTER_USE, True)
+
+    coords = fallback_coords
+    try:
+        coordinates, token_usage = model.get_computer_use_model_response(
+            prompt=vision_extraction.prompt,
+            screenshot=screenshot,
+        )
+        memory.token_usage += token_usage
+        if coordinates:
+            coords = list(coordinates[: len(output_vars)])
+            if len(coords) < len(output_vars):
+                coords += [-1] * (len(output_vars) - len(coords))
+    except Exception as e:
+        logger.error(f"[vision_extraction] computer use model failed: {e}")
+
+    logger.info(
+        f"[vision_extraction] '{vision_extraction.prompt}' → {dict(zip(output_vars, coords))}"
+    )
+    json_data = {}
+    for var, val in zip(output_vars, coords):
+        memory.variables.generated_variables[var] = [val]
+        json_data[var] = val
+
+    memory.variables.output_data.append(
+        OutputData(unique_identifier=unique_identifier, json_data=json_data)
+    )
 
 
 async def handle_api_call_extraction(

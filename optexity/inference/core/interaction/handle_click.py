@@ -1,23 +1,35 @@
 import logging
 
+import pyautogui
+
 from optexity.exceptions import (
     AxtreeIndexActionFailedException,
     ElementNotFoundInAxtreeException,
+    KeywordNotFoundOnScreenException,
 )
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
+from optexity.inference.core.interaction.screenshot_comparison import (
+    validate_recording_action,
+)
 from optexity.inference.core.interaction.utils import (
     LocatorExtraction,
+    get_coordinates_from_prompt,
     get_index_from_prompt,
     handle_download,
+    resolve_bounding_box_variables,
+    resolve_keyword_with_llm_fallback,
     update_screenshot_with_highlight,
 )
+from optexity.inference.core.vision.utils import mark_screenshot
 from optexity.inference.infra.browser import Browser
 from optexity.schema.actions.interaction_action import ClickElementAction
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
 
+pyautogui.FAILSAFE = True
+pyautogui.PAUSE = 0.05
 logger = logging.getLogger(__name__)
 
 
@@ -28,7 +40,20 @@ async def handle_click_element(
     browser: Browser,
     max_timeout_seconds_per_try: float,
     max_tries: int,
+    verify_before_step: bool = True,
 ):
+
+    if browser.channel == "rdp" or browser.backend == "computer-vision":
+        await click_element_coordinates(
+            click_element_action,
+            browser,
+            memory,
+            task,
+            max_tries,
+            max_timeout_seconds_per_try,
+            verify_before_step,
+        )
+        return
 
     if click_element_action.command and not click_element_action.skip_command:
         last_error = await command_based_action_with_retry(
@@ -110,4 +135,133 @@ async def click_element_index(
         raise
     except Exception as e:
         logger.error(f"Error in click_element_index: {e}")
+        return
+
+
+async def click_element_coordinates(
+    click_element_action: ClickElementAction,
+    browser: Browser,
+    memory: Memory,
+    task: Task,
+    max_tries: int = 3,
+    max_timeout_seconds_per_try: float = 5.0,
+    verify_before_step: bool = True,
+):
+    try:
+        x, y = None, None
+        bbox = (
+            resolve_bounding_box_variables(
+                click_element_action.bounding_box_variables, memory
+            )
+            if click_element_action.bounding_box_variables
+            else None
+        )
+
+        if (
+            verify_before_step
+            and click_element_action.recording_screenshot
+            and click_element_action.coordinates
+        ):
+            x, y = await validate_recording_action(
+                click_element_action,
+                browser,
+                memory,
+                task,
+                max_tries,
+                max_timeout_seconds_per_try,
+            )
+        elif click_element_action.coordinates:
+            x = int(click_element_action.coordinates[0])
+            y = int(click_element_action.coordinates[1])
+
+            if x == -1 and y == -1:
+                # Failed ocr_coordinates extraction — fallback to full OCR + LLM
+                result = await resolve_keyword_with_llm_fallback(
+                    keyword=click_element_action.keyword
+                    or click_element_action.prompt_instructions,
+                    recording_x=-1,
+                    recording_y=-1,
+                    prompt_instructions=click_element_action.prompt_instructions,
+                    memory=memory,
+                    task=task,
+                    bounding_box=bbox,
+                )
+                if result is None:
+                    raise KeywordNotFoundOnScreenException(
+                        message=f"Could not locate element on screen for: '{click_element_action.prompt_instructions}'",
+                        keyword=click_element_action.keyword
+                        or click_element_action.prompt_instructions,
+                    )
+                x, y = result
+            elif click_element_action.keyword:
+                result = await resolve_keyword_with_llm_fallback(
+                    keyword=click_element_action.keyword,
+                    recording_x=x,
+                    recording_y=y,
+                    prompt_instructions=click_element_action.prompt_instructions,
+                    memory=memory,
+                    task=task,
+                    bounding_box=bbox,
+                )
+                if result is None:
+                    raise KeywordNotFoundOnScreenException(
+                        message=f"Keyword '{click_element_action.keyword}' not found on screen.",
+                        keyword=click_element_action.keyword,
+                    )
+                x, y = result
+                logger.info(
+                    f"Matched keyword '{click_element_action.keyword}' at ({x}, {y})"
+                )
+        else:
+            data = await get_coordinates_from_prompt(
+                memory, click_element_action.prompt_instructions, browser, task
+            )
+            if data is None:
+                logger.error("No coordinates found")
+                return
+            x, y = data[0], data[1]
+            memory.browser_states[-1].llm_response = f"Coordinates: {x}, {y}"
+            if click_element_action.keyword:
+                result = await resolve_keyword_with_llm_fallback(
+                    keyword=click_element_action.keyword,
+                    recording_x=x,
+                    recording_y=y,
+                    prompt_instructions=click_element_action.prompt_instructions,
+                    memory=memory,
+                    task=task,
+                    bounding_box=bbox,
+                )
+                if result is None:
+                    raise KeywordNotFoundOnScreenException(
+                        message=f"Keyword '{click_element_action.keyword}' not found on screen.",
+                        keyword=click_element_action.keyword,
+                    )
+                x, y = result
+                logger.info(
+                    f"Matched keyword '{click_element_action.keyword}' at ({x}, {y})"
+                )
+
+        logger.debug(f"Clicking element at coordinates: {x}, {y}")
+
+        if click_element_action.double_click:
+            pyautogui.doubleClick(x, y)
+        else:
+            pyautogui.click(x, y)
+
+        screenshot_base64 = memory.browser_states[-1].screenshot
+        if screenshot_base64:
+            screenshot_base64 = await mark_screenshot(screenshot_base64, x, y)
+            memory.browser_states[-1].screenshot = (
+                screenshot_base64  # pyright: ignore[reportAttributeAccessIssue]
+            )
+
+    except (ElementNotFoundInAxtreeException, KeywordNotFoundOnScreenException) as e:
+        raise e
+    except Exception as e:
+        if click_element_action.keyword:
+            raise KeywordNotFoundOnScreenException(
+                message=f"Failed to verify keyword '{click_element_action.keyword}' on screen due to error: {e}",
+                keyword=click_element_action.keyword,
+            )
+        logger.error(f"Error in click_element_coordinates: {e}")
         return

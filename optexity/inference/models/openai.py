@@ -33,6 +33,7 @@ class OpenAI(LLMModel):
         self,
         prompt: str,
         response_schema: type[BaseModel],
+        recording_screenshot: Optional[str] = None,
         screenshot: Optional[str] = None,
         pdf_url: Optional[str | Path] = None,
         system_instruction: Optional[str] = None,
@@ -45,6 +46,19 @@ class OpenAI(LLMModel):
 
         if system_instruction:
             messages.append({"role": "system", "content": system_instruction})
+
+        if recording_screenshot is not None:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": recording_screenshot},
+                        }
+                    ],
+                }
+            )
 
         if screenshot is not None:
             messages.append(

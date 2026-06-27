@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <resistance>
+    <strength>100</strength>
+    <screen_edge_strength>100</screen_edge_strength>
+  </resistance>
+  <keyboard/>
+  <mouse>
+    <context name="Root"/>
+    <context name="Client">
+      <mousebind button="Left" action="Press">
+        <action name="Focus"/><action name="Raise"/>
+      </mousebind>
+    </context>
+  </mouse>
+  <applications>
+    <application class="*">
+      <decor>no</decor>
+      <fullscreen>yes</fullscreen>
+      <maximized>true</maximized>
+      <position force="yes">
+        <x>0</x>
+        <y>0</y>
+      </position>
+      <size>
+        <width>${SCREEN_WIDTH}</width>
+        <height>${SCREEN_HEIGHT}</height>
+      </size>
+    </application>
+  </applications>
+  <desktops><number>1</number></desktops>
+</openbox_config>

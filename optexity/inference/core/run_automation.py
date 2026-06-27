@@ -13,6 +13,13 @@ from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from patchright.async_api import expect as playwright_expect
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
+from optexity.exceptions import KeywordNotFoundOnScreenException
+from optexity.inference.core.agentic_recovery import (
+    AGENTIC_RECOVERY_MAX_STEPS,
+    MAX_AGENTIC_RECOVERIES_PER_TASK,
+    build_recovery_prompt,
+)
+from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
 from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
     _wait_for_file_stable,
@@ -40,10 +47,18 @@ from optexity.inference.core.run_misc import (
     run_set_variable_action,
     run_sleep_action,
 )
+from optexity.inference.core.run_powershell import run_powershell_action
 from optexity.inference.core.run_python_script import run_python_script_action
-from optexity.inference.core.variable_resolver import resolve_api_variables_in_node
+from optexity.inference.core.variable_resolver import (
+    resolve_api_variables_in_node,
+    resolve_dynamic_indices_in_node,
+)
+from optexity.inference.core.vision.time import wait_for_stable_screen
 from optexity.inference.infra.browser import Browser
-from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
+from optexity.schema.actions.interaction_action import (
+    AgenticTask,
+    DownloadUrlAsPdfAction,
+)
 from optexity.schema.automation import (
     ActionNode,
     AssertLocatorNode,
@@ -76,7 +91,7 @@ async def run_automation(
     task: Task,
     unique_child_arn: str,
     child_process_id: int,
-    cdp_url: str,
+    cdp_url: str | None,
     max_tries: int = 1,
 ):
     file_handler = logging.FileHandler(str(task.log_file_path))
@@ -98,7 +113,17 @@ async def run_automation(
         memory.update_system_info()
 
         def _get_browser():
-            return Browser(memory=memory, cdp_url=cdp_url)
+            return Browser(
+                memory=memory,
+                cdp_url=cdp_url,
+                backend=task.automation.backend,
+                channel=task.automation.browser_channel,
+                debug_port=9222 + child_process_id,
+                use_proxy=task.use_proxy,
+                proxy_session_id=task.proxy_session_id(
+                    settings.PROXY_PROVIDER if task.use_proxy else None
+                ),
+            )
 
         browser = _get_browser()
         memory.update_system_info()
@@ -117,9 +142,11 @@ async def run_automation(
             )
             raise e
 
-        if task.use_proxy:
+        if task.use_proxy and browser.channel != "rdp":
 
             page = await browser.get_current_page()
+            if page is None:
+                raise ValueError("Page is not available")
             await asyncio.sleep(5)
             await browser.go_to_url("https://ip.oxylabs.io/location")
 
@@ -287,17 +314,8 @@ async def run_final_logging(
 
         try:
             memory.automation_state.step_index += 1
-            browser_state_summary = await browser.get_browser_state_summary()
-            memory.browser_states.append(
-                BrowserState(
-                    url=browser_state_summary.url,
-                    screenshot=browser_state_summary.screenshot,
-                    title=browser_state_summary.title,
-                    axtree=browser_state_summary.dom_state.llm_representation(
-                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-                    ),
-                )
-            )
+            browser_state = await browser.get_browser_state_summary()
+            memory.browser_states.append(browser_state)
 
             if task.automation.take_final_screenshot:
                 memory.final_screenshot = await browser.get_screenshot(full_page=True)
@@ -319,6 +337,8 @@ async def run_action_node(
     task: Task,
     memory: Memory,
     browser: Browser,
+    siblings: list | None = None,
+    node_index: int | None = None,
 ):
     memory.update_system_info()
     await asyncio.sleep(action_node.before_sleep_time)
@@ -326,6 +346,13 @@ async def run_action_node(
 
     memory.automation_state.step_index += 1
     memory.automation_state.try_index = 0
+
+    # Inject default generated variables (current_time is dynamic per step)
+    memory.variables.generated_variables["current_time"] = [str(int(time.time()))]
+    memory.variables.generated_variables["task_id"] = [str(task.task_id)]
+
+    # Resolve dynamic indices like {var[some_var]} -> {var[N]} before variable replacement
+    resolve_dynamic_indices_in_node(action_node, memory.variables.generated_variables)
 
     await action_node.replace_variables(task.input_parameters)
     await action_node.replace_variables(
@@ -348,7 +375,7 @@ async def run_action_node(
 
     logger.debug(f"-----Running node new {memory.automation_state.step_index}-----")
 
-    try:
+    async def _dispatch_action_body() -> None:
         if action_node.interaction_action:
             ## Assuming network calls are only made during interaction actions and not during extraction actions
             await browser.clear_network_calls()
@@ -364,6 +391,8 @@ async def run_action_node(
             await run_python_script_action(
                 action_node.python_script_action, memory, browser
             )
+        elif action_node.powershell_action:
+            await run_powershell_action(action_node.powershell_action)
         elif action_node.sleep_action:
             await run_sleep_action(action_node.sleep_action)
         elif action_node.fail_state_action:
@@ -376,6 +405,11 @@ async def run_action_node(
             )
         elif action_node.captcha_action:
             await handle_captcha_action(action_node.captcha_action, browser, memory)
+        elif action_node.misc_action:
+            if action_node.misc_action.set_variable:
+                await run_set_variable_action(
+                    action_node.misc_action.set_variable, memory
+                )
         elif action_node.human_in_loop_action:
             await run_human_in_loop_action(
                 action_node.human_in_loop_action, task, memory
@@ -386,6 +420,49 @@ async def run_action_node(
                 await run_set_variable_action(misc.set_variable, memory)
             elif misc.llm_query:
                 await run_llm_query_action(misc.llm_query, memory, task)
+
+    try:
+        try:
+            await _dispatch_action_body()
+        except KeywordNotFoundOnScreenException as e:
+            # Only intercept on RDP; web flows have their own recovery
+            # paths (browseruse/axtree retries) and shouldn't pay this cost.
+            if browser.channel != "rdp":
+                raise
+            # Retry the action behind agentic recovery up to
+            # MAX_AGENTIC_RECOVERIES_PER_TASK times. Bounds LLM cost and
+            # contains damage from recovery misfires.
+            keyword = e.keyword
+            recovered = False
+            for attempt in range(1, MAX_AGENTIC_RECOVERIES_PER_TASK + 1):
+                logger.warning(
+                    f"Action failed with KeywordNotFoundOnScreenException "
+                    f"(keyword='{keyword}'); running agentic recovery "
+                    f"({attempt}/{MAX_AGENTIC_RECOVERIES_PER_TASK}) "
+                    f"before retry."
+                )
+                recovery_action = AgenticTask(
+                    task=await build_recovery_prompt(
+                        action_node, siblings, node_index, task, memory
+                    ),
+                    max_steps=AGENTIC_RECOVERY_MAX_STEPS,
+                )
+                await handle_agentic_task(recovery_action, task, memory, browser)
+                try:
+                    await _dispatch_action_body()
+                    recovered = True
+                    break
+                except KeywordNotFoundOnScreenException as retry_exc:
+                    keyword = retry_exc.keyword
+            if not recovered:
+                logger.error(
+                    f"Agentic recovery cap reached "
+                    f"({MAX_AGENTIC_RECOVERIES_PER_TASK}/"
+                    f"{MAX_AGENTIC_RECOVERIES_PER_TASK}); propagating "
+                    f"KeywordNotFoundOnScreenException for keyword "
+                    f"'{keyword}'."
+                )
+                raise
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
@@ -407,7 +484,10 @@ async def run_action_node(
             logger.debug(f"Switched to new tab after {total_time} seconds, as expected")
 
     else:
-        await sleep_for_page_to_load(browser, action_node.end_sleep_time)
+        if browser.channel == "rdp" or browser.backend == "computer-vision":
+            await wait_for_stable_screen(browser, timeout=action_node.end_sleep_time)
+        else:
+            await asyncio.sleep(action_node.end_sleep_time)
 
     logger.debug(f"-----Finished node {memory.automation_state.step_index}-----")
     memory.update_system_info()
@@ -467,7 +547,7 @@ async def handle_if_else_node(
     else:
         nodes = if_else_node.else_nodes
 
-    for node in nodes:
+    for i, node in enumerate(nodes):
         if isinstance(node, ActionNode):
             full_automation.append(node.model_dump())
             await run_action_node(
@@ -475,6 +555,8 @@ async def handle_if_else_node(
                 task,
                 memory,
                 browser,
+                siblings=nodes,
+                node_index=i,
             )
         elif isinstance(node, IfElseNode):
             await handle_if_else_node(node, memory, task, browser, full_automation)
@@ -497,6 +579,7 @@ async def handle_for_loop_node(
     full_automation: list[ActionNode],
 ):
     memory.update_system_info()
+    # Use the first variable name for iteration length (supports comma-separated variables)
     primary_variable = for_loop_node.variable_name.split(",")[0].strip()
     if primary_variable in task.input_parameters:
         values = task.input_parameters[primary_variable]
@@ -510,7 +593,7 @@ async def handle_for_loop_node(
     for index in range(len(values)):
 
         try:
-            for node in for_loop_node.nodes:
+            for i, node in enumerate(for_loop_node.nodes):
                 new_node = deepcopy(node)
                 # split variable names by comma
                 variable_names = for_loop_node.variable_name.split(",")
@@ -545,6 +628,8 @@ async def handle_for_loop_node(
                         task,
                         memory,
                         browser,
+                        siblings=for_loop_node.nodes,
+                        node_index=i,
                     )
             memory.variables.for_loop_status[-1].append(
                 ForLoopStatus(
@@ -585,7 +670,7 @@ async def handle_for_loop_node(
                 raise e
 
         if index < len(values) - 1:
-            for node in for_loop_node.reset_nodes:
+            for i, node in enumerate(for_loop_node.reset_nodes):
                 if isinstance(node, IfElseNode):
                     await handle_if_else_node(
                         node, memory, task, browser, full_automation
@@ -603,6 +688,8 @@ async def handle_for_loop_node(
                         task,
                         memory,
                         browser,
+                        siblings=for_loop_node.reset_nodes,
+                        node_index=i,
                     )
     memory.update_system_info()
 
@@ -666,7 +753,7 @@ async def _run_nodes(
     full_automation: list,
 ):
     """Dispatch a list of nodes (ActionNode, ForLoopNode, IfElseNode, or AssertLocatorNode) for execution."""
-    for node in nodes:
+    for i, node in enumerate(nodes):
         if isinstance(node, ForLoopNode):
             await handle_for_loop_node(node, memory, task, browser, full_automation)
         elif isinstance(node, IfElseNode):
@@ -677,7 +764,9 @@ async def _run_nodes(
             )
         else:
             full_automation.append(node.model_dump())
-            await run_action_node(node, task, memory, browser)
+            await run_action_node(
+                node, task, memory, browser, siblings=nodes, node_index=i
+            )
 
 
 async def run_post_processing_nodes(task: Task, memory: Memory, browser: Browser):

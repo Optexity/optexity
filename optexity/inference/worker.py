@@ -11,7 +11,7 @@ async def main():
     task = Task.model_validate_json(sys.argv[1])
     unique_child_arn = sys.argv[2]
     child_process_id = int(sys.argv[3])
-    cdp_url = sys.argv[4]
+    cdp_url = sys.argv[4] if sys.argv[4] != "None" else None
     max_tries = int(sys.argv[5]) if len(sys.argv) > 5 else 1
 
     try:

@@ -14,6 +14,13 @@ class ElementNotFoundInAxtreeException(Exception):
         self.command = command
 
 
+class KeywordNotFoundOnScreenException(Exception):
+    def __init__(self, message: str, keyword: str):
+        super().__init__(message)
+        self.message = message
+        self.keyword = keyword
+
+
 class AxtreeIndexActionFailedException(Exception):
     def __init__(self, message: str, index: int, original_error):
         super().__init__(message)

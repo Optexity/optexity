@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 # Examples that don't:  {key[0]}, {key[index]}
 _API_VAR_PATTERN = re.compile(r"\{(\w+)(\.\w+(?:\.\w+|\[\d+\])*)\}")
 
+# Matches {var[name]} where name is a non-numeric identifier (not the literal "index")
+# Examples that match:  {row_coords_x[current_click_index]}, {data[my_idx]}
+# Examples that don't:  {var[0]}, {var[index]}, {var.field}
+_DYNAMIC_INDEX_PATTERN = re.compile(r"\{(\w+)\[([A-Za-z_]\w*)\]\}")
 
 def _parse_path_segments(path: str) -> list[tuple[str, str | int]]:
     """Parse '.foo.bar[0].baz' into [('attr','foo'), ('attr','bar'), ('index',0), ('attr','baz')]"""
@@ -137,3 +141,52 @@ def evaluate_poll_condition(condition: str, response: dict) -> bool:
     except Exception as e:
         logger.warning(f"Poll condition eval failed: '{resolved_condition}' -> {e}")
         return False
+
+
+def resolve_dynamic_indices_in_node(action_node, generated_variables: dict) -> None:
+    """Resolve {var[some_var]} patterns to {var[N]} where N is the value of some_var.
+
+    Looks up `some_var` in generated_variables. If `some_var` is a list, uses [0].
+    Skips `{var[index]}` (handled by for-loop expansion) and `{var[N]}` (numeric).
+    Leaves untouched any pattern where the inner name is not in generated_variables.
+    """
+    node_json = action_node.model_dump_json()
+
+    seen = set()
+    for match in _DYNAMIC_INDEX_PATTERN.finditer(node_json):
+        full_pattern = match.group(0)
+        if full_pattern in seen:
+            continue
+        seen.add(full_pattern)
+
+        outer_var = match.group(1)
+        inner_name = match.group(2)
+
+        # Skip the literal "index" — it's handled by for-loop expansion
+        if inner_name == "index":
+            continue
+
+        # Skip if inner_name is not a known generated variable
+        if inner_name not in generated_variables:
+            continue
+
+        value = generated_variables[inner_name]
+        # If it's a list, use the first element
+        if isinstance(value, list):
+            if not value:
+                continue
+            index_value = value[0]
+        else:
+            index_value = value
+
+        try:
+            resolved_index = int(index_value)
+        except (TypeError, ValueError):
+            logger.warning(
+                f"Dynamic index resolution: '{inner_name}' value '{index_value}' "
+                f"is not convertible to int — skipping"
+            )
+            continue
+
+        new_pattern = f"{{{outer_var}[{resolved_index}]}}"
+        action_node.replace(full_pattern, new_pattern)

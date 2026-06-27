@@ -33,21 +33,25 @@ async def run_fail_state_action(
 
 
 async def run_set_variable_action(
-    set_variable_action: SetVariableAction,
-    memory: Memory,
+    set_variable_action: SetVariableAction, memory: Memory
 ):
     logger.debug(
-        f"---------Running set_variable action {set_variable_action.model_dump_json()}---------"
+        f"---------Running set variable action {set_variable_action.model_dump_json()}---------"
     )
-    name = set_variable_action.name
-    if set_variable_action.value is not None:
-        memory.variables.generated_variables[name] = [set_variable_action.value]
+
+    if set_variable_action.expression is not None:
+        try:
+            result = eval(set_variable_action.expression)  # noqa: S307
+        except Exception as e:
+            logger.error(
+                f"Failed to eval expression '{set_variable_action.expression}': {e}"
+            )
+            raise
     else:
-        result = eval(set_variable_action.expression)  # noqa: S307
-        memory.variables.generated_variables[name] = [result]
-    logger.debug(
-        f"Set variable '{name}' = {memory.variables.generated_variables[name]}"
-    )
+        result = set_variable_action.value
+
+    memory.variables.generated_variables[set_variable_action.name] = [result]
+    logger.info(f"Set variable '{set_variable_action.name}' = {result}")
 
 
 async def run_llm_query_action(

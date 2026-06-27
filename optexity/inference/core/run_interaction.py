@@ -7,6 +7,7 @@ import aiofiles
 from optexity.exceptions import (
     AssertLocatorPresenceException,
     ElementNotFoundInAxtreeException,
+    KeywordNotFoundOnScreenException,
 )
 from optexity.inference.agents.error_handler.error_handler import ErrorHandlerAgent
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
@@ -58,6 +59,7 @@ async def run_interaction_action(
     browser: Browser,
     retries_left: int,
 ):
+    # await asyncio.to_thread(input, "Press any key to continue...")
     if retries_left <= 0:
         return
 
@@ -75,6 +77,7 @@ async def run_interaction_action(
                 browser,
                 interaction_action.max_timeout_seconds_per_try,
                 interaction_action.max_tries,
+                interaction_action.verify_before_step,
             )
         elif interaction_action.input_text:
             await handle_input_text(
@@ -84,6 +87,7 @@ async def run_interaction_action(
                 browser,
                 interaction_action.max_timeout_seconds_per_try,
                 interaction_action.max_tries,
+                interaction_action.verify_before_step,
             )
         elif interaction_action.select_option:
             await handle_select_option(
@@ -155,9 +159,19 @@ async def run_interaction_action(
                 interaction_action.close_tabs_until, task, memory, browser
             )
         elif interaction_action.key_press:
-            await handle_key_press(interaction_action.key_press, memory, browser)
+            await handle_key_press(
+                interaction_action.key_press,
+                memory,
+                browser,
+                task,
+                interaction_action.max_tries,
+                interaction_action.max_timeout_seconds_per_try,
+            )
         elif interaction_action.scroll:
             await handle_scroll(interaction_action.scroll, memory, browser)
+    except KeywordNotFoundOnScreenException as e:
+        logger.error(f"Keyword not found on screen: {e.keyword}. Failing automation.")
+        raise
     except (AssertLocatorPresenceException, ElementNotFoundInAxtreeException) as e:
         await handle_assert_locator_presence_error(
             e, interaction_action, task, memory, browser, retries_left
@@ -225,6 +239,8 @@ async def handle_close_tabs_until(
 async def handle_go_to_url(
     go_to_url_action: GoToUrlAction, task: Task, memory: Memory, browser: Browser
 ):
+    if browser._rdp_remote:
+        return
     await browser.go_to_url(go_to_url_action.url)
 
 
