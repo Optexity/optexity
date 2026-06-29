@@ -1,0 +1,257 @@
+---
+title: Dedicated Instances
+description: Keep a portal logged in across runs and control how requests are queued
+---
+
+Dedicated instances keep a **warm, already‑logged‑in browser** pinned to a portal so a
+burst of requests doesn't pay the login cost every time. Instead of logging in, doing one
+task, and tearing everything down, a dedicated container logs in once and then serves many
+tasks for that portal back‑to‑back.
+
+Use dedicated instances when:
+
+- A portal is slow or rate‑limited to log into, and you run many tasks against it.
+- You get bursts of work for the same login (e.g. 30 requests three times a day).
+- You want to control the order/concurrency in which a portal's tasks run.
+
+<Info>
+You do **not** need a dedicated container reserved 24/7. Idle containers are automatically
+reclaimed after a few minutes of inactivity and a fresh one is started on the next burst —
+so you only consume capacity while you're actually using it.
+</Info>
+
+## Quick start
+
+For the common case, the defaults are exactly what you want — **just add
+`"is_dedicated": true` to your normal `/inference` request.** That gives you one warm,
+logged‑in container for the portal, with your tasks served one after another on it.
+
+```bash
+curl -X POST https://inference-api.optexity.com/api/v1/inference \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_OPTEXITY_API_KEY" \
+  -d '{
+    "endpoint_name": "your_portal_endpoint",
+    "input_parameters": { "username": ["alice@example.com"] },
+    "unique_parameter_names": ["username"],
+    "is_dedicated": true,
+    "max_parallelism": 1,
+    "per_login_parallelism": 1
+  }'
+```
+
+`max_parallelism` and `per_login_parallelism` are **optional** and both default to `1`, so
+the request above behaves identically to simply:
+
+```bash
+curl -X POST https://inference-api.optexity.com/api/v1/inference \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_OPTEXITY_API_KEY" \
+  -d '{
+    "endpoint_name": "your_portal_endpoint",
+    "input_parameters": { "username": ["alice@example.com"] },
+    "unique_parameter_names": ["username"],
+    "is_dedicated": true
+  }'
+```
+
+Set `"is_dedicated": false` (or omit it) for a normal, non‑dedicated run.
+
+## Request fields
+
+| Field | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| `is_dedicated` | `bool` | `false` | no | Opt into dedicated mode. Set to `true` to use a warm, logged‑in container. |
+| `max_parallelism` | `int` | `1` | no | Maximum number of warm containers for this portal (service‑wide cap across all logins). |
+| `per_login_parallelism` | `int` | `1` | no | Maximum number of containers a **single login** may use before its extra tasks round‑robin onto those containers. |
+| `unique_parameter_names` | `list[str]` | `[]` | no | Which input parameters identify a "login" / queue. **Each name must be one of the keys in `input_parameters`.** See [Controlling the queue](#controlling-the-queue). |
+
+<Tip>
+Defaults work great. Start with just `is_dedicated: true` and only raise the parallelism
+fields once you actually need more concurrency.
+</Tip>
+
+## How it works
+
+- **A "login" is a value of your unique parameters.** Whatever you list in
+  `unique_parameter_names` becomes the identity of a login (and its queue). With
+  `unique_parameter_names: ["username"]`, each distinct `username` is its own login.
+- **`per_login_parallelism`** controls how many warm containers one login may spread its
+  tasks across. With the default `1`, a login uses a single warm container and its tasks run
+  one at a time on it.
+- **`max_parallelism`** is the portal‑wide ceiling on warm containers across all logins.
+- **Idle reaping.** A warm container that has had no work for a few minutes is shut down and
+  its capacity returns to the shared pool. The next task for that login starts a fresh
+  container (which logs in again). Smaller idle windows reclaim capacity faster; larger ones
+  re‑login less often.
+- **Queue‑and‑return.** If there's no free capacity when your request arrives, the request is
+  **accepted and queued** (not rejected, not blocked). It runs as soon as capacity frees up.
+  Requests for a given portal are served in **first‑in, first‑out** order.
+
+## Examples
+
+### One login, a burst of tasks
+
+Run many tasks for a single login on one warm container, served in order:
+
+```json
+{
+  "endpoint_name": "billing_portal",
+  "input_parameters": { "username": ["acme@example.com"] },
+  "unique_parameter_names": ["username"],
+  "is_dedicated": true
+}
+```
+
+Send this 30 times for the same `username`: the first request logs in, and the next 29 reuse
+that warm session, running one after another.
+
+To let that single login run a few tasks **in parallel**, raise both limits:
+
+```json
+{
+  "endpoint_name": "billing_portal",
+  "input_parameters": { "username": ["acme@example.com"] },
+  "unique_parameter_names": ["username"],
+  "is_dedicated": true,
+  "max_parallelism": 3,
+  "per_login_parallelism": 3
+}
+```
+
+Now up to 3 warm containers serve that login concurrently; extra tasks round‑robin across them.
+
+### Multiple unique logins, isolated
+
+Mark the login parameter as unique, and each login gets its own warm container — they don't
+interfere and can run in parallel up to `max_parallelism`:
+
+```json
+{
+  "endpoint_name": "billing_portal",
+  "input_parameters": { "username": ["acme@example.com"] },
+  "unique_parameter_names": ["username"],
+  "is_dedicated": true,
+  "max_parallelism": 5
+}
+```
+
+Fire the same shape for `beta@example.com`, `gamma@example.com`, etc. Each distinct
+`username` is a separate login with its own warm, logged‑in container, up to 5 containers
+total for the portal.
+
+### More logins than capacity
+
+Suppose the portal can hold at most 4 warm containers and you send 5 different logins with
+`max_parallelism: 5`:
+
+- The first 4 logins each get a warm container and start immediately.
+- The 5th request is **accepted and queued** (status `queued`). It is not an error.
+- It runs as soon as a container frees up — for example when one of the first 4 logins sits
+  idle long enough to be reclaimed, returning a slot to the pool.
+
+<Warning>
+Setting `max_parallelism` higher than the portal's real container capacity does **not** create
+extra capacity — the excess requests simply queue until a slot frees. To truly run N logins at
+once, the portal's capacity must be at least N.
+</Warning>
+
+## Controlling the queue
+
+The value of your **unique parameters is the queue key**. By choosing what you mark as
+`unique_parameter_names`, you decide how requests are grouped onto warm containers — this lets
+you schedule a portal's traffic however your logic needs.
+
+<Info>
+`unique_parameter_names` must reference parameters that exist in `input_parameters`. The queue
+key is read from `input_parameters`, so the parameter you use as a queue key has to be declared
+in the automation and sent in the request.
+</Info>
+
+Common patterns:
+
+- **One queue per login (default isolation).** Mark the login parameter as unique. Each login
+  gets its own warm, logged‑in container.
+
+  ```json
+  { "unique_parameter_names": ["username"] }
+  ```
+
+- **One shared queue for the whole portal.** Send no unique parameters
+  (`"unique_parameter_names": []`). Every request funnels into a single warm container group and
+  runs serialized — useful when a portal must never run two sessions at once.
+
+  ```json
+  { "unique_parameter_names": [] }
+  ```
+
+- **Custom grouping (different logins on one queue).** Designate a dedicated routing parameter
+  (say `queue_key`) in the automation and give the requests you want serialized together the
+  **same** `queue_key` value — regardless of which login they use:
+
+  ```json
+  {
+    "endpoint_name": "billing_portal",
+    "input_parameters": {
+      "username": ["acme@example.com"],
+      "queue_key": ["batch-1"]
+    },
+    "unique_parameter_names": ["queue_key"],
+    "is_dedicated": true
+  }
+  ```
+
+  Send another request with `username: ["beta@example.com"]` but the same
+  `queue_key: ["batch-1"]`, and both share one queue / container and run one at a time. Use a
+  different `queue_key` value to put work on a separate queue.
+
+<Warning>
+If you route **different logins** onto the same queue, the container re‑logs‑in whenever the
+login changes between consecutive tasks — you trade away the "stay logged in" benefit for
+ordering/serialization control. Keep the same login on a queue to keep its session warm.
+</Warning>
+
+## Things to take special care of
+
+<Warning>
+**Your automation must handle both the logged‑in and logged‑out states.** A dedicated
+container is reused across tasks: a warm one arrives **already logged in**, while a fresh or
+just‑reclaimed one is **logged out**. Your recording must detect the current auth state with an
+**extraction node** and branch with an **if‑else node** — log in only when logged out,
+otherwise skip straight to the work.
+
+Without this, a warm container will try to log in again (and break), or a fresh container will
+never log in. See
+[Using Extraction Nodes to Set Conditions](/docs/building-automations/if-else-node#using-extraction-nodes-to-set-conditions)
+for the exact pattern.
+</Warning>
+
+- **`unique_parameter_names` must be a subset of `input_parameters`.** Names not present in
+  your `input_parameters` are rejected.
+- **`max_parallelism` above the portal's real capacity is unreachable** — the surplus requests
+  queue rather than running concurrently.
+- **Request limits are bounded server‑side.** A request‑supplied `max_parallelism` is clamped to
+  a platform maximum. An admin‑configured portal (see below) is not clamped.
+- **Limits are fixed per active portal.** The first request that opens a portal's reservation
+  sets its `max_parallelism` / `per_login_parallelism`; later requests reuse those values until
+  the portal goes fully idle and is reclaimed, after which a new burst can specify fresh limits.
+- **`use_proxy` cannot be combined with `is_dedicated`.** A request with both set is rejected.
+- **Admin configuration takes precedence.** If a portal is configured as dedicated on the
+  Optexity side for your account, it runs dedicated with those limits even if your request sends
+  `"is_dedicated": false` — you can opt *in* per request, but you cannot opt *out* of a portal
+  that is configured dedicated.
+
+## FAQ
+
+**Does a queued request ever fail just because the portal is busy?**
+No. When there's no free capacity, the request is accepted with status `queued` and runs when a
+slot frees up. It is never rejected for capacity reasons.
+
+**What happens to my warm session when there's a lull?**
+After a few minutes with no work, the container is reclaimed and its capacity returns to the
+pool. Your next request starts a fresh container and logs in again — which is why your
+automation must handle the logged‑out state.
+
+**How do I run several logins at the same time?**
+Mark the login as a unique parameter and set `max_parallelism` to at least the number of
+concurrent logins you need (and ensure the portal has that much capacity).

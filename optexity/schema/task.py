@@ -118,7 +118,14 @@ class Task(BaseModel):
     max_timeout_in_minutes: int = 10
     api_key: str
     callback_url: CallbackUrl | None = None
+    task_callback_url: str | None = None
+    task_callback_api_key: str | None = None
     is_dedicated: bool = False
+    # Dedicated limits carried with the task when is_dedicated is set via the
+    # request (no DB policy row). Ignored for non-dedicated tasks and when a
+    # dedicated_service DB row governs the service.
+    max_parallelism: int = 1
+    per_login_parallelism: int = 1
     company_id: CompanyID
     llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
     llm_model_name: str = "gemini-2.5-flash"
@@ -169,6 +176,21 @@ class Task(BaseModel):
                     f"Please provide exactly the same {a} as the automation. Missing keys: {missing_keys}, Extra keys: {extra_keys}"
                 )
 
+        return self
+
+    @model_validator(mode="after")
+    def validate_rdp_channel(self):
+        # browser_channel="rdp" runs in one of two modes:
+        #   * rdp_parameter set  -> RDP (xfreerdp) into a remote machine.
+        #   * rdp_parameter None -> open automation.url in a normal browser and
+        #     drive it via pyautogui (computer-use).
+        # The second mode needs a start URL to navigate to.
+        if self.automation.browser_channel == "rdp":
+            if self.rdp_parameter is None and not self.automation.url:
+                raise ValueError(
+                    "browser_channel='rdp' requires either an rdp_parameter "
+                    "(to RDP into a machine) or automation.url (to open in a browser)"
+                )
         return self
 
     @model_validator(mode="after")

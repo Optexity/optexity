@@ -1,4 +1,42 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from optexity.schema.actions.llm_actions import LLMAction
+from optexity.utils.utils import build_model
+
+
+class LLMQueryAction(LLMAction):
+    output_format: dict
+    prompt_instructions: str
+    output_variable_names: list[str] | None = None
+
+    def build_model(self):
+        return build_model(self.output_format)
+
+    @field_validator("output_format")
+    def validate_output_format(cls, v):
+        if isinstance(v, dict):
+            try:
+                build_model(v)
+            except Exception as e:
+                raise ValueError(f"Invalid output_format dict: {e}")
+            return v
+        raise ValueError("output_format must be a dict")
+
+    @model_validator(mode="after")
+    def validate_output_var_in_format(self):
+        if self.output_variable_names is not None:
+            for key in self.output_variable_names:
+                if key not in self.output_format:
+                    raise ValueError(
+                        f"Output variable {key} not found in output_format"
+                    )
+        return self
+
+    def replace(self, pattern: str, replacement: str):
+        self.prompt_instructions = self.prompt_instructions.replace(
+            pattern, replacement
+        )
+        return self
 
 
 class PythonScriptAction(BaseModel):
@@ -52,26 +90,19 @@ class SetVariableAction(BaseModel):
 
 
 class MiscAction(BaseModel):
-    """Container for miscellaneous actions (set_variable, etc.).
+    """Container for miscellaneous actions (set_variable, llm_query, etc.).
 
     Exactly one sub-action must be provided.
     """
 
     set_variable: SetVariableAction | None = None
-
-    @model_validator(mode="after")
-    def validate_one_provided(self):
-        provided = {"set_variable": self.set_variable}
-        non_null = [k for k, v in provided.items() if v is not None]
-        if len(non_null) != 1:
-            raise ValueError(
-                "Exactly one of set_variable must be provided in misc_action"
-            )
-        return self
+    llm_query: LLMQueryAction | None = None
 
     def replace(self, pattern: str, replacement: str):
         if self.set_variable:
             self.set_variable.replace(pattern, replacement)
+        if self.llm_query:
+            self.llm_query.replace(pattern, replacement)
         return self
 
 

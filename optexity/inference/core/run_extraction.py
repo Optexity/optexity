@@ -12,6 +12,7 @@ from optexity.inference.infra.browser import Browser
 from optexity.inference.infra.browser_health import fetch_browser_state_for_classifier
 from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.extraction_action import (
+    APICallExtraction,
     ExtractionAction,
     LLMExtraction,
     LocatorExtraction,
@@ -31,6 +32,7 @@ from optexity.schema.memory import (
     ScreenshotData,
 )
 from optexity.schema.task import Task
+from optexity.utils.http import make_api_request
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +53,47 @@ def _extraction_response_contains_null(obj) -> bool:
     return False
 
 
+def _enforce_extraction_not_null(
+    extraction_action: ExtractionAction, memory: Memory, vars_before: dict
+) -> None:
+    """Fail the automation if the extraction produced null value(s).
+
+    Only runs when ``allow_none`` is False (the default). It applies a deep null
+    check over the variables this node wrote, so any null anywhere in the
+    extracted value (top-level, list element, or nested field) fails.
+
+    ``api_call`` is intentionally exempt: prod tolerates errored / null api
+    responses (they are stored and can be branched on), so failing here would
+    change current behavior. The response dict still carries ``status_code`` /
+    ``error`` for the automation to handle explicitly.
+
+    Variables are identified by identity diff against ``vars_before`` so only the
+    values (re)written by this extraction node are inspected — making this safe
+    inside for-loops that overwrite the same variable each iteration.
+    """
+    gv = memory.variables.generated_variables
+
+    if extraction_action.api_call is not None:
+        return
+
+    for key, value in gv.items():
+        if vars_before.get(key) is value:
+            continue  # not (re)written by this extraction node
+        if _extraction_response_contains_null(value):
+            raise ValueError(
+                f"Extraction produced null value(s) in variable {key!r} "
+                f"and allow_none is False: {value!r}"
+            )
+
+
 async def run_extraction_action(
     extraction_action: ExtractionAction, memory: Memory, browser: Browser, task: Task
 ):
     logger.debug(
         f"---------Running extraction action {extraction_action.model_dump_json()}---------"
     )
+
+    vars_before = dict(memory.variables.generated_variables)
 
     if extraction_action.llm:
         await handle_llm_extraction(
@@ -108,6 +145,15 @@ async def run_extraction_action(
             task,
             extraction_action.unique_identifier,
         )
+    elif extraction_action.api_call:
+        await handle_api_call_extraction(
+            extraction_action.api_call,
+            memory,
+            extraction_action.unique_identifier,
+        )
+
+    if not extraction_action.allow_none:
+        _enforce_extraction_not_null(extraction_action, memory, vars_before)
 
 
 async def handle_state_extraction(
@@ -315,6 +361,10 @@ async def handle_llm_extraction(
                 or isinstance(v, bool)
             ):
                 memory.variables.generated_variables[output_variable_name] = [v]
+            elif v is None:
+                # Null is allowed through here; the allow_none policy in
+                # run_extraction_action decides whether it fails the run.
+                memory.variables.generated_variables[output_variable_name] = [None]
             else:
                 raise ValueError(
                     f"Output variable {output_variable_name} must be a string, int, float, bool, or a list of strings, ints, floats, or bools. Extracted values: {response_dict[output_variable_name]}"
@@ -436,6 +486,21 @@ async def handle_python_script_extraction(
                 json_data=result,
             )
         )
+        if python_script_extraction.output_variable_names is not None:
+            for output_variable_name in python_script_extraction.output_variable_names:
+                v = result[output_variable_name]
+                if isinstance(v, list):
+                    memory.variables.generated_variables[output_variable_name] = v
+                elif isinstance(v, (str, int, float, bool)):
+                    memory.variables.generated_variables[output_variable_name] = [v]
+                elif v is None:
+                    # Null is allowed through here; the allow_none policy in
+                    # run_extraction_action decides whether it fails the run.
+                    memory.variables.generated_variables[output_variable_name] = [None]
+                else:
+                    raise ValueError(
+                        f"Output variable {output_variable_name} must be a string, int, float, bool, or a list of strings, ints, floats, or bools. Extracted values: {result[output_variable_name]}"
+                    )
     else:
         logger.warning(
             f"No result from Python script extraction: {python_script_extraction.script}"
@@ -515,3 +580,74 @@ async def handle_pdf_extraction(
     )
 
     return output_data
+
+
+async def handle_api_call_extraction(
+    api_call_extraction: APICallExtraction,
+    memory: Memory,
+    unique_identifier: str | None = None,
+):
+    """Execute an external REST API call with optional polling and store the response."""
+    from optexity.inference.core.variable_resolver import evaluate_poll_condition
+
+    logger.info(f"API call: {api_call_extraction.method} {api_call_extraction.url}")
+
+    result = await make_api_request(
+        url=api_call_extraction.url,
+        method=api_call_extraction.method,
+        headers=api_call_extraction.headers,
+        body=api_call_extraction.body,
+        query_params=api_call_extraction.query_params,
+        timeout=api_call_extraction.timeout,
+    )
+    logger.info(
+        f"API response: status_code={result.get('status_code')}, body={result.get('body')}"
+    )
+
+    if api_call_extraction.poll_condition and "error" not in result:
+        for attempt in range(1, api_call_extraction.max_poll_attempts):
+            if evaluate_poll_condition(api_call_extraction.poll_condition, result):
+                logger.info(
+                    f"Poll condition met on attempt {attempt}: {api_call_extraction.poll_condition}"
+                )
+                break
+
+            logger.info(
+                f"Poll attempt {attempt}/{api_call_extraction.max_poll_attempts} "
+                f"- condition not met, waiting {api_call_extraction.poll_interval}s"
+            )
+            await asyncio.sleep(api_call_extraction.poll_interval)
+            result = await make_api_request(
+                url=api_call_extraction.url,
+                method=api_call_extraction.method,
+                headers=api_call_extraction.headers,
+                body=api_call_extraction.body,
+                query_params=api_call_extraction.query_params,
+                timeout=api_call_extraction.timeout,
+            )
+            logger.info(
+                f"Poll attempt {attempt} response: status_code={result.get('status_code')}, body={result.get('body')}"
+            )
+
+            if "error" in result:
+                logger.error(
+                    f"Poll attempt {attempt} failed with error: {result['error']}"
+                )
+                break
+        else:
+            logger.warning(
+                f"Poll condition not met after {api_call_extraction.max_poll_attempts} attempts, "
+                f"storing last response"
+            )
+
+    for var_name in api_call_extraction.output_variable_names:
+        memory.variables.generated_variables[var_name] = result
+
+    memory.variables.output_data.append(
+        OutputData(unique_identifier=unique_identifier, json_data=result)
+    )
+
+    logger.info(
+        f"API call result stored in {api_call_extraction.output_variable_names}, "
+        f"status_code={result.get('status_code')}"
+    )

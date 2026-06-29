@@ -67,7 +67,7 @@ async def handle_agentic_task(
         logger.debug(f"Starting browser session for agentic task {browser.cdp_url} ")
         await agent.browser_session.start()
         logger.debug(f"Finally running agentic task on browser_use {browser.cdp_url} ")
-        await agent.run(max_steps=agentic_task_action.max_steps)
+        history = await agent.run(max_steps=agentic_task_action.max_steps)
         logger.debug(f"Agentic task completed on browser_use {browser.cdp_url} ")
 
         agent.stop()
@@ -75,5 +75,9 @@ async def handle_agentic_task(
             await agent.browser_session.stop()
             await agent.browser_session.reset()
 
+        return history
+
     elif agentic_task_action.backend == "browserbase":
         raise NotImplementedError("Browserbase is not supported yet")
+
+    return None

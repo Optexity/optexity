@@ -5,18 +5,17 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 _BB_VARS_LENGTH = 4  # Bounding box variables length: [x1_var, y1_var, x2_var, y2_var]
 
+from optexity.schema.actions.llm_actions import LLMAction
 from optexity.schema.actions.two_fa_action import TwoFAAction
 from optexity.utils.utils import build_model, deep_replace
 
 
-class LLMExtraction(BaseModel):
+class LLMExtraction(LLMAction):
     source: list[Literal["axtree", "screenshot"]] = ["axtree"]
     extraction_format: dict
     extraction_instructions: str
     recording_screenshot: str | None = None
     output_variable_names: list[str] | None = None
-    llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
-    llm_model_name: str = "gemini-2.5-flash"
     include_full_page: bool = False
 
     def build_model(self):
@@ -87,7 +86,8 @@ class NetworkCallExtraction(BaseModel):
 
 class PythonScriptExtraction(BaseModel):
     script: str
-    ## TODO: add output to memory variables
+    extraction_format: dict | None = None
+    output_variable_names: list[str] | None = None
 
     @field_validator("script")
     @classmethod
@@ -95,6 +95,20 @@ class PythonScriptExtraction(BaseModel):
         if not v.strip():
             raise ValueError("Script cannot be empty")
         return v
+
+    @model_validator(mode="after")
+    def validate_output_var_in_format(self):
+        if self.output_variable_names is not None:
+            if self.extraction_format is None:
+                raise ValueError(
+                    "extraction_format must be provided when output_variable_names is set"
+                )
+            for key in self.output_variable_names:
+                if key not in self.extraction_format:
+                    raise ValueError(
+                        f"Output variable {key!r} not found in extraction_format"
+                    )
+        return self
 
     def replace(self, pattern: str, replacement: str):
         self.script = self.script.replace(pattern, replacement)
@@ -219,6 +233,7 @@ class APICallExtraction(BaseModel):
 
 class ExtractionAction(BaseModel):
     unique_identifier: str | None = None
+    allow_none: bool = False
     network_call: Optional[NetworkCallExtraction] = None
     llm: Optional[LLMExtraction] = None
     python_script: Optional[PythonScriptExtraction] = None

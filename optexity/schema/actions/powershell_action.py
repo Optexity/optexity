@@ -9,6 +9,7 @@ class PowerShellAction(BaseModel):
     """
 
     commands: list[str]
+    exit_after_commands: bool = True
 
     @model_validator(mode="after")
     def validate_commands(self):

@@ -66,7 +66,7 @@ curl -X POST http://localhost:9000/inference \
 
 On success, the inference server:
 
-1. Forwards the request to your control plane at `api.optexity.com` using `INFERENCE_ENDPOINT` (defaults to `api/v1/inference`).
+1. Forwards the request to your control plane at `inference-api.optexity.com` using `INFERENCE_ENDPOINT` (defaults to `api/v1/inference`).
 2. Receives a serialized `Task` object from the control plane.
 3. Enqueues that `Task` locally and starts processing it in the background.
 4. Returns a `202 Accepted` response like:

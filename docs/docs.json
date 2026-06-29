@@ -28,7 +28,8 @@
                             "/docs/building-automations/parameters",
                             "/docs/building-automations/action-node",
                             "/docs/building-automations/if-else-node",
-                            "/docs/building-automations/for-loop-node"
+                            "/docs/building-automations/for-loop-node",
+                            "/docs/action-types/assertion-action"
                         ]
                     },
                     {
@@ -36,13 +37,23 @@
                         "pages": [
                             "/docs/action-types/interaction-action",
                             "/docs/action-types/extraction-action",
-                            "/docs/action-types/agentic-tasks",
-                            "/docs/action-types/human-in-loop"
+                            {
+                                "group": "Misc Actions",
+                                "pages": [
+                                    "/docs/action-types/python-script-action",
+                                    "/docs/action-types/llm-query-action",
+                                    "/docs/action-types/human-in-loop"
+                                ]
+                            },
+                            "/docs/action-types/agentic-tasks"
                         ]
                     },
                     {
                         "group": "Inference",
-                        "pages": ["/docs/inference/inference-api"]
+                        "pages": [
+                            "/docs/inference/inference-api",
+                            "/docs/inference/dedicated-instances"
+                        ]
                     },
                     {
                         "group": "Advanced",
@@ -86,7 +97,8 @@
                             "POST /api/v1/get_callback_data",
                             "POST /api/v1/add_example",
                             "POST /api/v1/update_example",
-                            "POST /api/v1/validate_api_key"
+                            "POST /api/v1/validate_api_key",
+                            "PATCH /api/v1/update_recording/{recording_id}"
                         ]
                     }
                 ]

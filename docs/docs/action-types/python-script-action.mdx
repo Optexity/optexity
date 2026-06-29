@@ -1,4 +1,133 @@
 ---
 title: Python Script Action
-description: Understanding the Python Script Action of Optexity automations
+description: Execute custom Python code against the live browser page
 ---
+
+`python_script_action` lets you run arbitrary Python code against the live Playwright `page` object—covering anything that standard interaction actions cannot express.
+
+## Overview
+
+- **Use when**: Built-in actions are insufficient (complex DOM manipulation, custom scrolling, dispatching browser events, reading element properties).
+- **Execution**: The runner `exec`s your script, finds an async function named `code_fn`, and calls it with the current Playwright `page`.
+- **No output**: This action does not return or store data. To extract data with custom code, use [`extraction_action.python_script`](#python-script-extraction).
+
+## Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `execution_code` | `str` | Python source that defines an async `code_fn(page)` |
+
+## Script Contract
+
+Your script **must** define an async function named `code_fn` that accepts a single `page` argument (a Playwright [`Page`](https://playwright.dev/python/docs/api/class-page)):
+
+```python
+async def code_fn(page):
+    # interact with the page here
+```
+
+The function is called as `await code_fn(page)`. Any return value is ignored.
+
+## JSON Example
+
+```json
+{
+  "type": "action_node",
+  "python_script_action": {
+    "execution_code": "async def code_fn(page):\n    await page.evaluate(\"window.scrollTo(0, document.body.scrollHeight)\")"
+  }
+}
+```
+
+## Common Patterns
+
+### Scroll to the bottom of the page
+
+```python
+async def code_fn(page):
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+```
+
+### Wait for a custom JavaScript condition
+
+```python
+async def code_fn(page):
+    await page.wait_for_function("() => document.readyState === 'complete'")
+```
+
+### Dispatch a custom browser event
+
+```python
+async def code_fn(page):
+    await page.evaluate("""
+        document.querySelector('#upload-input').dispatchEvent(
+            new Event('change', { bubbles: true })
+        )
+    """)
+```
+
+### Interact with a shadow DOM element
+
+```python
+async def code_fn(page):
+    await page.evaluate("""
+        document.querySelector('my-component').shadowRoot
+            .querySelector('button.confirm')
+            .click()
+    """)
+```
+
+<Warning>
+`execution_code` is evaluated with `exec()`. Only run scripts from trusted sources.
+</Warning>
+
+---
+
+## Python Script Extraction
+
+To extract data from the page using custom code, use `python_script` inside an `extraction_action` instead. The contract is different: the function receives `(axtree, browser)` and **must return a dict** containing the extracted values.
+
+```json
+{
+  "type": "action_node",
+  "extraction_action": {
+    "python_script": {
+      "script": "async def code_fn(axtree, browser):\n    page = await browser.get_current_page()\n    text = await page.locator('.order-id').inner_text()\n    return {\"order_id\": text.strip()}",
+      "output_variable_names": ["order_id"]
+    }
+  }
+}
+```
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `script` | `str` | Required | Python source defining `async def code_fn(axtree, browser)` |
+| `extraction_format` | `dict \| None` | `None` | Expected output structure (required when `output_variable_names` is set) |
+| `output_variable_names` | `list[str] \| None` | `None` | Promote returned dict keys to `generated_variables` |
+
+### Script Contract
+
+```python
+async def code_fn(axtree, browser):
+    # axtree: string representation of the page accessibility tree
+    # browser: the Browser instance (use browser.get_current_page() for the Playwright page)
+    return {"key": "value"}  # must return a dict
+```
+
+The returned dict is stored as `OutputData` and, if `output_variable_names` is set, the specified keys are promoted to `generated_variables` for use in later nodes.
+
+<Tip>
+All keys in `output_variable_names` must exist in `extraction_format`, or schema validation will fail.
+</Tip>
+
+---
+
+## Action vs Extraction — Which to Use
+
+| Scenario | Use |
+|----------|-----|
+| Scroll, dispatch events, manipulate DOM | `python_script_action` |
+| Extract and store data from the page | `extraction_action.python_script` |
+| Simple text / table extraction | `extraction_action.llm` |
