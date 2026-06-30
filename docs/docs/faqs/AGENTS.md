@@ -7,7 +7,7 @@ Use `<AccordionGroup>` to organize FAQs that would otherwise clutter the page.
   <Accordion title="Advanced configuration options">
     Content about advanced settings...
   </Accordion>
-  
+
   <Accordion title="Troubleshooting common issues">
     Solutions to frequent problems...
   </Accordion>
