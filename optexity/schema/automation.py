@@ -413,13 +413,14 @@ class AssertLocatorNode(BaseModel):
     The boolean is stored in generated_variables under `output_variable_name`
     (as a single-element list, e.g. {output_variable_name: [True]}) so it can be
     referenced later via `{output_variable_name[0]}`, e.g. in an if_else_node
-    condition.
+    condition. When `output_variable_name` is omitted, the result is stored under
+    `node{index}_output`, where index is the node's step index resolved at runtime.
     """
 
     type: Literal["assert_locator_node"]
     locator: str
     assertion: Literal["to_be_visible", "to_be_hidden"]
-    output_variable_name: str
+    output_variable_name: str | None = None
     timeout: float = 5.0
 
     def replace(self, pattern: str, replacement: str | int | float | bool | None):
