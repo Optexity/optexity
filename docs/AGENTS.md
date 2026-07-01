@@ -173,11 +173,12 @@ Group related questions with `<AccordionGroup>`:
 <AccordionGroup>
   <Accordion title="How do I handle passwords securely?">
     Use `secure_parameters` with 1Password or TOTP integration.
-    
+
     | Provider | Use Case |
     |----------|----------|
     | 1Password | Passwords, API keys |
     | TOTP | 2FA codes |
+
   </Accordion>
 </AccordionGroup>
 ```
