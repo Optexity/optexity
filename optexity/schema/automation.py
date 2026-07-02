@@ -554,6 +554,63 @@ class Automation(BaseModel):
         ## TODO: static check that all parameters with examples are used in the nodes
         return self
 
+    @model_validator(mode="after")
+    def assign_default_output_variable_names(self):
+        """Bake in the default ``node{index}_output`` key when a recording is saved.
+
+        AssertLocatorNode and locator ExtractionAction both resolve an omitted
+        ``output_variable_name`` to ``node{index}_output`` at runtime (see
+        run_automation.handle_assert_locator_node and
+        run_extraction.handle_locator_extraction). Here we materialise that same
+        name into the stored recording so the variable is explicit in the saved
+        automation (and shown in the dashboard) instead of only existing at
+        runtime. ``index`` is the node's static position in document order, so the
+        assignment is deterministic and idempotent — nodes that already carry a
+        name (user-supplied or previously baked in) are left untouched.
+        """
+        counter = 0
+
+        def visit(node):
+            nonlocal counter
+            counter += 1
+            index = counter
+
+            if isinstance(node, AssertLocatorNode):
+                if node.output_variable_name is None:
+                    node.output_variable_name = f"node{index}_output"
+            elif isinstance(node, ActionNode):
+                extraction = node.extraction_action
+                locator = extraction.locator if extraction is not None else None
+                if locator is not None and locator.output_variable_name is None:
+                    default_name = f"node{index}_output"
+                    # When output_variable_name is omitted the validator guarantees
+                    # extraction_format has exactly one field. Rename that field to
+                    # the default name so it stays the format key the runtime reads
+                    # from (run_extraction uses output_variable_name as the format
+                    # key once it is set); otherwise the two would diverge.
+                    (only_key,) = tuple(locator.extraction_format)
+                    locator.extraction_format = {
+                        default_name: locator.extraction_format[only_key]
+                    }
+                    locator.output_variable_name = default_name
+            elif isinstance(node, ForLoopNode):
+                for child in node.nodes:
+                    visit(child)
+                for child in node.reset_nodes:
+                    visit(child)
+            elif isinstance(node, IfElseNode):
+                for child in node.if_nodes:
+                    visit(child)
+                for child in node.else_nodes:
+                    visit(child)
+
+        for node in self.nodes:
+            visit(node)
+        for node in self.post_processing_nodes:
+            visit(node)
+
+        return self
+
     def model_dump(self, *, sort_params_by_nodes: bool = False, **kwargs):
         """
         Extended model_dump with option to sort parameters by node order
