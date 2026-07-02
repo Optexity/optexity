@@ -53,8 +53,18 @@ def get_browser_restart_flag_path(child_process_id: int) -> Path:
 
 
 def request_browser_restart(child_process_id: int, reason: str) -> None:
+    # Best-effort signal to the parent; a write failure must never propagate and
+    # mask the caller's original error (e.g. inside an except handler).
     path = get_browser_restart_flag_path(child_process_id)
-    path.write_text(reason[:2000])
+    try:
+        path.write_text(reason[:2000])
+    except Exception as e:
+        logger.warning(
+            "Failed to write browser restart flag (child_process_id=%s): %s",
+            child_process_id,
+            e,
+        )
+        return
     logger.warning(
         "Requested dedicated browser restart (child_process_id=%s): %s",
         child_process_id,
