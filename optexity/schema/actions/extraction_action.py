@@ -183,7 +183,9 @@ class VisionExtraction(BaseModel):
 
 class LocatorExtraction(BaseModel):
     command: str
-    output_variable_name: str
+    # Optional: when omitted, the result is stored under ``node{index}_output``
+    # (the node's step index), resolved at runtime.
+    output_variable_name: str | None = None
     extraction_format: dict
     extraction_instructions: str | None = None
     llm_provider: Literal["gemini"] = "gemini"
@@ -191,6 +193,16 @@ class LocatorExtraction(BaseModel):
 
     @model_validator(mode="after")
     def validate_variable_in_format(self):
+        if self.output_variable_name is None:
+            # No explicit name: the synthesized ``node{index}_output`` key is
+            # not in the (statically authored) format, so the format must
+            # describe exactly one field, which we remap at runtime.
+            if len(self.extraction_format) != 1:
+                raise ValueError(
+                    "When output_variable_name is omitted, extraction_format "
+                    "must contain exactly one field"
+                )
+            return self
         if self.output_variable_name not in self.extraction_format:
             raise ValueError(
                 f"Variable {self.output_variable_name!r} not found in extraction_format"

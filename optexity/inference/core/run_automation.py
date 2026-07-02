@@ -615,10 +615,15 @@ async def handle_assert_locator_node(
     full_automation: list,
 ):
     memory.update_system_info()
+    memory.automation_state.step_index += 1
     full_automation.append(assert_node.model_dump())
+    var_name = (
+        assert_node.output_variable_name
+        or f"node{memory.automation_state.step_index}_output"
+    )
     logger.debug(
         f"Handling assert locator node {assert_node.locator} ({assert_node.assertion}) "
-        f"-> {assert_node.output_variable_name}"
+        f"-> {var_name}"
     )
 
     locator = await browser.get_locator_from_command(assert_node.locator)
@@ -648,13 +653,8 @@ async def handle_assert_locator_node(
                 f"failed: {type(e).__name__}"
             )
 
-    memory.variables.generated_variables[assert_node.output_variable_name] = [
-        assertion_passed
-    ]
-    logger.debug(
-        f"Assert locator result={assertion_passed}; stored in "
-        f"{assert_node.output_variable_name!r}"
-    )
+    memory.variables.generated_variables[var_name] = [assertion_passed]
+    logger.debug(f"Assert locator result={assertion_passed}; stored in {var_name!r}")
     memory.update_system_info()
 
 
