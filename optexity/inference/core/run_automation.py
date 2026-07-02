@@ -65,7 +65,6 @@ logger = logging.getLogger(__name__)
 # TODO: give a warning where any variable of type {variable_name[index]} is used but variable_name is not in the memory in generated variables or in input variables
 
 from optexity.inference.infra.browser_health import (
-    get_child_process_id_from_env,
     is_browser_session_poisoned_error,
     is_driver_closed_error,
     request_browser_restart,
@@ -89,6 +88,8 @@ async def run_automation(
     logger.info(f"Task {task.task_id} started running")
     memory = None
     browser = None
+    in_browser_setup = False
+    entered_workflow = False
 
     try:
         if task.retry_count == 0:
@@ -108,14 +109,19 @@ async def run_automation(
         memory.automation_state.try_index = 0
 
         try:
+            in_browser_setup = True
             await browser.start()
             await browser.go_to_url("about:blank")
-            memory.update_system_info()
         except Exception as e:
             logger.error(
                 f"Error going to about:blank on start: {e}, stopping browser and restarting"
             )
             raise e
+        # Browser bring-up (where connect_over_cdp lives) succeeded. Later
+        # pre-workflow steps (proxy IP check, initial navigation) are not browser
+        # health problems, so drop out of the unconditional-restart window.
+        in_browser_setup = False
+        memory.update_system_info()
 
         if task.use_proxy:
 
@@ -151,6 +157,7 @@ async def run_automation(
 
         full_automation = []
 
+        entered_workflow = True
         await _run_nodes(automation.nodes, task, memory, browser, full_automation)
 
         task.status = "success"
@@ -163,10 +170,21 @@ async def run_automation(
             logger.error(f"Driver closed error: {e}, restarting browser")
             if browser is not None:
                 await browser.stop(force=True)
-        if is_browser_session_poisoned_error(e):
-            child_process_id = get_child_process_id_from_env()
-            if child_process_id is not None:
-                request_browser_restart(child_process_id, str(e))
+        # A failure during browser bring-up (browser.start() / connect_over_cdp /
+        # about:blank) is almost always a browser health problem, so request a
+        # restart regardless of error type. Everything else — before bring-up (e.g.
+        # start_task_in_server), the proxy IP check, initial navigation, and the
+        # workflow nodes — restarts only on an explicitly poisoned session. Note:
+        # go_to_url swallows navigation errors, so a bad automation.url never lands
+        # here and never restarts the browser.
+        is_browser_setup_failure = in_browser_setup and not entered_workflow
+        if is_browser_setup_failure or is_browser_session_poisoned_error(e):
+            reason = (
+                "browser setup failure"
+                if is_browser_setup_failure
+                else "browser session poisoned"
+            )
+            request_browser_restart(child_process_id, f"{reason}: {e}")
         logger.error(f"Error running automation: {traceback.format_exc()}")
         task.error = str(e)
         task.status = "failed"
