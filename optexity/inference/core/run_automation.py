@@ -347,7 +347,10 @@ async def run_action_node(
 
     await action_node.replace_variables(task.input_parameters)
     await action_node.replace_variables(
-        task.secure_parameters, task.workspace_id, task.api_key
+        task.secure_parameters,
+        task.workspace_id,
+        task.api_key,
+        task.integration_secret_id,
     )
     await action_node.replace_variables(memory.variables.generated_variables)
     resolve_api_variables_in_node(action_node, memory.variables.generated_variables)

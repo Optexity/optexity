@@ -11,13 +11,16 @@ logger = logging.getLogger(__name__)
 
 
 async def _resolve_aws_credentials(
-    workspace_id: str | None, api_key: str | None = None
+    workspace_id: str | None,
+    api_key: str | None = None,
+    integration_secret_id: str | None = None,
 ) -> tuple[str, str]:
     """Resolve AWS credentials.
 
     Prefers fetching the 'aws_secret_manager' integration secret from the opbackend API
     when workspace_id is provided; falls back to AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
-    env vars.
+    env vars. When integration_secret_id is set, that specific credential is fetched;
+    otherwise the workspace's active credential of this type is used.
     """
     if workspace_id is not None:
         try:
@@ -26,7 +29,10 @@ async def _resolve_aws_credentials(
             )
 
             data = await fetch_decrypted_integration_secret(
-                workspace_id, "aws_secret_manager", api_key
+                workspace_id,
+                "aws_secret_manager",
+                api_key,
+                integration_secret_id,
             )
             access_key = data.get("access_key_id")
             secret_key = data.get("secret_access_key")
@@ -102,11 +108,17 @@ async def get_aws_secret_value(
     key: str | None = None,
     workspace_id: str | None = None,
     api_key: str | None = None,
+    integration_secret_id: str | None = None,
 ) -> str:
     """
     Cached helper to fetch a value from AWS Secrets Manager.
+
+    integration_secret_id is part of the cache key, so selecting a different stored
+    credential resolves independently rather than returning a cached value.
     """
-    access_key, secret_key = await _resolve_aws_credentials(workspace_id, api_key)
+    access_key, secret_key = await _resolve_aws_credentials(
+        workspace_id, api_key, integration_secret_id
+    )
     manager = AWSSecretsManager(region_name, access_key, secret_key)
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(

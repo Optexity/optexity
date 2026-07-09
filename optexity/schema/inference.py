@@ -26,6 +26,9 @@ class InferenceRequest(BaseModel):
     per_login_parallelism: int = 1
     task_callback_url: str | None = None
     task_callback_api_key: str | None = None
+    # Optional: id of the integration_secret (stored credential) to use for this
+    # run. When None, the workspace's active credential of the matching type is used.
+    integration_secret_id: str | None = None
 
     @model_validator(mode="after")
     def validate_use_proxy(self):
