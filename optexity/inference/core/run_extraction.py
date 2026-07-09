@@ -379,7 +379,19 @@ async def handle_locator_extraction(
     task: Task,
     unique_identifier: str | None = None,
 ):
-    var_name = locator_extraction.output_variable_name
+    # Resolve the storage key: explicit name, else the node's index.
+    var_name = (
+        locator_extraction.output_variable_name
+        or f"node{memory.automation_state.step_index}_output"
+    )
+    # The LLM fallback reads this field out of the extraction_format. When the
+    # name is explicit it is itself a format key; otherwise the validator
+    # guarantees the format has exactly one field, whose value we remap.
+    format_key = (
+        locator_extraction.output_variable_name
+        if locator_extraction.output_variable_name is not None
+        else next(iter(locator_extraction.extraction_format))
+    )
     extracted_value = None
     locator_failed = False
 
@@ -408,15 +420,26 @@ async def handle_locator_extraction(
                 llm_extraction = LLMExtraction(
                     extraction_format=locator_extraction.extraction_format,
                     extraction_instructions=locator_extraction.extraction_instructions,
-                    output_variable_names=[var_name],
+                    output_variable_names=[format_key],
                     llm_provider=locator_extraction.llm_provider,
                     llm_model_name=locator_extraction.llm_model_name,
                 )
                 output = await handle_llm_extraction(
                     llm_extraction, memory, browser, task, unique_identifier
                 )
-                if output is not None and var_name in output.json_data:
-                    extracted_value = output.json_data[var_name]
+                if output is not None and format_key in output.json_data:
+                    extracted_value = output.json_data[format_key]
+                # handle_llm_extraction stored the value under format_key; move
+                # it to the resolved name when they differ (synthesized name).
+                if format_key != var_name:
+                    if format_key in memory.variables.generated_variables:
+                        memory.variables.generated_variables[var_name] = (
+                            memory.variables.generated_variables.pop(format_key)
+                        )
+                    else:
+                        memory.variables.generated_variables[var_name] = [
+                            extracted_value
+                        ]
                 logger.debug(f"LLM fallback extracted {var_name}={extracted_value!r}")
             except Exception as e:
                 logger.warning(f"LLM fallback also failed for {var_name!r}: {e}")
