@@ -241,10 +241,9 @@ class UploadFileAction(BaseAction):
             raise ValueError(
                 "UploadFileAction: exactly one of file_path or file_url must be set"
             )
-        if self.file_url and not self.file_url.startswith(("http://", "https://")):
-            raise ValueError(
-                "UploadFileAction.file_url must be an http:// or https:// URL"
-            )
+        # The http(s) scheme of file_url is validated at run time in
+        # handle_upload_file, after templated placeholders (e.g.
+        # "{upload_file_url[0]}") have been substituted with the real URL.
         return self
 
     def replace(self, pattern: str, replacement: str):
