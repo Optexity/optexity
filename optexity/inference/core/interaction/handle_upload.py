@@ -88,6 +88,10 @@ async def handle_upload_file(
 ):
     tmp_path: str | None = None
     if upload_file_action.file_url:
+        if not upload_file_action.file_url.startswith(("http://", "https://")):
+            raise ValueError(
+                "UploadFileAction.file_url must be an http:// or https:// URL"
+            )
         tmp_path = await _download_to_temp_file(upload_file_action.file_url, browser)
         upload_file_action.file_path = tmp_path
 
