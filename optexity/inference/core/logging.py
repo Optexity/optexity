@@ -22,12 +22,24 @@ from optexity.utils.utils import save_screenshot
 logger = logging.getLogger(__name__)
 
 
-def create_tar_in_memory(directory: Path | str, name: str) -> io.BytesIO:
+def create_tar_in_memory(
+    directory: Path | str, name: str, exclude_dirs: list[str] | None = None
+) -> io.BytesIO:
     if isinstance(directory, str):
         directory = Path(directory)
+
+    exclude_prefixes = tuple(f"{name}/{d}" for d in exclude_dirs or [])
+
+    def tar_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo | None:
+        if tarinfo.name in exclude_prefixes or tarinfo.name.startswith(
+            tuple(f"{prefix}/" for prefix in exclude_prefixes)
+        ):
+            return None
+        return tarinfo
+
     tar_bytes = io.BytesIO()
     with tarfile.open(fileobj=tar_bytes, mode="w:gz") as tar:
-        tar.add(directory, arcname=name)
+        tar.add(directory, arcname=name, filter=tar_filter if exclude_dirs else None)
     tar_bytes.seek(0)  # rewind to start
     return tar_bytes
 
@@ -171,7 +183,9 @@ async def save_downloads_in_server(task: Task, memory: Memory):
             if download.is_file()
         ]
         if len(downloads) > 0:
-            tar_bytes = create_tar_in_memory(task.downloads_directory, task.task_id)
+            tar_bytes = await asyncio.to_thread(
+                create_tar_in_memory, task.downloads_directory, task.task_id
+            )
             # add tar.gz
             files.append(
                 (
@@ -209,7 +223,7 @@ async def save_downloads_in_server(task: Task, memory: Memory):
         if len(files) == 0:
             return
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
 
             response = await client.post(
                 url, headers=headers, data=payload, files=files
@@ -222,7 +236,7 @@ async def save_downloads_in_server(task: Task, memory: Memory):
             f"Failed to save downloads in server: {e.response.status_code} - {e.response.text}"
         )
     except Exception as e:
-        logger.error(f"Failed to save downloads in server: {e}")
+        logger.error(f"Failed to save downloads in server: {type(e).__name__}: {e}")
 
 
 async def save_trajectory_in_server(task: Task):
@@ -234,7 +248,9 @@ async def save_trajectory_in_server(task: Task):
             "task_id": task.task_id,  # form field
         }
 
-        tar_bytes = create_tar_in_memory(task.task_directory, task.task_id)
+        tar_bytes = await asyncio.to_thread(
+            create_tar_in_memory, task.task_directory, task.task_id, ["downloads"]
+        )
         files = {
             "compressed_trajectory": (
                 f"{task.task_id}.tar.gz",
@@ -242,7 +258,7 @@ async def save_trajectory_in_server(task: Task):
                 "application/gzip",
             )
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
 
             response = await client.post(url, headers=headers, data=data, files=files)
 
@@ -253,7 +269,7 @@ async def save_trajectory_in_server(task: Task):
             f"Failed to save trajectory in server: {e.response.status_code} - {e.response.text}"
         )
     except Exception as e:
-        logger.error(f"Failed to save trajectory in server: {e}")
+        logger.error(f"Failed to save trajectory in server: {type(e).__name__}: {e}")
 
 
 async def initiate_callback(task: Task):
