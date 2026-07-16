@@ -5,6 +5,7 @@ import json
 import logging
 import shutil
 import tarfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urljoin
@@ -21,13 +22,32 @@ from optexity.utils.utils import save_screenshot
 
 logger = logging.getLogger(__name__)
 
+UPLOAD_TIMEOUT = httpx.Timeout(
+    connect=settings.UPLOAD_CONNECT_TIMEOUT_SECONDS,
+    write=settings.UPLOAD_WRITE_TIMEOUT_SECONDS,
+    read=settings.UPLOAD_READ_TIMEOUT_SECONDS,
+    pool=settings.UPLOAD_POOL_TIMEOUT_SECONDS,
+)
 
-def create_tar_in_memory(directory: Path | str, name: str) -> io.BytesIO:
+
+def create_tar_in_memory(
+    directory: Path | str, name: str, exclude_dirs: list[str] | None = None
+) -> io.BytesIO:
     if isinstance(directory, str):
         directory = Path(directory)
+
+    exclude_prefixes = tuple(f"{name}/{d}" for d in exclude_dirs or [])
+
+    def tar_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo | None:
+        if tarinfo.name in exclude_prefixes or tarinfo.name.startswith(
+            tuple(f"{prefix}/" for prefix in exclude_prefixes)
+        ):
+            return None
+        return tarinfo
+
     tar_bytes = io.BytesIO()
     with tarfile.open(fileobj=tar_bytes, mode="w:gz") as tar:
-        tar.add(directory, arcname=name)
+        tar.add(directory, arcname=name, filter=tar_filter if exclude_dirs else None)
     tar_bytes.seek(0)  # rewind to start
     return tar_bytes
 
@@ -153,6 +173,7 @@ async def save_output_data_in_server(task: Task, memory: Memory):
 
 
 async def save_downloads_in_server(task: Task, memory: Memory):
+    upload_start = None
     try:
         # if len(memory.downloads) == 0:
         #     return
@@ -170,8 +191,21 @@ async def save_downloads_in_server(task: Task, memory: Memory):
             for download in task.downloads_directory.iterdir()
             if download.is_file()
         ]
+        logger.info(
+            f"[save_downloads_in_server] task={task.task_id} "
+            f"found {len(downloads)} download file(s): "
+            f"{[(d.name, d.stat().st_size) for d in downloads]}"
+        )
         if len(downloads) > 0:
-            tar_bytes = create_tar_in_memory(task.downloads_directory, task.task_id)
+            tar_start = time.monotonic()
+            tar_bytes = await asyncio.to_thread(
+                create_tar_in_memory, task.downloads_directory, task.task_id
+            )
+            tar_size = tar_bytes.getbuffer().nbytes
+            logger.info(
+                f"[save_downloads_in_server] task={task.task_id} "
+                f"tar built in {time.monotonic() - tar_start:.2f}s, size={tar_size} bytes"
+            )
             # add tar.gz
             files.append(
                 (
@@ -209,23 +243,42 @@ async def save_downloads_in_server(task: Task, memory: Memory):
         if len(files) == 0:
             return
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        upload_start = time.monotonic()
+        logger.info(
+            f"[save_downloads_in_server] task={task.task_id} "
+            f"starting upload of {len(files)} file part(s) to {url}"
+        )
+        async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT) as client:
 
             response = await client.post(
                 url, headers=headers, data=payload, files=files
             )
 
             response.raise_for_status()
-            return response.json()
+            response_json = response.json()
+            logger.info(
+                f"[save_downloads_in_server] task={task.task_id} "
+                f"upload succeeded in {time.monotonic() - upload_start:.2f}s, "
+                f"status={response.status_code}, response={response_json}"
+            )
+            return response_json
     except httpx.HTTPStatusError as e:
+        elapsed = time.monotonic() - upload_start if upload_start is not None else None
         logger.error(
-            f"Failed to save downloads in server: {e.response.status_code} - {e.response.text}"
+            f"[save_downloads_in_server] task={task.task_id} "
+            f"failed after {elapsed}s: "
+            f"{e.response.status_code} - {e.response.text}"
         )
     except Exception as e:
-        logger.error(f"Failed to save downloads in server: {e}")
+        elapsed = time.monotonic() - upload_start if upload_start is not None else None
+        logger.error(
+            f"[save_downloads_in_server] task={task.task_id} "
+            f"failed after {elapsed}s: {type(e).__name__}: {e}"
+        )
 
 
 async def save_trajectory_in_server(task: Task):
+    upload_start = None
     try:
         url = urljoin(settings.SERVER_URL, settings.SAVE_TRAJECTORY_ENDPOINT)
         headers = {"x-api-key": task.api_key}
@@ -234,7 +287,15 @@ async def save_trajectory_in_server(task: Task):
             "task_id": task.task_id,  # form field
         }
 
-        tar_bytes = create_tar_in_memory(task.task_directory, task.task_id)
+        tar_start = time.monotonic()
+        tar_bytes = await asyncio.to_thread(
+            create_tar_in_memory, task.task_directory, task.task_id, ["downloads"]
+        )
+        tar_size = tar_bytes.getbuffer().nbytes
+        logger.info(
+            f"[save_trajectory_in_server] task={task.task_id} "
+            f"tar built in {time.monotonic() - tar_start:.2f}s, size={tar_size} bytes"
+        )
         files = {
             "compressed_trajectory": (
                 f"{task.task_id}.tar.gz",
@@ -242,18 +303,31 @@ async def save_trajectory_in_server(task: Task):
                 "application/gzip",
             )
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        upload_start = time.monotonic()
+        async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT) as client:
 
             response = await client.post(url, headers=headers, data=data, files=files)
 
             response.raise_for_status()
-            return response.json()
+            response_json = response.json()
+            logger.info(
+                f"[save_trajectory_in_server] task={task.task_id} "
+                f"upload succeeded in {time.monotonic() - upload_start:.2f}s, "
+                f"status={response.status_code}"
+            )
+            return response_json
     except httpx.HTTPStatusError as e:
+        elapsed = time.monotonic() - upload_start if upload_start is not None else None
         logger.error(
-            f"Failed to save trajectory in server: {e.response.status_code} - {e.response.text}"
+            f"[save_trajectory_in_server] task={task.task_id} "
+            f"failed after {elapsed}s: {e.response.status_code} - {e.response.text}"
         )
     except Exception as e:
-        logger.error(f"Failed to save trajectory in server: {e}")
+        elapsed = time.monotonic() - upload_start if upload_start is not None else None
+        logger.error(
+            f"[save_trajectory_in_server] task={task.task_id} "
+            f"failed after {elapsed}s: {type(e).__name__}: {e}"
+        )
 
 
 async def initiate_callback(task: Task):

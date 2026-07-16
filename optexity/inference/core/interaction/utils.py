@@ -23,6 +23,7 @@ from optexity.inference.infra.browser import Browser
 from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
+from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -686,7 +687,7 @@ async def handle_download(
         # download = await download_info.value
         # logger.info(f"Suggested filename: {download.suggested_filename}")
 
-        timeout = 120.0
+        timeout = settings.DOWNLOAD_TIMEOUT_SECONDS
         poll_interval = 2.0
         elapsed = 0.0
         new_file: str | None = None

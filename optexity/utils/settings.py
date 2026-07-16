@@ -52,6 +52,13 @@ class Settings(BaseSettings):
 
     BROWSER_USE_API_KEY: str | None = None
 
+    DOWNLOAD_TIMEOUT_SECONDS: float = 200.0
+
+    UPLOAD_CONNECT_TIMEOUT_SECONDS: float = 30.0
+    UPLOAD_WRITE_TIMEOUT_SECONDS: float = 300.0
+    UPLOAD_READ_TIMEOUT_SECONDS: float = 600.0
+    UPLOAD_POOL_TIMEOUT_SECONDS: float = 30.0
+
     @model_validator(mode="after")
     def validate_local_callback_url(self):
         if self.DEPLOYMENT == "prod" and self.LOCAL_CALLBACK_URL is not None:
