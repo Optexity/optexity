@@ -11,12 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 async def fetch_decrypted_integration_secret(
-    workspace_id: str, secret_type: str, api_key: str | None = None
+    workspace_id: str,
+    secret_type: str,
+    api_key: str | None = None,
+    integration_secret_id: str | None = None,
 ) -> dict:
     """Fetch an integration secret from the opbackend API and decrypt it.
 
     Makes a GET request to /integration-secrets/{type}/encrypt using the configured
     API key, then decrypts the Fernet-encrypted payload with FERNET_SECRET_KEY.
+
+    When integration_secret_id is provided it is sent as the `secret_id` query param
+    so the server returns that specific credential; otherwise the server returns the
+    workspace's active credential of the given type.
     """
     url = urljoin(
         settings.SERVER_URL,
@@ -26,10 +33,11 @@ async def fetch_decrypted_integration_secret(
         "x-api-key": api_key if api_key is not None else settings.OPTEXITY_API_KEY,
         "x-workspace-id": workspace_id,
     }
+    params = {"secret_id": integration_secret_id} if integration_secret_id else None
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url, headers=headers)
+            response = await client.get(url, headers=headers, params=params)
             response.raise_for_status()
 
         body = response.json()

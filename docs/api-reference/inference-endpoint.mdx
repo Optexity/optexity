@@ -62,6 +62,10 @@ The inference endpoint is the primary way to submit automation tasks to an Optex
 
     Every name in this list must exist as a key in `input_parameters`.
 
+- **`integration_secret_id`** `string` _optional_
+
+    Id of the stored credential (AWS Secrets Manager or 1Password) to use when resolving this task's `secure_parameters`. Lets the same automation run against different credentials. When omitted, the workspace's active credential of the matching type is used. See [AWS Secrets Manager](/docs/advanced/aws-secrets-manager#using-multiple-credentials) and [1Password](/docs/advanced/onepassword#using-multiple-credentials).
+
 ## Code Examples
 
 <CodeGroup>

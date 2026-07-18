@@ -126,6 +126,9 @@ class Task(BaseModel):
     # dedicated_service DB row governs the service.
     max_parallelism: int = 1
     per_login_parallelism: int = 1
+    # Optional: id of the integration_secret (stored credential) to use when
+    # resolving secure parameters for this task. None -> active credential by type.
+    integration_secret_id: str | None = None
     company_id: CompanyID
     llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
     llm_model_name: str = "gemini-2.5-flash"

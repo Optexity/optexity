@@ -30,12 +30,16 @@ _onepassword_clients: dict[str, OnePasswordClient] = {}
 
 
 async def _get_onepassword_token(
-    workspace_id: str | None, api_key: str | None = None
+    workspace_id: str | None,
+    api_key: str | None = None,
+    integration_secret_id: str | None = None,
 ) -> str:
     """Resolve the 1Password service-account token.
 
     Prefers fetching the 'one_password' integration secret from the opbackend API
     when workspace_id is provided; falls back to the OP_SERVICE_ACCOUNT_TOKEN env var.
+    When integration_secret_id is set, that specific credential is fetched; otherwise
+    the workspace's active credential of this type is used.
     """
     if workspace_id is not None:
         try:
@@ -44,7 +48,10 @@ async def _get_onepassword_token(
             )
 
             data = await fetch_decrypted_integration_secret(
-                workspace_id, "one_password", api_key
+                workspace_id,
+                "one_password",
+                api_key,
+                integration_secret_id,
             )
             token = data.get("service_account_token")
             if token:
@@ -70,9 +77,11 @@ async def _get_onepassword_token(
 
 
 async def get_onepassword_client(
-    workspace_id: str | None = None, api_key: str | None = None
+    workspace_id: str | None = None,
+    api_key: str | None = None,
+    integration_secret_id: str | None = None,
 ) -> OnePasswordClient:
-    token = await _get_onepassword_token(workspace_id, api_key)
+    token = await _get_onepassword_token(workspace_id, api_key, integration_secret_id)
     if token not in _onepassword_clients:
         _onepassword_clients[token] = await OnePasswordClient.authenticate(
             auth=token,
@@ -133,8 +142,9 @@ async def get_onepassword_value(
     field_name: str,
     workspace_id: str | None = None,
     api_key: str | None = None,
+    integration_secret_id: str | None = None,
 ) -> str:
-    client = await get_onepassword_client(workspace_id, api_key)
+    client = await get_onepassword_client(workspace_id, api_key, integration_secret_id)
     return await client.secrets.resolve(f"op://{vault_name}/{item_name}/{field_name}")
 
 
