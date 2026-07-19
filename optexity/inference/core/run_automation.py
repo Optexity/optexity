@@ -299,10 +299,6 @@ async def run_final_logging(
 ):
 
     try:
-        await complete_task_in_server(
-            task, memory.token_usage, child_process_id, memory.unique_child_arn
-        )
-
         try:
             memory.automation_state.step_index += 1
             browser_state_summary = await browser.get_browser_state_summary()
@@ -326,6 +322,12 @@ async def run_final_logging(
         await save_downloads_in_server(task, memory)
         await save_latest_memory_state_locally(task, memory, None)
         await save_trajectory_in_server(task)
+        # Mark the task complete only after all artifacts (output data, downloads,
+        # trajectory) are uploaded, since opcloud tears down this container's ECS
+        # task as soon as complete_task is received, racing any uploads still in flight.
+        await complete_task_in_server(
+            task, memory.token_usage, child_process_id, memory.unique_child_arn
+        )
         await initiate_callback(task)
 
     except Exception as e:
