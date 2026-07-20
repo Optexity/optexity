@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     START_TASK_ENDPOINT: str = "api/v1/start_task"
     COMPLETE_TASK_ENDPOINT: str = "api/v1/complete_task"
     SAVE_OUTPUT_DATA_ENDPOINT: str = "api/v1/save_output_data"
-    SAVE_DOWNLOADS_ENDPOINT: str = "api/v1/save_downloads"
+    REQUEST_DOWNLOAD_UPLOAD_URLS_ENDPOINT: str = "api/v1/request_download_upload_urls"
+    CONFIRM_DOWNLOADS_ENDPOINT: str = "api/v1/confirm_downloads"
     SAVE_TRAJECTORY_ENDPOINT: str = "api/v1/save_trajectory"
     INITIATE_CALLBACK_ENDPOINT: str = "api/v1/initiate_callback"
     GET_CALLBACK_DATA_ENDPOINT: str = "api/v1/get_callback_data"
@@ -51,6 +52,13 @@ class Settings(BaseSettings):
     PROXY_PROVIDER: Literal["oxylabs", "brightdata", "other"] | None = None
 
     BROWSER_USE_API_KEY: str | None = None
+
+    DOWNLOAD_TIMEOUT_SECONDS: float = 200.0
+
+    UPLOAD_CONNECT_TIMEOUT_SECONDS: float = 30.0
+    UPLOAD_WRITE_TIMEOUT_SECONDS: float = 300.0
+    UPLOAD_READ_TIMEOUT_SECONDS: float = 600.0
+    UPLOAD_POOL_TIMEOUT_SECONDS: float = 30.0
 
     @model_validator(mode="after")
     def validate_local_callback_url(self):

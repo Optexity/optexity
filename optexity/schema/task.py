@@ -290,3 +290,13 @@ class TaskOutputDataRequest(BaseModel):
             return True
         except Exception as e:
             return False
+
+
+class RequestDownloadUploadUrlsRequest(BaseModel):
+    task_id: str
+    filenames: list[str]
+
+
+class ConfirmDownloadsRequest(BaseModel):
+    task_id: str
+    filenames: list[str]
