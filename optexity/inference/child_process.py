@@ -50,8 +50,21 @@ child_process_id = -1
 unique_child_arn: str = str(uuid.uuid4())
 task_running = False
 last_task_start_time = None
-task_queue: asyncio.Queue[Task] = asyncio.Queue()
+task_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+# Monotonic tie-breaker so equal-priority entries stay FIFO and heap ordering
+# never compares Task objects. See Task.priority_order_key.
+_task_seq = 0
 tasks_to_kill: set[str] = set()
+
+
+def _enqueue_task(task: Task) -> None:
+    """Put a task on the local priority queue: lower priority runs first, None
+    last, ties FIFO. The queue is unbounded so put_nowait never blocks."""
+    global _task_seq
+    _task_seq += 1
+    task_queue.put_nowait((*task.priority_order_key(), _task_seq, task))
+
+
 # task_id -> worker subprocess, so /kill_task can signal an in-flight worker.
 running_task_processes: dict[str, asyncio.subprocess.Process] = {}
 _global_actual_browser: ActualBrowser | None = None
@@ -347,8 +360,9 @@ async def task_processor():
 
     while True:
         try:
-            # Get next task from queue (blocks until one is available)
-            task = await task_queue.get()
+            # Get next task from queue (blocks until one is available);
+            # highest priority (lowest key) first, then FIFO.
+            *_, task = await task_queue.get()
             if task.task_id in tasks_to_kill:
                 logger.info(f"Task {task.task_id} has been killed")
                 tasks_to_kill.remove(task.task_id)
@@ -539,7 +553,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
         """Get details of a specific task."""
         try:
 
-            await task_queue.put(task)
+            _enqueue_task(task)
             return JSONResponse(
                 content={
                     "success": True,
@@ -579,7 +593,7 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
                     )
                 task.is_dedicated = inference_request.is_dedicated
                 task.allocated_at = datetime.now(timezone.utc)
-                await task_queue.put(task)
+                _enqueue_task(task)
 
                 return JSONResponse(
                     content={

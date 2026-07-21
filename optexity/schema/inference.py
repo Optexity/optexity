@@ -26,6 +26,9 @@ class InferenceRequest(BaseModel):
     per_login_parallelism: int = 1
     task_callback_url: str | None = None
     task_callback_api_key: str | None = None
+    # Optional queue priority: lower runs first, negatives allowed, None runs
+    # last. Only orders tasks within the same login / unique_parameters group.
+    priority: int | None = None
 
     @model_validator(mode="after")
     def validate_use_proxy(self):

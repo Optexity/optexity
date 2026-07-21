@@ -129,6 +129,10 @@ class Task(BaseModel):
     company_id: CompanyID
     llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
     llm_model_name: str = "gemini-2.5-flash"
+    # Optional queue priority: lower runs first, negatives allowed, None runs
+    # last (see priority_order_key). Only orders tasks within the same login /
+    # unique_parameters group; never across users.
+    priority: int | None = None
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}
@@ -152,6 +156,17 @@ class Task(BaseModel):
     @property
     def log_file_path(self) -> Path:
         return self.logs_directory / "optexity.log"
+
+    def priority_order_key(self) -> tuple[int, int, float]:
+        """Ordering key for the priority queues.
+
+        Lower runs first; None priority sorts last; ties fall back to FIFO by
+        created_at. Callers append a monotonic sequence number for a total
+        order so queue entries never compare Task objects against each other.
+        """
+        if self.priority is None:
+            return (1, 0, self.created_at.timestamp())
+        return (0, self.priority, self.created_at.timestamp())
 
     @model_validator(mode="after")
     def validate_unique_parameters(self):
