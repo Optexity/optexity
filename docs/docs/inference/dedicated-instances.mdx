@@ -27,7 +27,7 @@ For the common case, the defaults are exactly what you want — **just add
 logged‑in container for the portal, with your tasks served one after another on it.
 
 ```bash
-curl -X POST https://api.optexity.com/api/v1/inference \
+curl -X POST https://inference-api.optexity.com/api/v1/inference \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_OPTEXITY_API_KEY" \
   -d '{
@@ -44,7 +44,7 @@ curl -X POST https://api.optexity.com/api/v1/inference \
 the request above behaves identically to simply:
 
 ```bash
-curl -X POST https://api.optexity.com/api/v1/inference \
+curl -X POST https://inference-api.optexity.com/api/v1/inference \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_OPTEXITY_API_KEY" \
   -d '{
@@ -218,7 +218,7 @@ By default tasks in a queue run **first‑in, first‑out**. Set `priority` to r
 urgent task ahead of already‑queued ones without interrupting any currently running task.
 
 ```bash
-curl -X POST https://api.optexity.com/api/v1/inference \
+curl -X POST https://inference-api.optexity.com/api/v1/inference \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_OPTEXITY_API_KEY" \
   -d '{
