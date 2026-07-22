@@ -764,7 +764,7 @@
             "id": "docs-advanced-downloads-files",
             "path": "docs/advanced/downloads-files.mdx",
             "title": "Downloads and File Handling",
-            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, saving pages as PDF (download_url_as_pdf), iterating multiple downloads with for_loop_node, and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, and best practices.",
+            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, saving pages as PDF (download_url_as_pdf), iterating multiple downloads with for_loop_node, and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, failure behavior when an expected download or download_url_as_pdf produces no file (the task fails with a clear error), and best practices.",
             "gist": "File download and upload patterns: click-to-download, PDF save, multi-file loops, upload with file_path.",
             "keywords": [
                 "download",
@@ -795,8 +795,8 @@
                 "data_models": []
             },
             "reading_priority": 3,
-            "when_to_use": "Select when the query is about downloading files, uploading files, saving pages as PDF, handling multiple file downloads, or the file storage path during task execution.",
-            "embedding_hint": "download upload file PDF expect_download /tmp/optexity for_loop"
+            "when_to_use": "Select when the query is about downloading files, uploading files, saving pages as PDF, handling multiple file downloads, the file storage path during task execution, or why a task fails when an expected download produces no file.",
+            "embedding_hint": "download upload file PDF expect_download download_url_as_pdf /tmp/optexity for_loop download failure task failed no file"
         },
         {
             "id": "docs-advanced-locators",
