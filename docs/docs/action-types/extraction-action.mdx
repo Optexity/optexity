@@ -44,10 +44,12 @@ Set `allow_none: true` on the `extraction_action` when the value may legitimatel
     "llm": {
       "source": ["axtree"],
       "extraction_format": {
-        "notice_text": "str"
+        "product_name": "str",
+        "price": "str",
+        "availability": "str"
       },
-      "extraction_instructions": "Extract the notice_text banner if one is displayed on the page. Return null if no banner is present. Do not guess.",
-      "output_variable_names": ["notice_text"]
+      "extraction_instructions": "Extract product details from the product page. Return null for any field not visible on the page.",
+      "output_variable_names": ["price"]
     }
   }
 }
