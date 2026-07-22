@@ -15,6 +15,7 @@ import playwright.async_api
 
 from optexity.exceptions import (
     ElementNotFoundInAxtreeException,
+    ExpectedDownloadFailedException,
 )
 from optexity.inference.agents.index_prediction.action_prediction_locator_axtree import (
     ActionPredictionLocatorAxtree,
@@ -756,7 +757,7 @@ async def handle_download(
             logger.error(
                 f"No new file appeared in {browser.temp_downloads_dir} within {timeout}s after download action"
             )
-            return
+            raise ExpectedDownloadFailedException()
     finally:
         for target, event_name, handler in listener_cleanup:
             try:
@@ -793,6 +794,9 @@ async def handle_download(
         memory.downloads.append(download_path)
     else:
         logger.error(f"Download file is empty or missing: {download_path}")
+        raise ExpectedDownloadFailedException(
+            "file appeared but was empty/missing after move"
+        )
 
 
 async def clean_download(download_path: Path):

@@ -3,6 +3,7 @@ import logging
 from optexity.exceptions import (
     AxtreeIndexActionFailedException,
     ElementNotFoundInAxtreeException,
+    ExpectedDownloadFailedException,
 )
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
@@ -100,13 +101,21 @@ async def click_element_index(
                 )
             else:
                 await _actual_click_element()
+        except ExpectedDownloadFailedException:
+            # expect_download was True but no file was produced; fail the task
+            # with the fixed message instead of masking it as a click failure.
+            raise
         except Exception as e:
             raise AxtreeIndexActionFailedException(
                 message=f"Failed to click element at axtree index {index}",
                 index=index,
                 original_error=e,
             )
-    except (ElementNotFoundInAxtreeException, AxtreeIndexActionFailedException):
+    except (
+        ElementNotFoundInAxtreeException,
+        AxtreeIndexActionFailedException,
+        ExpectedDownloadFailedException,
+    ):
         raise
     except Exception as e:
         logger.error(f"Error in click_element_index: {e}")

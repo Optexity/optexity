@@ -15,7 +15,49 @@ Extraction actions capture data from web pages during automation—essential for
 | `api_call` | Call an external REST API directly | Webhooks, triggering jobs, polling for async results |
 | `screenshot` | Save visual snapshot | Receipts, proofs, visual records |
 | `state` | Capture page state (URL, title, storage, cookies) | Debugging auth, navigation validation |
+| `python_script` | Run custom Python code to extract data | Complex parsing, computed values |
 | `two_fa_action` | Wait for and extract 2FA code | 2FA codes |
+
+## Common Properties
+
+These properties sit on the `extraction_action` object itself, regardless of extraction type:
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `allow_none` | `bool` | `false` | Allow `output_variable_names` to resolve to `null` without failing the workflow |
+
+### `allow_none`
+
+By default, if you declare `output_variable_names` and any of those variables comes back `null`, the workflow **fails immediately** with an error like:
+
+```
+Extraction produced null value(s) in variable 'price' and allow_none is False: [None]
+```
+
+Set `allow_none: true` on the `extraction_action` when the value may legitimately be absent on some pages:
+
+```json
+{
+  "type": "action_node",
+  "extraction_action": {
+    "allow_none": true,
+    "llm": {
+      "source": ["axtree"],
+      "extraction_format": {
+        "product_name": "str",
+        "price": "str",
+        "availability": "str"
+      },
+      "extraction_instructions": "Extract product details from the product page. Return null for any field not visible on the page.",
+      "output_variable_names": ["price"]
+    }
+  }
+}
+```
+
+<Warning>
+Only use `output_variable_names` when you need to reference the extracted value in a later action (e.g. `{price[0]}`). If you only need the value in the output data and won't reference it downstream, omit `output_variable_names` entirely — the null-check is skipped and the value is simply stored in `OutputData`.
+</Warning>
 
 ---
 
@@ -46,7 +88,8 @@ The most powerful extraction method. Uses AI to parse page content into structur
 | `source` | `list["axtree" \| "screenshot"]` | `["axtree"]` | Data sources to analyze |
 | `extraction_format` | `dict` | Required | Expected output structure |
 | `extraction_instructions` | `str` | Required | What to extract |
-| `output_variable_names` | `list[str]` | `None` | Store values as variables |
+| `output_variable_names` | `list[str]` | `None` | Store specific keys as workflow variables for use in later actions. Only set this when you need to reference the value downstream. Null values fail the workflow unless `allow_none: true` is set. |
+| `include_full_page` | `bool` | `false` | Capture the full scrollable page (not just the visible viewport) when `source` includes `"screenshot"` |
 | `llm_model_name` | `str` | `"gemini-2.5-flash"` | LLM model to use |
 
 ### Source Selection
@@ -143,15 +186,11 @@ Extract text from a specific element on the page using a Playwright locator — 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `command` | `str` | Required | Playwright locator command to find the element |
-| `output_variable_name` | `str` | Required | Variable name to store the extracted text |
-| `extraction_format` | `dict` | Required | Must contain `output_variable_name` as a key |
+| `output_variable_name` | `str \| None` | `None` | Variable name to store the extracted text. When omitted, the value is stored under an auto-generated key (`node{index}_output`) and `extraction_format` must contain exactly one field. |
+| `extraction_format` | `dict` | Required | Must contain `output_variable_name` as a key (or exactly one field when `output_variable_name` is omitted) |
 | `extraction_instructions` | `str \| None` | `None` | LLM fallback instructions if the locator fails |
 | `llm_provider` | `"gemini"` | `"gemini"` | LLM provider to use for fallback |
 | `llm_model_name` | `str` | `"gemini-2.5-flash"` | LLM model for fallback |
-
-<Warning>
-`extraction_format` must contain `output_variable_name` as a key, or validation will fail.
-</Warning>
 
 ### Fallback Behavior
 
@@ -360,6 +399,38 @@ Capture page state, including URL/title plus browser storage and cookies:
 | `cookies` | `list[dict]` | Cookies from the current browser context |
 | `document_cookie` | `str` | `document.cookie` string for the current page |
 
+## Python Script Extraction
+
+Run a custom Python function to extract data from the current page's accessibility tree or perform any computed logic.
+
+```json
+{
+  "extraction_action": {
+    "python_script": {
+      "script": "async def code_fn(axtree, browser):\n    rows = [r.strip() for r in axtree.split('\\n') if r.strip()]\n    return {'row_count': str(len(rows))}",
+      "extraction_format": {
+        "row_count": "str"
+      },
+      "output_variable_names": ["row_count"]
+    }
+  }
+}
+```
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `script` | `str` | Required | Python source defining an `async def code_fn(axtree, browser)` function. Must return a `dict` matching `extraction_format`, or `None`. |
+| `extraction_format` | `dict \| None` | `None` | Expected output structure (same `str` / `List[str]` types as `llm` extraction) |
+| `output_variable_names` | `list[str] \| None` | `None` | Keys from the returned dict to store as workflow variables |
+
+<Info>
+The `code_fn` function receives the page's accessibility tree as a plain string (`axtree`) and the Playwright `browser` object. Return `None` to skip storing any output.
+</Info>
+
+---
+
 ## Two-Factor Authentication Extraction
 
 Wait for and extract 2FA code:
@@ -434,3 +505,5 @@ Override if needed:
 | Poll an async endpoint until ready | `api_call` with `poll_condition` |
 | Visual proof/documentation | `screenshot` |
 | Validate navigation | `state` |
+| Complex parsing / computed values | `python_script` |
+| Value may be null on some pages | Any type + `allow_none: true` on `extraction_action` |

@@ -4,7 +4,10 @@ import time
 
 from playwright.async_api import Locator
 
-from optexity.exceptions import AssertLocatorPresenceException
+from optexity.exceptions import (
+    AssertLocatorPresenceException,
+    ExpectedDownloadFailedException,
+)
 from optexity.inference.core.interaction.handle_select_utils import (
     SelectOptionValue,
     smart_select,
@@ -210,6 +213,11 @@ async def command_based_action_with_retry(
             else:
                 await asyncio.sleep(max_timeout_seconds_per_try)
                 last_error = f"error: locator not visible"
+        except ExpectedDownloadFailedException:
+            # The action ran but expect_download=True produced no file. Do not
+            # retry or downgrade to a string error; fail the task with the fixed
+            # message.
+            raise
         except Exception as e:
             last_error = f"error: {e}"
             await asyncio.sleep(max_timeout_seconds_per_try)

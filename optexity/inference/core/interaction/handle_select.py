@@ -5,6 +5,7 @@ from browser_use.dom.serializer.serializer import DOMTreeSerializer
 from optexity.exceptions import (
     AxtreeIndexActionFailedException,
     ElementNotFoundInAxtreeException,
+    ExpectedDownloadFailedException,
 )
 from optexity.inference.agents.select_option_prediction.select_option_prediction import (
     SelectOptionPredictionAgent,
@@ -245,13 +246,21 @@ async def select_option_index(
                 )
             else:
                 await _actual_select_option()
+        except ExpectedDownloadFailedException:
+            # expect_download was True but no file was produced; fail the task
+            # with the fixed message instead of masking it as a select failure.
+            raise
         except Exception as e:
             raise AxtreeIndexActionFailedException(
                 message=f"Failed to select option at axtree index {index}",
                 index=index,
                 original_error=e,
             )
-    except (ElementNotFoundInAxtreeException, AxtreeIndexActionFailedException):
+    except (
+        ElementNotFoundInAxtreeException,
+        AxtreeIndexActionFailedException,
+        ExpectedDownloadFailedException,
+    ):
         raise
     except Exception as e:
         logger.error(f"Error in select_option_index: {e}")

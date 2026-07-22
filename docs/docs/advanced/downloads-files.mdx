@@ -168,6 +168,33 @@ Optexity automatically waits for downloads when `expect_download=true`. For larg
 
 ---
 
+## Failure on Missing Download
+
+When a node expects a file but none is produced, the task **fails** rather than
+silently continuing. This applies to both download mechanisms:
+
+**`expect_download=true`** (`click_element` / `select_option`):
+
+| Condition | Task error |
+|-----------|------------|
+| No file appears within the download timeout | `could not download file when expect download is true` |
+| A file appears but is empty or missing after being saved | `file appeared but was empty/missing after move` |
+
+**`download_url_as_pdf`:**
+
+| Condition | Task error |
+|-----------|------------|
+| No URL could be resolved for the page | `could not download file for download_url_as_pdf: no URL found` |
+| The request returns a non-OK HTTP status | `could not download file for download_url_as_pdf: HTTP <status>` |
+| The saved PDF is empty or missing | `file appeared but was empty/missing after move` |
+
+<Tip>
+If a download is slow, increase `end_sleep_time` (see below) so the file has
+time to finish before the timeout triggers a failure.
+</Tip>
+
+---
+
 ## Best Practices
 
 | Practice | Recommendation |

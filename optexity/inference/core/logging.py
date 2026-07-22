@@ -360,6 +360,21 @@ async def save_trajectory_in_server(task: Task):
         )
 
 
+def _redact_callback_data(data: dict) -> dict:
+    """Return a copy of the callback payload with secrets masked, safe to log."""
+    redacted = dict(data)
+    if redacted.get("task_callback_api_key"):
+        redacted["task_callback_api_key"] = "***"
+    callback_url = redacted.get("callback_url")
+    if isinstance(callback_url, dict):
+        callback_url = dict(callback_url)
+        for secret_key in ("api_key", "password"):
+            if callback_url.get(secret_key):
+                callback_url[secret_key] = "***"
+        redacted["callback_url"] = callback_url
+    return redacted
+
+
 async def initiate_callback(task: Task):
 
     if settings.DEPLOYMENT == "dev" and settings.LOCAL_CALLBACK_URL is not None:
@@ -412,18 +427,35 @@ async def initiate_callback(task: Task):
         if task.callback_url is not None:
             data["callback_url"] = task.callback_url.model_dump()
 
+        logger.info(
+            "Sending callback for task %s to %s with data: %s",
+            task.task_id,
+            url,
+            _redact_callback_data(data),
+        )
+
         async with httpx.AsyncClient(timeout=30.0) as client:
 
             response = await client.post(url, headers=headers, json=data)
 
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            logger.info(
+                "Callback for task %s succeeded (status=%s): %s",
+                task.task_id,
+                response.status_code,
+                result,
+            )
+            return result
     except httpx.HTTPStatusError as e:
         logger.error(
-            f"Failed to save trajectory in server: {e.response.status_code} - {e.response.text}"
+            "Callback for task %s failed with HTTP %s: %s",
+            task.task_id,
+            e.response.status_code,
+            e.response.text,
         )
     except Exception as e:
-        logger.error(f"Failed to save trajectory in server: {e}")
+        logger.error("Callback for task %s failed: %s", task.task_id, e)
 
 
 async def save_latest_memory_state_locally(
