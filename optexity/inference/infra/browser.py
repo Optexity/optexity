@@ -143,7 +143,7 @@ class Browser:
                     self.page_to_target_id.append(tab.target_id)
             self.previous_total_pages = len(self.context.pages)
 
-            logger.debug("Browser started successfully")
+            logger.debug("[Browser] Browser started successfully")
 
         except Exception as e:
             logger.error(f"Error starting playwright: {e}")
