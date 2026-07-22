@@ -31,7 +31,7 @@ These properties sit on the `extraction_action` object itself, regardless of ext
 By default, if you declare `output_variable_names` and any of those variables comes back `null`, the workflow **fails immediately** with an error like:
 
 ```
-Extraction produced null value(s) in variable 'pcp_required' and allow_none is False: [None]
+Extraction produced null value(s) in variable 'price' and allow_none is False: [None]
 ```
 
 Set `allow_none: true` on the `extraction_action` when the value may legitimately be absent on some pages:
@@ -56,7 +56,7 @@ Set `allow_none: true` on the `extraction_action` when the value may legitimatel
 ```
 
 <Warning>
-Only use `output_variable_names` when you need to reference the extracted value in a later action (e.g. `{pcp_required[0]}`). If you only need the value in the output data and won't reference it downstream, omit `output_variable_names` entirely — the null-check is skipped and the value is simply stored in `OutputData`.
+Only use `output_variable_names` when you need to reference the extracted value in a later action (e.g. `{price[0]}`). If you only need the value in the output data and won't reference it downstream, omit `output_variable_names` entirely — the null-check is skipped and the value is simply stored in `OutputData`.
 </Warning>
 
 ---
