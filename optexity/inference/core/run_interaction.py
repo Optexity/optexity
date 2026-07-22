@@ -7,6 +7,7 @@ import aiofiles
 from optexity.exceptions import (
     AssertLocatorPresenceException,
     ElementNotFoundInAxtreeException,
+    ExpectedDownloadFailedException,
 )
 from optexity.inference.agents.error_handler.error_handler import ErrorHandlerAgent
 from optexity.inference.core.interaction.agentic_fallback import (
@@ -257,7 +258,9 @@ async def handle_download_url_as_pdf(
 
     if pdf_url is None:
         logger.error("No PDF URL found for current page")
-        return
+        raise ExpectedDownloadFailedException(
+            "could not download file for download_url_as_pdf: no URL found"
+        )
     download_path = (
         task.downloads_directory / download_url_as_pdf_action.download_filename
     )
@@ -266,11 +269,19 @@ async def handle_download_url_as_pdf(
 
     if not resp.ok:
         logger.error(f"Failed to download PDF: {resp.status}")
-        return
+        raise ExpectedDownloadFailedException(
+            f"could not download file for download_url_as_pdf: HTTP {resp.status}"
+        )
 
     content = await resp.body()
     async with aiofiles.open(download_path, "wb") as f:
         await f.write(content)
+
+    if not (download_path.exists() and download_path.stat().st_size > 0):
+        logger.error(f"Downloaded PDF is empty or missing: {download_path}")
+        raise ExpectedDownloadFailedException(
+            "file appeared but was empty/missing after move"
+        )
 
     memory.downloads.append(download_path)
 

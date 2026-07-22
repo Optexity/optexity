@@ -26,3 +26,14 @@ class HumanInLoopTimeoutException(Exception):
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
+
+
+class ExpectedDownloadFailedException(Exception):
+    """Raised when a node has expect_download=True but the action did not
+    produce a downloaded file. This fails the task with a fixed message."""
+
+    MESSAGE = "could not download file when expect download is true"
+
+    def __init__(self, message: str = MESSAGE):
+        super().__init__(message)
+        self.message = message
