@@ -116,7 +116,7 @@ class Browser:
 
             self.backend_agent = Agent(
                 task="",
-                llm=ChatGoogle(model="gemini-flash-latest"),
+                llm=ChatGoogle(model="gemini-2.5-flash"),
                 browser_session=browser_session,
                 use_vision=False,
             )

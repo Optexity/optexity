@@ -45,7 +45,7 @@ async def handle_agentic_task(
             )
         else:
             tools = Tools()
-        llm = ChatGoogle(model="gemini-flash-latest")
+        llm = ChatGoogle(model="gemini-2.5-flash")
         browser_session = BrowserSession(
             cdp_url=browser.cdp_url, keep_alive=agentic_task_action.keep_alive
         )
