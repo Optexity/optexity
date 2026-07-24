@@ -52,6 +52,14 @@ Defined in `optexity/schema/inference.py`:
     - Validation ensures every name in `unique_parameter_names` exists as a key in `input_parameters`.
     - If no `unique_parameter_names` are provided, the task will be allocated immediately.
 
+- **`priority: int | None`** *(optional, default `null`)*
+    - Queue priority for this task within its login‑queue.
+    - **Lower number runs first.** Negatives are allowed (`-10` beats `-1` beats `0` beats `5` beats `null`).
+    - `null` (or omitting the field) runs last — preserves the previous FIFO behaviour.
+    - Ties at the same priority value break on arrival order (FIFO).
+    - Priority is scoped per login‑queue and never affects other users or other portals.
+    - A running task is never preempted; priority only reorders *waiting* tasks.
+
 ### `Task`
 
 Defined in `optexity/schema/task.py`:
@@ -101,7 +109,7 @@ When **`is_aws=False`** (local mode, recommended for development):
     - **Behavior**:
         1. Sends the request to `inference-api.optexity.com` + `INFERENCE_ENDPOINT` with header `x-api-key: OPTEXITY_API_KEY`.
         2. Expects a response containing a serialized `Task`.
-        3. Enqueues that `Task` onto a local `asyncio.Queue`.
+        3. Enqueues that `Task` onto a local priority queue (ordered by `priority`, then arrival time).
         4. Returns `202 Accepted` with:
             - `{"success": true, "message": "Task has been allocated"}` on success.
 

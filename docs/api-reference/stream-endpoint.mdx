@@ -39,7 +39,7 @@ Requires an API key in the `x-api-key` header. The same key used for `POST /api/
 
 ```bash cURL
 curl -X GET \
-  "https://inference-api.optexity.com/api/v1/tasks/<task_id>/stream" \
+  "https://api.optexity.com/api/v1/tasks/<task_id>/stream" \
   -H "x-api-key: $OPTEXITY_API_KEY"
 ```
 
@@ -49,7 +49,7 @@ import requests
 
 task_id = "bf982ff9-f0af-4598-97be-2eb99c917eb0"
 resp = requests.get(
-    f"https://inference-api.optexity.com/api/v1/tasks/{task_id}/stream",
+    f"https://api.optexity.com/api/v1/tasks/{task_id}/stream",
     headers={"x-api-key": os.environ["OPTEXITY_API_KEY"]},
 )
 resp.raise_for_status()
@@ -60,7 +60,7 @@ print(stream_url)
 ```javascript JavaScript
 const taskId = "bf982ff9-f0af-4598-97be-2eb99c917eb0";
 const res = await fetch(
-    `https://inference-api.optexity.com/api/v1/tasks/${taskId}/stream`,
+    `https://api.optexity.com/api/v1/tasks/${taskId}/stream`,
     { headers: { "x-api-key": process.env.OPTEXITY_API_KEY } },
 );
 if (!res.ok) {
@@ -129,7 +129,7 @@ Install with `npm install @novnc/novnc`.
 import { useEffect, useRef, useState } from "react";
 import RFB from "@novnc/novnc";
 
-const INFERENCE_API_BASE_URL = "https://inference-api.optexity.com";
+const INFERENCE_API_BASE_URL = "https://api.optexity.com";
 
 async function getStreamUrl(taskId, apiKey) {
     const res = await fetch(
@@ -239,7 +239,7 @@ export function LiveStreamViewer({ taskId, apiKey }) {
     <script type="module">
         import RFB from "https://cdn.jsdelivr.net/npm/@novnc/novnc@1.5.0/lib/rfb.js";
 
-        const INFERENCE_API_BASE_URL = "https://inference-api.optexity.com";
+        const INFERENCE_API_BASE_URL = "https://api.optexity.com";
         const TASK_ID = "<your_task_id>";
         const API_KEY = "<your_api_key>";
 
@@ -308,7 +308,7 @@ export function LiveStreamViewer({ taskId, apiKey }) {
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import RFB from "@novnc/novnc";
 
-const INFERENCE_API_BASE_URL = "https://inference-api.optexity.com";
+const INFERENCE_API_BASE_URL = "https://api.optexity.com";
 
 const props = defineProps({
     taskId: { type: String, required: true },
@@ -403,7 +403,7 @@ import {
 // @ts-ignore — @novnc/novnc ships ESM without bundled types
 import RFB from "@novnc/novnc";
 
-const INFERENCE_API_BASE_URL = "https://inference-api.optexity.com";
+const INFERENCE_API_BASE_URL = "https://api.optexity.com";
 
 type StreamState = "loading" | "connecting" | "connected" | "disconnected" | "error";
 

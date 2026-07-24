@@ -65,6 +65,7 @@ Set `"is_dedicated": false` (or omit it) for a normal, non‑dedicated run.
 | `max_parallelism` | `int` | `1` | no | Maximum number of warm containers for this portal (service‑wide cap across all logins). |
 | `per_login_parallelism` | `int` | `1` | no | Maximum number of containers a **single login** may use before its extra tasks round‑robin onto those containers. |
 | `unique_parameter_names` | `list[str]` | `[]` | no | Which input parameters identify a "login" / queue. **Each name must be one of the keys in `input_parameters`.** See [Controlling the queue](#controlling-the-queue). |
+| `priority` | `int \| null` | `null` | no | Queue priority. **Lower runs first; negatives allowed; omit to run last.** Only reorders tasks within the same login‑queue. See [Task priority](#task-priority). |
 
 <Tip>
 Defaults work great. Start with just `is_dedicated: true` and only raise the parallelism
@@ -86,7 +87,7 @@ fields once you actually need more concurrency.
   re‑login less often.
 - **Queue‑and‑return.** If there's no free capacity when your request arrives, the request is
   **accepted and queued** (not rejected, not blocked). It runs as soon as capacity frees up.
-  Requests for a given portal are served in **first‑in, first‑out** order.
+  Requests for a given login‑queue are served in **priority order** (lower number runs first; omitted priority runs last). Tasks with the same priority run **first‑in, first‑out**.
 
 ## Examples
 
@@ -210,6 +211,39 @@ If you route **different logins** onto the same queue, the container re‑logs�
 login changes between consecutive tasks — you trade away the "stay logged in" benefit for
 ordering/serialization control. Keep the same login on a queue to keep its session warm.
 </Warning>
+
+## Task priority
+
+By default tasks in a queue run **first‑in, first‑out**. Set `priority` to run an
+urgent task ahead of already‑queued ones without interrupting any currently running task.
+
+```bash
+curl -X POST https://inference-api.optexity.com/api/v1/inference \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_OPTEXITY_API_KEY" \
+  -d '{
+    "endpoint_name": "billing_portal",
+    "input_parameters": { "username": ["alice@example.com"] },
+    "unique_parameter_names": ["username"],
+    "is_dedicated": true,
+    "priority": -1
+  }'
+```
+
+| Priority value | Runs |
+| --- | --- |
+| Negative (e.g. `-5`, `-1`) | Before everything else (most urgent) |
+| `0` | After negatives, before positives |
+| Positive (e.g. `1`, `3`) | After zero, before omitted |
+| `null` / omitted | **Last** — default, preserves current FIFO behaviour |
+
+Ties within the same priority value break on arrival order (FIFO).
+
+**Key rules:**
+
+- **No preemption.** A currently‑running task is never interrupted; priority only reorders *waiting* tasks.
+- **Scope is per login‑queue.** A high‑priority task can only jump ahead of tasks in its own login‑queue — it never affects other users or other portals.
+- **Restart preserves priority.** Restarting a task re‑queues it with its original priority.
 
 ## Things to take special care of
 
