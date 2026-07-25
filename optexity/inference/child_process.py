@@ -27,6 +27,7 @@ from optexity.inference.core.logging import (
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.inference.infra.browser_health import consume_browser_restart_request
+from optexity.schema.automation import Automation
 from optexity.schema.enums import ExitCodes
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import SystemInfo
@@ -370,13 +371,45 @@ async def task_processor():
 
     while True:
         try:
-            # Get next task from queue (blocks until one is available);
-            # highest priority (lowest key) first, then FIFO.
             *_, task = await task_queue.get()
             if task.task_id in tasks_to_kill:
                 logger.info(f"Task {task.task_id} has been killed")
                 tasks_to_kill.remove(task.task_id)
                 continue
+
+            # Fetch fresh automation from server just before running so any
+            # workflow changes after allocation are picked up.
+            try:
+                recording_url = settings.GET_RECORDING_ENDPOINT.format(
+                    recording_id=task.recording_id
+                )
+                url = f"{settings.SERVER_URL.rstrip('/')}/{recording_url}"
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(
+                        url, headers={"x-api-key": task.api_key}
+                    )
+                    response.raise_for_status()
+                    fresh_automation = Automation.model_validate(
+                        response.json()["automation"]
+                    )
+                    task.automation = fresh_automation
+                    logger.info(
+                        f"Fetched fresh automation for task {task.task_id} "
+                        f"(recording {task.recording_id})"
+                    )
+            except Exception as fetch_err:
+                if task.automation is not None:
+                    logger.warning(
+                        f"Failed to fetch fresh automation for task {task.task_id}; "
+                        f"using in-memory fallback. Error: {fetch_err}"
+                    )
+                else:
+                    logger.error(
+                        f"Failed to fetch automation for task {task.task_id} and no "
+                        f"in-memory fallback available; skipping task. Error: {fetch_err}"
+                    )
+                    continue
+
             task_running = True
             last_task_start_time = datetime.now(timezone.utc)
             current_task_timeout_minutes = task.max_timeout_in_minutes
@@ -497,30 +530,36 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
         return {"completed": completed}
 
     @app.post("/kill_task")
-    async def kill_task(task_id: str = Body(...)):
-        """Kill task endpoint.
+    async def kill_task(task_ids: list[str] = Body(...)):
+        """Kill task endpoint (bulk).
 
-        - Adds task_id to tasks_to_kill so queued tasks are skipped by the
-          processor and a running worker's post-exit retry loop bails out.
-        - If a worker subprocess for this task is currently running, SIGKILL
-          its process group so the worker exits promptly.
+        Accepts a list of task IDs. For each:
+        - Adds to tasks_to_kill so queued tasks are skipped by the processor
+          and a running worker's post-exit retry loop bails out.
+        - SIGKILLs the worker subprocess if currently running.
         """
-        tasks_to_kill.add(task_id)
-        hitl_completed_tasks.discard(task_id)
-        proc = running_task_processes.get(task_id)
-        if proc is not None and proc.returncode is None:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                logger.info(f"Killed worker process group for task {task_id}")
-            except ProcessLookupError:
-                logger.info(
-                    f"Worker process group for task {task_id} was already gone; "
-                    "treating /kill_task as successful"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to kill worker process for task {task_id}: {e}")
+        for task_id in task_ids:
+            tasks_to_kill.add(task_id)
+            hitl_completed_tasks.discard(task_id)
+            proc = running_task_processes.get(task_id)
+            if proc is not None and proc.returncode is None:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    logger.info(f"Killed worker process group for task {task_id}")
+                except ProcessLookupError:
+                    logger.info(
+                        f"Worker process group for task {task_id} was already gone; "
+                        "treating /kill_task as successful"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to kill worker process for task {task_id}: {e}"
+                    )
         return JSONResponse(
-            content={"success": True, "message": "Task has been killed"},
+            content={
+                "success": True,
+                "message": f"Kill signal sent for {len(task_ids)} tasks",
+            },
             status_code=200,
         )
 
@@ -567,19 +606,20 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
         )
 
     @app.post("/allocate_task")
-    async def allocate_task(task: Task = Body(...)):
-        """Get details of a specific task."""
+    async def allocate_task(tasks: list[Task] = Body(...)):
+        """Bulk allocate tasks onto this child's local priority queue."""
         try:
-            _enqueue_task(task)
+            for task in tasks:
+                _enqueue_task(task)
             return JSONResponse(
                 content={
                     "success": True,
-                    "message": "Task has been allocated. Check its status and output at https://dashboard.optexity.com/tasks",
+                    "message": f"{len(tasks)} task(s) allocated. Check status at https://dashboard.optexity.com/tasks",
                 },
                 status_code=202,
             )
         except Exception as e:
-            logger.error(f"Error allocating task {task.task_id}: {e}")
+            logger.error(f"Error allocating tasks: {e}")
             return JSONResponse(
                 content={"success": False, "message": str(e)}, status_code=500
             )
