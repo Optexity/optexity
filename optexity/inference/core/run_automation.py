@@ -131,6 +131,7 @@ async def run_automation(
     cdp_url: str,
     max_tries: int = 1,
 ):
+    assert task.automation is not None, f"Task {task.task_id} has no automation"
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
 
