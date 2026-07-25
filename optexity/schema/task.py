@@ -93,7 +93,7 @@ class Task(BaseModel):
     recording_id: RecordingID
     endpoint_name: str
     version: str | None = None
-    automation: Automation
+    automation: Automation | None = None
     input_parameters: dict[str, list[str | int | float | bool]]
     secure_parameters: dict[str, list[SecureParameter]]
     rdp_parameter: RDPParameter | None = None
@@ -180,32 +180,34 @@ class Task(BaseModel):
                 json.dumps(self.unique_parameters, sort_keys=True) + self.user_id
             )
 
-        for a, b in [
-            (self.automation.parameters.input_parameters, self.input_parameters),
-            (self.automation.parameters.secure_parameters, self.secure_parameters),
-        ]:
-            if a.keys() != b.keys():
-                missing_keys = a.keys() - b.keys()
-                extra_keys = b.keys() - a.keys()
-                raise ValueError(
-                    f"Please provide exactly the same {a} as the automation. Missing keys: {missing_keys}, Extra keys: {extra_keys}"
-                )
+        if self.automation is not None:
+            for a, b in [
+                (self.automation.parameters.input_parameters, self.input_parameters),
+                (self.automation.parameters.secure_parameters, self.secure_parameters),
+            ]:
+                if a.keys() != b.keys():
+                    missing_keys = a.keys() - b.keys()
+                    extra_keys = b.keys() - a.keys()
+                    raise ValueError(
+                        f"Please provide exactly the same {a} as the automation. Missing keys: {missing_keys}, Extra keys: {extra_keys}"
+                    )
 
         return self
 
     @model_validator(mode="after")
     def validate_rdp_channel(self):
-        # browser_channel="rdp" runs in one of two modes:
-        #   * rdp_parameter set  -> RDP (xfreerdp) into a remote machine.
-        #   * rdp_parameter None -> open automation.url in a normal browser and
-        #     drive it via pyautogui (computer-use).
-        # The second mode needs a start URL to navigate to.
-        if self.automation.browser_channel == "rdp":
-            if self.rdp_parameter is None and not self.automation.url:
-                raise ValueError(
-                    "browser_channel='rdp' requires either an rdp_parameter "
-                    "(to RDP into a machine) or automation.url (to open in a browser)"
-                )
+        if self.automation is not None:
+            # browser_channel="rdp" runs in one of two modes:
+            #   * rdp_parameter set  -> RDP (xfreerdp) into a remote machine.
+            #   * rdp_parameter None -> open automation.url in a normal browser and
+            #     drive it via pyautogui (computer-use).
+            # The second mode needs a start URL to navigate to.
+            if self.automation.browser_channel == "rdp":
+                if self.rdp_parameter is None and not self.automation.url:
+                    raise ValueError(
+                        "browser_channel='rdp' requires either an rdp_parameter "
+                        "(to RDP into a machine) or automation.url (to open in a browser)"
+                    )
         return self
 
     @model_validator(mode="after")
