@@ -370,35 +370,44 @@ async def task_processor():
                 continue
 
             # Fetch fresh automation from server just before running so any
-            # workflow changes after allocation are picked up.
-            try:
-                recording_url = settings.GET_RECORDING_ENDPOINT.format(
-                    recording_id=task.recording_id
-                )
-                url = f"{settings.SERVER_URL.rstrip('/')}/{recording_url}"
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.get(
-                        url, headers={"x-api-key": task.api_key}
+            # workflow changes after allocation are picked up. Retry up to 3 times.
+            recording_url = settings.GET_RECORDING_ENDPOINT.format(
+                recording_id=task.recording_id
+            )
+            fetch_url = f"{settings.SERVER_URL.rstrip('/')}/{recording_url}"
+            fetch_success = False
+            for attempt in range(3):
+                try:
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        response = await client.get(
+                            fetch_url, headers={"x-api-key": task.api_key}
+                        )
+                        response.raise_for_status()
+                        fresh_automation = Automation.model_validate(
+                            response.json()["automation"]
+                        )
+                        task.automation = fresh_automation
+                        fetch_success = True
+                        logger.info(
+                            f"Fetched fresh automation for task {task.task_id} "
+                            f"(recording {task.recording_id})"
+                        )
+                        break
+                except Exception as fetch_err:
+                    logger.warning(
+                        f"Automation fetch attempt {attempt + 1}/3 failed for task "
+                        f"{task.task_id}: {fetch_err}"
                     )
-                    response.raise_for_status()
-                    fresh_automation = Automation.model_validate(
-                        response.json()["automation"]
-                    )
-                    task.automation = fresh_automation
-                    logger.info(
-                        f"Fetched fresh automation for task {task.task_id} "
-                        f"(recording {task.recording_id})"
-                    )
-            except Exception as fetch_err:
+            if not fetch_success:
                 if task.automation is not None:
                     logger.warning(
-                        f"Failed to fetch fresh automation for task {task.task_id}; "
-                        f"using in-memory fallback. Error: {fetch_err}"
+                        f"All automation fetch attempts failed for task {task.task_id}; "
+                        f"using in-memory fallback"
                     )
                 else:
                     logger.error(
-                        f"Failed to fetch automation for task {task.task_id} and no "
-                        f"in-memory fallback available; skipping task. Error: {fetch_err}"
+                        f"All automation fetch attempts failed for task {task.task_id} "
+                        f"and no in-memory fallback available; skipping task"
                     )
                     continue
 
