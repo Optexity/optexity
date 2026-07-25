@@ -122,6 +122,7 @@ async def restart_global_actual_browser(reason: str) -> None:
 
 
 async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int):
+    assert task.automation is not None, f"Task {task.task_id} has no automation"
     global _global_actual_browser
     system_info = SystemInfo()
     memory_exceeded = (
@@ -219,6 +220,7 @@ async def run_automation_in_process(
     logger.info(
         f"---------- Starting to run automation for task {task.task_id} ----------\n"
     )
+    assert task.automation is not None, f"Task {task.task_id} has no automation"
     worker_path = pathlib.Path(__file__).parent / "worker.py"
     total_attempts = max(1, int(task.automation.max_retries) + 1)
     returncode: int | None = None
