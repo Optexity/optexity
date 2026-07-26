@@ -417,9 +417,21 @@ async def task_processor():
                     )
                 else:
                     logger.error(
-                        f"All automation fetch attempts failed for task {task.task_id} "
-                        f"and no in-memory fallback available; skipping task"
+                        f"All automation fetch attempts failed for task {task.task_id}; "
+                        f"marking failed and firing callback"
                     )
+                    task.status = "failed"
+                    task.error = "Failed to fetch automation after 3 attempts"
+                    task.completed_at = datetime.now(timezone.utc)
+                    try:
+                        await complete_task_in_server(
+                            task, None, child_process_id, unique_child_arn
+                        )
+                        await initiate_callback(task)
+                    except Exception as fail_err:
+                        logger.error(
+                            f"Failed to report task {task.task_id} failure: {fail_err}"
+                        )
                     continue
 
             task_running = True
