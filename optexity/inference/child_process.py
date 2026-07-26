@@ -393,10 +393,21 @@ async def task_processor():
                             fetch_url, headers={"x-api-key": task.api_key}
                         )
                         response.raise_for_status()
-                        fresh_automation = Automation.model_validate(
-                            response.json()["automation"]
-                        )
-                        task.automation = fresh_automation
+                        data = response.json()
+                        task.automation = Automation.model_validate(data["automation"])
+                        # Use recording/workspace callback_url if no per-task override.
+                        if not task.task_callback_url and data.get("callback_url"):
+                            from optexity.schema.task import CallbackUrl
+
+                            try:
+                                task.callback_url = CallbackUrl.model_validate(
+                                    data["callback_url"]
+                                )
+                            except Exception as cb_err:
+                                logger.warning(
+                                    f"Failed to parse callback_url for task "
+                                    f"{task.task_id}: {cb_err}"
+                                )
                         fetch_success = True
                         logger.info(
                             f"Fetched fresh automation for task {task.task_id} "
