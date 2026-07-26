@@ -395,8 +395,15 @@ async def task_processor():
                         response.raise_for_status()
                         data = response.json()
                         task.automation = Automation.model_validate(data["automation"])
-                        # Use recording/workspace callback_url if no per-task override.
-                        if not task.task_callback_url and data.get("callback_url"):
+                        # Use recording/workspace callback_url only if no per-task
+                        # override exists on either field (task_callback_url takes
+                        # priority; task.callback_url may have been set via x-callback-url
+                        # header and must not be overwritten).
+                        if (
+                            task.callback_url is None
+                            and not task.task_callback_url
+                            and data.get("callback_url")
+                        ):
                             from optexity.schema.task import CallbackUrl
 
                             try:
