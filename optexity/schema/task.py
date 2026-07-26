@@ -87,6 +87,14 @@ class CallbackUrl(BaseModel):
         return self
 
 
+# Controls whether Task model validation creates local filesystem directories.
+# Set to False in server contexts (e.g. opcloud) where tasks are queued and
+# routed but never executed locally — the directories are only needed on child
+# workers just before a task actually runs. Skipping mkdir for 1000+ tasks
+# prevents 3000+ blocking syscalls from stalling the asyncio event loop.
+_CREATE_TASK_DIRS: bool = True
+
+
 class Task(BaseModel):
     task_id: TaskID
     user_id: UserID
@@ -216,11 +224,10 @@ class Task(BaseModel):
 
     @model_validator(mode="after")
     def set_dependent_paths(self):
-
-        self.logs_directory.mkdir(parents=True, exist_ok=True)
-        self.downloads_directory.mkdir(parents=True, exist_ok=True)
-        self.log_file_path.parent.mkdir(parents=True, exist_ok=True)
-
+        if _CREATE_TASK_DIRS:
+            self.logs_directory.mkdir(parents=True, exist_ok=True)
+            self.downloads_directory.mkdir(parents=True, exist_ok=True)
+            self.log_file_path.parent.mkdir(parents=True, exist_ok=True)
         return self
 
     def proxy_session_id(
