@@ -78,12 +78,11 @@ def get_equivalent_model(
 
 def _try_create_model(
     model_name: GeminiModels | HumanModels | OpenAIModels | AnthropicModels,
-    use_structured_output: bool,
 ) -> LLMModel | None:
     """Try to create a model. Returns instance on success, None on failure.
     Results are cached — successful models in _model_cache, failures in _failed_models.
     """
-    cache_key = (model_name, use_structured_output)
+    cache_key = model_name
 
     # Already cached
     if cache_key in _model_cache:
@@ -94,25 +93,23 @@ def _try_create_model(
         if isinstance(model_name, GeminiModels):
             from .gemini import Gemini
 
-            instance = Gemini(model_name, use_structured_output)
+            instance = Gemini(model_name)
 
         elif isinstance(model_name, OpenAIModels):
             from .openai import OpenAI
 
-            instance = OpenAI(model_name, use_structured_output)
+            instance = OpenAI(model_name)
 
         elif isinstance(model_name, AnthropicModels):
             from .anthropic import Anthropic
 
-            instance = Anthropic(model_name, use_structured_output)
+            instance = Anthropic(model_name)
 
         else:
             raise ValueError(f"Invalid model type: {model_name}")
 
         _model_cache[cache_key] = instance
-        logger.info(
-            f"Created model {model_name.value} (structured={use_structured_output})"
-        )
+        logger.info(f"Created model {model_name.value}")
         return instance
 
     except Exception as e:
@@ -122,26 +119,21 @@ def _try_create_model(
 
 def get_llm_model(
     model_name: GeminiModels | HumanModels | OpenAIModels | AnthropicModels,
-    use_structured_output: bool,
 ) -> LLMModel:
-    model = _try_create_model(model_name, use_structured_output)
+    model = _try_create_model(model_name)
     if model is not None:
         return model
-    raise ValueError(
-        f"Model {model_name.value} (structured={use_structured_output}) not available"
-    )
+    raise ValueError(f"Model {model_name.value} not available")
 
 
-def _get_first_fallback(
-    provider: str, model_name: str, use_structured_output: bool
-) -> LLMModel | None:
+def _get_first_fallback(provider: str, model_name: str) -> LLMModel | None:
     """Try fallback providers one by one, return the first that works."""
     for fallback_provider in FALLBACK_ORDER:
         if fallback_provider == provider:
             continue
         try:
             equiv = get_equivalent_model(model_name, fallback_provider)
-            fb_model = _try_create_model(equiv, use_structured_output)
+            fb_model = _try_create_model(equiv)
             if fb_model is not None:
                 logger.info(
                     f"Fallback: {provider}/{model_name} "
@@ -157,22 +149,20 @@ def _get_first_fallback(
     return None
 
 
-def get_llm_model_with_fallback(
-    provider: str, model_name: str, use_structured_output: bool
-) -> LLMModel:
+def get_llm_model_with_fallback(provider: str, model_name: str) -> LLMModel:
     """Get an LLMModel with one fallback for inference-time failures."""
     from .fallback import FallbackLLMModel
 
     model_enum = resolve_model_name(provider, model_name)
 
     # Try primary
-    primary = _try_create_model(model_enum, use_structured_output)
+    primary = _try_create_model(model_enum)
 
     if primary is not None:
         logger.info(f"Using primary model {provider}/{model_name}")
 
         # Try to add one fallback for inference-time safety
-        fallback = _get_first_fallback(provider, model_name, use_structured_output)
+        fallback = _get_first_fallback(provider, model_name)
         if fallback is not None:
             return FallbackLLMModel([primary, fallback])
         return primary
@@ -181,7 +171,7 @@ def get_llm_model_with_fallback(
     logger.warning(
         f"Primary model {provider}/{model_name} not available, trying fallbacks..."
     )
-    fallback = _get_first_fallback(provider, model_name, use_structured_output)
+    fallback = _get_first_fallback(provider, model_name)
     if fallback is not None:
         return fallback
 

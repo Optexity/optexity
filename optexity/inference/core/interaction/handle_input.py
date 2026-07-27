@@ -30,9 +30,7 @@ _input_text_prediction_cache: dict[tuple, InputTextPredictionAgent] = {}
 def _get_input_text_prediction_agent(task: Task) -> InputTextPredictionAgent:
     cache_key = (task.llm_provider, task.llm_model_name)
     if cache_key not in _input_text_prediction_cache:
-        model = get_llm_model_with_fallback(
-            task.llm_provider, task.llm_model_name, True
-        )
+        model = get_llm_model_with_fallback(task.llm_provider, task.llm_model_name)
         _input_text_prediction_cache[cache_key] = InputTextPredictionAgent(model)
     return _input_text_prediction_cache[cache_key]
 

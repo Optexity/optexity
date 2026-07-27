@@ -16,7 +16,7 @@ class FallbackLLMModel(LLMModel):
         if not models:
             raise ValueError("FallbackLLMModel requires at least one model")
         primary = models[0]
-        super().__init__(primary.model_name, primary.use_structured_output)
+        super().__init__(primary.model_name)
         self.models = models
 
     def get_model_response(
