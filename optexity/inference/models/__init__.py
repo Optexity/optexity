@@ -22,6 +22,7 @@ _MODEL_TIER_MAP: dict[str, str] = {
     "gpt-4.1": "pro",
     # Standard tier
     "gemini-2.5-flash": "standard",
+    "gemini-3.5-flash-lite": "standard",
     "claude-sonnet-4-6": "standard",
     "gpt-4.1-mini": "standard",
     "gpt-4o": "standard",
@@ -38,7 +39,7 @@ _TIER_DEFAULTS: dict[tuple[str, str], str] = {
     ("pro", "gemini"): "gemini-2.5-pro",
     ("pro", "anthropic"): "claude-opus-4-6",
     ("pro", "openai"): "gpt-4.1",
-    ("standard", "gemini"): "gemini-2.5-flash",
+    ("standard", "gemini"): "gemini-3.5-flash-lite",
     ("standard", "anthropic"): "claude-sonnet-4-6",
     ("standard", "openai"): "gpt-4.1-mini",
     ("light", "gemini"): "gemini-2.0-flash",

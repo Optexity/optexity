@@ -128,7 +128,7 @@ class Task(BaseModel):
     per_login_parallelism: int = 1
     company_id: CompanyID
     llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
-    llm_model_name: str = "gemini-2.5-flash"
+    llm_model_name: str = "gemini-3.5-flash-lite"
     # Optional queue priority: lower runs first, negatives allowed, None runs
     # last (see priority_order_key). Only orders tasks within the same login /
     # unique_parameters group; never across users.

@@ -24,6 +24,8 @@ _TOKENCOST_MODEL_MAP: dict[str, str] = {
     "gemini-3-flash-preview": "gemini-2.5-flash",
     "gemini-3.1-flash-lite-preview": "gemini-2.5-flash-lite",
     "gemini-3.1-pro-preview": "gemini-2.5-pro",
+    # Same per-token input/output pricing as gemini-2.5-flash.
+    "gemini-3.5-flash-lite": "gemini-2.5-flash",
 }
 
 
@@ -39,6 +41,7 @@ class GeminiModels(Enum):
     GEMINI_2_5_FLASH = "gemini-2.5-flash"
     GEMINI_2_5_FLASH_LITE = "gemini-2.5-flash-lite-preview-06-17"
     GEMINI_2_5_PRO = "gemini-2.5-pro"
+    GEMINI_3_5_FLASH_LITE = "gemini-3.5-flash-lite"
 
 
 @unique

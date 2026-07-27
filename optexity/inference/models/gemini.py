@@ -15,6 +15,17 @@ from .llm_model import GeminiModels, LLMModel, TokenUsage
 
 logger = logging.getLogger(__name__)
 
+# Gemini 3.x replaced the integer ``thinking_budget`` with a discrete
+# ``thinking_level``. There is no equivalent of ``thinking_budget=0``, so
+# ``minimal`` is the floor. Models older than 3.x are left on the SDK default.
+_GEMINI_3_THINKING_LEVEL = "minimal"
+
+
+def _thinking_config(model_value: str) -> dict[str, str] | None:
+    if model_value.startswith("gemini-3"):
+        return {"thinking_level": _GEMINI_3_THINKING_LEVEL}
+    return None
+
 
 class Gemini(LLMModel):
 
@@ -27,6 +38,13 @@ class Gemini(LLMModel):
             self.client.models.list()
         except Exception as e:
             raise ValueError("Invalid GOOGLE_API_KEY")
+
+    def _build_config(self, **overrides) -> dict:
+        config = dict(overrides)
+        thinking_config = _thinking_config(self.model_name.value)
+        if thinking_config is not None:
+            config["thinking_config"] = thinking_config
+        return config
 
     def _get_model_response_with_structured_output(
         self,
@@ -77,11 +95,11 @@ class Gemini(LLMModel):
                 response = self.client.models.generate_content(
                     model=self.model_name.value,
                     contents=final_prompt,
-                    config={
-                        "response_mime_type": "application/json",
-                        "system_instruction": system_instruction,
-                        "response_json_schema": response_schema.model_json_schema(),
-                    },
+                    config=self._build_config(
+                        response_mime_type="application/json",
+                        system_instruction=system_instruction,
+                        response_json_schema=response_schema.model_json_schema(),
+                    ),
                 )
 
                 if isinstance(response.parsed, BaseModel):
@@ -92,7 +110,7 @@ class Gemini(LLMModel):
                 response = self.client.models.generate_content(
                     model=self.model_name.value,
                     contents=final_prompt,
-                    config={"system_instruction": system_instruction},
+                    config=self._build_config(system_instruction=system_instruction),
                 )
 
                 parsed_response: BaseModel = self.parse_from_completion(
@@ -120,7 +138,7 @@ class Gemini(LLMModel):
         response = self.client.models.generate_content(
             model=self.model_name.value,
             contents=prompt,
-            config={"system_instruction": system_instruction},
+            config=self._build_config(system_instruction=system_instruction),
         )
         if response.usage_metadata is not None:
             token_usage = self.get_token_usage(

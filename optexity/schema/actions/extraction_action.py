@@ -129,7 +129,7 @@ class PDFExtraction(BaseModel):
     extraction_format: dict
     extraction_instructions: str
     llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
-    llm_model_name: str = "gemini-2.5-flash"
+    llm_model_name: str = "gemini-3.5-flash-lite"
 
     def build_model(self):
         return build_model(self.extraction_format)
@@ -189,7 +189,7 @@ class LocatorExtraction(BaseModel):
     extraction_format: dict
     extraction_instructions: str | None = None
     llm_provider: Literal["gemini"] = "gemini"
-    llm_model_name: str = "gemini-2.5-flash"
+    llm_model_name: str = "gemini-3.5-flash-lite"
 
     @model_validator(mode="after")
     def validate_variable_in_format(self):

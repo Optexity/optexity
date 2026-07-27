@@ -1,8 +1,9 @@
 import logging
 
-from browser_use import Agent, BrowserSession, ChatGoogle, Tools
+from browser_use import Agent, BrowserSession, Tools
 
 from optexity.inference.infra.browser import Browser
+from optexity.inference.models.chat_google import build_agent_llm
 from optexity.schema.actions.interaction_action import (
     AgenticTask,
     CloseOverlayPopupAction,
@@ -45,7 +46,7 @@ async def handle_agentic_task(
             )
         else:
             tools = Tools()
-        llm = ChatGoogle(model="gemini-2.5-flash")
+        llm = build_agent_llm()
         browser_session = BrowserSession(
             cdp_url=browser.cdp_url, keep_alive=agentic_task_action.keep_alive
         )
