@@ -1220,13 +1220,15 @@
             "id": "docs-building-automations-for-loop-node",
             "path": "docs/building-automations/for-loop-node.mdx",
             "title": "For Loop Node",
-            "summary": "Documents the for_loop_node for iterating over a list of values in automations. Covers the variable_name property, {variable[index]} substitution syntax, using multiple variables (comma-separated), reset_nodes for returning browser to a known state between iterations, and on_error_in_loop error handling (continue, break, raise). Also covers data source options and limitations (no nested loops, variable must be pre-populated).",
-            "gist": "for_loop_node: iterate a variable list, {var[index]} substitution, reset_nodes, error handling strategies.",
+            "summary": "Documents the for_loop_node for iterating over a list of values in automations. Covers the variable_name property, optional index_variable_name (default index), {variable[index]} / bare {index} / {index_of(var)} substitution, nested for_loop_node support, using multiple variables (comma-separated), reset_nodes for returning browser to a known state between iterations, and on_error_in_loop error handling (continue, break, raise). Also covers data source options and the requirement that loop variables be pre-populated.",
+            "gist": "for_loop_node: iterate a variable list, nested loops, index_variable_name, {var[index]} substitution, reset_nodes, error handling.",
             "keywords": [
                 "for_loop",
                 "loop",
                 "iteration",
                 "variable_name",
+                "index_variable_name",
+                "nested loop",
                 "reset_nodes",
                 "on_error_in_loop",
                 "continue",
@@ -1261,8 +1263,8 @@
                 "data_models": ["for_loop_node"]
             },
             "reading_priority": 3,
-            "when_to_use": "Select when the query is about iterating over a list in an automation, for_loop_node schema, reset_nodes, error handling within loops, or the {variable[index]} syntax.",
-            "embedding_hint": "for loop iteration variable list reset_nodes on_error_in_loop control flow"
+            "when_to_use": "Select when the query is about iterating over a list in an automation, nested for_loop_node, index_variable_name, reset_nodes, error handling within loops, or the {variable[index]} syntax.",
+            "embedding_hint": "for loop nested iteration index_variable_name variable list reset_nodes on_error_in_loop control flow"
         },
         {
             "id": "docs-building-automations-if-else-node",

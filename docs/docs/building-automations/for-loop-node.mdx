@@ -29,16 +29,17 @@ Use `for_loop_node` to repeat actions for each value in a list—processing sear
 
 ## Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `variable_name` | `str` | Parameter to iterate over |
-| `nodes` | `list[action_node \| if_else_node]` | Actions for each iteration |
-| `reset_nodes` | `list[action_node \| if_else_node]` | Actions to run after each iteration |
-| `on_error_in_loop` | `"continue" \| "break" \| "raise"` | Error handling behavior |
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `variable_name` | `str` | — | Parameter to iterate over |
+| `index_variable_name` | `str` | `"index"` | Placeholder name used in `{var[<name>]}` and bare `{<name>}` |
+| `nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | — | Actions for each iteration |
+| `reset_nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | `[]` | Actions to run after each iteration |
+| `on_error_in_loop` | `"continue" \| "break" \| "raise"` | `"raise"` | Error handling behavior |
 
-## The `index` Variable
+## The Index Variable
 
-Inside a loop, `{variable[index]}` references the current iteration's value:
+Inside a loop, `{variable[index]}` references the current iteration's value. The token `index` comes from `index_variable_name` (default `"index"`):
 
 ```
 order_ids = ["ORD-001", "ORD-002", "ORD-003"]
@@ -47,6 +48,14 @@ Iteration 1: {order_ids[index]} → "ORD-001"
 Iteration 2: {order_ids[index]} → "ORD-002"
 Iteration 3: {order_ids[index]} → "ORD-003"
 ```
+
+You can also use:
+
+| Pattern | Expands to |
+|---------|------------|
+| `{order_ids[index]}` | Current list value |
+| `{index_of(order_ids)}` | Current numeric index (`0`, `1`, …) |
+| `{index}` | Current numeric index (same as `index_of`, using `index_variable_name`) |
 
 ### Using Multiple Variables in a Loop
 
@@ -101,6 +110,47 @@ Then:
 - Iteration 1 uses `{primary_var[index]}` → `"Value A1"` and `{secondary_var[index]}` → `"Value B1"`
 - Iteration 2 uses `{primary_var[index]}` → `"Value A2"` and `{secondary_var[index]}` → `"Value B2"`
 
+## Nested Loops
+
+`for_loop_node` can contain another `for_loop_node`. Give each loop a distinct `index_variable_name` so the outer index stays usable inside the inner loop:
+
+```json
+{
+  "type": "for_loop_node",
+  "variable_name": "pages",
+  "index_variable_name": "page_i",
+  "nodes": [
+    {
+      "type": "for_loop_node",
+      "variable_name": "items",
+      "index_variable_name": "item_i",
+      "nodes": [
+        {
+          "type": "action_node",
+          "interaction_action": {
+            "click_element": {
+              "command": "get_by_text(\"{items[item_i]}\")",
+              "prompt_instructions": "Page {page_i} ({pages[page_i]}), item {item_i} ({items[item_i]})"
+            }
+          }
+        }
+      ],
+      "reset_nodes": [],
+      "on_error_in_loop": "raise"
+    }
+  ],
+  "reset_nodes": [],
+  "on_error_in_loop": "raise"
+}
+```
+
+| Omitted `index_variable_name`? | Behavior |
+|--------------------------------|----------|
+| Both loops use default `"index"` | `{pages[index]}` and `{items[index]}` still work. Bare `{index}` in the inner body is bound by the **outer** loop. Prefer `{index_of(items)}` for the inner numeric index, or set distinct names. |
+| Distinct names (`page_i`, `item_i`) | Outer and inner indexes can both be referenced clearly inside the innermost body. |
+
+The inner loop's list must already exist when that loop starts (for example, extract `items` inside the outer iteration before the inner `for_loop_node`).
+
 ## Data Sources
 
 Loop variables can come from:
@@ -135,7 +185,7 @@ For dynamic iteration, extract values first:
 
 ## Reset Nodes
 
-Actions that run **after each iteration** to return the browser to a known state. Essential for loops that navigate away from the starting page.
+Actions that run **after each iteration** to return the browser to a known state. Essential for loops that navigate away from the starting page. Reset nodes also receive the current iteration's placeholder bindings.
 
 ```json
 {
@@ -255,6 +305,5 @@ Use `"continue"` when some items may fail but you want to process as many as pos
 
 ## Limitations
 
-- Nested loops are not supported
 - Variable must be populated before loop execution
-- Only `action_node` and `if_else_node` allowed inside loops
+- Deep nesting is allowed; keep `index_variable_name` distinct per nesting level when you need both indexes

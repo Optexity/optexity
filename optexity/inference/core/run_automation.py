@@ -509,6 +509,56 @@ async def handle_if_else_node(
     memory.update_system_info()
 
 
+def _expand_for_loop_placeholders(
+    node,
+    variable_names: list[str],
+    index: int,
+    index_variable_name: str,
+):
+    """Bind loop placeholders for one iteration onto a deep-copied node.
+
+    Replacement order matters:
+    1. ``{var[<index_variable_name>]}`` → ``{var[<N>]}``
+    2. ``{index_of(primary)}`` → ``<N>``
+    3. bare ``{<index_variable_name>}`` → ``<N>`` (last, so it cannot
+       corrupt ``index_of(...)`` or ``{var[...]}`` patterns)
+    """
+    for variable_name in variable_names:
+        try:
+            node.replace(
+                f"{{{variable_name}[{index_variable_name}]}}",
+                f"{{{variable_name}[{index}]}}",
+            )
+        except Exception as e:
+            logger.error(
+                f"Error replacing variable {variable_name} in for loop node: {e}"
+            )
+            continue
+
+    node.replace(f"{{index_of({variable_names[0]})}}", f"{index}")
+    node.replace(f"{{{index_variable_name}}}", f"{index}")
+    return node
+
+
+async def _run_for_loop_child_node(
+    node,
+    memory: Memory,
+    task: Task,
+    browser: Browser,
+    full_automation: list,
+):
+    """Dispatch one expanded child of a for_loop_node (body or reset)."""
+    if isinstance(node, ForLoopNode):
+        await handle_for_loop_node(node, memory, task, browser, full_automation)
+    elif isinstance(node, IfElseNode):
+        await handle_if_else_node(node, memory, task, browser, full_automation)
+    elif isinstance(node, AssertLocatorNode):
+        await handle_assert_locator_node(node, memory, task, browser, full_automation)
+    else:
+        full_automation.append(node.model_dump())
+        await run_action_node(node, task, memory, browser)
+
+
 async def handle_for_loop_node(
     for_loop_node: ForLoopNode,
     memory: Memory,
@@ -526,46 +576,22 @@ async def handle_for_loop_node(
         raise ValueError(
             f"Variable name {primary_variable} not found in input variables or generated variables"
         )
+    variable_names = [name.strip() for name in for_loop_node.variable_name.split(",")]
+    index_variable_name = for_loop_node.index_variable_name
     memory.variables.for_loop_status.append([])
     for index in range(len(values)):
 
         try:
             for node in for_loop_node.nodes:
-                new_node = deepcopy(node)
-                # split variable names by comma
-                variable_names = for_loop_node.variable_name.split(",")
-                for variable_name in variable_names:
-                    try:
-                        new_node.replace(
-                            f"{{{variable_name}[index]}}",
-                            f"{{{variable_name}[{index}]}}",
-                        )
-                    except Exception as e:
-                        logger.error(
-                            f"Error replacing variable {variable_name} in for loop node: {e}"
-                        )
-                        continue
-
-                new_node.replace(f"{{index_of({variable_names[0]})}}", f"{index}")
-
-                if isinstance(new_node, IfElseNode):
-                    await handle_if_else_node(
-                        new_node, memory, task, browser, full_automation
-                    )
-
-                elif isinstance(new_node, AssertLocatorNode):
-                    await handle_assert_locator_node(
-                        new_node, memory, task, browser, full_automation
-                    )
-
-                else:
-                    full_automation.append(new_node.model_dump())
-                    await run_action_node(
-                        new_node,
-                        task,
-                        memory,
-                        browser,
-                    )
+                new_node = _expand_for_loop_placeholders(
+                    deepcopy(node),
+                    variable_names,
+                    index,
+                    index_variable_name,
+                )
+                await _run_for_loop_child_node(
+                    new_node, memory, task, browser, full_automation
+                )
             memory.variables.for_loop_status[-1].append(
                 ForLoopStatus(
                     variable_name=for_loop_node.variable_name,
@@ -606,24 +632,17 @@ async def handle_for_loop_node(
 
         if index < len(values) - 1:
             for node in for_loop_node.reset_nodes:
-                if isinstance(node, IfElseNode):
-                    await handle_if_else_node(
-                        node, memory, task, browser, full_automation
-                    )
-
-                elif isinstance(node, AssertLocatorNode):
-                    await handle_assert_locator_node(
-                        node, memory, task, browser, full_automation
-                    )
-
-                else:
-                    full_automation.append(node.model_dump())
-                    await run_action_node(
-                        node,
-                        task,
-                        memory,
-                        browser,
-                    )
+                # Reset nodes also get the current iteration's placeholders
+                # bound so they can reference the item that just finished.
+                new_node = _expand_for_loop_placeholders(
+                    deepcopy(node),
+                    variable_names,
+                    index,
+                    index_variable_name,
+                )
+                await _run_for_loop_child_node(
+                    new_node, memory, task, browser, full_automation
+                )
     memory.update_system_info()
 
 

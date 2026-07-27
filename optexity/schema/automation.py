@@ -246,22 +246,48 @@ class ActionNode(BaseModel):
 
 
 class ForLoopNode(BaseModel):
-    # Loops through range of values of {variable_name[index]}
+    # Loops through range of values of {variable_name[<index_variable_name>]}
     type: Literal["for_loop_node"]
     variable_name: str
+    # Placeholder name used in {var[<name>]} / bare {<name>}. Defaults to
+    # "index" for backward compatibility. Use distinct names when nesting loops
+    # so the outer index remains addressable inside the inner loop.
+    index_variable_name: str = "index"
     nodes: list[
         Annotated[
-            ActionNode | IfElseNodeRef | AssertLocatorNodeRef,
+            ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef,
             Field(discriminator="type"),
         ]
     ]
     reset_nodes: list[
         Annotated[
-            ActionNode | IfElseNodeRef | AssertLocatorNodeRef,
+            ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef,
             Field(discriminator="type"),
         ]
     ] = []
     on_error_in_loop: Literal["continue", "break", "raise"] = "raise"
+
+    @model_validator(mode="after")
+    def validate_index_variable_name(self):
+        name = self.index_variable_name
+        if not name or not name.isidentifier():
+            raise ValueError(
+                f"index_variable_name {name!r} must be a valid Python identifier"
+            )
+        if name == "index_of":
+            raise ValueError(
+                "index_variable_name cannot be 'index_of' (reserved for "
+                "{index_of(variable)} placeholders)"
+            )
+        loop_vars = {
+            part.strip() for part in self.variable_name.split(",") if part.strip()
+        }
+        if name in loop_vars:
+            raise ValueError(
+                f"index_variable_name {name!r} must not match a name in "
+                f"variable_name {self.variable_name!r}"
+            )
+        return self
 
     def replace(self, pattern: str, replacement: str | int | float | bool | None):
         """Recursively replace placeholders in loop body/reset nodes.
@@ -283,8 +309,10 @@ class ForLoopNode(BaseModel):
 
     @model_validator(mode="before")
     def migrate_old_nodes(cls, data: dict[str, Any]):
-        for key in ["nodes"]:
+        for key in ["nodes", "reset_nodes"]:
             raw_nodes = data.get(key, [])
+            if not raw_nodes:
+                continue
             new_nodes = []
             used_old_format = False
 
