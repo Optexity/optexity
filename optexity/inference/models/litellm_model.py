@@ -9,7 +9,7 @@ import httpx
 import litellm
 from pydantic import BaseModel
 
-from optexity.utils.settings import settings
+from optexity.utils.llm_settings import llm_settings
 from optexity.utils.utils import is_local_path, is_url
 
 from .llm_model import LLMModel, TokenUsage
@@ -53,7 +53,7 @@ def _resolve_api_key(model: str) -> str | None:
     Special case: litellm reads GEMINI_API_KEY for the gemini/ route, but this
     codebase and both opcloud deploy paths set GOOGLE_API_KEY.
     """
-    key = settings.llm_api_key_for(model)
+    key = llm_settings.llm_api_key_for(model)
     if key:
         return key
     if model.startswith("gemini/"):
@@ -122,7 +122,7 @@ class LiteLLMModel(LLMModel):
         into each fallback — leaving it out would send the primary provider's key
         to the fallback provider.
         """
-        model = settings.LLM_MODEL_FALLBACK
+        model = llm_settings.LLM_MODEL_FALLBACK
         if not model or model == self.model_name:
             return []
         return [{"model": model, "api_key": _resolve_api_key(model)}]

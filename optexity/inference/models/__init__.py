@@ -1,6 +1,6 @@
 import logging
 
-from optexity.utils.settings import settings
+from optexity.utils.llm_settings import llm_settings
 
 from .litellm_model import LiteLLMModel
 from .llm_model import LLMModel
@@ -17,7 +17,7 @@ def normalize_model(provider: str | None, model_name: str | None) -> str:
     `llm_model_name` is preferred — but existing workflow JSON still sets it.
     """
     if not model_name:
-        return settings.LLM_MODEL
+        return llm_settings.LLM_MODEL
     if "/" in model_name:
         return model_name
     if provider:
@@ -36,5 +36,5 @@ def get_llm_model(model_name: str, use_structured_output: bool) -> LLMModel:
 def get_llm_model_with_fallback(
     provider: str | None, model_name: str | None, use_structured_output: bool
 ) -> LLMModel:
-    """Fallback is handled inside litellm via settings.LLM_MODEL_FALLBACK."""
+    """Fallback is handled inside litellm via llm_settings.LLM_MODEL_FALLBACK."""
     return get_llm_model(normalize_model(provider, model_name), use_structured_output)
