@@ -1,0 +1,118 @@
+---
+title: Model Configuration
+description: Choose the LLM provider and model your automations run on
+---
+
+Point Optexity at any LLM — Gemini, Claude, GPT, or a self-hosted endpoint — by setting one environment variable. Every LLM call routes through [LiteLLM](https://docs.litellm.ai/docs/providers), so any model LiteLLM supports works without code changes.
+
+## Environment Variables
+
+| Variable | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `LLM_MODEL` | `str` | `gemini/gemini-2.5-flash` | Primary model for every LLM call |
+| `LLM_MODEL_API_KEY` | `str \| None` | `None` | API key for `LLM_MODEL` |
+| `LLM_MODEL_FALLBACK` | `str \| None` | `None` | Model used when the primary call fails |
+| `LLM_MODEL_FALLBACK_API_KEY` | `str \| None` | `None` | API key for `LLM_MODEL_FALLBACK` |
+
+```bash
+LLM_MODEL=anthropic/claude-sonnet-4-6
+LLM_MODEL_API_KEY=YOUR_ANTHROPIC_API_KEY
+
+LLM_MODEL_FALLBACK=openai/gpt-4.1-mini
+LLM_MODEL_FALLBACK_API_KEY=YOUR_OPENAI_API_KEY
+```
+
+The primary and fallback models can live on different providers, each with its own key. Omit a key and LiteLLM reads the provider's own environment variable instead (`GEMINI_API_KEY` / `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, ...).
+
+## Model Strings
+
+Write models as `provider/model`:
+
+| Model String | Provider |
+| ------------ | -------- |
+| `gemini/gemini-2.5-flash` | Google Gemini (default) |
+| `gemini/gemini-2.5-pro` | Google Gemini |
+| `anthropic/claude-sonnet-4-6` | Anthropic |
+| `anthropic/claude-haiku-4-5-20251001` | Anthropic |
+| `openai/gpt-4.1-mini` | OpenAI |
+| `bedrock/anthropic.claude-sonnet-4-20250514-v1:0` | AWS Bedrock |
+
+See the [LiteLLM provider list](https://docs.litellm.ai/docs/providers) for the full set of supported prefixes.
+
+<Tip>
+Always include the provider prefix. A bare name like `gemini-2.5-flash` is passed to LiteLLM as-is and may resolve to a different provider than you expect.
+</Tip>
+
+## Resolution Order
+
+The model for any given LLM call is resolved from the most specific setting available:
+
+| Priority | Source | Example |
+| -------- | ------ | ------- |
+| 1 | Action-level `llm_model_name` | `extraction_action.llm.llm_model_name` |
+| 2 | Task-level `llm_model_name` | Top-level field on the automation |
+| 3 | `LLM_MODEL` environment variable | `gemini/gemini-2.5-flash` |
+
+### Task-Level Override
+
+Set the model once for the whole automation:
+
+```json
+{
+  "llm_model_name": "anthropic/claude-sonnet-4-6",
+  "nodes": []
+}
+```
+
+### Action-Level Override
+
+Give a single action a stronger (or cheaper) model than the rest of the automation:
+
+```json
+{
+  "type": "action_node",
+  "extraction_action": {
+    "llm": {
+      "extraction_format": { "invoice_total": "str" },
+      "extraction_instructions": "Read the invoice total from the summary table.",
+      "llm_model_name": "gemini/gemini-2.5-pro"
+    }
+  }
+}
+```
+
+Actions that accept `llm_model_name`: `extraction_action.llm`, `extraction_action.pdf`, `extraction_action.locator`, `misc_action.llm_query`, and `interaction_action.captcha`.
+
+<Info>
+Captcha solving is the one exception to the resolution order — `interaction_action.captcha` defaults to `gemini/gemini-2.5-pro` rather than falling through to `LLM_MODEL`, because captcha grids need a stronger vision model. Override `llm_model_name` on the action to change it.
+</Info>
+
+## Fallbacks
+
+When `LLM_MODEL_FALLBACK` is set, a failed primary call is retried once on the fallback model before the action errors. Each model uses its own key, so the fallback can be on a completely different provider — useful for surviving a single provider's rate limits or outages.
+
+```bash
+LLM_MODEL=gemini/gemini-2.5-flash
+LLM_MODEL_API_KEY=YOUR_GEMINI_API_KEY
+
+LLM_MODEL_FALLBACK=anthropic/claude-haiku-4-5-20251001
+LLM_MODEL_FALLBACK_API_KEY=YOUR_ANTHROPIC_API_KEY
+```
+
+Fallbacks apply to the environment-level models only. A per-task or per-action `llm_model_name` overrides the primary model; the same `LLM_MODEL_FALLBACK` still backs it up.
+
+## Cost Tracking
+
+Token usage and cost are reported per task from LiteLLM's pricing data. Reasoning and tool-use tokens are already counted inside completion tokens, so they are reported but never billed twice. If a model has no pricing entry in LiteLLM, tokens are still tracked and cost is reported as `0`.
+
+## Migrating from `llm_provider`
+
+`llm_provider` is deprecated. Existing automations that set it keep working — the provider and model are joined into a LiteLLM string — but new automations should use a single prefixed `llm_model_name`.
+
+| Before | After |
+| ------ | ----- |
+| `"llm_provider": "gemini", "llm_model_name": "gemini-2.5-flash"` | `"llm_model_name": "gemini/gemini-2.5-flash"` |
+| `"llm_provider": "anthropic", "llm_model_name": "claude-sonnet-4-6"` | `"llm_model_name": "anthropic/claude-sonnet-4-6"` |
+| `"llm_provider": "openai", "llm_model_name": "gpt-4.1-mini"` | `"llm_model_name": "openai/gpt-4.1-mini"` |
+
+The provider is no longer restricted to `gemini`, `anthropic`, or `openai` — any LiteLLM prefix is accepted.

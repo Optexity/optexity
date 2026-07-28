@@ -68,7 +68,8 @@
                             "/docs/advanced/two-fa-integration",
                             "/docs/advanced/totp-integration",
                             "/docs/advanced/orchestration",
-                            "/docs/advanced/proxy-setup"
+                            "/docs/advanced/proxy-setup",
+                            "/docs/advanced/model-configuration"
                         ]
                     },
                     {

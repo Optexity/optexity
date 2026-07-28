@@ -68,9 +68,20 @@ optexity install-browsers
 ## Set required environment variables:
 
 ```bash
-OPTEXITY_API_KEY=YOUR_OPTEXITY_API_KEY           # API key used for authenticated requests
+OPTEXITY_API_KEY=YOUR_OPTEXITY_API_KEY  # API key used for authenticated requests
 GOOGLE_API_KEY=YOUR_GOOGLE_API_KEY      # API key used for Google Gemini
 DEPLOYMENT=dev                          # or "prod" in production
 ```
 
 You can get your free Google Gemini API key from the [Google AI Studio Console](https://aistudio.google.com).
+
+### Using a Different LLM
+
+Optexity defaults to `gemini/gemini-2.5-flash`, but runs on any model [LiteLLM](https://docs.litellm.ai/docs/providers) supports. Set `LLM_MODEL` with its own key:
+
+```bash
+LLM_MODEL=anthropic/claude-sonnet-4-6
+LLM_MODEL_API_KEY=YOUR_ANTHROPIC_API_KEY
+```
+
+See [Model Configuration](/docs/advanced/model-configuration) for fallbacks, per-task overrides, and the full list of settings.

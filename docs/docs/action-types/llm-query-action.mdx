@@ -18,8 +18,8 @@ description: Run a direct LLM query without browser context
 | `output_format` | `dict` | Required | Expected output structure as a type-annotated dict |
 | `prompt_instructions` | `str` | Required | The full prompt to send to the LLM |
 | `output_variable_names` | `list[str] \| None` | `None` | Promote response fields to `generated_variables` |
-| `llm_provider` | `"gemini" \| "anthropic" \| "openai"` | `"gemini"` | LLM provider |
-| `llm_model_name` | `str` | `"gemini-2.5-flash"` | Model name |
+| `llm_model_name` | `str \| None` | `None` | LiteLLM model string, e.g. `"gemini/gemini-2.5-pro"`. Falls back to the task model, then `LLM_MODEL` |
+| `llm_provider` | `str \| None` | `None` | Deprecated — prefix the provider in `llm_model_name` instead |
 
 ## JSON Example
 
@@ -98,15 +98,18 @@ Set `output_variable_names` to promote response fields into `generated_variables
 Every key in `output_variable_names` must appear in `output_format`. Validation fails at schema load time if a key is missing.
 </Warning>
 
-## Choosing a Provider and Model
+## Choosing a Model
 
-| Provider | Models | Notes |
-|----------|--------|-------|
-| `gemini` | `gemini-2.5-flash`, `gemini-2.5-pro` | Default; cost-effective |
-| `anthropic` | `claude-sonnet-4-6`, `claude-haiku-4-5-20251001` | Strong reasoning |
-| `openai` | `gpt-4o`, `gpt-4o-mini` | OpenAI models |
+Set `llm_model_name` to any LiteLLM model string:
 
-If `llm_provider` and `llm_model_name` are omitted, the task-level defaults are used.
+| Model | Notes |
+|-------|-------|
+| `gemini/gemini-2.5-flash` | Default; cost-effective |
+| `gemini/gemini-2.5-pro` | Harder reasoning over extracted data |
+| `anthropic/claude-sonnet-4-6` | Strong reasoning |
+| `openai/gpt-4.1-mini` | OpenAI models |
+
+Omit `llm_model_name` to use the task model, which itself falls back to the `LLM_MODEL` environment variable. See [Model Configuration](/docs/advanced/model-configuration).
 
 ## LLM Query vs LLM Extraction
 

@@ -480,7 +480,8 @@
                 "classify",
                 "transform",
                 "llm_provider",
-                "llm_model_name"
+                "llm_model_name",
+                "litellm"
             ],
             "document_type": "guide",
             "tags": ["action-types", "llm", "misc-action", "structured-output", "classification"],
@@ -490,6 +491,10 @@
                     {
                         "doc_id": "docs-action-types-extraction-action",
                         "context": "extraction_action.llm is the browser-context counterpart to llm_query"
+                    },
+                    {
+                        "doc_id": "docs-advanced-model-configuration",
+                        "context": "Model selection and llm_model_name resolution order are documented there."
                     }
                 ],
                 "referenced_by": []
@@ -967,6 +972,58 @@
             "embedding_hint": "proxy PROXY_URL Webshare Oxylabs use_proxy configuration"
         },
         {
+            "id": "docs-advanced-model-configuration",
+            "path": "docs/advanced/model-configuration.mdx",
+            "title": "Model Configuration",
+            "summary": "Explains how to choose the LLM that powers an automation. Every LLM call routes through LiteLLM, so any supported provider works. Covers the LLM_MODEL, LLM_MODEL_API_KEY, LLM_MODEL_FALLBACK and LLM_MODEL_FALLBACK_API_KEY environment variables, the provider/model string format, the action -> task -> LLM_MODEL resolution order, per-task and per-action llm_model_name overrides, cross-provider fallbacks, the gemini/gemini-2.5-pro captcha default, LiteLLM-based cost tracking, and migrating off the deprecated llm_provider field.",
+            "gist": "Pick the LLM via LLM_MODEL (LiteLLM strings), override per task or per action with llm_model_name, and configure a cross-provider fallback.",
+            "keywords": [
+                "LLM_MODEL",
+                "LLM_MODEL_API_KEY",
+                "LLM_MODEL_FALLBACK",
+                "LLM_MODEL_FALLBACK_API_KEY",
+                "litellm",
+                "llm_model_name",
+                "llm_provider",
+                "model",
+                "fallback",
+                "gemini",
+                "anthropic",
+                "openai",
+                "cost",
+                "token usage"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "llm", "configuration", "models", "cost"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-local-setup",
+                        "context": "Local setup defines the base environment variables this page extends."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-action-types-llm-query-action",
+                        "context": "llm_query defers model selection to this page."
+                    },
+                    {
+                        "doc_id": "docs-action-types-extraction-action",
+                        "context": "LLM and locator extraction defer model selection to this page."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["LiteLLM", "Google Gemini", "Anthropic", "OpenAI", "AWS Bedrock"],
+                "apis": [],
+                "data_models": ["Task", "LLMAction", "CaptchaAction"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about which LLM an automation uses, switching provider or model, setting LLM_MODEL or an API key, configuring a fallback model, LLM cost or token pricing, or migrating from llm_provider to a prefixed llm_model_name.",
+            "embedding_hint": "LLM model configuration litellm LLM_MODEL fallback api key provider gemini anthropic openai cost"
+        },
+        {
             "id": "docs-advanced-timing-retries",
             "path": "docs/advanced/timing-retries.mdx",
             "title": "Timing and Retries",
@@ -1329,13 +1386,14 @@
             "id": "docs-building-automations-local-setup",
             "path": "docs/building-automations/local-setup.mdx",
             "title": "Local Setup",
-            "summary": "Step-by-step guide for setting up the Optexity development environment locally. Covers creating an account at dashboard.optexity.com, obtaining an API key, installing the Chrome Recorder Extension, prerequisites (Python 3.11+, Git), creating a conda/venv environment, installing Optexity via PyPI or source, and setting required environment variables (OPTEXITY_API_KEY, GOOGLE_API_KEY, DEPLOYMENT).",
+            "summary": "Step-by-step guide for setting up the Optexity development environment locally. Covers creating an account at dashboard.optexity.com, obtaining an API key, installing the Chrome Recorder Extension, prerequisites (Python 3.11+, Git), creating a conda/venv environment, installing Optexity via PyPI or source, setting required environment variables (OPTEXITY_API_KEY, GOOGLE_API_KEY, DEPLOYMENT), and pointing Optexity at a non-default LLM with LLM_MODEL.",
             "gist": "Local dev setup: account, API key, recorder extension, Python 3.11 env, pip install, env vars.",
             "keywords": [
                 "local setup",
                 "installation",
                 "OPTEXITY_API_KEY",
                 "GOOGLE_API_KEY",
+                "LLM_MODEL",
                 "conda",
                 "pip install optexity",
                 "recorder extension",
@@ -1346,7 +1404,12 @@
             "tags": ["getting-started", "setup", "installation", "environment"],
             "relationships": {
                 "depends_on": [],
-                "references": [],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-model-configuration",
+                        "context": "Local setup links here for choosing a non-default LLM."
+                    }
+                ],
                 "referenced_by": [
                     {
                         "doc_id": "docs-building-automations-quickstart",
