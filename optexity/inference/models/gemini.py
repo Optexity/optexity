@@ -141,9 +141,15 @@ class Gemini(LLMModel):
             config=self._build_config(system_instruction=system_instruction),
         )
         if response.usage_metadata is not None:
+            # ``candidates_token_count`` excludes thinking tokens, so
+            # ``thoughts_token_count`` has to be reported separately or the cost
+            # is undercounted (it is billed at the output rate).
             token_usage = self.get_token_usage(
                 input_tokens=response.usage_metadata.prompt_token_count,
                 output_tokens=response.usage_metadata.candidates_token_count,
+                tool_use_tokens=response.usage_metadata.tool_use_prompt_token_count,
+                thoughts_tokens=response.usage_metadata.thoughts_token_count,
+                total_tokens=response.usage_metadata.total_token_count,
             )
         else:
             token_usage = TokenUsage()
