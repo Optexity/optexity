@@ -1,5 +1,3 @@
-from typing import Literal
-
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -7,8 +5,10 @@ class CaptchaAction(BaseModel):
     locator: str
     secondary_locator: str | None = None
     wait_time: float = 2.0  # Seconds to wait after trigger click for captcha to appear
-    llm_provider: Literal["gemini"] = "gemini"
-    llm_model_name: str = "gemini-2.5-pro"
+    # Captcha grids need a stronger model than the task default, so this one
+    # keeps an explicit default rather than falling through to settings.LLM_MODEL.
+    llm_provider: str | None = None
+    llm_model_name: str = "gemini/gemini-2.5-pro"
 
     config: dict = Field(
         default_factory=lambda: {

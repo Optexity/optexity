@@ -128,8 +128,8 @@ class PDFExtraction(BaseModel):
     filename: str
     extraction_format: dict
     extraction_instructions: str
-    llm_provider: Literal["gemini", "anthropic", "openai"] = "gemini"
-    llm_model_name: str = "gemini-2.5-flash"
+    llm_provider: str | None = None
+    llm_model_name: str | None = None
 
     def build_model(self):
         return build_model(self.extraction_format)
@@ -188,8 +188,8 @@ class LocatorExtraction(BaseModel):
     output_variable_name: str | None = None
     extraction_format: dict
     extraction_instructions: str | None = None
-    llm_provider: Literal["gemini"] = "gemini"
-    llm_model_name: str = "gemini-2.5-flash"
+    llm_provider: str | None = None
+    llm_model_name: str | None = None
 
     @model_validator(mode="after")
     def validate_variable_in_format(self):

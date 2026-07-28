@@ -30,13 +30,14 @@ dependencies = [
     "browser_use_sdk",
 
     # misc runtime deps
-    "tokencost",
     "onepassword-sdk",
     "boto3",
 
     # llm clients
-    "anthropic",
-    "openai",
+    # Capped at <1.81: litellm 1.81+ requires openai>=2.20, but
+    # optexity-browser-use pins openai<2.0.0. Bumping that fork's pin to
+    # <3.0.0 would let this move to the latest litellm.
+    "litellm>=1.80,<1.81",
 ]
 
 [project.optional-dependencies]
