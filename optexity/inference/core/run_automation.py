@@ -43,6 +43,7 @@ from optexity.inference.core.run_misc import (
 from optexity.inference.core.run_python_script import run_python_script_action
 from optexity.inference.core.variable_resolver import resolve_api_variables_in_node
 from optexity.inference.infra.browser import Browser
+from optexity.inference.models import normalize_model
 from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
 from optexity.schema.automation import (
     ActionNode,
@@ -99,7 +100,11 @@ async def run_automation(
         memory.update_system_info()
 
         def _get_browser():
-            return Browser(memory=memory, cdp_url=cdp_url)
+            return Browser(
+                memory=memory,
+                cdp_url=cdp_url,
+                llm_model=normalize_model(task.llm_provider, task.llm_model_name),
+            )
 
         browser = _get_browser()
         memory.update_system_info()

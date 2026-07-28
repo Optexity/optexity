@@ -1,7 +1,6 @@
 import base64
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -9,7 +8,7 @@ import httpx
 import litellm
 from pydantic import BaseModel
 
-from optexity.utils.llm_settings import llm_settings
+from optexity.utils.llm_settings import llm_settings, resolve_llm_api_key
 from optexity.utils.utils import is_local_path, is_url
 
 from .llm_model import LLMModel, TokenUsage
@@ -47,18 +46,45 @@ def _restore_schema_keys(obj):
     return obj
 
 
-def _resolve_api_key(model: str) -> str | None:
-    """The configured key for this model; otherwise the provider's own env var.
+# Gemini 3.x thinks by default. litellm has no thinking_level support, so this
+# goes through reasoning_effort, which it maps to a thinkingBudget: "minimal" is
+# 128 tokens and "disable"/"none" are 0, which Gemini 3.x rejects with a 400.
+# 128 is therefore the floor.
+_GEMINI_3_REASONING_EFFORT = "minimal"
 
-    Special case: litellm reads GEMINI_API_KEY for the gemini/ route, but this
-    codebase and both opcloud deploy paths set GOOGLE_API_KEY.
+
+def reasoning_effort_for(model: str) -> str | None:
+    """The reasoning_effort to force on a model, or None to leave it unset.
+
+    Scoped to gemini-3* on purpose. litellm turns reasoning_effort into
+    per-provider thinking config, and "minimal" becomes budget_tokens=128 on
+    Anthropic — under its 1024 floor, so it would 400 every Claude call. Gemini
+    2.x is left on the SDK default, as it was before 3.x became the default.
     """
-    key = llm_settings.llm_api_key_for(model)
-    if key:
-        return key
-    if model.startswith("gemini/"):
-        return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if model.split("/")[-1].startswith("gemini-3"):
+        return _GEMINI_3_REASONING_EFFORT
     return None
+
+
+def litellm_fallbacks(model: str) -> list[dict[str, Any]]:
+    """LLM_MODEL_FALLBACK as a litellm dict so it carries its own api_key.
+
+    Rebuilt on every call: litellm pops "model" off these dicts. api_key and
+    reasoning_effort are always set, even to None, because litellm merges the
+    primary call's kwargs into each fallback — leaving them out would send the
+    primary provider's key, and a Gemini-shaped reasoning_effort, to a fallback
+    on a different provider.
+    """
+    fallback = llm_settings.LLM_MODEL_FALLBACK
+    if not fallback or fallback == model:
+        return []
+    return [
+        {
+            "model": fallback,
+            "api_key": resolve_llm_api_key(fallback),
+            "reasoning_effort": reasoning_effort_for(fallback),
+        }
+    ]
 
 
 def _pdf_to_base64(pdf_url: str | Path) -> str:
@@ -114,29 +140,17 @@ class LiteLLMModel(LLMModel):
         messages.append({"role": "user", "content": content})
         return messages
 
-    def _fallbacks(self) -> list[dict[str, Any]]:
-        """LLM_MODEL_FALLBACK as a litellm dict so it carries its own api_key.
-
-        Rebuilt on every call: litellm pops "model" off these dicts. api_key is
-        always set, even to None, because litellm merges the primary call's kwargs
-        into each fallback — leaving it out would send the primary provider's key
-        to the fallback provider.
-        """
-        model = llm_settings.LLM_MODEL_FALLBACK
-        if not model or model == self.model_name:
-            return []
-        return [{"model": model, "api_key": _resolve_api_key(model)}]
-
     def _completion(self, messages: list[dict[str, Any]], **kwargs):
-        fallbacks = self._fallbacks()
+        fallbacks = litellm_fallbacks(self.model_name)
         if fallbacks:
             # litellm only routes through its fallback path when this is present,
             # and that path hops to a worker thread — skip it when unconfigured.
             kwargs["fallbacks"] = fallbacks
+        kwargs.setdefault("reasoning_effort", reasoning_effort_for(self.model_name))
         return litellm.completion(
             model=self.model_name,
             messages=messages,
-            api_key=_resolve_api_key(self.model_name),
+            api_key=resolve_llm_api_key(self.model_name),
             # LLMModel.get_model_response already retries 3x; letting litellm retry
             # too would multiply that out to 9 attempts.
             num_retries=0,

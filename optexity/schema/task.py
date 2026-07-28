@@ -127,7 +127,7 @@ class Task(BaseModel):
     max_parallelism: int = 1
     per_login_parallelism: int = 1
     company_id: CompanyID
-    # Any litellm model string, e.g. "gemini/gemini-2.5-flash" or
+    # Any litellm model string, e.g. "gemini/gemini-3.5-flash-lite" or
     # "anthropic/claude-sonnet-4-6". Unset falls through to settings.LLM_MODEL.
     # llm_provider is deprecated — prefer a "provider/model" llm_model_name — but
     # is still honored so existing workflow JSON keeps working.

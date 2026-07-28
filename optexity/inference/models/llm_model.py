@@ -6,11 +6,52 @@ from pathlib import Path
 from typing import Optional
 
 import litellm
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from optexity.schema.token_usage import TokenUsage
 
 logger = logging.getLogger(__name__)
+
+
+def extract_json_objects(text: str) -> list[str]:
+    stack = []  # Stack to track `{` positions
+    json_candidates = []  # Potential JSON substrings
+
+    # Iterate through the text to find balanced { }
+    for i, char in enumerate(text):
+        if char == "{":
+            stack.append(i)  # Store index of '{'
+        elif char == "}" and stack:
+            start = stack.pop()  # Get the last unmatched '{'
+            json_candidates.append(text[start : i + 1])  # Extract substring
+
+    return json_candidates
+
+
+def parse_json_from_completion(
+    content: str, response_schema: type[BaseModel]
+) -> BaseModel:
+    """Recover a schema instance from a completion that isn't clean JSON.
+
+    Covers providers that wrap JSON in markdown fences or prose, and those that
+    drop `response_format` altogether.
+    """
+    patterns = [r"```json\n(.*?)\n```"]
+    json_blocks = []
+    for pattern in patterns:
+        json_blocks += re.findall(pattern, content, re.DOTALL)
+    json_blocks += extract_json_objects(content)
+    for block in json_blocks:
+        block = block.strip()
+        try:
+            return response_schema.model_validate_json(block)
+        except Exception:
+            try:
+                return response_schema.model_validate(ast.literal_eval(block))
+            except Exception:
+                continue
+
+    raise ValueError("Could not parse response from completion.")
 
 
 class LLMModel:
@@ -91,41 +132,12 @@ class LLMModel:
         )
 
     def extract_json_objects(self, text):
-        stack = []  # Stack to track `{` positions
-        json_candidates = []  # Potential JSON substrings
-
-        # Iterate through the text to find balanced { }
-        for i, char in enumerate(text):
-            if char == "{":
-                stack.append(i)  # Store index of '{'
-            elif char == "}" and stack:
-                start = stack.pop()  # Get the last unmatched '{'
-                json_candidates.append(text[start : i + 1])  # Extract substring
-
-        return json_candidates
+        return extract_json_objects(text)
 
     def parse_from_completion(
         self, content: str, response_schema: type[BaseModel]
     ) -> BaseModel:
-        patterns = [r"```json\n(.*?)\n```"]
-        json_blocks = []
-        for pattern in patterns:
-            json_blocks += re.findall(pattern, content, re.DOTALL)
-        json_blocks += self.extract_json_objects(content)
-        for block in json_blocks:
-            block = block.strip()
-            try:
-                response = response_schema.model_validate_json(block)
-                return response
-            except Exception as e:
-                try:
-                    block_dict = ast.literal_eval(block)
-                    response = response_schema.model_validate(block_dict)
-                    return response
-                except Exception as e:
-                    continue
-
-        raise ValidationError("Could not parse response from completion.")
+        return parse_json_from_completion(content, response_schema)
 
     def get_token_usage(
         self,

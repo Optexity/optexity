@@ -33,7 +33,7 @@ class LLMSettings(BaseSettings):
     # env var (GEMINI_API_KEY / GOOGLE_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY).
     #
     # Every field has a default, so this validates under any environment.
-    LLM_MODEL: str = "gemini/gemini-2.5-flash"
+    LLM_MODEL: str = "gemini/gemini-3.5-flash-lite"
     LLM_MODEL_API_KEY: str | None = None
     LLM_MODEL_FALLBACK: str | None = None
     LLM_MODEL_FALLBACK_API_KEY: str | None = None
@@ -69,3 +69,22 @@ class LLMSettings(BaseSettings):
 
 
 llm_settings = LLMSettings()
+
+
+def resolve_llm_api_key(model: str) -> str | None:
+    """The configured key for this litellm model string, else the provider env var.
+
+    Both halves are load-bearing: `LLM_MODEL_API_KEY` is read out of the env file
+    into `llm_settings` only and never lands in `os.environ`, while a bare
+    `GOOGLE_API_KEY` in that same file only reaches `os.environ` via the
+    `load_dotenv` in `cli.py`. Callers get the key either way.
+
+    Special case: litellm reads GEMINI_API_KEY for the gemini/ route, but this
+    codebase and both opcloud deploy paths set GOOGLE_API_KEY.
+    """
+    key = llm_settings.llm_api_key_for(model)
+    if key:
+        return key
+    if model.startswith("gemini/"):
+        return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    return None

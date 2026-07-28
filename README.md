@@ -98,7 +98,7 @@ LLM_MODEL_FALLBACK=openai/gpt-4.1-mini
 LLM_MODEL_FALLBACK_API_KEY=YOUR_OPENAI_API_KEY
 ```
 
-`LLM_MODEL` defaults to `gemini/gemini-2.5-flash`. Either key may be omitted, in which
+`LLM_MODEL` defaults to `gemini/gemini-3.5-flash-lite`. Either key may be omitted, in which
 case the provider's own environment variable is used (`GOOGLE_API_KEY` /
 `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, ...).
 
