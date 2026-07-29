@@ -645,6 +645,31 @@ async def handle_download(
             or len(memory.raw_downloads) > raw_before
         )
 
+    def _rename_captured_downloads() -> None:
+        """The response-capture channel names files from the server
+        (Content-Disposition) or a random UUID, ignoring the node's
+        download_filename. Rewrite the urls_to_downloads entries captured during
+        THIS action so run_final_downloads_check saves them under the requested
+        name (e.g. "401002157.pdf" instead of "<uuid>.pdf")."""
+        new_indices = list(range(urls_before, len(memory.urls_to_downloads)))
+        if not new_indices:
+            return
+        for pos, i in enumerate(new_indices):
+            url, auto_name = memory.urls_to_downloads[i]
+            desired = download_filename
+            # Preserve the captured extension if the requested name has none.
+            if not Path(desired).suffix and Path(auto_name).suffix:
+                desired = desired + Path(auto_name).suffix
+            # Disambiguate if a single action captured more than one file.
+            if len(new_indices) > 1:
+                p = Path(desired)
+                desired = f"{p.stem}_{pos}{p.suffix}"
+            memory.urls_to_downloads[i] = (url, desired)
+            logger.info(
+                f"handle_download: renamed captured download "
+                f"{auto_name!r} -> {desired!r}"
+            )
+
     # ---- Fallback-only signal collection (does not affect the main path) ----
     # Some sites (e.g. ASP.NET reports) open a popup that performs the
     # download. The popup may take longer than the primary 30s window to
@@ -712,6 +737,7 @@ async def handle_download(
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
             if _download_captured_via_other_channel():
+                _rename_captured_downloads()
                 logger.info(
                     "handle_download: download captured via response/playwright "
                     "channel; run_final_downloads_check will save the file"
@@ -760,6 +786,7 @@ async def handle_download(
                     await asyncio.sleep(poll_interval)
                     extra_elapsed += poll_interval
                     if _download_captured_via_other_channel():
+                        _rename_captured_downloads()
                         logger.info(
                             "handle_download: download captured via "
                             "response/playwright channel during extended wait; "
