@@ -630,6 +630,21 @@ async def handle_download(
 
     before = _snapshot_dir(browser.temp_downloads_dir)
 
+    # Not every site writes the file into temp_downloads_dir. Some serve it as an
+    # HTTP response (captured into memory.urls_to_downloads) or trigger a
+    # Playwright download event (captured into memory.raw_downloads). Those
+    # channels are materialized into actual files later by
+    # run_final_downloads_check, so for expect_download we only need to confirm a
+    # NEW capture happened during this action rather than wait for a temp file.
+    urls_before = len(memory.urls_to_downloads)
+    raw_before = len(memory.raw_downloads)
+
+    def _download_captured_via_other_channel() -> bool:
+        return (
+            len(memory.urls_to_downloads) > urls_before
+            or len(memory.raw_downloads) > raw_before
+        )
+
     # ---- Fallback-only signal collection (does not affect the main path) ----
     # Some sites (e.g. ASP.NET reports) open a popup that performs the
     # download. The popup may take longer than the primary 30s window to
@@ -696,6 +711,12 @@ async def handle_download(
         while elapsed < timeout:
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
+            if _download_captured_via_other_channel():
+                logger.info(
+                    "handle_download: download captured via response/playwright "
+                    "channel; run_final_downloads_check will save the file"
+                )
+                return
             after = _snapshot_dir(browser.temp_downloads_dir)
             new_files = [
                 name
@@ -723,6 +744,7 @@ async def handle_download(
                 download_event.is_set()
                 or len(new_popup_pages) > 0
                 or len(in_progress_files) > 0
+                or _download_captured_via_other_channel()
             )
             if has_signal:
                 extra_timeout = 30.0
@@ -737,6 +759,13 @@ async def handle_download(
                 while extra_elapsed < extra_timeout:
                     await asyncio.sleep(poll_interval)
                     extra_elapsed += poll_interval
+                    if _download_captured_via_other_channel():
+                        logger.info(
+                            "handle_download: download captured via "
+                            "response/playwright channel during extended wait; "
+                            "run_final_downloads_check will save the file"
+                        )
+                        return
                     after = _snapshot_dir(browser.temp_downloads_dir)
                     new_files = [
                         name
