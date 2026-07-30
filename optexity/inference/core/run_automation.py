@@ -551,7 +551,8 @@ async def handle_for_loop_node(
     locator_command: str | None = None
     variable_names: list[str] | None = None
 
-    if for_loop_node.locator:
+    # Schema normalizes blanks to None; use is not None so branch matches XOR.
+    if for_loop_node.locator is not None:
         locator_command = for_loop_node.locator
         pw_locator = await browser.get_locator_from_command(locator_command)
         if pw_locator is None:

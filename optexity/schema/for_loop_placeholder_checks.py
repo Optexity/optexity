@@ -32,6 +32,36 @@ def check_existing_variable_loop_validates() -> None:
     )
     assert node.variable_name == "items"
     assert node.locator is None
+    dumped = node.model_dump()
+    assert "locator" not in dumped
+    assert dumped["variable_name"] == "items"
+
+
+def check_locator_loop_omits_variable_name_in_dump() -> None:
+    node = ForLoopNode.model_validate(
+        {
+            "type": "for_loop_node",
+            "locator": 'get_by_role("row")',
+            "nodes": [],
+        }
+    )
+    dumped = node.model_dump()
+    assert "variable_name" not in dumped
+    assert dumped["locator"] == 'get_by_role("row")'
+
+
+def check_whitespace_locator_normalized_with_variable() -> None:
+    node = ForLoopNode.model_validate(
+        {
+            "type": "for_loop_node",
+            "variable_name": "items",
+            "locator": "  ",
+            "nodes": [],
+        }
+    )
+    assert node.variable_name == "items"
+    assert node.locator is None
+    assert "locator" not in node.model_dump()
 
 
 def check_xor_validation() -> None:
@@ -44,6 +74,7 @@ def check_xor_validation() -> None:
             "nodes": [],
         },
         {"type": "for_loop_node", "variable_name": "  ", "nodes": []},
+        {"type": "for_loop_node", "locator": "  ", "nodes": []},
     ):
         try:
             ForLoopNode.model_validate(payload)
@@ -137,6 +168,8 @@ def check_old_format_locator_loop_migration() -> None:
 def main() -> None:
     checks = [
         check_existing_variable_loop_validates,
+        check_locator_loop_omits_variable_name_in_dump,
+        check_whitespace_locator_normalized_with_variable,
         check_xor_validation,
         check_locator_index_name_reserved,
         check_variable_expand_unchanged,
