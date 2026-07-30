@@ -1,11 +1,15 @@
 ---
 title: For Loop Node
-description: Iterating over multiple values in automations
+description: Iterating over list values or page locator matches in automations
 ---
 
-Use `for_loop_node` to repeat actions for each value in a list—processing search results, downloading multiple files, or clicking through items.
+Use `for_loop_node` to repeat actions for each value in a list, or for each element matching a Playwright locator on the page—processing search results, downloading multiple files, or clicking through table rows.
+
+Exactly one of `variable_name` or `locator` is required.
 
 ## Structure
+
+### Variable loop
 
 ```json
 {
@@ -27,11 +31,36 @@ Use `for_loop_node` to repeat actions for each value in a list—processing sear
 }
 ```
 
+### Locator loop
+
+```json
+{
+  "type": "for_loop_node",
+  "locator": "get_by_role(\"row\")",
+  "index_variable_name": "row",
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "{row}.get_by_role(\"button\", name=\"Edit\")"
+        }
+      }
+    }
+  ],
+  "reset_nodes": [],
+  "on_error_in_loop": "raise"
+}
+```
+
+At loop start the runtime counts matches once, then iterates `0 .. count-1`. An empty match set runs zero iterations (same as an empty list variable).
+
 ## Properties
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `variable_name` | `str` | — | Parameter to iterate over |
+| `variable_name` | `str \| None` | `None` | Parameter list to iterate over. Mutually exclusive with `locator` |
+| `locator` | `str \| None` | `None` | Playwright locator command whose matches are iterated. Mutually exclusive with `variable_name` |
 | `index_variable_name` | `str` | `"index"` | Placeholder name used in `{var[<name>]}` and bare `{<name>}` |
 | `nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | — | Actions for each iteration |
 | `reset_nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | `[]` | Actions to run after each iteration |
@@ -39,7 +68,9 @@ Use `for_loop_node` to repeat actions for each value in a list—processing sear
 
 ## The Index Variable
 
-Inside a loop, `{variable[index]}` references the current iteration's value. The token `index` comes from `index_variable_name` (default `"index"`):
+### Variable loops
+
+Inside a variable loop, `{variable[index]}` references the current iteration's value. The token `index` comes from `index_variable_name` (default `"index"`):
 
 ```
 order_ids = ["ORD-001", "ORD-002", "ORD-003"]
@@ -49,13 +80,29 @@ Iteration 2: {order_ids[index]} → "ORD-002"
 Iteration 3: {order_ids[index]} → "ORD-003"
 ```
 
-You can also use:
-
 | Pattern | Expands to |
 |---------|------------|
 | `{order_ids[index]}` | Current list value |
 | `{index_of(order_ids)}` | Current numeric index (`0`, `1`, …) |
 | `{index}` | Current numeric index (same as `index_of`, using `index_variable_name`) |
+
+### Locator loops
+
+Bare `{index_variable_name}` expands to the Playwright command for the current match (`<locator>.nth(<N>)`), so you can pass it as a `command` or chain off it. Use `{index_of(locator)}` for the numeric index:
+
+```
+locator = get_by_role("row")  (3 matches)
+
+Iteration 1: {row} → get_by_role("row").nth(0)
+Iteration 2: {row} → get_by_role("row").nth(1)
+Iteration 3: {row} → get_by_role("row").nth(2)
+```
+
+| Pattern | Expands to |
+|---------|------------|
+| `{row}` / `{index}` | Current match command (`<locator>.nth(<N>)`) |
+| `{index_of(locator)}` | Current numeric index (`0`, `1`, …) |
+| `{row}.get_by_role("button")` | Chained command on the current match |
 
 ### Using Multiple Variables in a Loop
 
@@ -250,6 +297,23 @@ Use `"continue"` when some items may fail but you want to process as many as pos
 
 ## Common Patterns
 
+### Click Every Matching Element
+
+```json
+{
+  "type": "for_loop_node",
+  "locator": "get_by_role(\"checkbox\")",
+  "nodes": [{
+    "type": "action_node",
+    "interaction_action": {
+      "click_element": {
+        "command": "{index}"
+      }
+    }
+  }]
+}
+```
+
 ### Download Multiple Files
 
 ```json
@@ -305,5 +369,7 @@ Use `"continue"` when some items may fail but you want to process as many as pos
 
 ## Limitations
 
-- Variable must be populated before loop execution
+- Variable loops require the list to be populated before loop execution
+- Locator loops snapshot `count()` once at start; DOM changes mid-loop do not change how many iterations run
+- In locator mode, bare `{index}` is a locator command (not a number)—use `{index_of(locator)}` for the numeric index
 - Deep nesting is allowed; keep `index_variable_name` distinct per nesting level when you need both indexes
