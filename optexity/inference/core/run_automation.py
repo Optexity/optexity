@@ -545,6 +545,27 @@ def _expand_for_loop_placeholders(
     return node
 
 
+def _expand_locator_for_loop_placeholders(
+    node,
+    locator_command: str,
+    index: int,
+    index_variable_name: str,
+):
+    """Bind locator-loop placeholders for one iteration onto a deep-copied node.
+
+    Replacement order matters:
+    1. ``{index_of(locator)}`` → ``<N>``
+    2. bare ``{<index_variable_name>}`` → ``<locator>.nth(<N>)`` (last, so it
+       cannot corrupt ``index_of(locator)``)
+    """
+    node.replace("{index_of(locator)}", f"{index}")
+    node.replace(
+        f"{{{index_variable_name}}}",
+        f"{locator_command}.nth({index})",
+    )
+    return node
+
+
 async def _run_for_loop_child_node(
     node,
     memory: Memory,
@@ -572,46 +593,76 @@ async def handle_for_loop_node(
     full_automation: list[ActionNode],
 ):
     memory.update_system_info()
-    primary_variable = for_loop_node.variable_name.split(",")[0].strip()
-    if primary_variable in task.input_parameters:
-        values = task.input_parameters[primary_variable]
-    elif primary_variable in memory.variables.generated_variables:
-        values = memory.variables.generated_variables[primary_variable]
-    else:
-        raise ValueError(
-            f"Variable name {primary_variable} not found in input variables or generated variables"
-        )
-    variable_names = [name.strip() for name in for_loop_node.variable_name.split(",")]
     index_variable_name = for_loop_node.index_variable_name
     memory.variables.for_loop_status.append([])
-    for index in range(len(values)):
 
+    locator_command: str | None = None
+    variable_names: list[str] | None = None
+
+    if for_loop_node.locator:
+        locator_command = for_loop_node.locator
+        pw_locator = await browser.get_locator_from_command(locator_command)
+        if pw_locator is None:
+            raise ValueError(
+                f"Could not resolve locator {locator_command!r} for for_loop_node"
+            )
+        # Snapshot match count once at loop start (stable index set for .nth).
+        count = await pw_locator.count()
+        values: list[str | int | float | bool] = [
+            f"{locator_command}.nth({i})" for i in range(count)
+        ]
+        status_name = locator_command
+    else:
+        assert for_loop_node.variable_name is not None
+        primary_variable = for_loop_node.variable_name.split(",")[0].strip()
+        if primary_variable in task.input_parameters:
+            values = task.input_parameters[primary_variable]
+        elif primary_variable in memory.variables.generated_variables:
+            values = memory.variables.generated_variables[primary_variable]
+        else:
+            raise ValueError(
+                f"Variable name {primary_variable} not found in input variables or generated variables"
+            )
+        variable_names = [
+            name.strip() for name in for_loop_node.variable_name.split(",")
+        ]
+        status_name = for_loop_node.variable_name
+
+    for index in range(len(values)):
         try:
             for node in for_loop_node.nodes:
-                new_node = _expand_for_loop_placeholders(
-                    deepcopy(node),
-                    variable_names,
-                    index,
-                    index_variable_name,
-                )
+                new_node = deepcopy(node)
+                if locator_command is not None:
+                    new_node = _expand_locator_for_loop_placeholders(
+                        new_node,
+                        locator_command,
+                        index,
+                        index_variable_name,
+                    )
+                else:
+                    assert variable_names is not None
+                    new_node = _expand_for_loop_placeholders(
+                        new_node,
+                        variable_names,
+                        index,
+                        index_variable_name,
+                    )
                 await _run_for_loop_child_node(
                     new_node, memory, task, browser, full_automation
                 )
             memory.variables.for_loop_status[-1].append(
                 ForLoopStatus(
-                    variable_name=for_loop_node.variable_name,
+                    variable_name=status_name,
                     index=index,
                     value=values[index],
                     status="success",
                 )
             )
         except Exception as e:
-            logger.error(
-                f"Error running for loop node {for_loop_node.variable_name}: {e}"
-            )
+            logger.error(f"Error running for loop node {status_name}: {e}")
             memory.variables.for_loop_status[-1].append(
                 ForLoopStatus(
-                    variable_name=for_loop_node.variable_name,
+                    variable_name=status_name,
                     index=index,
                     value=values[index],
                     status="error",
@@ -624,7 +675,7 @@ async def handle_for_loop_node(
                 for index2 in range(index + 1, len(values)):
                     memory.variables.for_loop_status[-1].append(
                         ForLoopStatus(
-                            variable_name=for_loop_node.variable_name,
+                            variable_name=status_name,
                             index=index2,
                             value=values[index2],
                             status="skipped",
@@ -639,12 +690,22 @@ async def handle_for_loop_node(
             for node in for_loop_node.reset_nodes:
                 # Reset nodes also get the current iteration's placeholders
                 # bound so they can reference the item that just finished.
-                new_node = _expand_for_loop_placeholders(
-                    deepcopy(node),
-                    variable_names,
-                    index,
-                    index_variable_name,
-                )
+                new_node = deepcopy(node)
+                if locator_command is not None:
+                    new_node = _expand_locator_for_loop_placeholders(
+                        new_node,
+                        locator_command,
+                        index,
+                        index_variable_name,
+                    )
+                else:
+                    assert variable_names is not None
+                    new_node = _expand_for_loop_placeholders(
+                        new_node,
+                        variable_names,
+                        index,
+                        index_variable_name,
+                    )
                 await _run_for_loop_child_node(
                     new_node, memory, task, browser, full_automation
                 )
