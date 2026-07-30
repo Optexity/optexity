@@ -13,6 +13,10 @@ from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from patchright.async_api import expect as playwright_expect
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
+from optexity.inference.core.for_loop_placeholders import (
+    expand_for_loop_placeholders,
+    expand_locator_for_loop_placeholders,
+)
 from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
     _wait_for_file_stable,
@@ -514,58 +518,6 @@ async def handle_if_else_node(
     memory.update_system_info()
 
 
-def _expand_for_loop_placeholders(
-    node,
-    variable_names: list[str],
-    index: int,
-    index_variable_name: str,
-):
-    """Bind loop placeholders for one iteration onto a deep-copied node.
-
-    Replacement order matters:
-    1. ``{var[<index_variable_name>]}`` → ``{var[<N>]}``
-    2. ``{index_of(primary)}`` → ``<N>``
-    3. bare ``{<index_variable_name>}`` → ``<N>`` (last, so it cannot
-       corrupt ``index_of(...)`` or ``{var[...]}`` patterns)
-    """
-    for variable_name in variable_names:
-        try:
-            node.replace(
-                f"{{{variable_name}[{index_variable_name}]}}",
-                f"{{{variable_name}[{index}]}}",
-            )
-        except Exception as e:
-            logger.error(
-                f"Error replacing variable {variable_name} in for loop node: {e}"
-            )
-            continue
-
-    node.replace(f"{{index_of({variable_names[0]})}}", f"{index}")
-    node.replace(f"{{{index_variable_name}}}", f"{index}")
-    return node
-
-
-def _expand_locator_for_loop_placeholders(
-    node,
-    locator_command: str,
-    index: int,
-    index_variable_name: str,
-):
-    """Bind locator-loop placeholders for one iteration onto a deep-copied node.
-
-    Replacement order matters:
-    1. ``{index_of(locator)}`` → ``<N>``
-    2. bare ``{<index_variable_name>}`` → ``<locator>.nth(<N>)`` (last, so it
-       cannot corrupt ``index_of(locator)``)
-    """
-    node.replace("{index_of(locator)}", f"{index}")
-    node.replace(
-        f"{{{index_variable_name}}}",
-        f"{locator_command}.nth({index})",
-    )
-    return node
-
-
 async def _run_for_loop_child_node(
     node,
     memory: Memory,
@@ -633,7 +585,7 @@ async def handle_for_loop_node(
             for node in for_loop_node.nodes:
                 new_node = deepcopy(node)
                 if locator_command is not None:
-                    new_node = _expand_locator_for_loop_placeholders(
+                    new_node = expand_locator_for_loop_placeholders(
                         new_node,
                         locator_command,
                         index,
@@ -641,7 +593,7 @@ async def handle_for_loop_node(
                     )
                 else:
                     assert variable_names is not None
-                    new_node = _expand_for_loop_placeholders(
+                    new_node = expand_for_loop_placeholders(
                         new_node,
                         variable_names,
                         index,
@@ -692,7 +644,7 @@ async def handle_for_loop_node(
                 # bound so they can reference the item that just finished.
                 new_node = deepcopy(node)
                 if locator_command is not None:
-                    new_node = _expand_locator_for_loop_placeholders(
+                    new_node = expand_locator_for_loop_placeholders(
                         new_node,
                         locator_command,
                         index,
@@ -700,7 +652,7 @@ async def handle_for_loop_node(
                     )
                 else:
                     assert variable_names is not None
-                    new_node = _expand_for_loop_placeholders(
+                    new_node = expand_for_loop_placeholders(
                         new_node,
                         variable_names,
                         index,

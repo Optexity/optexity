@@ -251,13 +251,13 @@ class ForLoopNode(BaseModel):
     type: Literal["for_loop_node"]
     variable_name: str | None = None
     # Playwright locator command (e.g. get_by_role("row")). Iterates each match
-    # via .nth(i). Bare {index_variable_name} expands to "<locator>.nth(<i>)".
+    # via .nth(i). Use {locator[<index_variable_name>]} for the current match
+    # (same shape as {var[index]}); bare {<index_variable_name>} is the numeric
+    # index. {index_of(locator)} is also the numeric index.
     locator: str | None = None
-    # Placeholder name used in {var[<name>]} / bare {<name>}. Defaults to
-    # "index" for backward compatibility. Use distinct names when nesting loops
-    # so the outer index remains addressable inside the inner loop.
-    # In locator mode, bare {<name>} is the current match command (not a number);
-    # use {index_of(locator)} for the numeric index.
+    # Placeholder name used in {var[<name>]} / {locator[<name>]} / bare {<name>}.
+    # Defaults to "index" for backward compatibility. Use distinct names when
+    # nesting loops so the outer index remains addressable inside the inner loop.
     index_variable_name: str = "index"
     nodes: list[
         Annotated[
@@ -289,6 +289,12 @@ class ForLoopNode(BaseModel):
             raise ValueError(
                 "index_variable_name cannot be 'index_of' (reserved for "
                 "{index_of(variable)} placeholders)"
+            )
+        if has_locator and name == "locator":
+            raise ValueError(
+                "index_variable_name cannot be 'locator' in locator mode; "
+                "use a distinct name (e.g. 'row') with {locator[row]} for the "
+                "current match and {row} / {index_of(locator)} for the numeric index"
             )
         if has_variable:
             loop_vars = {
@@ -361,7 +367,13 @@ class ForLoopNode(BaseModel):
                     new_nodes.append({"type": "assert_locator_node", **item})
                     continue
 
-                if isinstance(item, dict) and "locator" in item and "nodes" in item:
+                if (
+                    isinstance(item, dict)
+                    and "locator" in item
+                    and "nodes" in item
+                    and "assertion" not in item
+                    and "variable_name" not in item
+                ):
                     new_nodes.append({"type": "for_loop_node", **item})
                     continue
 
@@ -439,7 +451,13 @@ class IfElseNode(BaseModel):
                     new_nodes.append({"type": "assert_locator_node", **item})
                     continue
 
-                if isinstance(item, dict) and "locator" in item and "nodes" in item:
+                if (
+                    isinstance(item, dict)
+                    and "locator" in item
+                    and "nodes" in item
+                    and "assertion" not in item
+                    and "variable_name" not in item
+                ):
                     new_nodes.append({"type": "for_loop_node", **item})
                     continue
 
@@ -570,7 +588,13 @@ class Automation(BaseModel):
                 new_nodes.append({"type": "assert_locator_node", **item})
                 continue
 
-            if isinstance(item, dict) and "locator" in item and "nodes" in item:
+            if (
+                isinstance(item, dict)
+                and "locator" in item
+                and "nodes" in item
+                and "assertion" not in item
+                and "variable_name" not in item
+            ):
                 new_nodes.append({"type": "for_loop_node", **item})
                 continue
 
