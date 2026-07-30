@@ -43,7 +43,7 @@ Exactly one of `variable_name` or `locator` is required.
       "type": "action_node",
       "interaction_action": {
         "click_element": {
-          "command": "{row}.get_by_role(\"button\", name=\"Edit\")"
+          "command": "{locator[row]}.get_by_role(\"button\", name=\"Edit\")"
         }
       }
     }
@@ -61,7 +61,7 @@ At loop start the runtime counts matches once, then iterates `0 .. count-1`. An 
 |----------|------|---------|-------------|
 | `variable_name` | `str \| None` | `None` | Parameter list to iterate over. Mutually exclusive with `locator` |
 | `locator` | `str \| None` | `None` | Playwright locator command whose matches are iterated. Mutually exclusive with `variable_name` |
-| `index_variable_name` | `str` | `"index"` | Placeholder name used in `{var[<name>]}` and bare `{<name>}` |
+| `index_variable_name` | `str` | `"index"` | Placeholder name used in `{var[<name>]}` / `{locator[<name>]}` and bare `{<name>}` |
 | `nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | — | Actions for each iteration |
 | `reset_nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | `[]` | Actions to run after each iteration |
 | `on_error_in_loop` | `"continue" \| "break" \| "raise"` | `"raise"` | Error handling behavior |
@@ -88,21 +88,23 @@ Iteration 3: {order_ids[index]} → "ORD-003"
 
 ### Locator loops
 
-Bare `{index_variable_name}` expands to the Playwright command for the current match (`<locator>.nth(<N>)`), so you can pass it as a `command` or chain off it. Use `{index_of(locator)}` for the numeric index:
+Locator loops use the same shape as variable loops: `{locator[index]}` is the current match (like `{order_ids[index]}`), and bare `{index}` is the numeric index:
 
 ```
 locator = get_by_role("row")  (3 matches)
 
-Iteration 1: {row} → get_by_role("row").nth(0)
-Iteration 2: {row} → get_by_role("row").nth(1)
-Iteration 3: {row} → get_by_role("row").nth(2)
+Iteration 1: {locator[index]} → get_by_role("row").nth(0)
+Iteration 2: {locator[index]} → get_by_role("row").nth(1)
+Iteration 3: {locator[index]} → get_by_role("row").nth(2)
 ```
+
+With `index_variable_name: "row"`:
 
 | Pattern | Expands to |
 |---------|------------|
-| `{row}` / `{index}` | Current match command (`<locator>.nth(<N>)`) |
-| `{index_of(locator)}` | Current numeric index (`0`, `1`, …) |
-| `{row}.get_by_role("button")` | Chained command on the current match |
+| `{locator[row]}` | Current match command (`<locator>.nth(<N>)`) |
+| `{row}` / `{index_of(locator)}` | Current numeric index (`0`, `1`, …) |
+| `{locator[row]}.get_by_role("button")` | Chained command on the current match |
 
 ### Using Multiple Variables in a Loop
 
@@ -307,7 +309,7 @@ Use `"continue"` when some items may fail but you want to process as many as pos
     "type": "action_node",
     "interaction_action": {
       "click_element": {
-        "command": "{index}"
+        "command": "{locator[index]}"
       }
     }
   }]
@@ -371,5 +373,7 @@ Use `"continue"` when some items may fail but you want to process as many as pos
 
 - Variable loops require the list to be populated before loop execution
 - Locator loops snapshot `count()` once at start; DOM changes mid-loop do not change how many iterations run
-- In locator mode, bare `{index}` is a locator command (not a number)—use `{index_of(locator)}` for the numeric index
+- Use `{locator[index]}` for the current match and bare `{index}` (or `{index_of(locator)}`) for the numeric index
+- When nesting locator loops, give each a distinct `index_variable_name` and reference `{locator[row]}` / `{locator[cell]}` so each level keeps its own match token; avoid `{index_of(locator)}` inside nested locator loops (it is not scoped per level)
+- Locator loops that mutate the matched set (remove/add rows) should use `reset_nodes` and/or prefer extracting a stable list into a variable loop
 - Deep nesting is allowed; keep `index_variable_name` distinct per nesting level when you need both indexes
