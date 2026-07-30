@@ -519,13 +519,18 @@ def _expand_for_loop_placeholders(
     variable_names: list[str],
     index: int,
     index_variable_name: str,
+    iteration_count: int | None = None,
+    item_variable_name: str | None = None,
+    item_command: str | None = None,
 ):
     """Bind loop placeholders for one iteration onto a deep-copied node.
 
     Replacement order matters:
     1. ``{var[<index_variable_name>]}`` → ``{var[<N>]}``
     2. ``{index_of(primary)}`` → ``<N>``
-    3. bare ``{<index_variable_name>}`` → ``<N>`` (last, so it cannot
+    3. ``{<item_variable_name>}`` → the current element's locator command
+       (locator loops only)
+    4. bare ``{<index_variable_name>}`` → ``<N>`` (last, so it cannot
        corrupt ``index_of(...)`` or ``{var[...]}`` patterns)
     """
     for variable_name in variable_names:
@@ -540,7 +545,22 @@ def _expand_for_loop_placeholders(
             )
             continue
 
-    node.replace(f"{{index_of({variable_names[0]})}}", f"{index}")
+    if variable_names:
+        node.replace(f"{{index_of({variable_names[0]})}}", f"{index}")
+
+    if item_variable_name is not None and item_command is not None:
+        node.replace(f"{{{item_variable_name}}}", item_command)
+
+    if iteration_count is not None:
+        # ``{count}`` is convenient but is rebound by every enclosing loop, so
+        # nested loops should prefer a qualified form: ``{<item>_count}`` for
+        # locator loops, ``{count_of(var)}`` for variable loops.
+        if item_variable_name is not None:
+            node.replace(f"{{{item_variable_name}_count}}", f"{iteration_count}")
+        if variable_names:
+            node.replace(f"{{count_of({variable_names[0]})}}", f"{iteration_count}")
+        node.replace("{count}", f"{iteration_count}")
+
     node.replace(f"{{{index_variable_name}}}", f"{index}")
     return node
 
@@ -564,6 +584,39 @@ async def _run_for_loop_child_node(
         await run_action_node(node, task, memory, browser)
 
 
+async def _count_locator_matches(for_loop_node: ForLoopNode, browser: Browser) -> int:
+    """Number of elements a locator loop should iterate over.
+
+    Playwright's ``count()`` does not auto-wait, so give the first match a
+    chance to attach first. A locator that never attaches means zero rows,
+    which is a legitimate outcome (empty table) rather than an error.
+    """
+    assert for_loop_node.locator is not None
+    locator = await browser.get_locator_from_command(for_loop_node.locator)
+    if locator is None:
+        logger.warning(
+            f"Locator {for_loop_node.locator!r} did not resolve; "
+            "for loop will run zero iterations"
+        )
+        return 0
+
+    if for_loop_node.locator_timeout > 0:
+        try:
+            await locator.first.wait_for(
+                state="attached", timeout=for_loop_node.locator_timeout * 1000
+            )
+        except (TimeoutError, PatchrightTimeoutError, PlaywrightTimeoutError):
+            logger.info(
+                f"No element matched {for_loop_node.locator!r} within "
+                f"{for_loop_node.locator_timeout}s; for loop will run zero iterations"
+            )
+            return 0
+
+    count = await locator.count()
+    logger.debug(f"Locator {for_loop_node.locator!r} matched {count} element(s)")
+    return count
+
+
 async def handle_for_loop_node(
     for_loop_node: ForLoopNode,
     memory: Memory,
@@ -572,17 +625,47 @@ async def handle_for_loop_node(
     full_automation: list[ActionNode],
 ):
     memory.update_system_info()
-    primary_variable = for_loop_node.variable_name.split(",")[0].strip()
-    if primary_variable in task.input_parameters:
-        values = task.input_parameters[primary_variable]
-    elif primary_variable in memory.variables.generated_variables:
-        values = memory.variables.generated_variables[primary_variable]
+    item_variable_name: str | None = None
+    if for_loop_node.locator is not None:
+        # Iterating over DOM matches: the loop "values" are the per-element
+        # locator commands, which is also what gets recorded in for_loop_status.
+        item_variable_name = for_loop_node.item_variable_name
+        variable_names = []
+        values = [
+            f"{for_loop_node.locator}.nth({i})"
+            for i in range(await _count_locator_matches(for_loop_node, browser))
+        ]
     else:
-        raise ValueError(
-            f"Variable name {primary_variable} not found in input variables or generated variables"
+        assert for_loop_node.variable_name is not None
+        primary_variable = for_loop_node.variable_name.split(",")[0].strip()
+        if primary_variable in task.input_parameters:
+            values = task.input_parameters[primary_variable]
+        elif primary_variable in memory.variables.generated_variables:
+            values = memory.variables.generated_variables[primary_variable]
+        else:
+            raise ValueError(
+                f"Variable name {primary_variable} not found in input variables or generated variables"
+            )
+        variable_names = [
+            name.strip() for name in for_loop_node.variable_name.split(",")
+        ]
+
+    if (
+        for_loop_node.max_iterations is not None
+        and len(values) > for_loop_node.max_iterations
+    ):
+        logger.warning(
+            f"For loop source has {len(values)} items but max_iterations is "
+            f"{for_loop_node.max_iterations}; skipping the remaining "
+            f"{len(values) - for_loop_node.max_iterations} item(s)"
         )
-    variable_names = [name.strip() for name in for_loop_node.variable_name.split(",")]
+        values = values[: for_loop_node.max_iterations]
+
+    iteration_count = len(values)
     index_variable_name = for_loop_node.index_variable_name
+    # ForLoopStatus needs a name for the thing being looped over; a locator
+    # loop has no variable, so report the locator command itself.
+    loop_label = for_loop_node.variable_name or for_loop_node.locator or ""
     memory.variables.for_loop_status.append([])
     for index in range(len(values)):
 
@@ -593,25 +676,26 @@ async def handle_for_loop_node(
                     variable_names,
                     index,
                     index_variable_name,
+                    iteration_count=iteration_count,
+                    item_variable_name=item_variable_name,
+                    item_command=values[index] if item_variable_name else None,
                 )
                 await _run_for_loop_child_node(
                     new_node, memory, task, browser, full_automation
                 )
             memory.variables.for_loop_status[-1].append(
                 ForLoopStatus(
-                    variable_name=for_loop_node.variable_name,
+                    variable_name=loop_label,
                     index=index,
                     value=values[index],
                     status="success",
                 )
             )
         except Exception as e:
-            logger.error(
-                f"Error running for loop node {for_loop_node.variable_name}: {e}"
-            )
+            logger.error(f"Error running for loop node {loop_label}: {e}")
             memory.variables.for_loop_status[-1].append(
                 ForLoopStatus(
-                    variable_name=for_loop_node.variable_name,
+                    variable_name=loop_label,
                     index=index,
                     value=values[index],
                     status="error",
@@ -624,7 +708,7 @@ async def handle_for_loop_node(
                 for index2 in range(index + 1, len(values)):
                     memory.variables.for_loop_status[-1].append(
                         ForLoopStatus(
-                            variable_name=for_loop_node.variable_name,
+                            variable_name=loop_label,
                             index=index2,
                             value=values[index2],
                             status="skipped",
@@ -644,6 +728,9 @@ async def handle_for_loop_node(
                     variable_names,
                     index,
                     index_variable_name,
+                    iteration_count=iteration_count,
+                    item_variable_name=item_variable_name,
+                    item_command=values[index] if item_variable_name else None,
                 )
                 await _run_for_loop_child_node(
                     new_node, memory, task, browser, full_automation

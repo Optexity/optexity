@@ -246,13 +246,69 @@ class ActionNode(BaseModel):
 
 
 class ForLoopNode(BaseModel):
-    # Loops through range of values of {variable_name[<index_variable_name>]}
+    # Two iteration sources, exactly one of which must be set: variable_name
+    # (values known before the loop starts) or locator (DOM matches, count only
+    # known at runtime). Field descriptions are consumed by the workflow
+    # authoring agent via TypeAdapter(...).json_schema(), so keep them accurate.
     type: Literal["for_loop_node"]
-    variable_name: str
-    # Placeholder name used in {var[<name>]} / bare {<name>}. Defaults to
-    # "index" for backward compatibility. Use distinct names when nesting loops
-    # so the outer index remains addressable inside the inner loop.
-    index_variable_name: str = "index"
+    variable_name: str | None = Field(
+        default=None,
+        description=(
+            "Name of the list variable to iterate over; its length is the "
+            "iteration count. Comma-separated names iterate in parallel, with "
+            "the first one setting the length. Reference values in the loop "
+            "body as {variable_name[<index_variable_name>]}. Mutually "
+            "exclusive with locator: exactly one of the two must be set."
+        ),
+    )
+    locator: str | None = Field(
+        default=None,
+        description=(
+            "Playwright locator command evaluated against `page` (same grammar "
+            "as assert_locator_node.locator), e.g. 'locator(\"tr.rowEven, "
+            "tr.rowOdd\")'. The number of matched elements is the iteration "
+            "count, so use this to loop over rows/items whose count is not "
+            "known when authoring. Mutually exclusive with variable_name: "
+            "exactly one of the two must be set."
+        ),
+    )
+    index_variable_name: str = Field(
+        default="index",
+        description=(
+            "Placeholder name bound to the current iteration's number, used as "
+            "{var[<name>]} and bare {<name>}. Use distinct names when nesting "
+            "loops so the outer index remains addressable inside the inner "
+            "loop. Must not be 'index_of', 'count_of' or 'count' (reserved for "
+            "the {index_of(var)}, {count_of(var)} and {count} placeholders), "
+            "and must not match a name listed in variable_name."
+        ),
+    )
+    item_variable_name: str = Field(
+        default="item",
+        description=(
+            "Locator loops only: placeholder bound to the current element's "
+            'locator, e.g. {item} -> locator("tr.rowEven, tr.rowOdd").nth(3). '
+            "Scope body commands off it: '{item}.locator(\"td.NameCell\")'. "
+            "{<item_variable_name>_count} is bound to the total number of "
+            "matches. Must differ from index_variable_name."
+        ),
+    )
+    locator_timeout: float = Field(
+        default=5.0,
+        description=(
+            "Locator loops only: seconds to wait for the first match to attach "
+            "before counting (Playwright's count() does not auto-wait). A "
+            "locator that never attaches yields zero iterations rather than an "
+            "error, so an empty table is handled without failing the run."
+        ),
+    )
+    max_iterations: int | None = Field(
+        default=None,
+        description=(
+            "Cap on the number of iterations; extra items are skipped with a "
+            "warning. Null means iterate over everything the source provides."
+        ),
+    )
     nodes: list[
         Annotated[
             ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef,
@@ -268,24 +324,57 @@ class ForLoopNode(BaseModel):
     on_error_in_loop: Literal["continue", "break", "raise"] = "raise"
 
     @model_validator(mode="after")
+    def validate_iteration_source(self):
+        if (self.variable_name is None) == (self.locator is None):
+            raise ValueError("Exactly one of variable_name or locator must be provided")
+        if self.locator is not None:
+            if not self.locator.strip():
+                raise ValueError("locator must not be empty")
+            if self.locator_timeout < 0:
+                raise ValueError("locator_timeout must not be negative")
+        if self.max_iterations is not None and self.max_iterations <= 0:
+            raise ValueError("max_iterations must be greater than 0")
+        return self
+
+    @model_validator(mode="after")
     def validate_index_variable_name(self):
-        name = self.index_variable_name
-        if not name or not name.isidentifier():
-            raise ValueError(
-                f"index_variable_name {name!r} must be a valid Python identifier"
-            )
-        if name == "index_of":
-            raise ValueError(
-                "index_variable_name cannot be 'index_of' (reserved for "
-                "{index_of(variable)} placeholders)"
-            )
         loop_vars = {
-            part.strip() for part in self.variable_name.split(",") if part.strip()
+            part.strip()
+            for part in (self.variable_name or "").split(",")
+            if part.strip()
         }
-        if name in loop_vars:
+        names = {"index_variable_name": self.index_variable_name}
+        if self.locator is not None:
+            names["item_variable_name"] = self.item_variable_name
+
+        # Reserved because the runtime binds {index_of(var)}, {count_of(var)}
+        # and bare {count} itself; reusing these names would silently shadow
+        # them (e.g. index_variable_name "count" would resolve {count} to the
+        # iteration count rather than the current index).
+        reserved = {"index_of", "count_of", "count"}
+
+        for field, name in names.items():
+            if not name or not name.isidentifier():
+                raise ValueError(f"{field} {name!r} must be a valid Python identifier")
+            if name in reserved:
+                raise ValueError(
+                    f"{field} cannot be {name!r} (reserved for "
+                    "{index_of(variable)} / {count_of(variable)} / {count} "
+                    "placeholders)"
+                )
+            if name in loop_vars:
+                raise ValueError(
+                    f"{field} {name!r} must not match a name in "
+                    f"variable_name {self.variable_name!r}"
+                )
+
+        if (
+            self.locator is not None
+            and self.item_variable_name == self.index_variable_name
+        ):
             raise ValueError(
-                f"index_variable_name {name!r} must not match a name in "
-                f"variable_name {self.variable_name!r}"
+                "item_variable_name must differ from index_variable_name "
+                f"(both are {self.index_variable_name!r})"
             )
         return self
 
@@ -296,6 +385,12 @@ class ForLoopNode(BaseModel):
         the runtime expects a `.replace()` method (e.g. loop expansion).
         """
         replacement_str = "" if replacement is None else str(replacement)
+
+        # A nested locator loop can be scoped by the enclosing loop, e.g.
+        # 'locator("table").nth({page_i}).locator("tr")', so the locator
+        # command itself takes part in placeholder expansion.
+        if self.locator is not None:
+            self.locator = self.locator.replace(pattern, replacement_str)
 
         for node in self.nodes:
             if hasattr(node, "replace"):

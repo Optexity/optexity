@@ -1277,21 +1277,31 @@
             "id": "docs-building-automations-for-loop-node",
             "path": "docs/building-automations/for-loop-node.mdx",
             "title": "For Loop Node",
-            "summary": "Documents the for_loop_node for iterating over a list of values in automations. Covers the variable_name property, optional index_variable_name (default index), {variable[index]} / bare {index} / {index_of(var)} substitution, nested for_loop_node support, using multiple variables (comma-separated), reset_nodes for returning browser to a known state between iterations, and on_error_in_loop error handling (continue, break, raise). Also covers data source options and the requirement that loop variables be pre-populated.",
-            "gist": "for_loop_node: iterate a variable list, nested loops, index_variable_name, {var[index]} substitution, reset_nodes, error handling.",
+            "summary": "Documents the for_loop_node for repeating actions in automations. Covers the two iteration sources: variable_name (a pre-populated list, optionally comma-separated for parallel variables) and locator (a Playwright locator whose runtime match count sets the iteration count, for tables or rows whose size is unknown when authoring). Covers optional index_variable_name (default index), item_variable_name (default item) for the current element's locator, locator_timeout, max_iterations, {variable[index]} / bare {index} / {index_of(var)} / {count_of(var)} / {count} / {item} / {item_count} substitution, templating output_variable_name to store one value per iteration, nested for_loop_node support including scoping an inner locator by the outer index, reset_nodes for returning browser to a known state between iterations, on_error_in_loop error handling (continue, break, raise), and empty-match and snapshotted-count behavior.",
+            "gist": "for_loop_node: iterate a variable list or a locator's matched elements, index_variable_name / item_variable_name placeholders, nested loops, reset_nodes, error handling.",
             "keywords": [
                 "for_loop",
                 "loop",
                 "iteration",
                 "variable_name",
+                "locator",
+                "iterate over locator",
+                "unknown count",
+                "table rows",
+                "nth",
                 "index_variable_name",
+                "item_variable_name",
+                "locator_timeout",
+                "max_iterations",
                 "nested loop",
                 "reset_nodes",
                 "on_error_in_loop",
                 "continue",
                 "break",
                 "raise",
-                "{variable[index]}"
+                "{variable[index]}",
+                "{item}",
+                "{count}"
             ],
             "document_type": "guide",
             "tags": ["building-automations", "loop", "iteration", "control-flow"],
@@ -1320,8 +1330,8 @@
                 "data_models": ["for_loop_node"]
             },
             "reading_priority": 3,
-            "when_to_use": "Select when the query is about iterating over a list in an automation, nested for_loop_node, index_variable_name, reset_nodes, error handling within loops, or the {variable[index]} syntax.",
-            "embedding_hint": "for loop nested iteration index_variable_name variable list reset_nodes on_error_in_loop control flow"
+            "when_to_use": "Select when the query is about iterating over a list in an automation, looping over every element a locator matches (e.g. every row of a table) without knowing the count in advance, nested for_loop_node, index_variable_name or item_variable_name, reset_nodes, error handling within loops, or the {variable[index]} / {item} syntax.",
+            "embedding_hint": "for loop nested iteration index_variable_name item_variable_name variable list locator count nth table rows dynamic count reset_nodes on_error_in_loop control flow"
         },
         {
             "id": "docs-building-automations-if-else-node",

@@ -5,6 +5,13 @@ description: Iterating over multiple values in automations
 
 Use `for_loop_node` to repeat actions for each value in a list—processing search results, downloading multiple files, or clicking through items.
 
+A loop iterates over one of two sources, and exactly one must be set:
+
+| Source | Use when |
+|--------|----------|
+| `variable_name` | The values are known before the loop starts (a parameter or an earlier extraction) |
+| `locator` | The count is only known at runtime—iterate over whatever a locator matches, e.g. every row in a table |
+
 ## Structure
 
 ```json
@@ -31,8 +38,12 @@ Use `for_loop_node` to repeat actions for each value in a list—processing sear
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `variable_name` | `str` | — | Parameter to iterate over |
+| `variable_name` | `str` | — | Parameter to iterate over (mutually exclusive with `locator`) |
+| `locator` | `str` | — | Playwright locator command whose match count sets the iteration count (mutually exclusive with `variable_name`) |
 | `index_variable_name` | `str` | `"index"` | Placeholder name used in `{var[<name>]}` and bare `{<name>}` |
+| `item_variable_name` | `str` | `"item"` | Locator loops only: placeholder that expands to the current element's locator |
+| `locator_timeout` | `float` | `5.0` | Locator loops only: seconds to wait for the first match before counting |
+| `max_iterations` | `int \| null` | `null` | Cap on iterations; extra items are skipped with a warning |
 | `nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | — | Actions for each iteration |
 | `reset_nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | `[]` | Actions to run after each iteration |
 | `on_error_in_loop` | `"continue" \| "break" \| "raise"` | `"raise"` | Error handling behavior |
@@ -56,6 +67,8 @@ You can also use:
 | `{order_ids[index]}` | Current list value |
 | `{index_of(order_ids)}` | Current numeric index (`0`, `1`, …) |
 | `{index}` | Current numeric index (same as `index_of`, using `index_variable_name`) |
+| `{count_of(order_ids)}` | Total number of iterations |
+| `{count}` | Total number of iterations (rebound by each enclosing loop—prefer `{count_of(...)}` when nesting) |
 
 ### Using Multiple Variables in a Loop
 
@@ -110,6 +123,90 @@ Then:
 - Iteration 1 uses `{primary_var[index]}` → `"Value A1"` and `{secondary_var[index]}` → `"Value B1"`
 - Iteration 2 uses `{primary_var[index]}` → `"Value A2"` and `{secondary_var[index]}` → `"Value B2"`
 
+## Looping Over a Locator
+
+When the number of items is only known at runtime—every row of a results table, every row of a schedule—set `locator` instead of `variable_name`. The loop resolves the locator once, counts the matches, and runs the body once per match:
+
+```json
+{
+  "type": "for_loop_node",
+  "locator": "locator(\"tr.tableRowEven, tr.tableRowOdd\")",
+  "index_variable_name": "row_index",
+  "item_variable_name": "row",
+  "nodes": [
+    {
+      "type": "action_node",
+      "extraction_action": {
+        "locator": {
+          "command": "{row}.locator(\"td.PatientNameCell\")",
+          "output_variable_name": "patient_{row_index}",
+          "extraction_format": { "patient_{row_index}": "str" }
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "extraction_action": {
+        "locator": {
+          "command": "{row}.locator(\"td.TimeCell\")",
+          "output_variable_name": "time_{row_index}",
+          "extraction_format": { "time_{row_index}": "str" }
+        }
+      }
+    }
+  ],
+  "on_error_in_loop": "continue"
+}
+```
+
+This is the equivalent of:
+
+```python
+rows = page.locator("tr.tableRowEven, tr.tableRowOdd")
+
+for row_index in range(await rows.count()):
+    row = rows.nth(row_index)
+    patient = await row.locator("td.PatientNameCell").inner_text()
+    time = await row.locator("td.TimeCell").inner_text()
+```
+
+### Locator Loop Placeholders
+
+| Pattern | Expands to |
+|---------|------------|
+| `{row}` | The current element's locator, e.g. `locator("tr.tableRowEven, tr.tableRowOdd").nth(2)` |
+| `{row_index}` | Current numeric index (`0`, `1`, …) |
+| `{row_count}` | Total number of matched elements (`{item_variable_name}_count`) |
+| `{count}` | Same as `{row_count}`, but rebound by each enclosing loop |
+
+`{row}` and `{row_index}` are independent, so writing the selector out by hand works too:
+
+```json
+"command": "locator(\"tr.tableRowEven, tr.tableRowOdd\").nth({row_index}).locator(\"td.PatientNameCell\")"
+```
+
+<Tip>
+Prefer `{item_variable_name}` for anything longer than a node or two. A hand-written selector in the body can drift from the one in `locator`, and then the iteration count and the rows come from different selectors—wrong results rather than an error.
+</Tip>
+
+Because each action re-resolves its command when it runs, `nth(i)` is evaluated against the live DOM. Clicking into a row, extracting from the detail page, and returning via `reset_nodes` works as expected.
+
+### Storing One Value Per Iteration
+
+`output_variable_name` is expanded like any other placeholder, so template it (`"patient_{row_index}"`) to give each iteration its own variable. Without the placeholder, every iteration overwrites the same variable and only the last row survives. Extractions are also appended to the task's output data on every iteration regardless.
+
+### Empty Matches and Runaway Loops
+
+| Situation | Behavior |
+|-----------|----------|
+| No element matches within `locator_timeout` | Zero iterations, no error—an empty table is a valid outcome |
+| Locator command doesn't resolve | Zero iterations, logged as a warning |
+| More matches than `max_iterations` | Extra items skipped, logged as a warning |
+
+<Warning>
+The match count is taken once, when the loop starts. If the body adds or removes rows, set `max_iterations` as a guard and re-check state inside the loop rather than relying on the initial count.
+</Warning>
+
 ## Nested Loops
 
 `for_loop_node` can contain another `for_loop_node`. Give each loop a distinct `index_variable_name` so the outer index stays usable inside the inner loop:
@@ -150,6 +247,8 @@ Then:
 | Distinct names (`page_i`, `item_i`) | Outer and inner indexes can both be referenced clearly inside the innermost body. |
 
 The inner loop's list must already exist when that loop starts (for example, extract `items` inside the outer iteration before the inner `for_loop_node`).
+
+An inner loop's `locator` is itself expanded by the outer loop, so it can be scoped to the outer iteration—`"locator(\"table\").nth({page_i}).locator(\"tr\")"`. Give each locator level a distinct `item_variable_name` too, so its `{<item>_count}` stays unambiguous where bare `{count}` would not.
 
 ## Data Sources
 
@@ -305,5 +404,6 @@ Use `"continue"` when some items may fail but you want to process as many as pos
 
 ## Limitations
 
-- Variable must be populated before loop execution
+- With `variable_name`, the variable must be populated before loop execution
+- With `locator`, the match count is snapshotted when the loop starts
 - Deep nesting is allowed; keep `index_variable_name` distinct per nesting level when you need both indexes
