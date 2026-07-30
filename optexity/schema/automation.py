@@ -249,12 +249,13 @@ class ForLoopNode(BaseModel):
     # Loops through list values ({variable_name}) or page matches ({locator}).
     # Exactly one of variable_name / locator must be set.
     type: Literal["for_loop_node"]
-    variable_name: str | None = None
+    # omit from dumps when unset so JSON never carries variable_name/locator: null
+    variable_name: str | None = Field(default=None, exclude_if=lambda v: v is None)
     # Playwright locator command (e.g. get_by_role("row")). Iterates each match
     # via .nth(i). Use {locator[<index_variable_name>]} for the current match
     # (same shape as {var[index]}); bare {<index_variable_name>} is the numeric
     # index. {index_of(locator)} is also the numeric index.
-    locator: str | None = None
+    locator: str | None = Field(default=None, exclude_if=lambda v: v is None)
     # Placeholder name used in {var[<name>]} / {locator[<name>]} / bare {<name>}.
     # Defaults to "index" for backward compatibility. Use distinct names when
     # nesting loops so the outer index remains addressable inside the inner loop.
@@ -275,8 +276,16 @@ class ForLoopNode(BaseModel):
 
     @model_validator(mode="after")
     def validate_loop_source_and_index(self):
-        has_variable = bool(self.variable_name and self.variable_name.strip())
-        has_locator = bool(self.locator and self.locator.strip())
+        # Normalize blanks so schema and runtime agree (whitespace ≠ a source).
+        if self.variable_name is not None:
+            stripped = self.variable_name.strip()
+            self.variable_name = stripped or None
+        if self.locator is not None:
+            stripped = self.locator.strip()
+            self.locator = stripped or None
+
+        has_variable = self.variable_name is not None
+        has_locator = self.locator is not None
         if has_variable == has_locator:
             raise ValueError("Exactly one of variable_name or locator must be provided")
 
@@ -297,6 +306,7 @@ class ForLoopNode(BaseModel):
                 "current match and {row} / {index_of(locator)} for the numeric index"
             )
         if has_variable:
+            assert self.variable_name is not None
             loop_vars = {
                 part.strip() for part in self.variable_name.split(",") if part.strip()
             }
