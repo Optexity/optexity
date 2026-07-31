@@ -211,6 +211,18 @@ class LocatorExtraction(BaseModel):
 
     def replace(self, pattern: str, replacement: str):
         self.command = self.command.replace(pattern, replacement)
+        # Inside a loop, the storage key is usually templated too (e.g.
+        # "patient_{row}") so each iteration lands in its own variable instead
+        # of overwriting one key. The format keys are rewritten alongside it to
+        # keep output_variable_name a valid key for the LLM fallback path.
+        if self.output_variable_name:
+            self.output_variable_name = self.output_variable_name.replace(
+                pattern, replacement
+            )
+            self.extraction_format = {
+                key.replace(pattern, replacement): value
+                for key, value in self.extraction_format.items()
+            }
         return self
 
 

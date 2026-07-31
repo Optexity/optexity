@@ -14,8 +14,7 @@ from patchright.async_api import expect as playwright_expect
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
 from optexity.inference.core.for_loop_placeholders import (
-    expand_for_loop_placeholders,
-    expand_locator_for_loop_placeholders,
+    expand_iteration_placeholders,
 )
 from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
@@ -537,6 +536,44 @@ async def _run_for_loop_child_node(
         await run_action_node(node, task, memory, browser)
 
 
+async def _count_locator_matches(for_loop_node: ForLoopNode, browser: Browser) -> int:
+    """Number of elements a locator loop should iterate over.
+
+    Playwright's ``count()`` does not auto-wait, so give the first match a chance
+    to attach first: results tables are usually rendered a moment after the
+    action that triggers them, and sleep_for_page_to_load returns immediately
+    once the page has loaded. Counting straight away would see zero rows and
+    silently skip the whole loop body.
+
+    A locator that resolves but never attaches means zero rows, which is a
+    legitimate outcome (empty result table) rather than an error.
+    """
+    assert for_loop_node.locator is not None
+    locator = await browser.get_locator_from_command(for_loop_node.locator)
+    if locator is None:
+        # Only happens when the browser/page itself is gone, not when the
+        # selector matches nothing, so surface it instead of looping zero times.
+        raise ValueError(
+            f"Could not resolve locator {for_loop_node.locator!r} for for_loop_node"
+        )
+
+    if for_loop_node.locator_timeout > 0:
+        try:
+            await locator.first.wait_for(
+                state="attached", timeout=for_loop_node.locator_timeout * 1000
+            )
+        except (TimeoutError, PatchrightTimeoutError, PlaywrightTimeoutError):
+            logger.info(
+                f"No element matched {for_loop_node.locator!r} within "
+                f"{for_loop_node.locator_timeout}s; for loop will run zero iterations"
+            )
+            return 0
+
+    count = await locator.count()
+    logger.debug(f"Locator {for_loop_node.locator!r} matched {count} element(s)")
+    return count
+
+
 async def handle_for_loop_node(
     for_loop_node: ForLoopNode,
     memory: Memory,
@@ -554,13 +591,8 @@ async def handle_for_loop_node(
     # Schema normalizes blanks to None; use is not None so branch matches XOR.
     if for_loop_node.locator is not None:
         locator_command = for_loop_node.locator
-        pw_locator = await browser.get_locator_from_command(locator_command)
-        if pw_locator is None:
-            raise ValueError(
-                f"Could not resolve locator {locator_command!r} for for_loop_node"
-            )
         # Snapshot match count once at loop start (stable index set for .nth).
-        count = await pw_locator.count()
+        count = await _count_locator_matches(for_loop_node, browser)
         values: list[str | int | float | bool] = [
             f"{locator_command}.nth({i})" for i in range(count)
         ]
@@ -581,25 +613,27 @@ async def handle_for_loop_node(
         ]
         status_name = for_loop_node.variable_name
 
+    if (
+        for_loop_node.max_iterations is not None
+        and len(values) > for_loop_node.max_iterations
+    ):
+        logger.warning(
+            f"For loop source {status_name} has {len(values)} items but "
+            f"max_iterations is {for_loop_node.max_iterations}; skipping the "
+            f"remaining {len(values) - for_loop_node.max_iterations} item(s)"
+        )
+        values = values[: for_loop_node.max_iterations]
+
     for index in range(len(values)):
         try:
             for node in for_loop_node.nodes:
-                new_node = deepcopy(node)
-                if locator_command is not None:
-                    new_node = expand_locator_for_loop_placeholders(
-                        new_node,
-                        locator_command,
-                        index,
-                        index_variable_name,
-                    )
-                else:
-                    assert variable_names is not None
-                    new_node = expand_for_loop_placeholders(
-                        new_node,
-                        variable_names,
-                        index,
-                        index_variable_name,
-                    )
+                new_node = expand_iteration_placeholders(
+                    deepcopy(node),
+                    index,
+                    index_variable_name,
+                    variable_names=variable_names,
+                    locator_command=locator_command,
+                )
                 await _run_for_loop_child_node(
                     new_node, memory, task, browser, full_automation
                 )
@@ -643,22 +677,13 @@ async def handle_for_loop_node(
             for node in for_loop_node.reset_nodes:
                 # Reset nodes also get the current iteration's placeholders
                 # bound so they can reference the item that just finished.
-                new_node = deepcopy(node)
-                if locator_command is not None:
-                    new_node = expand_locator_for_loop_placeholders(
-                        new_node,
-                        locator_command,
-                        index,
-                        index_variable_name,
-                    )
-                else:
-                    assert variable_names is not None
-                    new_node = expand_for_loop_placeholders(
-                        new_node,
-                        variable_names,
-                        index,
-                        index_variable_name,
-                    )
+                new_node = expand_iteration_placeholders(
+                    deepcopy(node),
+                    index,
+                    index_variable_name,
+                    variable_names=variable_names,
+                    locator_command=locator_command,
+                )
                 await _run_for_loop_child_node(
                     new_node, memory, task, browser, full_automation
                 )
