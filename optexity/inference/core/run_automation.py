@@ -536,6 +536,37 @@ async def _run_for_loop_child_node(
         await run_action_node(node, task, memory, browser)
 
 
+# After the first match attaches, require the match count to stay unchanged
+# for this long so slowly streaming tables are not under-counted.
+_LOCATOR_COUNT_STABLE_SECONDS = 1.0
+_LOCATOR_COUNT_POLL_INTERVAL = 0.1
+# Safety bound if the page keeps adding matches forever (e.g. infinite scroll).
+_LOCATOR_COUNT_STABLE_MAX_WAIT = 30.0
+
+
+async def _wait_for_stable_locator_count(locator) -> int:
+    """Poll ``count()`` until it is unchanged for ``_LOCATOR_COUNT_STABLE_SECONDS``."""
+    last_count = await locator.count()
+    stable_since = time.monotonic()
+    deadline = time.monotonic() + _LOCATOR_COUNT_STABLE_MAX_WAIT
+    while True:
+        now = time.monotonic()
+        if now - stable_since >= _LOCATOR_COUNT_STABLE_SECONDS:
+            return last_count
+        if now >= deadline:
+            logger.warning(
+                f"Locator match count did not stay stable for "
+                f"{_LOCATOR_COUNT_STABLE_SECONDS}s within "
+                f"{_LOCATOR_COUNT_STABLE_MAX_WAIT}s; using count={last_count}"
+            )
+            return last_count
+        await asyncio.sleep(_LOCATOR_COUNT_POLL_INTERVAL)
+        current = await locator.count()
+        if current != last_count:
+            last_count = current
+            stable_since = time.monotonic()
+
+
 async def _count_locator_matches(for_loop_node: ForLoopNode, browser: Browser) -> int:
     """Number of elements a locator loop should iterate over.
 
@@ -545,8 +576,11 @@ async def _count_locator_matches(for_loop_node: ForLoopNode, browser: Browser) -
     once the page has loaded. Counting straight away would see zero rows and
     silently skip the whole loop body.
 
-    A locator that resolves but never attaches means zero rows, which is a
-    legitimate outcome (empty result table) rather than an error.
+    After the first match attaches, the count must stay unchanged for
+    ``_LOCATOR_COUNT_STABLE_SECONDS`` so rows that stream in shortly after the
+    first paint are included. A locator that resolves but never attaches means
+    zero rows, which is a legitimate outcome (empty result table) rather than
+    an error.
     """
     assert for_loop_node.locator is not None
     locator = await browser.get_locator_from_command(for_loop_node.locator)
@@ -563,13 +597,20 @@ async def _count_locator_matches(for_loop_node: ForLoopNode, browser: Browser) -
                 state="attached", timeout=for_loop_node.locator_timeout * 1000
             )
         except (TimeoutError, PatchrightTimeoutError, PlaywrightTimeoutError):
-            logger.info(
-                f"No element matched {for_loop_node.locator!r} within "
-                f"{for_loop_node.locator_timeout}s; for loop will run zero iterations"
+            logger.warning(
+                f"No matching locator found: {for_loop_node.locator!r} "
+                f"(waited {for_loop_node.locator_timeout}s); "
+                f"for loop will run zero iterations"
             )
             return 0
+    elif await locator.count() == 0:
+        logger.warning(
+            f"No matching locator found: {for_loop_node.locator!r}; "
+            f"for loop will run zero iterations"
+        )
+        return 0
 
-    count = await locator.count()
+    count = await _wait_for_stable_locator_count(locator)
     logger.debug(f"Locator {for_loop_node.locator!r} matched {count} element(s)")
     return count
 
@@ -592,9 +633,21 @@ async def handle_for_loop_node(
     if for_loop_node.locator is not None:
         locator_command = for_loop_node.locator
         # Snapshot match count once at loop start (stable index set for .nth).
+        # Apply max_iterations before building the values list so a huge match
+        # set cannot allocate thousands of strings before the cap bites.
         count = await _count_locator_matches(for_loop_node, browser)
+        if (
+            for_loop_node.max_iterations is not None
+            and count > for_loop_node.max_iterations
+        ):
+            logger.warning(
+                f"For loop source {locator_command} has {count} items but "
+                f"max_iterations is {for_loop_node.max_iterations}; skipping the "
+                f"remaining {count - for_loop_node.max_iterations} item(s)"
+            )
+            count = for_loop_node.max_iterations
         values: list[str | int | float | bool] = [
-            f"{locator_command}.nth({i})" for i in range(count)
+            f"{locator_command}.nth(" + str(i) + ")" for i in range(count)
         ]
         status_name = locator_command
     else:
@@ -612,17 +665,16 @@ async def handle_for_loop_node(
             name.strip() for name in for_loop_node.variable_name.split(",")
         ]
         status_name = for_loop_node.variable_name
-
-    if (
-        for_loop_node.max_iterations is not None
-        and len(values) > for_loop_node.max_iterations
-    ):
-        logger.warning(
-            f"For loop source {status_name} has {len(values)} items but "
-            f"max_iterations is {for_loop_node.max_iterations}; skipping the "
-            f"remaining {len(values) - for_loop_node.max_iterations} item(s)"
-        )
-        values = values[: for_loop_node.max_iterations]
+        if (
+            for_loop_node.max_iterations is not None
+            and len(values) > for_loop_node.max_iterations
+        ):
+            logger.warning(
+                f"For loop source {status_name} has {len(values)} items but "
+                f"max_iterations is {for_loop_node.max_iterations}; skipping the "
+                f"remaining {len(values) - for_loop_node.max_iterations} item(s)"
+            )
+            values = values[: for_loop_node.max_iterations]
 
     for index in range(len(values)):
         try:

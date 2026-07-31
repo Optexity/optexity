@@ -53,7 +53,7 @@ Exactly one of `variable_name` or `locator` is required.
 }
 ```
 
-At loop start the runtime waits up to `locator_timeout` for the first match to attach, counts matches once, then iterates `0 .. count-1`. An empty match set runs zero iterations (same as an empty list variable).
+At loop start the runtime waits up to `locator_timeout` for the first match to attach, then waits until the match count stays unchanged for 1 second (so slowly streaming rows are not missed), snapshots that count once, and iterates `0 .. count-1`. An empty match set runs zero iterations with a warning (same as an empty list variable — the run does not fail).
 
 ## Properties
 
@@ -62,7 +62,7 @@ At loop start the runtime waits up to `locator_timeout` for the first match to a
 | `variable_name` | `str \| None` | `None` | Parameter list to iterate over. Mutually exclusive with `locator` |
 | `locator` | `str \| None` | `None` | Playwright locator command whose matches are iterated. Mutually exclusive with `variable_name` |
 | `index_variable_name` | `str` | `"index"` | Placeholder name used in `{var[<name>]}` / `{locator[<name>]}` and bare `{<name>}` |
-| `locator_timeout` | `float` | `5.0` | Locator loops only: seconds to wait for the first match to attach before counting |
+| `locator_timeout` | `float` | `5.0` | Locator loops only: seconds to wait for the first match to attach; after that, count must stay stable for 1s before the loop starts |
 | `max_iterations` | `int \| null` | `null` | Cap on iterations; extra items are skipped with a warning |
 | `nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | — | Actions for each iteration |
 | `reset_nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | `[]` | Actions to run after each iteration |
@@ -165,16 +165,19 @@ Then:
 
 ## Waiting for Matches
 
-Locator loops only. `count()` does not auto-wait, and the sleep after an action returns as soon as the page has loaded — which is immediately for an SPA that re-renders without navigating. Counting straight away would see zero rows and skip the loop body silently, so a locator loop first waits up to `locator_timeout` (default 5s) for the first match to attach.
+Locator loops only. `count()` does not auto-wait, and the sleep after an action returns as soon as the page has loaded — which is immediately for an SPA that re-renders without navigating. Counting straight away would see zero rows and skip the loop body silently, so a locator loop:
+
+1. Waits up to `locator_timeout` (default 5s) for the first match to attach
+2. Then waits until the match count stays unchanged for **1 second**, so rows that appear shortly after the first paint are included
 
 | Situation | Behavior |
 |-----------|----------|
-| Matches appear within `locator_timeout` | Loop runs over the count at that moment |
-| No match within `locator_timeout` | Zero iterations, no error — an empty result table is a valid outcome |
+| Matches appear and count stays stable for 1s | Loop runs over that stable count |
+| No match within `locator_timeout` | Zero iterations, warning `No matching locator found`, run does not fail |
 | Locator command doesn't resolve (browser/page gone) | Raises, rather than silently looping zero times |
 | More matches than `max_iterations` | Extra items skipped, logged as a warning |
 
-Raise `locator_timeout` for slow grids; set it to `0` to count immediately when the rows are already on the page.
+Raise `locator_timeout` for slow grids; set it to `0` to skip the first-match wait when rows are already on the page (the 1s stability wait still applies).
 
 ## Storing One Value Per Iteration
 
@@ -436,7 +439,7 @@ Three matched rows download `invoice_0.pdf`, `invoice_1.pdf`, `invoice_2.pdf`. K
 ## Limitations
 
 - Variable loops require the list to be populated before loop execution
-- Locator loops snapshot `count()` once at start; DOM changes mid-loop do not change how many iterations run. Set `max_iterations` as a guard and re-check state inside the loop rather than relying on the initial count
+- Locator loops wait for a stable `count()` (unchanged for 1s) once at start; DOM changes mid-loop do not change how many iterations run. Set `max_iterations` as a guard and re-check state inside the loop rather than relying on the initial count
 - Use `{locator[index]}` for the current match and bare `{index}` for the numeric index
 - When nesting locator loops, give each a distinct `index_variable_name` and reference `{locator[row]}` / `{locator[cell]}` so each level keeps its own match token
 - Locator loops that mutate the matched set (remove/add rows) should use `reset_nodes` and/or prefer extracting a stable list into a variable loop

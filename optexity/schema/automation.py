@@ -292,9 +292,12 @@ class ForLoopNode(BaseModel):
             "Locator loops only: seconds to wait for the first match to attach "
             "before counting (Playwright's count() does not auto-wait, so "
             "without this a table that renders asynchronously counts as empty "
-            "and the loop body never runs). A locator that never attaches "
-            "yields zero iterations rather than an error, so an empty result "
-            "table is handled without failing the run."
+            "and the loop body never runs). After the first match, the runtime "
+            "also waits until the match count stays unchanged for 1s so rows "
+            "that stream in shortly after the first paint are included. A "
+            "locator that never attaches yields zero iterations (with a "
+            "warning) rather than an error, so an empty result table is "
+            "handled without failing the run."
         ),
     )
     max_iterations: int | None = Field(

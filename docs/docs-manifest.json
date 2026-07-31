@@ -1279,8 +1279,8 @@
             "id": "docs-building-automations-for-loop-node",
             "path": "docs/building-automations/for-loop-node.mdx",
             "title": "For Loop Node",
-            "summary": "Documents the for_loop_node for iterating over a list of values or Playwright locator matches in automations. Covers variable_name vs locator (exactly one required), optional index_variable_name (default index), {variable[index]} / bare {index} / {index_of(var)} for variable loops, {locator[index]} / bare {index} for locator loops (no {index_of(locator)}), locator_timeout for waiting on asynchronously rendered matches before counting, max_iterations as a runaway guard, templating output_variable_name to store one value per iteration, nested for_loop_node support including scoping an inner locator by the outer match, using multiple variables (comma-separated), reset_nodes for returning browser to a known state between iterations, and on_error_in_loop error handling (continue, break, raise). Also covers data source options, empty-match behavior, and the requirement that loop variables be pre-populated.",
-            "gist": "for_loop_node: iterate a variable list or locator matches, nested loops, index_variable_name, {var[index]} / {locator[index]} substitution, locator_timeout, max_iterations, reset_nodes, error handling.",
+            "summary": "Documents the for_loop_node for iterating over a list of values or Playwright locator matches in automations. Covers variable_name vs locator (exactly one required), optional index_variable_name (default index), {variable[index]} / bare {index} / {index_of(var)} for variable loops, {locator[index]} / bare {index} for locator loops (no {index_of(locator)}), locator_timeout for waiting on asynchronously rendered matches, a 1s stable-count wait so streaming rows are not under-counted, max_iterations as an optional runaway guard, templating output_variable_name to store one value per iteration, nested for_loop_node support including scoping an inner locator by the outer match, using multiple variables (comma-separated), reset_nodes for returning browser to a known state between iterations, and on_error_in_loop error handling (continue, break, raise). Also covers data source options, empty-match warning behavior, and the requirement that loop variables be pre-populated.",
+            "gist": "for_loop_node: iterate a variable list or locator matches, nested loops, index_variable_name, {var[index]} / {locator[index]} substitution, locator_timeout, stable count, max_iterations, reset_nodes, error handling.",
             "keywords": [
                 "for_loop",
                 "loop",
@@ -1332,7 +1332,7 @@
             },
             "reading_priority": 3,
             "when_to_use": "Select when the query is about iterating over a list or locator matches in an automation, looping over every element a locator matches (e.g. every row of a table) without knowing the count in advance, nested for_loop_node, index_variable_name, locator_timeout, max_iterations, reset_nodes, error handling within loops, or the {variable[index]} / {locator[index]} syntax.",
-            "embedding_hint": "for loop nested iteration index_variable_name variable list locator loop locator[index] nth table rows dynamic count locator_timeout max_iterations reset_nodes on_error_in_loop control flow"
+            "embedding_hint": "for loop nested iteration index_variable_name variable list locator loop locator[index] nth table rows dynamic count locator_timeout stable count max_iterations reset_nodes on_error_in_loop control flow"
         },
         {
             "id": "docs-building-automations-if-else-node",
