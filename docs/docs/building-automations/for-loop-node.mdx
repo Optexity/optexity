@@ -373,6 +373,32 @@ Use `"continue"` when some items may fail but you want to process as many as pos
 }
 ```
 
+### Download One File Per Matched Row
+
+When the rows are on the page but their identifiers aren't known in advance, loop the locator and use the index for the filename. `{row}` works in any field, not just `command`:
+
+```json
+{
+  "type": "for_loop_node",
+  "locator": "locator(\"tr.invoiceRow\")",
+  "index_variable_name": "row",
+  "on_error_in_loop": "continue",
+  "nodes": [{
+    "type": "action_node",
+    "interaction_action": {
+      "click_element": {
+        "command": "{locator[row]}.get_by_role(\"link\", name=\"Download\")",
+        "expect_download": true,
+        "download_filename": "invoice_{row}.pdf",
+        "prompt_instructions": "Download the invoice on row {row}"
+      }
+    }
+  }]
+}
+```
+
+Three matched rows download `invoice_0.pdf`, `invoice_1.pdf`, `invoice_2.pdf`. Keep the index in `download_filename` — a constant name makes every iteration overwrite the previous file.
+
 ### Process Items and Return
 
 ```json

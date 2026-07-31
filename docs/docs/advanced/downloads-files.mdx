@@ -94,6 +94,28 @@ Use `for_loop_node` to download multiple files:
 Use variable substitution in `download_filename` to create unique filenames.
 </Tip>
 
+When the download links are on the page but their identifiers aren't known in advance, iterate a locator instead of a variable and use the loop index for the filename:
+
+```json
+{
+  "type": "for_loop_node",
+  "locator": "locator(\"tr.invoiceRow\")",
+  "index_variable_name": "row",
+  "nodes": [{
+    "type": "action_node",
+    "interaction_action": {
+      "click_element": {
+        "command": "{locator[row]}.get_by_role(\"link\", name=\"Download\")",
+        "expect_download": true,
+        "download_filename": "invoice_{row}.pdf"
+      }
+    }
+  }]
+}
+```
+
+See [For Loop Node](/docs/building-automations/for-loop-node) for the locator loop's placeholders and timing.
+
 ---
 
 ## Upload Files

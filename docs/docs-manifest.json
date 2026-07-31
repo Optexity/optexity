@@ -769,7 +769,7 @@
             "id": "docs-advanced-downloads-files",
             "path": "docs/advanced/downloads-files.mdx",
             "title": "Downloads and File Handling",
-            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, saving pages as PDF (download_url_as_pdf), iterating multiple downloads with for_loop_node, and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, failure behavior when an expected download or download_url_as_pdf produces no file (the task fails with a clear error), and best practices.",
+            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, saving pages as PDF (download_url_as_pdf), iterating multiple downloads with for_loop_node (over a variable list, or over a locator's matched rows using the loop index for unique filenames), and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, failure behavior when an expected download or download_url_as_pdf produces no file (the task fails with a clear error), and best practices.",
             "gist": "File download and upload patterns: click-to-download, PDF save, multi-file loops, upload with file_path.",
             "keywords": [
                 "download",
@@ -779,6 +779,8 @@
                 "download_url_as_pdf",
                 "PDF",
                 "for_loop",
+                "locator loop",
+                "download_filename",
                 "/tmp/optexity",
                 "file handling"
             ],
@@ -1299,7 +1301,8 @@
                 "raise",
                 "{variable[index]}",
                 "{locator[index]}",
-                ".nth"
+                ".nth",
+                "download_filename"
             ],
             "document_type": "guide",
             "tags": ["building-automations", "loop", "iteration", "control-flow"],
