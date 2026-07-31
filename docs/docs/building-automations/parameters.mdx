@@ -194,6 +194,8 @@ If `product_ids = ["PROD-1", "PROD-2", "PROD-3"]`:
 - Iteration 2: `{product_ids[index]}` → `"PROD-2"`  
 - Iteration 3: `{product_ids[index]}` → `"PROD-3"`
 
+A `for_loop_node` can also iterate a locator instead of a parameter, in which case `{locator[index]}` is the current match rather than a value. See [For Loop Node](/docs/building-automations/for-loop-node).
+
 ## Complete Example
 
 This automation logs in, extracts order IDs, and processes each order:

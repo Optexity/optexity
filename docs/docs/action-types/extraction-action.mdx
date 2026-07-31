@@ -186,8 +186,8 @@ Extract text from a specific element on the page using a Playwright locator — 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `command` | `str` | Required | Playwright locator command to find the element |
-| `output_variable_name` | `str \| None` | `None` | Variable name to store the extracted text. When omitted, the value is stored under an auto-generated key (`node{index}_output`) and `extraction_format` must contain exactly one field. |
-| `extraction_format` | `dict` | Required | Must contain `output_variable_name` as a key (or exactly one field when `output_variable_name` is omitted) |
+| `output_variable_name` | `str \| None` | `None` | Variable name to store the extracted text. When omitted, the value is stored under an auto-generated key (`node{index}_output`) and `extraction_format` must contain exactly one field. Accepts loop placeholders (e.g. `"patient_{row}"`) to store one value per iteration — see [For Loop Node](/docs/building-automations/for-loop-node) |
+| `extraction_format` | `dict` | Required | Must contain `output_variable_name` as a key (or exactly one field when `output_variable_name` is omitted). Templated keys are expanded alongside `output_variable_name` |
 | `extraction_instructions` | `str \| None` | `None` | LLM fallback instructions if the locator fails |
 | `llm_model_name` | `str \| None` | `None` | LiteLLM model string used for the fallback, e.g. `"gemini/gemini-2.5-pro"`. Falls back to the task model, then `LLM_MODEL` |
 | `llm_provider` | `str \| None` | `None` | Deprecated — prefix the provider in `llm_model_name` instead |

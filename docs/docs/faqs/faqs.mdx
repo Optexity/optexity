@@ -48,7 +48,7 @@ description: Frequently asked questions about Optexity
 
 <AccordionGroup>
   <Accordion title="How do I iterate over multiple items on a page?">
-    Use `for_loop_node` to iterate over values from input parameters or extracted data. See [For Loop Node](/docs/building-automations/for-loop-node).
+    Use `for_loop_node`. Set `variable_name` to iterate over values from input parameters or extracted data, or set `locator` to iterate over every element a Playwright locator matches when you don't know the count in advance (e.g. every row of a results table). See [For Loop Node](/docs/building-automations/for-loop-node).
   </Accordion>
 
   <Accordion title="How do I handle conditional logic?">

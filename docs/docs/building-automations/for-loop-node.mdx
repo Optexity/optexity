@@ -53,7 +53,7 @@ Exactly one of `variable_name` or `locator` is required.
 }
 ```
 
-At loop start the runtime counts matches once, then iterates `0 .. count-1`. An empty match set runs zero iterations (same as an empty list variable).
+At loop start the runtime waits up to `locator_timeout` for the first match to attach, counts matches once, then iterates `0 .. count-1`. An empty match set runs zero iterations (same as an empty list variable).
 
 ## Properties
 
@@ -62,6 +62,8 @@ At loop start the runtime counts matches once, then iterates `0 .. count-1`. An 
 | `variable_name` | `str \| None` | `None` | Parameter list to iterate over. Mutually exclusive with `locator` |
 | `locator` | `str \| None` | `None` | Playwright locator command whose matches are iterated. Mutually exclusive with `variable_name` |
 | `index_variable_name` | `str` | `"index"` | Placeholder name used in `{var[<name>]}` / `{locator[<name>]}` and bare `{<name>}` |
+| `locator_timeout` | `float` | `5.0` | Locator loops only: seconds to wait for the first match to attach before counting |
+| `max_iterations` | `int \| null` | `null` | Cap on iterations; extra items are skipped with a warning |
 | `nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | — | Actions for each iteration |
 | `reset_nodes` | `list[action_node \| for_loop_node \| if_else_node \| assert_locator_node]` | `[]` | Actions to run after each iteration |
 | `on_error_in_loop` | `"continue" \| "break" \| "raise"` | `"raise"` | Error handling behavior |
@@ -103,8 +105,10 @@ With `index_variable_name: "row"`:
 | Pattern | Expands to |
 |---------|------------|
 | `{locator[row]}` | Current match command (`<locator>.nth(<N>)`) |
-| `{row}` / `{index_of(locator)}` | Current numeric index (`0`, `1`, …) |
+| `{row}` | Current numeric index (`0`, `1`, …) |
 | `{locator[row]}.get_by_role("button")` | Chained command on the current match |
+
+There is no `{index_of(locator)}` counterpart to `{index_of(<variable>)}`. It would carry no per-loop name, so in nested locator loops the outer loop would bind the inner loop's occurrences. Use the bare `{<index_variable_name>}` form, which is scoped per level.
 
 ### Using Multiple Variables in a Loop
 
@@ -159,6 +163,38 @@ Then:
 - Iteration 1 uses `{primary_var[index]}` → `"Value A1"` and `{secondary_var[index]}` → `"Value B1"`
 - Iteration 2 uses `{primary_var[index]}` → `"Value A2"` and `{secondary_var[index]}` → `"Value B2"`
 
+## Waiting for Matches
+
+Locator loops only. `count()` does not auto-wait, and the sleep after an action returns as soon as the page has loaded — which is immediately for an SPA that re-renders without navigating. Counting straight away would see zero rows and skip the loop body silently, so a locator loop first waits up to `locator_timeout` (default 5s) for the first match to attach.
+
+| Situation | Behavior |
+|-----------|----------|
+| Matches appear within `locator_timeout` | Loop runs over the count at that moment |
+| No match within `locator_timeout` | Zero iterations, no error — an empty result table is a valid outcome |
+| Locator command doesn't resolve (browser/page gone) | Raises, rather than silently looping zero times |
+| More matches than `max_iterations` | Extra items skipped, logged as a warning |
+
+Raise `locator_timeout` for slow grids; set it to `0` to count immediately when the rows are already on the page.
+
+## Storing One Value Per Iteration
+
+`output_variable_name` is expanded like any other placeholder, so template it to give each iteration its own variable:
+
+```json
+{
+  "type": "action_node",
+  "extraction_action": {
+    "locator": {
+      "command": "{locator[row]}.locator(\"td.PatientNameCell\")",
+      "output_variable_name": "patient_{row}",
+      "extraction_format": { "patient_{row}": "str" }
+    }
+  }
+}
+```
+
+Without the placeholder every iteration overwrites the same variable and only the last row survives. Extracted values are appended to the task's output data on every iteration either way — template the name only when you need to reference a specific row's value later.
+
 ## Nested Loops
 
 `for_loop_node` can contain another `for_loop_node`. Give each loop a distinct `index_variable_name` so the outer index stays usable inside the inner loop:
@@ -199,6 +235,8 @@ Then:
 | Distinct names (`page_i`, `item_i`) | Outer and inner indexes can both be referenced clearly inside the innermost body. |
 
 The inner loop's list must already exist when that loop starts (for example, extract `items` inside the outer iteration before the inner `for_loop_node`).
+
+An inner loop's `locator` is itself expanded by the outer loop, so a locator loop can be scoped to the outer iteration — `"locator": "{locator[row]}.locator(\"td\")"` inside a loop over `tr` elements iterates that row's cells. The inner count is taken from the already-scoped locator.
 
 ## Data Sources
 
@@ -372,8 +410,8 @@ Use `"continue"` when some items may fail but you want to process as many as pos
 ## Limitations
 
 - Variable loops require the list to be populated before loop execution
-- Locator loops snapshot `count()` once at start; DOM changes mid-loop do not change how many iterations run
-- Use `{locator[index]}` for the current match and bare `{index}` (or `{index_of(locator)}`) for the numeric index
-- When nesting locator loops, give each a distinct `index_variable_name` and reference `{locator[row]}` / `{locator[cell]}` so each level keeps its own match token; avoid `{index_of(locator)}` inside nested locator loops (it is not scoped per level)
+- Locator loops snapshot `count()` once at start; DOM changes mid-loop do not change how many iterations run. Set `max_iterations` as a guard and re-check state inside the loop rather than relying on the initial count
+- Use `{locator[index]}` for the current match and bare `{index}` for the numeric index
+- When nesting locator loops, give each a distinct `index_variable_name` and reference `{locator[row]}` / `{locator[cell]}` so each level keeps its own match token
 - Locator loops that mutate the matched set (remove/add rows) should use `reset_nodes` and/or prefer extracting a stable list into a variable loop
 - Deep nesting is allowed; keep `index_variable_name` distinct per nesting level when you need both indexes
