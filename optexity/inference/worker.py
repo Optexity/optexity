@@ -1,10 +1,23 @@
 import asyncio
-import json
+import os
 import sys
 
 from optexity.inference.core.run_automation import run_automation
 from optexity.schema.enums import ExitCodes
 from optexity.schema.task import Task
+
+
+def _force_exit(code: int) -> None:
+    """Exit immediately, ignoring leftover non-daemon threads (Playwright/Chrome).
+
+    ``sys.exit`` can hang if browser teardown left non-daemon threads alive; the
+    parent then hits ``max_timeout_in_minutes`` and overwrites a successful
+    completion as killed. Task post-processing already finished inside
+    ``run_automation`` before this is called.
+    """
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)
 
 
 async def main():
@@ -23,13 +36,13 @@ async def main():
             max_tries=max_tries,
         )
     except Exception:
-        sys.exit(ExitCodes.WORKER_CRASHED.value)
+        _force_exit(ExitCodes.WORKER_CRASHED.value)
 
     if task.status == "success":
-        sys.exit(ExitCodes.SUCCESS.value)
+        _force_exit(ExitCodes.SUCCESS.value)
     if task.status == "killed":
-        sys.exit(ExitCodes.AUTOMATION_KILLED.value)
-    sys.exit(ExitCodes.AUTOMATION_FAILED.value)
+        _force_exit(ExitCodes.AUTOMATION_KILLED.value)
+    _force_exit(ExitCodes.AUTOMATION_FAILED.value)
 
 
 if __name__ == "__main__":
