@@ -27,10 +27,12 @@ from optexity.inference.core.logging import (
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.inference.infra.browser_health import consume_browser_restart_request
+from optexity.schema.automation import Automation
 from optexity.schema.enums import ExitCodes
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import SystemInfo
 from optexity.schema.task import Task
+from optexity.utils.http import request_with_backoff
 from optexity.utils.settings import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -120,6 +122,7 @@ async def restart_global_actual_browser(reason: str) -> None:
 
 
 async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int):
+    assert task.automation is not None, f"Task {task.task_id} has no automation"
     global _global_actual_browser
     system_info = SystemInfo()
     memory_exceeded = (
@@ -207,6 +210,7 @@ async def run_automation_in_process(
     logger.info(
         f"---------- Starting to run automation for task {task.task_id} ----------\n"
     )
+    assert task.automation is not None, f"Task {task.task_id} has no automation"
     worker_path = pathlib.Path(__file__).parent / "worker.py"
     total_attempts = max(1, int(task.automation.max_retries) + 1)
     returncode: int | None = None
@@ -360,13 +364,85 @@ async def task_processor():
 
     while True:
         try:
-            # Get next task from queue (blocks until one is available);
-            # highest priority (lowest key) first, then FIFO.
             *_, task = await task_queue.get()
             if task.task_id in tasks_to_kill:
                 logger.info(f"Task {task.task_id} has been killed")
                 tasks_to_kill.remove(task.task_id)
                 continue
+
+            # Fetch fresh automation from server just before running so any
+            # workflow changes after allocation are picked up. Client errors
+            # (<500) retry 3x with 3s wait; 5xx / unreachable use up to 4 min
+            # exponential backoff.
+            recording_url = settings.GET_RECORDING_ENDPOINT.format(
+                recording_id=task.recording_id
+            )
+            fetch_url = f"{settings.SERVER_URL.rstrip('/')}/{recording_url}"
+            fetch_success = False
+            response, attempt = await request_with_backoff(
+                fetch_url,
+                headers={"x-api-key": task.api_key},
+                log_label=f"automation fetch for task {task.task_id}",
+            )
+            if response is not None:
+                try:
+                    data = response.json()
+                    task.automation = Automation.model_validate(data["automation"])
+                    # Use recording/workspace callback_url only if no per-task
+                    # override exists on either field (task_callback_url takes
+                    # priority; task.callback_url may have been set via x-callback-url
+                    # header and must not be overwritten).
+                    if (
+                        task.callback_url is None
+                        and not task.task_callback_url
+                        and data.get("callback_url")
+                    ):
+                        from optexity.schema.task import CallbackUrl
+
+                        try:
+                            task.callback_url = CallbackUrl.model_validate(
+                                data["callback_url"]
+                            )
+                        except Exception as cb_err:
+                            logger.warning(
+                                f"Failed to parse callback_url for task "
+                                f"{task.task_id}: {cb_err}"
+                            )
+                    fetch_success = True
+                    logger.info(
+                        f"Fetched fresh automation for task {task.task_id} "
+                        f"(recording {task.recording_id})"
+                    )
+                except Exception as parse_err:
+                    logger.warning(
+                        f"Failed to parse automation response for task "
+                        f"{task.task_id}: {parse_err}"
+                    )
+            if not fetch_success:
+                if task.automation is not None:
+                    logger.warning(
+                        f"All automation fetch attempts failed for task {task.task_id}; "
+                        f"using in-memory fallback"
+                    )
+                else:
+                    logger.error(
+                        f"All automation fetch attempts failed for task {task.task_id}; "
+                        f"marking failed and firing callback"
+                    )
+                    task.status = "failed"
+                    task.error = f"Failed to fetch automation after {attempt} attempts"
+                    task.completed_at = datetime.now(timezone.utc)
+                    try:
+                        await complete_task_in_server(
+                            task, None, child_process_id, unique_child_arn
+                        )
+                        await initiate_callback(task)
+                    except Exception as fail_err:
+                        logger.error(
+                            f"Failed to report task {task.task_id} failure: {fail_err}"
+                        )
+                    continue
+
             task_running = True
             last_task_start_time = datetime.now()
             await run_automation_in_process(task, unique_child_arn, child_process_id)
@@ -485,30 +561,36 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
         return {"completed": completed}
 
     @app.post("/kill_task")
-    async def kill_task(task_id: str = Body(...)):
-        """Kill task endpoint.
+    async def kill_task(task_ids: list[str] = Body(...)):
+        """Kill task endpoint (bulk).
 
-        - Adds task_id to tasks_to_kill so queued tasks are skipped by the
-          processor and a running worker's post-exit retry loop bails out.
-        - If a worker subprocess for this task is currently running, SIGKILL
-          its process group so the worker exits promptly.
+        Accepts a list of task IDs. For each:
+        - Adds to tasks_to_kill so queued tasks are skipped by the processor
+          and a running worker's post-exit retry loop bails out.
+        - SIGKILLs the worker subprocess if currently running.
         """
-        tasks_to_kill.add(task_id)
-        hitl_completed_tasks.discard(task_id)
-        proc = running_task_processes.get(task_id)
-        if proc is not None and proc.returncode is None:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                logger.info(f"Killed worker process group for task {task_id}")
-            except ProcessLookupError:
-                logger.info(
-                    f"Worker process group for task {task_id} was already gone; "
-                    "treating /kill_task as successful"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to kill worker process for task {task_id}: {e}")
+        for task_id in task_ids:
+            tasks_to_kill.add(task_id)
+            hitl_completed_tasks.discard(task_id)
+            proc = running_task_processes.get(task_id)
+            if proc is not None and proc.returncode is None:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    logger.info(f"Killed worker process group for task {task_id}")
+                except ProcessLookupError:
+                    logger.info(
+                        f"Worker process group for task {task_id} was already gone; "
+                        "treating /kill_task as successful"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to kill worker process for task {task_id}: {e}"
+                    )
         return JSONResponse(
-            content={"success": True, "message": "Task has been killed"},
+            content={
+                "success": True,
+                "message": f"Kill signal sent for {len(task_ids)} tasks",
+            },
             status_code=200,
         )
 
@@ -549,20 +631,20 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
         )
 
     @app.post("/allocate_task")
-    async def allocate_task(task: Task = Body(...)):
-        """Get details of a specific task."""
+    async def allocate_task(tasks: list[Task] = Body(...)):
+        """Bulk allocate tasks onto this child's local priority queue."""
         try:
-
-            _enqueue_task(task)
+            for task in tasks:
+                _enqueue_task(task)
             return JSONResponse(
                 content={
                     "success": True,
-                    "message": "Task has been allocated. Check its status and output at https://dashboard.optexity.com/tasks",
+                    "message": f"{len(tasks)} task(s) allocated. Check status at https://dashboard.optexity.com/tasks",
                 },
                 status_code=202,
             )
         except Exception as e:
-            logger.error(f"Error allocating task {task.task_id}: {e}")
+            logger.error(f"Error allocating tasks: {e}")
             return JSONResponse(
                 content={"success": False, "message": str(e)}, status_code=500
             )

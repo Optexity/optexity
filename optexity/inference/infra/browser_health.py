@@ -88,6 +88,7 @@ def update_memory_browser_state_from_summary(
     memory: Memory,
     task: Task,
 ) -> None:
+    assert task.automation is not None, f"Task {task.task_id} has no automation"
     memory.browser_states[-1] = BrowserState(
         url=browser_state_summary.url,
         screenshot=browser_state_summary.screenshot,
