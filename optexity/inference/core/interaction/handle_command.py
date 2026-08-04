@@ -326,7 +326,12 @@ async def click_locator(
 
     if click_element_action.expect_download:
         await handle_download(
-            _actual_click, memory, browser, task, click_element_action.download_filename
+            _actual_click,
+            memory,
+            browser,
+            task,
+            click_element_action.download_filename,
+            click_element_action.download_metadata,
         )
     else:
         await _actual_click()
@@ -443,6 +448,7 @@ async def select_option_locator(
             browser,
             task,
             select_option_action.download_filename,
+            select_option_action.download_metadata,
         )
     else:
         await _actual_select_option()

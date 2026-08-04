@@ -243,6 +243,7 @@ async def select_option_index(
                     browser,
                     task,
                     select_option_action.download_filename,
+                    select_option_action.download_metadata,
                 )
             else:
                 await _actual_select_option()

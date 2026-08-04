@@ -33,6 +33,32 @@ Optexity can download files from websites and upload files to forms.
 |----------|------|---------|-------------|
 | `expect_download` | `bool` | `False` | Action triggers download |
 | `download_filename` | `str \| None` | Auto-generated UUID | Filename for download |
+| `download_metadata` | `dict \| None` | `None` | Freeform JSON stored with the download |
+
+---
+
+## Download Metadata
+
+Attach freeform JSON to a download when using `expect_download`. Values support the same `{variable}` substitution as other action fields:
+
+```json
+{
+  "interaction_action": {
+    "click_element": {
+      "command": "get_by_text(\"{doc_ids[index]}\")",
+      "expect_download": true,
+      "download_filename": "doc_{doc_ids[index]}.pdf",
+      "download_metadata": {
+        "doc_id": "{doc_ids[index]}",
+        "source": "ehr",
+        "kind": "report"
+      }
+    }
+  }
+}
+```
+
+Metadata is keyed by the final filename and returned on callbacks as optional `downloads_with_metadata` (see [Callbacks](/docs/advanced/callbacks)). Only `click_element` / `select_option` with `expect_download` support this field.
 
 ---
 

@@ -15,6 +15,7 @@ The callback response is a JSON object with the following fields:
 - `error`: string indicating the error message. If there is no error, it will be `null`.
 - `final_screenshot`: base64 encoded string of the final screenshot
 - `downloads`: list of download objects. Each object has a `url` and a `filename` field.
+- `downloads_with_metadata`: optional list included only when at least one download has metadata. Each object has `url`, `filename`, and `metadata` (`null` when that file has none). Omitted entirely when no download metadata was set.
 
 ```json
 {
@@ -29,6 +30,13 @@ The callback response is a JSON object with the following fields:
         {
             "url": "signed url",
             "filename": "filename"
+        }
+    ],
+    "downloads_with_metadata": [
+        {
+            "url": "signed url",
+            "filename": "filename",
+            "metadata": { "doc_id": "123" }
         }
     ]
 }

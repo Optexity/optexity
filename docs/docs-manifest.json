@@ -103,7 +103,7 @@
             "id": "api-reference-callback",
             "path": "api-reference/callback.mdx",
             "title": "Callback Reference",
-            "summary": "Complete reference for the callback payload Optexity sends to a user-configured endpoint when an automation task completes. Documents all top-level fields: status, task_id, recording_id, output_data, error, final_screenshot, and downloads. Includes a full example JSON payload.",
+            "summary": "Complete reference for the callback payload Optexity sends to a user-configured endpoint when an automation task completes. Documents all top-level fields: status, task_id, recording_id, output_data, error, final_screenshot, downloads, and optional downloads_with_metadata. Includes a full example JSON payload.",
             "gist": "Full schema of the HTTP POST payload sent to your callback URL on task completion.",
             "keywords": [
                 "callback",
@@ -113,6 +113,7 @@
                 "status",
                 "output_data",
                 "downloads",
+                "downloads_with_metadata",
                 "final_screenshot",
                 "schema"
             ],
@@ -135,11 +136,16 @@
             "entities": {
                 "systems": ["Optexity cloud"],
                 "apis": ["callback endpoint"],
-                "data_models": ["callback payload", "output_data", "downloads"]
+                "data_models": [
+                    "callback payload",
+                    "output_data",
+                    "downloads",
+                    "downloads_with_metadata"
+                ]
             },
             "reading_priority": 3,
             "when_to_use": "Select when the query is about the shape or fields of the callback/webhook payload received after a task completes, or when debugging what fields are returned in a callback.",
-            "embedding_hint": "callback webhook payload schema task completion output_data downloads"
+            "embedding_hint": "callback webhook payload schema task completion output_data downloads downloads_with_metadata"
         },
         {
             "id": "api-reference-inference-endpoint",
@@ -726,7 +732,7 @@
             "id": "docs-advanced-callbacks",
             "path": "docs/advanced/callbacks.mdx",
             "title": "Callbacks",
-            "summary": "Explains how to receive HTTP POST notifications when automations complete. Covers local development setup via the LOCAL_CALLBACK_URL environment variable, production configuration through the Optexity dashboard, the callback payload structure (task_id, status, output_data, downloads), and authentication options (API key, Basic Auth). Links to the Callback Reference for the complete schema.",
+            "summary": "Explains how to receive HTTP POST notifications when automations complete. Covers local development setup via the LOCAL_CALLBACK_URL environment variable, production configuration through the Optexity dashboard, the callback payload structure (task_id, status, output_data, downloads, optional downloads_with_metadata), and authentication options (API key, Basic Auth). Links to the Callback Reference for the complete schema.",
             "gist": "HTTP callback setup for automation completion: local dev vs production, payload overview, authentication.",
             "keywords": [
                 "callback",
@@ -737,7 +743,8 @@
                 "API key",
                 "Basic Auth",
                 "notification",
-                "task completion"
+                "task completion",
+                "downloads_with_metadata"
             ],
             "document_type": "guide",
             "tags": ["advanced", "callbacks", "webhook", "integration"],
@@ -747,6 +754,10 @@
                     {
                         "doc_id": "api-reference-callback",
                         "context": "Links to callback reference for the complete payload schema."
+                    },
+                    {
+                        "doc_id": "docs-advanced-downloads-files",
+                        "context": "Download metadata on expect_download populates downloads_with_metadata."
                     }
                 ],
                 "referenced_by": [
@@ -759,22 +770,23 @@
             "entities": {
                 "systems": ["Optexity dashboard"],
                 "apis": [],
-                "data_models": ["callback payload"]
+                "data_models": ["callback payload", "downloads_with_metadata"]
             },
             "reading_priority": 3,
             "when_to_use": "Select when the query is about setting up callbacks/webhooks, receiving notifications on task completion, configuring LOCAL_CALLBACK_URL, or authenticating callback requests.",
-            "embedding_hint": "callback webhook notification task completion LOCAL_CALLBACK_URL authentication"
+            "embedding_hint": "callback webhook notification task completion LOCAL_CALLBACK_URL authentication downloads_with_metadata"
         },
         {
             "id": "docs-advanced-downloads-files",
             "path": "docs/advanced/downloads-files.mdx",
             "title": "Downloads and File Handling",
-            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, saving pages as PDF (download_url_as_pdf), iterating multiple downloads with for_loop_node (over a variable list, or over a locator's matched rows using the loop index for unique filenames), and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, failure behavior when an expected download or download_url_as_pdf produces no file (the task fails with a clear error), and best practices.",
-            "gist": "File download and upload patterns: click-to-download, PDF save, multi-file loops, upload with file_path.",
+            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, attaching freeform download_metadata, saving pages as PDF (download_url_as_pdf), iterating multiple downloads with for_loop_node (over a variable list, or over a locator's matched rows using the loop index for unique filenames), and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, failure behavior when an expected download or download_url_as_pdf produces no file (the task fails with a clear error), and best practices.",
+            "gist": "File download and upload patterns: click-to-download, metadata, PDF save, multi-file loops, upload with file_path.",
             "keywords": [
                 "download",
                 "upload",
                 "expect_download",
+                "download_metadata",
                 "file_path",
                 "download_url_as_pdf",
                 "PDF",
@@ -792,6 +804,10 @@
                     {
                         "doc_id": "docs-building-automations-for-loop-node",
                         "context": "Multiple downloads use for_loop_node."
+                    },
+                    {
+                        "doc_id": "docs-advanced-callbacks",
+                        "context": "download_metadata appears on callbacks as downloads_with_metadata."
                     }
                 ],
                 "referenced_by": []
@@ -799,11 +815,11 @@
             "entities": {
                 "systems": [],
                 "apis": [],
-                "data_models": []
+                "data_models": ["download_metadata"]
             },
             "reading_priority": 3,
-            "when_to_use": "Select when the query is about downloading files, uploading files, saving pages as PDF, handling multiple file downloads, the file storage path during task execution, or why a task fails when an expected download produces no file.",
-            "embedding_hint": "download upload file PDF expect_download download_url_as_pdf /tmp/optexity for_loop download failure task failed no file"
+            "when_to_use": "Select when the query is about downloading files, uploading files, saving pages as PDF, attaching download metadata, handling multiple file downloads, the file storage path during task execution, or why a task fails when an expected download produces no file.",
+            "embedding_hint": "download upload file PDF expect_download download_metadata download_url_as_pdf /tmp/optexity for_loop download failure task failed no file"
         },
         {
             "id": "docs-advanced-locators",

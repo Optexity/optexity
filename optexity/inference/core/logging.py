@@ -277,12 +277,24 @@ async def save_downloads_in_server(task: Task, memory: Memory):
         if len(uploaded_filenames) == 0:
             return
 
+        confirm_payload: dict = {
+            "task_id": task.task_id,
+            "filenames": uploaded_filenames,
+        }
+        downloads_metadata = {
+            name: memory.download_metadata[name]
+            for name in uploaded_filenames
+            if name in memory.download_metadata
+        }
+        if downloads_metadata:
+            confirm_payload["downloads_metadata"] = downloads_metadata
+
         confirm_url = urljoin(settings.SERVER_URL, settings.CONFIRM_DOWNLOADS_ENDPOINT)
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 confirm_url,
                 headers=headers,
-                json={"task_id": task.task_id, "filenames": uploaded_filenames},
+                json=confirm_payload,
             )
             response.raise_for_status()
             response_json = response.json()

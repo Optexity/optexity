@@ -54,6 +54,13 @@ Configure in the Optexity dashboard:
   "final_screenshot": "base64_encoded_string",
   "downloads": [
     {"url": "signed_url", "filename": "report.pdf"}
+  ],
+  "downloads_with_metadata": [
+    {
+      "url": "signed_url",
+      "filename": "report.pdf",
+      "metadata": {"doc_id": "123", "kind": "report"}
+    }
   ]
 }
 ```
@@ -66,6 +73,9 @@ Configure in the Optexity dashboard:
 | `error` | `str \| null` | Error message if failed |
 | `final_screenshot` | `str` | Base64 screenshot |
 | `downloads` | `list` | Download URLs and filenames |
+| `downloads_with_metadata` | `list \| omitted` | All downloads with optional `metadata`; only present when at least one file has metadata |
+
+Set `download_metadata` on `expect_download` actions to populate this. See [Downloads & Files](/docs/advanced/downloads-files).
 
 ---
 

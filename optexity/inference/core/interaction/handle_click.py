@@ -98,6 +98,7 @@ async def click_element_index(
                     browser,
                     task,
                     click_element_action.download_filename,
+                    click_element_action.download_metadata,
                 )
             else:
                 await _actual_click_element()

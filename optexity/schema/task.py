@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from PIL import Image
 from pydantic import BaseModel, Field, computed_field, model_validator
@@ -319,3 +319,4 @@ class RequestDownloadUploadUrlsRequest(BaseModel):
 class ConfirmDownloadsRequest(BaseModel):
     task_id: str
     filenames: list[str]
+    downloads_metadata: dict[str, dict[str, Any]] | None = None

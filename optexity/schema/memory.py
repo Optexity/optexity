@@ -159,6 +159,9 @@ class Memory(BaseModel):
     )
     urls_to_downloads: list[tuple[str, str]] = Field(default_factory=list)
     downloads: list[Path] = Field(default_factory=list)
+    # Sparse map of final download filename -> freeform metadata from
+    # expect_download actions that set download_metadata.
+    download_metadata: dict[str, dict[str, Any]] = Field(default_factory=dict)
     final_screenshot: str | None = Field(default=None)
     system_info_tracking: list[SystemInfo] = Field(default_factory=list)
     unique_child_arn: str

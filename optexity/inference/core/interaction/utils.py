@@ -7,7 +7,7 @@ import shutil
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Union
+from typing import Any, Callable, Union
 
 import aiofiles
 import patchright.async_api
@@ -624,9 +624,28 @@ async def _wait_for_file_stable(
 
 
 async def handle_download(
-    func: Callable, memory: Memory, browser: Browser, task: Task, download_filename: str
+    func: Callable,
+    memory: Memory,
+    browser: Browser,
+    task: Task,
+    download_filename: str,
+    download_metadata: dict[str, Any] | None = None,
 ):
     download_path: Path = task.downloads_directory / download_filename
+
+    def _register_download_metadata(filename: str) -> None:
+        if download_metadata is None:
+            return
+        try:
+            memory.download_metadata[filename] = download_metadata
+            logger.info(
+                f"handle_download: registered metadata for {filename!r}: "
+                f"{download_metadata}"
+            )
+        except Exception as e:
+            logger.warning(
+                f"handle_download: failed to register metadata for {filename!r}: {e}"
+            )
 
     before = _snapshot_dir(browser.temp_downloads_dir)
 
@@ -653,6 +672,8 @@ async def handle_download(
         name (e.g. "401002157.pdf" instead of "<uuid>.pdf")."""
         new_indices = list(range(urls_before, len(memory.urls_to_downloads)))
         if not new_indices:
+            # raw_downloads channel: file name finalized later; key by requested name
+            _register_download_metadata(download_filename)
             return
         for pos, i in enumerate(new_indices):
             url, auto_name = memory.urls_to_downloads[i]
@@ -665,6 +686,7 @@ async def handle_download(
                 p = Path(desired)
                 desired = f"{p.stem}_{pos}{p.suffix}"
             memory.urls_to_downloads[i] = (url, desired)
+            _register_download_metadata(desired)
             logger.info(
                 f"handle_download: renamed captured download "
                 f"{auto_name!r} -> {desired!r}"
@@ -848,6 +870,7 @@ async def handle_download(
 
     if download_path.exists() and download_path.stat().st_size > 0:
         memory.downloads.append(download_path)
+        _register_download_metadata(download_path.name)
     else:
         logger.error(f"Download file is empty or missing: {download_path}")
         raise ExpectedDownloadFailedException(
