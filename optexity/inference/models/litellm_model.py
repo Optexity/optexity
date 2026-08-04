@@ -50,7 +50,7 @@ def _restore_schema_keys(obj):
 # goes through reasoning_effort, which it maps to a thinkingBudget: "minimal" is
 # 128 tokens and "disable"/"none" are 0, which Gemini 3.x rejects with a 400.
 # 128 is therefore the floor.
-_GEMINI_3_REASONING_EFFORT = "minimal"
+_GEMINI_3_REASONING_EFFORT = "medium"
 
 
 def reasoning_effort_for(model: str) -> str | None:
