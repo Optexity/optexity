@@ -9,7 +9,7 @@ import subprocess
 import sys
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 
 import httpx
@@ -49,6 +49,8 @@ class HumanInLoopCompletedBody(BaseModel):
 child_process_id = -1
 unique_child_arn: str = str(uuid.uuid4())
 task_running = False
+last_task_start_time: datetime | None = None
+current_task_timeout_minutes: int | None = None
 task_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
 # Monotonic tie-breaker so equal-priority entries stay FIFO and heap ordering
 # never compares Task objects. See Task.priority_order_key.
@@ -137,7 +139,6 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
         restart_reason = None
 
     if _global_actual_browser is not None:
-
         restart_browser = False
         if restart_reason:
             logger.info(
@@ -353,7 +354,7 @@ async def run_automation_in_process(
 
 async def task_processor():
     """Background worker that processes tasks from the queue one at a time."""
-    global task_running
+    global task_running, last_task_start_time, current_task_timeout_minutes
     logger.info("Task processor started")
 
     while True:
@@ -366,6 +367,8 @@ async def task_processor():
                 tasks_to_kill.remove(task.task_id)
                 continue
             task_running = True
+            last_task_start_time = datetime.now(timezone.utc)
+            current_task_timeout_minutes = task.max_timeout_in_minutes
             await run_automation_in_process(task, unique_child_arn, child_process_id)
 
         except asyncio.CancelledError:
@@ -374,8 +377,9 @@ async def task_processor():
         except Exception as e:
             logger.error(f"Error in task processor: {e}")
         finally:
-
             task_running = False
+            last_task_start_time = None
+            current_task_timeout_minutes = None
 
 
 async def register_with_master():
@@ -511,13 +515,26 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
 
     @app.get("/health", tags=["info"])
     async def health():
-        """Liveness probe for ECS/opcloud.
+        """Health check endpoint.
 
-        Always 200 while this process can serve HTTP. Task duration limits are
-        enforced by ``max_timeout_in_minutes`` on the worker subprocess — do not
-        fail health during long (e.g. 120m) runs or ECS will mark the essential
-        container unhealthy mid-task.
+        Returns 503 if a task has been running longer than its
+        ``max_timeout_in_minutes`` (default 15). Valid long runs stay healthy
+        until that task-specific limit.
         """
+        timeout_minutes = current_task_timeout_minutes or 15
+        if (
+            task_running
+            and last_task_start_time is not None
+            and datetime.now(timezone.utc) - last_task_start_time
+            > timedelta(minutes=timeout_minutes)
+        ):
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unhealthy",
+                    "message": (f"Task not finished within {timeout_minutes} minutes"),
+                },
+            )
         return JSONResponse(
             status_code=200,
             content={
@@ -542,7 +559,6 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
     async def allocate_task(task: Task = Body(...)):
         """Get details of a specific task."""
         try:
-
             _enqueue_task(task)
             return JSONResponse(
                 content={
@@ -563,7 +579,6 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
         async def inference(inference_request: InferenceRequest = Body(...)):
             response_data: dict | None = None
             try:
-
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     url = urljoin(settings.SERVER_URL, settings.INFERENCE_ENDPOINT)
                     headers = {"x-api-key": settings.OPTEXITY_API_KEY}
