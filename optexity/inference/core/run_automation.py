@@ -8,6 +8,7 @@ import traceback
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from patchright.async_api import expect as playwright_expect
@@ -75,6 +76,53 @@ from optexity.inference.infra.browser_health import (
 )
 
 
+def _is_same_url(current: str, target: str) -> bool:
+    """Exact match apart from a trailing slash on the path.
+
+    Deliberately strict: query and fragment are compared as-is, because a
+    hash-routed portal's fragment is the only thing distinguishing one screen
+    from another. A false positive starts the nodes on the wrong page, which is
+    far worse than falling back to a normal cold navigation.
+    """
+    try:
+        pc, pt = urlparse(current), urlparse(target)
+    except Exception:
+        return False
+    return (pc.scheme, pc.netloc, pc.path.rstrip("/"), pc.query, pc.fragment) == (
+        pt.scheme,
+        pt.netloc,
+        pt.path.rstrip("/"),
+        pt.query,
+        pt.fragment,
+    )
+
+
+async def _can_reuse_page(browser: Browser, target_url: str) -> bool:
+    """Whether the reused browser is already usable on `target_url`.
+
+    Read-only: neither the URL read nor the evaluate navigates or reloads, which
+    is the whole point for portals that break on refresh. The evaluate also
+    stands in for the `about:blank` liveness probe that the caller skips.
+    """
+    try:
+        current_url = await browser.get_current_page_url()
+        if not _is_same_url(current_url, target_url):
+            logger.info(
+                "Not reusing page: browser is on %s, automation expects %s",
+                current_url,
+                target_url,
+            )
+            return False
+
+        page = await browser.get_current_page()
+        await asyncio.wait_for(page.evaluate("() => true"), timeout=5)
+        logger.info("Reusing existing page at %s without navigating", current_url)
+        return True
+    except Exception as e:
+        logger.info("Page reuse check failed (%s); falling back to cold navigation", e)
+        return False
+
+
 async def run_automation(
     task: Task,
     unique_child_arn: str,
@@ -116,10 +164,19 @@ async def run_automation(
         memory.automation_state.step_index = -1
         memory.automation_state.try_index = 0
 
+        reuse_page = False
         try:
             in_browser_setup = True
             await browser.start()
-            await browser.go_to_url("about:blank")
+
+            # Opt-in fast path for portals that error out on any reload: if the
+            # dedicated browser is still on automation.url, keep that page and
+            # skip about:blank / the proxy check / the navigation below.
+            if task.is_dedicated and automation.reuse_page_if_already_on_url:
+                reuse_page = await _can_reuse_page(browser, automation.url)
+
+            if not reuse_page:
+                await browser.go_to_url("about:blank")
         except Exception as e:
             logger.error(
                 f"Error going to about:blank on start: {e}, stopping browser and restarting"
@@ -131,7 +188,7 @@ async def run_automation(
         in_browser_setup = False
         memory.update_system_info()
 
-        if task.use_proxy:
+        if task.use_proxy and not reuse_page:
 
             page = await browser.get_current_page()
             await asyncio.sleep(5)
@@ -159,7 +216,8 @@ async def run_automation(
                 except Exception as e:
                     logger.error(f"Error getting IP info: {e}")
 
-        await browser.go_to_url(task.automation.url, retry_count=3)
+        if not reuse_page:
+            await browser.go_to_url(task.automation.url, retry_count=3)
         memory.update_system_info()
         memory.automation_state.start_2fa_time = datetime.now(timezone.utc)
 

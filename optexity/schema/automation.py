@@ -597,6 +597,12 @@ class Automation(BaseModel):
     expected_downloads: int = 0
     remove_empty_nodes_in_axtree: bool = True
     url: str
+    # Opt-in, dedicated-workers only. Some portals error out if their page is
+    # reloaded at all, so when the reused browser is already sitting on `url`
+    # this skips every pre-workflow navigation (about:blank, the proxy IP check,
+    # and the navigation to `url` itself) and starts the nodes on that page as-is.
+    # Any mismatch or health-check failure falls back to the normal cold flow.
+    reuse_page_if_already_on_url: bool = False
     take_final_screenshot: bool = True
     parameters: Parameters
     nodes: list[
