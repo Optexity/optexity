@@ -1222,8 +1222,8 @@
             "id": "docs-building-automations-automation-structure",
             "path": "docs/building-automations/automation-structure.mdx",
             "title": "Automation Structure",
-            "summary": "Defines the top-level schema of an Optexity automation JSON/Python object. Documents all root properties: url, browser_channel (chromium vs chrome), os_emulation (null/windows/linux), max_retries, expected_downloads, parameters, and nodes. Explains the four node types (action_node, for_loop_node, if_else_node, assert_locator_node), the declarative execution model, and important semantics like max_retries counting total attempts and AssertionError bypassing retries.",
-            "gist": "Top-level automation schema: url, browser_channel, os_emulation, max_retries, parameters, and four node types.",
+            "summary": "Defines the top-level schema of an Optexity automation JSON/Python object. Documents all root properties: url, browser_channel (chromium vs chrome), os_emulation (null/windows/linux), max_retries, expected_downloads, reuse_page_if_already_on_url, parameters, and nodes. Explains the four node types (action_node, for_loop_node, if_else_node, assert_locator_node), the declarative execution model, and important semantics like max_retries counting total attempts and AssertionError bypassing retries. Covers reuse_page_if_already_on_url, the dedicated-only flag that skips pre-run navigation when the warm browser is already on the automation's url, for portals that error out on page reload.",
+            "gist": "Top-level automation schema: url, browser_channel, os_emulation, max_retries, reuse_page_if_already_on_url, parameters, and four node types.",
             "keywords": [
                 "automation",
                 "structure",
@@ -1233,6 +1233,11 @@
                 "os_emulation",
                 "max_retries",
                 "expected_downloads",
+                "reuse_page_if_already_on_url",
+                "reuse page",
+                "skip navigation",
+                "no reload",
+                "dedicated",
                 "parameters",
                 "nodes",
                 "declarative"
@@ -1269,11 +1274,17 @@
             "entities": {
                 "systems": [],
                 "apis": [],
-                "data_models": ["Automation", "Parameters", "browser_channel", "os_emulation"]
+                "data_models": [
+                    "Automation",
+                    "Parameters",
+                    "browser_channel",
+                    "os_emulation",
+                    "reuse_page_if_already_on_url"
+                ]
             },
             "reading_priority": 2,
-            "when_to_use": "Select when the query is about the top-level automation schema, browser_channel options, OS emulation, max_retries semantics, or the overall structure of an automation JSON/Python object.",
-            "embedding_hint": "automation schema structure url browser_channel os_emulation max_retries nodes declarative"
+            "when_to_use": "Select when the query is about the top-level automation schema, browser_channel options, OS emulation, max_retries semantics, skipping the initial navigation on a dedicated run for portals that break on reload, or the overall structure of an automation JSON/Python object.",
+            "embedding_hint": "automation schema structure url browser_channel os_emulation max_retries reuse_page_if_already_on_url skip navigation reload nodes declarative"
         },
         {
             "id": "docs-building-automations-for-loop-node",

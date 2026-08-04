@@ -14,6 +14,7 @@ Automation
 ├── os_emulation         # OS to emulate: "windows", "linux", or null
 ├── max_retries          # Total run attempts on failure (default: 1)
 ├── expected_downloads   # Number of files to download
+├── reuse_page_if_already_on_url   # Skip navigation when already on url (dedicated only)
 ├── parameters           # Input, secure, and generated variables
 └── nodes[]              # Sequence of actions
     ├── action_node
@@ -60,6 +61,7 @@ Automation
 | `os_emulation` | `"windows" \| "linux" \| null` | `null` | OS user-agent to emulate; `null` uses the default system OS |
 | `max_retries` | `int` | `0` | Total number of run attempts. `0` = no retry, `1` = one retry, etc. |
 | `expected_downloads` | `int` | `0` | Number of expected downloads (automation waits for completion) |
+| `reuse_page_if_already_on_url` | `bool` | `false` | Start on the existing page instead of navigating, when a dedicated browser is already on `url`. See [Reuse Page If Already On URL](#reuse-page-if-already-on-url) |
 | `parameters` | `Parameters` | — | Input, secure, and generated variables |
 | `nodes` | `list[action_node \| for_loop_node \| if_else_node]` | — | Ordered list of actions |
 
@@ -175,3 +177,27 @@ Control how many times the full automation reruns when an unexpected error occur
 <Tip>
 See [Timing & Retries](/docs/advanced/timing-retries) for controlling per-element retry behavior (`max_tries`) vs. full-automation retries (`max_retries`).
 </Tip>
+
+## Reuse Page If Already On URL
+
+Every run navigates to `url` before the first node executes, even on a warm [dedicated instance](/docs/inference/dedicated-instances). Set `reuse_page_if_already_on_url` to leave the existing page untouched when the reused browser is **already sitting on `url`**:
+
+```json
+{
+  "reuse_page_if_already_on_url": true
+}
+```
+
+Use this only for portals that break when their page is reloaded — some session-bound portals throw an error or invalidate the session on any refresh, so the safest thing is not to navigate at all.
+
+| Condition | Behavior |
+|-----------|----------|
+| Dedicated run, browser already on `url` | Nodes start on the existing page; no navigation |
+| URL differs, or the page is unresponsive | Normal navigation to `url` |
+| Non-dedicated run | Normal navigation to `url` (flag has no effect) |
+
+The URL comparison is exact on scheme, host, path, query string, and fragment — only a trailing slash on the path is ignored. A hash-routed portal on `#/dashboard` therefore does not match a `url` of `#/home`. Anything that doesn't match falls back to normal navigation, so enabling the flag can never leave a run stranded.
+
+<Warning>
+Your first node now runs against whatever the previous task left behind — an open modal, a filled form, a scrolled list. Make it tolerant of a mid-session page, or pair it with an [if-else node](/docs/building-automations/if-else-node) that resets the portal to a known state.
+</Warning>

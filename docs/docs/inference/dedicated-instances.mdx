@@ -260,6 +260,10 @@ never log in. See
 for the exact pattern.
 </Warning>
 
+- **Every run still navigates to the automation's `url`**, even on a warm container. If your
+  portal breaks when its page is reloaded, set
+  [`reuse_page_if_already_on_url`](/docs/building-automations/automation-structure#reuse-page-if-already-on-url)
+  on the automation to start on the existing page instead. It applies to dedicated runs only.
 - **`unique_parameter_names` must be a subset of `input_parameters`.** Names not present in
   your `input_parameters` are rejected.
 - **`max_parallelism` above the portal's real capacity is unreachable** — the surplus requests
