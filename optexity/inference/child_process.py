@@ -9,7 +9,7 @@ import subprocess
 import sys
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from urllib.parse import urljoin
 
 import httpx
@@ -49,7 +49,6 @@ class HumanInLoopCompletedBody(BaseModel):
 child_process_id = -1
 unique_child_arn: str = str(uuid.uuid4())
 task_running = False
-last_task_start_time = None
 task_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
 # Monotonic tie-breaker so equal-priority entries stay FIFO and heap ordering
 # never compares Task objects. See Task.priority_order_key.
@@ -355,7 +354,6 @@ async def run_automation_in_process(
 async def task_processor():
     """Background worker that processes tasks from the queue one at a time."""
     global task_running
-    global last_task_start_time
     logger.info("Task processor started")
 
     while True:
@@ -368,7 +366,6 @@ async def task_processor():
                 tasks_to_kill.remove(task.task_id)
                 continue
             task_running = True
-            last_task_start_time = datetime.now()
             await run_automation_in_process(task, unique_child_arn, child_process_id)
 
         except asyncio.CancelledError:
@@ -514,20 +511,13 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
 
     @app.get("/health", tags=["info"])
     async def health():
-        """Health check endpoint."""
-        global last_task_start_time
-        if (
-            task_running
-            and last_task_start_time
-            and datetime.now() - last_task_start_time > timedelta(minutes=15)
-        ):
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "unhealthy",
-                    "message": "Task not finished in the last 15 minutes",
-                },
-            )
+        """Liveness probe for ECS/opcloud.
+
+        Always 200 while this process can serve HTTP. Task duration limits are
+        enforced by ``max_timeout_in_minutes`` on the worker subprocess — do not
+        fail health during long (e.g. 120m) runs or ECS will mark the essential
+        container unhealthy mid-task.
+        """
         return JSONResponse(
             status_code=200,
             content={
