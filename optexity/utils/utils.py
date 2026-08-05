@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 from urllib.parse import urlparse
 
 import aiofiles
@@ -175,3 +175,32 @@ def deep_replace(obj, pattern: str, replacement: str):
     if isinstance(obj, list):
         return [deep_replace(item, pattern, replacement) for item in obj]
     return obj
+
+
+def resolve_download_metadata_template(
+    template: dict[str, Any] | None,
+    *variable_sources: dict,
+) -> dict[str, Any] | None:
+    """Resolve ``{key[index]}`` placeholders in download_metadata from live vars.
+
+    Called when a download is registered so metadata reflects extracted values
+    at file-save time, not earlier in-place ``replace_variables`` on the action.
+    Missing keys and ``None`` list entries leave the placeholder unchanged
+    (same skip behavior as ``ActionNode.replace_variables``).
+    """
+    if template is None:
+        return None
+
+    resolved: Any = template
+    for variables in variable_sources:
+        if not variables:
+            continue
+        for key, values in variables.items():
+            if not isinstance(values, list):
+                continue
+            for index, value in enumerate(values):
+                if value is None:
+                    continue
+                pattern = f"{{{key}[{index}]}}"
+                resolved = deep_replace(resolved, pattern, str(value))
+    return resolved

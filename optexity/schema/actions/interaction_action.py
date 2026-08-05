@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field, model_validator
 
 from optexity.schema.actions.keyboard_keys import KEY_NAMES
 from optexity.schema.actions.prompts import overlay_popup_prompt
-from optexity.utils.utils import deep_replace
 
 
 class Locator(BaseModel):
@@ -140,10 +139,8 @@ class SelectOptionAction(BaseAction):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        if self.download_metadata is not None:
-            self.download_metadata = deep_replace(
-                self.download_metadata, pattern, replacement
-            )
+        # download_metadata placeholders are resolved at download-register
+        # time from live memory (see resolve_download_metadata_template).
 
 
 class ClickElementAction(BaseAction):
@@ -184,10 +181,8 @@ class ClickElementAction(BaseAction):
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
             ).strip('"')
-        if self.download_metadata is not None:
-            self.download_metadata = deep_replace(
-                self.download_metadata, pattern, replacement
-            )
+        # download_metadata placeholders are resolved at download-register
+        # time from live memory (see resolve_download_metadata_template).
 
 
 class InputTextAction(BaseAction):

@@ -25,6 +25,7 @@ from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.memory import BrowserState, Memory
 from optexity.schema.task import Task
 from optexity.utils.settings import settings
+from optexity.utils.utils import resolve_download_metadata_template
 
 logger = logging.getLogger(__name__)
 
@@ -637,10 +638,15 @@ async def handle_download(
         if download_metadata is None:
             return
         try:
-            memory.download_metadata[filename] = download_metadata
+            resolved = resolve_download_metadata_template(
+                download_metadata,
+                task.input_parameters,
+                memory.variables.generated_variables,
+                task.unique_parameters or {},
+            )
+            memory.download_metadata[filename] = resolved
             logger.info(
-                f"handle_download: registered metadata for {filename!r}: "
-                f"{download_metadata}"
+                f"handle_download: registered metadata for {filename!r}: " f"{resolved}"
             )
         except Exception as e:
             logger.warning(
