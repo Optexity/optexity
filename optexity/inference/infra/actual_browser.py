@@ -359,14 +359,27 @@ class ActualBrowser:
 
         raise RuntimeError("Chrome CDP not reachable")
 
-    async def check_browser_alive(self, timeout=10):
+    async def check_browser_alive(self, timeout=10, preserve_page: bool = False):
+        """Liveness probe. Set preserve_page to avoid navigating the current page.
+
+        The default probe navigates to about:blank, which runs before every task
+        and therefore discards whatever page a reused dedicated browser was left
+        on. Callers honouring automation.reuse_page_if_already_on_url must pass
+        preserve_page=True so that page survives; the evaluate proves the
+        renderer is responsive without touching the URL.
+        """
         if settings.USE_PLAYWRIGHT_BROWSER:
             try:
                 if self.context is None:
                     return False
                 if self.channel == "browser-use":
                     return True
-                await self.context.pages[0].goto("about:blank")
+                if preserve_page:
+                    await asyncio.wait_for(
+                        self.context.pages[0].evaluate("() => true"), timeout=timeout
+                    )
+                else:
+                    await self.context.pages[0].goto("about:blank")
             except Exception:
                 return False
             return True
@@ -375,9 +388,11 @@ class ActualBrowser:
             await self._wait_for_cdp(timeout)
             return True
 
-    async def check_browser_session_healthy(self, timeout: float = 10) -> bool:
+    async def check_browser_session_healthy(
+        self, timeout: float = 10, preserve_page: bool = False
+    ) -> bool:
         """Stricter than check_browser_alive: verifies pages/context are usable."""
-        if not await self.check_browser_alive(timeout):
+        if not await self.check_browser_alive(timeout, preserve_page=preserve_page):
             return False
 
         if settings.USE_PLAYWRIGHT_BROWSER:

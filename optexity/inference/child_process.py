@@ -138,6 +138,13 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
         )
         restart_reason = None
 
+    # The health checks below navigate to about:blank by default, which would
+    # discard the page this task is meant to resume on. Keep the page only when
+    # the automation opted in, so every other run keeps the existing probe.
+    preserve_page = bool(
+        task.is_dedicated and task.automation.reuse_page_if_already_on_url
+    )
+
     if _global_actual_browser is not None:
         restart_browser = False
         if restart_reason:
@@ -146,12 +153,16 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             )
             restart_browser = True
 
-        if not await _global_actual_browser.check_browser_alive():
+        if not await _global_actual_browser.check_browser_alive(
+            preserve_page=preserve_page
+        ):
             logger.info("CDP is not alive, restarting browser")
             restart_browser = True
 
         if task.is_dedicated and not restart_browser:
-            if not await _global_actual_browser.check_browser_session_healthy():
+            if not await _global_actual_browser.check_browser_session_healthy(
+                preserve_page=preserve_page
+            ):
                 logger.info("Dedicated browser session unhealthy, restarting browser")
                 restart_browser = True
 
