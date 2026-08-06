@@ -39,6 +39,7 @@ from optexity.inference.core.run_interaction import (
     run_interaction_action,
 )
 from optexity.inference.core.run_misc import (
+    run_count_locator_action,
     run_fail_state_action,
     run_llm_query_action,
     run_set_variable_action,
@@ -472,6 +473,8 @@ async def run_action_node(
                 await run_set_variable_action(misc.set_variable, memory)
             elif misc.llm_query:
                 await run_llm_query_action(misc.llm_query, memory, task)
+            elif misc.count_locator:
+                await run_count_locator_action(misc.count_locator, memory, browser)
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
@@ -625,52 +628,54 @@ async def _wait_for_stable_locator_count(locator) -> int:
             stable_since = time.monotonic()
 
 
-async def _count_locator_matches(for_loop_node: ForLoopNode, browser: Browser) -> int:
-    """Number of elements a locator loop should iterate over.
+async def count_locator_matches(
+    locator_command: str, locator_timeout: float, browser: Browser
+) -> int:
+    """Number of elements a Playwright locator matches on the current page.
 
     Playwright's ``count()`` does not auto-wait, so give the first match a chance
     to attach first: results tables are usually rendered a moment after the
     action that triggers them, and sleep_for_page_to_load returns immediately
-    once the page has loaded. Counting straight away would see zero rows and
-    silently skip the whole loop body.
+    once the page has loaded. Counting straight away would see zero rows.
 
     After the first match attaches, the count must stay unchanged for
     ``_LOCATOR_COUNT_STABLE_SECONDS`` so rows that stream in shortly after the
     first paint are included. A locator that resolves but never attaches means
-    zero rows, which is a legitimate outcome (empty result table) rather than
+    zero matches, which is a legitimate outcome (empty result table) rather than
     an error.
     """
-    assert for_loop_node.locator is not None
-    locator = await browser.get_locator_from_command(for_loop_node.locator)
+    locator = await browser.get_locator_from_command(locator_command)
     if locator is None:
         # Only happens when the browser/page itself is gone, not when the
-        # selector matches nothing, so surface it instead of looping zero times.
-        raise ValueError(
-            f"Could not resolve locator {for_loop_node.locator!r} for for_loop_node"
-        )
+        # selector matches nothing.
+        raise ValueError(f"Could not resolve locator {locator_command!r}")
 
-    if for_loop_node.locator_timeout > 0:
+    if locator_timeout > 0:
         try:
             await locator.first.wait_for(
-                state="attached", timeout=for_loop_node.locator_timeout * 1000
+                state="attached", timeout=locator_timeout * 1000
             )
         except (TimeoutError, PatchrightTimeoutError, PlaywrightTimeoutError):
             logger.warning(
-                f"No matching locator found: {for_loop_node.locator!r} "
-                f"(waited {for_loop_node.locator_timeout}s); "
-                f"for loop will run zero iterations"
+                f"No matching locator found: {locator_command!r} "
+                f"(waited {locator_timeout}s); count=0"
             )
             return 0
     elif await locator.count() == 0:
-        logger.warning(
-            f"No matching locator found: {for_loop_node.locator!r}; "
-            f"for loop will run zero iterations"
-        )
+        logger.warning(f"No matching locator found: {locator_command!r}; count=0")
         return 0
 
     count = await _wait_for_stable_locator_count(locator)
-    logger.debug(f"Locator {for_loop_node.locator!r} matched {count} element(s)")
+    logger.debug(f"Locator {locator_command!r} matched {count} element(s)")
     return count
+
+
+async def _count_locator_matches(for_loop_node: ForLoopNode, browser: Browser) -> int:
+    """Number of elements a locator loop should iterate over."""
+    assert for_loop_node.locator is not None
+    return await count_locator_matches(
+        for_loop_node.locator, for_loop_node.locator_timeout, browser
+    )
 
 
 async def handle_for_loop_node(

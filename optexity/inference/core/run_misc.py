@@ -5,6 +5,7 @@ import traceback
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.misc_action import (
+    CountLocatorAction,
     FailStateAction,
     LLMQueryAction,
     SetVariableAction,
@@ -45,6 +46,29 @@ async def run_set_variable_action(
     else:
         result = eval(set_variable_action.expression)  # noqa: S307
         memory.variables.generated_variables[name] = [result]
+    logger.debug(
+        f"Set variable '{name}' = {memory.variables.generated_variables[name]}"
+    )
+
+
+async def run_count_locator_action(
+    count_locator_action: CountLocatorAction,
+    memory: Memory,
+    browser: Browser,
+):
+    # Imported lazily to avoid a circular import with run_automation.
+    from optexity.inference.core.run_automation import count_locator_matches
+
+    logger.debug(
+        f"---------Running count_locator action {count_locator_action.model_dump_json()}---------"
+    )
+    count = await count_locator_matches(
+        count_locator_action.locator,
+        count_locator_action.locator_timeout,
+        browser,
+    )
+    name = count_locator_action.name
+    memory.variables.generated_variables[name] = [count]
     logger.debug(
         f"Set variable '{name}' = {memory.variables.generated_variables[name]}"
     )

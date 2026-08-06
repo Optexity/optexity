@@ -42,6 +42,7 @@
                                 "pages": [
                                     "/docs/action-types/python-script-action",
                                     "/docs/action-types/llm-query-action",
+                                    "/docs/action-types/count-locator-action",
                                     "/docs/action-types/human-in-loop"
                                 ]
                             },

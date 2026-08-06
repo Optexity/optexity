@@ -89,6 +89,28 @@ class SetVariableAction(BaseModel):
         return self
 
 
+class CountLocatorAction(BaseModel):
+    """Count how many elements a Playwright locator matches on the current page.
+
+    The integer count is stored in generated_variables under `name` as a
+    single-element list (same wrapping as set_variable).
+    """
+
+    locator: str
+    name: str
+    locator_timeout: float = 5.0
+
+    @model_validator(mode="after")
+    def validate_timeout(self):
+        if self.locator_timeout < 0:
+            raise ValueError("locator_timeout must not be negative")
+        return self
+
+    def replace(self, pattern: str, replacement: str):
+        self.locator = self.locator.replace(pattern, replacement)
+        return self
+
+
 class MiscAction(BaseModel):
     """Container for miscellaneous actions (set_variable, llm_query, etc.).
 
@@ -97,12 +119,15 @@ class MiscAction(BaseModel):
 
     set_variable: SetVariableAction | None = None
     llm_query: LLMQueryAction | None = None
+    count_locator: CountLocatorAction | None = None
 
     def replace(self, pattern: str, replacement: str):
         if self.set_variable:
             self.set_variable.replace(pattern, replacement)
         if self.llm_query:
             self.llm_query.replace(pattern, replacement)
+        if self.count_locator:
+            self.count_locator.replace(pattern, replacement)
         return self
 
 

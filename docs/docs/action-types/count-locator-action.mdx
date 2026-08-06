@@ -1,0 +1,66 @@
+---
+title: Count Locator Action
+description: Count how many elements a Playwright locator matches on the current page
+---
+
+Use `misc_action.count_locator` to count Playwright locator matches on the current page and store the integer in `generated_variables`—useful for pagination checks, empty-state branches, or capping loops.
+
+## Overview
+
+- **Use when**: You need the match count as a variable (e.g. decide whether to paginate, skip an empty table, or compare against a threshold) without iterating over the matches.
+- **Execution**: Resolves `locator` against the live page, waits for the first match to attach (optional timeout), then waits until the match count is stable for 1s before storing the result.
+- **Same counting semantics as locator for-loops**: See [For Loop Node](/docs/building-automations/for-loop-node) for `locator_timeout` and the stable-count wait.
+
+## Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `locator` | `str` | Required | Playwright locator command evaluated against `page`, e.g. `get_by_role("row")` |
+| `name` | `str` | Required | Key written into `generated_variables` as a single-element list `[count]` |
+| `locator_timeout` | `float` | `5.0` | Seconds to wait for the first match to attach before counting; `0` skips the attach wait |
+
+## JSON Example
+
+```json
+{
+  "type": "action_node",
+  "misc_action": {
+    "count_locator": {
+      "locator": "get_by_role(\"row\")",
+      "name": "row_count"
+    }
+  }
+}
+```
+
+After this action, `{row_count[0]}` is available in subsequent nodes (including `if_else_node` conditions and `set_variable` expressions).
+
+## Waiting for Matches
+
+Playwright's `count()` does not auto-wait. Without `locator_timeout`, an asynchronously rendered table can count as empty. Defaults match locator for-loops: wait up to 5s for the first match, then require the count to stay unchanged for 1s so streaming rows are included.
+
+```json
+{
+  "misc_action": {
+    "count_locator": {
+      "locator": "locator(\"table tbody tr\")",
+      "name": "result_rows",
+      "locator_timeout": 10.0
+    }
+  }
+}
+```
+
+Zero matches is a valid result: the action stores `0` (with a warning) rather than failing the run.
+
+## Count Locator vs Locator For-Loop
+
+| | `misc_action.count_locator` | `for_loop_node` with `locator` |
+|--|----------------------------|--------------------------------|
+| Purpose | Store match count as a variable | Iterate once per match |
+| Output | `generated_variables[name] = [count]` | Body runs `count` times; `{locator[index]}` expands to `.nth(N)` |
+| Typical use | Branching, thresholds, logging | Process every row/item |
+
+<Tip>
+Use `count_locator` when you only need the number. Use a locator for-loop when you need to act on each match.
+</Tip>
