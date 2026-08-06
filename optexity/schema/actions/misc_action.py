@@ -69,11 +69,15 @@ class SetVariableAction(BaseModel):
 
     Use `value` for a static value, or `expression` for a computed value
     (evaluated after variable replacement, e.g. "{counter[0]} + 1").
+
+    When `output_variable_name` is set, the value is also appended to
+    ``output_data`` under that key.
     """
 
     name: str
     value: int | float | str | bool | None = None
     expression: str | None = None
+    output_variable_name: str | None = None
 
     @model_validator(mode="after")
     def validate_one_provided(self):
@@ -84,8 +88,13 @@ class SetVariableAction(BaseModel):
         return self
 
     def replace(self, pattern: str, replacement: str):
+        self.name = self.name.replace(pattern, replacement)
         if self.expression:
             self.expression = self.expression.replace(pattern, replacement)
+        if self.output_variable_name is not None:
+            self.output_variable_name = self.output_variable_name.replace(
+                pattern, replacement
+            )
         return self
 
 
@@ -94,11 +103,15 @@ class CountLocatorAction(BaseModel):
 
     The integer count is stored in generated_variables under `name` as a
     single-element list (same wrapping as set_variable).
+
+    When `output_variable_name` is set, the count is also appended to
+    ``output_data`` under that key.
     """
 
     locator: str
     name: str
     locator_timeout: float = 5.0
+    output_variable_name: str | None = None
 
     @model_validator(mode="after")
     def validate_timeout(self):
@@ -108,6 +121,11 @@ class CountLocatorAction(BaseModel):
 
     def replace(self, pattern: str, replacement: str):
         self.locator = self.locator.replace(pattern, replacement)
+        self.name = self.name.replace(pattern, replacement)
+        if self.output_variable_name is not None:
+            self.output_variable_name = self.output_variable_name.replace(
+                pattern, replacement
+            )
         return self
 
 

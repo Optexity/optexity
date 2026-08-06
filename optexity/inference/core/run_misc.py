@@ -33,6 +33,17 @@ async def run_fail_state_action(
     raise Exception(fail_state_action.failure_message)
 
 
+def _maybe_append_output_data(memory: Memory, output_variable_name: str | None, value):
+    if output_variable_name is None:
+        return
+    memory.variables.output_data.append(
+        OutputData(
+            unique_identifier=output_variable_name,
+            json_data={output_variable_name: value},
+        )
+    )
+
+
 async def run_set_variable_action(
     set_variable_action: SetVariableAction,
     memory: Memory,
@@ -42,10 +53,11 @@ async def run_set_variable_action(
     )
     name = set_variable_action.name
     if set_variable_action.value is not None:
-        memory.variables.generated_variables[name] = [set_variable_action.value]
+        value = set_variable_action.value
     else:
-        result = eval(set_variable_action.expression)  # noqa: S307
-        memory.variables.generated_variables[name] = [result]
+        value = eval(set_variable_action.expression)  # noqa: S307
+    memory.variables.generated_variables[name] = [value]
+    _maybe_append_output_data(memory, set_variable_action.output_variable_name, value)
     logger.debug(
         f"Set variable '{name}' = {memory.variables.generated_variables[name]}"
     )
@@ -69,6 +81,7 @@ async def run_count_locator_action(
     )
     name = count_locator_action.name
     memory.variables.generated_variables[name] = [count]
+    _maybe_append_output_data(memory, count_locator_action.output_variable_name, count)
     logger.debug(
         f"Set variable '{name}' = {memory.variables.generated_variables[name]}"
     )

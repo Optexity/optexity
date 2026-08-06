@@ -16,8 +16,9 @@ Use `misc_action.count_locator` to count Playwright locator matches on the curre
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `locator` | `str` | Required | Playwright locator command evaluated against `page`, e.g. `get_by_role("row")` |
-| `name` | `str` | Required | Key written into `generated_variables` as a single-element list `[count]` |
+| `name` | `str` | Required | Key written into `generated_variables` as a single-element list `[count]`. Accepts placeholders (e.g. `"rows_{index}"`) |
 | `locator_timeout` | `float` | `5.0` | Seconds to wait for the first match to attach before counting; `0` skips the attach wait |
+| `output_variable_name` | `str \| None` | `None` | When set, also append the count to task `output_data` under this key. Accepts placeholders |
 
 ## JSON Example
 
@@ -34,6 +35,20 @@ Use `misc_action.count_locator` to count Playwright locator matches on the curre
 ```
 
 After this action, `{row_count[0]}` is available in subsequent nodes (including `if_else_node` conditions and `set_variable` expressions).
+
+To also include the count in the task output payload, set `output_variable_name`:
+
+```json
+{
+  "misc_action": {
+    "count_locator": {
+      "locator": "get_by_role(\"row\")",
+      "name": "row_count",
+      "output_variable_name": "row_count"
+    }
+  }
+}
+```
 
 ## Waiting for Matches
 

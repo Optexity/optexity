@@ -518,7 +518,7 @@
             "id": "docs-action-types-count-locator-action",
             "path": "docs/action-types/count-locator-action.mdx",
             "title": "Count Locator Action",
-            "summary": "Documents misc_action.count_locator — counts Playwright locator matches on the current page and stores the integer in generated_variables. Covers locator, name, locator_timeout, stable-count wait semantics shared with locator for-loops, and when to use count_locator vs a locator for_loop_node.",
+            "summary": "Documents misc_action.count_locator — counts Playwright locator matches on the current page and stores the integer in generated_variables. Covers locator, name, locator_timeout, optional output_variable_name for task output_data, placeholder expansion on name/output_variable_name, stable-count wait semantics shared with locator for-loops, and when to use count_locator vs a locator for_loop_node.",
             "gist": "Count how many elements a Playwright locator matches and store the result as a generated variable for branching or thresholds.",
             "keywords": [
                 "count_locator",
@@ -528,6 +528,8 @@
                 "locator_timeout",
                 "count",
                 "generated_variables",
+                "output_variable_name",
+                "output_data",
                 "Playwright",
                 "match count",
                 "stable count"
@@ -554,8 +556,8 @@
                 "data_models": ["CountLocatorAction", "MiscAction"]
             },
             "reading_priority": 2,
-            "when_to_use": "Select when the query is about misc_action.count_locator, counting Playwright locator matches on a page, storing a match count in generated_variables, locator_timeout for counting, or choosing between count_locator and a locator for_loop_node.",
-            "embedding_hint": "count locator misc action match count generated_variables locator_timeout stable count pagination empty table"
+            "when_to_use": "Select when the query is about misc_action.count_locator, counting Playwright locator matches on a page, storing a match count in generated_variables, output_variable_name for output_data, locator_timeout for counting, or choosing between count_locator and a locator for_loop_node.",
+            "embedding_hint": "count locator misc action match count generated_variables output_variable_name output_data locator_timeout stable count pagination empty table"
         },
         {
             "id": "docs-action-types-sleep-action",
