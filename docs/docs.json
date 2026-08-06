@@ -16,6 +16,7 @@
                     {
                         "group": "Quickstart",
                         "pages": [
+                            "/docs/getting_started/marketplace",
                             "/docs/getting_started/recording-first-inference",
                             "/docs/getting_started/running-first-inference"
                         ]

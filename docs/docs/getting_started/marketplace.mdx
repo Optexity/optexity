@@ -1,0 +1,44 @@
+---
+title: Marketplace workflows
+description: Install a public workflow from the Marketplace and run it with curl
+---
+
+You can start from a ready-made public workflow instead of recording one yourself.
+
+## Install from the Marketplace
+
+1. Open the Optexity dashboard and go to **[Marketplace](https://dashboard.optexity.com/marketplace)** (`/marketplace`).
+2. Pick a public workflow and click **Add to workspace**.
+3. Open **Workflows** — the install appears in your workspace (marked **Public**).
+
+The installed workflow references the public template. You can edit settings (name, callback URL, notification emails). Automation stays read-only until you explicitly fork it from the workflow editor.
+
+## Run it with curl
+
+1. On **Workflows**, open the **curl** action for the installed workflow.
+2. Copy the generated request (cURL or Python).
+3. Fill in your values under `input_parameters` (and `secure_parameters` if the workflow needs them).
+4. Send the request with your API key.
+
+Example shape (replace `endpoint_name`, parameters, and API key with yours):
+
+```bash
+curl -X POST https://inference-api.optexity.com/api/v1/inference \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_OPTEXITY_API_KEY" \
+  -d '{
+    "endpoint_name": "your-installed-endpoint-name",
+    "input_parameters": {
+      "your_param": ["your_value"]
+    },
+    "unique_parameter_names": [],
+    "secure_parameters": {},
+    "generated_parameters": {}
+  }'
+```
+
+The dashboard curl snippet is generated from the public template’s parameters, so you can see which keys to fill in.
+
+<Tip>
+    Prefer building from scratch? Follow [Recording first automation](/docs/getting_started/recording-first-inference), then [Running first inference](/docs/getting_started/running-first-inference).
+</Tip>
