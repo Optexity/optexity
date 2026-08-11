@@ -131,6 +131,7 @@ async def run_automation(
     cdp_url: str,
     max_tries: int = 1,
 ):
+    assert task.automation is not None, f"Task {task.task_id} has no automation"
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
 
@@ -267,7 +268,10 @@ async def run_automation(
             if memory and browser:
                 await run_final_logging(task, memory, browser, child_process_id)
         if browser is not None:
-            await browser.stop()
+            try:
+                await asyncio.wait_for(browser.stop(), timeout=30)
+            except Exception as e:
+                logger.error(f"Error/timeout stopping browser after automation: {e}")
 
     logger.info(f"Task {task.task_id} completed with status {task.status}")
     file_handler.flush()
