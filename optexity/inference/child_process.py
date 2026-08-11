@@ -215,6 +215,11 @@ async def run_automation_in_process(
 
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s.%(funcName)s: %(message)s"
+        )
+    )
 
     current_module = __name__.split(".")[0]  # top-level module/package
     logging.getLogger(current_module).addHandler(file_handler)

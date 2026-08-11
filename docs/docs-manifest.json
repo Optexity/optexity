@@ -416,8 +416,8 @@
             "id": "docs-action-types-python-script-action",
             "path": "docs/action-types/python-script-action.mdx",
             "title": "Python Script Action",
-            "summary": "Documents python_script_action (async code_fn(page) for browser interaction) and extraction_action.python_script (async code_fn(axtree, browser) for data extraction). Covers script contract, output variable promotion, and when to use each variant.",
-            "gist": "Run custom Python against a live Playwright page (action) or extract structured data via code (extraction). Defines the code_fn contract for both variants.",
+            "summary": "Documents python_script_action (async code_fn(page) for browser interaction) and extraction_action.python_script (async code_fn(axtree, browser) for data extraction). Covers script contract, output variable promotion, when to use each variant, the requirement that imports go inside code_fn, timeout_seconds, and the optional ctx (ScriptContext) argument providing ctx.save_download() to emit a file as a task download with metadata, ctx.state for sharing data across script nodes, ctx.get_page(), ctx.variables and ctx.log().",
+            "gist": "Run custom Python against a live Playwright page (action) or extract structured data via code (extraction). Defines the code_fn contract for both variants and the opt-in ctx argument for saving downloads and sharing state.",
             "keywords": [
                 "python",
                 "script",
@@ -430,7 +430,12 @@
                 "axtree",
                 "browser",
                 "PythonScriptAction",
-                "PythonScriptExtraction"
+                "PythonScriptExtraction",
+                "ctx",
+                "ScriptContext",
+                "save_download",
+                "ctx.state",
+                "timeout_seconds"
             ],
             "document_type": "guide",
             "tags": [
@@ -447,6 +452,10 @@
                     {
                         "doc_id": "docs-action-types-extraction-action",
                         "context": "python_script extraction variant lives under extraction_action"
+                    },
+                    {
+                        "doc_id": "docs-advanced-downloads-files",
+                        "context": "ctx.save_download() registers a file as a task download"
                     }
                 ],
                 "referenced_by": [
@@ -825,7 +834,7 @@
             "id": "docs-advanced-downloads-files",
             "path": "docs/advanced/downloads-files.mdx",
             "title": "Downloads and File Handling",
-            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, attaching freeform download_metadata, saving pages as PDF (download_url_as_pdf), iterating multiple downloads with for_loop_node (over a variable list, or over a locator's matched rows using the loop index for unique filenames), and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, failure behavior when an expected download or download_url_as_pdf produces no file (the task fails with a clear error), and best practices.",
+            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, attaching freeform download_metadata, saving pages as PDF (download_url_as_pdf), saving a file directly from a Python script with ctx.save_download() (content or path, plus metadata, without a Blob/anchor + click workaround), iterating multiple downloads with for_loop_node (over a variable list, or over a locator's matched rows using the loop index for unique filenames), and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, failure behavior when an expected download or download_url_as_pdf produces no file (the task fails with a clear error), and best practices.",
             "gist": "File download and upload patterns: click-to-download, metadata, PDF save, multi-file loops, upload with file_path.",
             "keywords": [
                 "download",
@@ -839,7 +848,10 @@
                 "locator loop",
                 "download_filename",
                 "/tmp/optexity",
-                "file handling"
+                "file handling",
+                "save_download",
+                "ctx",
+                "python_script download"
             ],
             "document_type": "guide",
             "tags": ["advanced", "files", "downloads", "upload", "PDF"],
@@ -853,9 +865,18 @@
                     {
                         "doc_id": "docs-advanced-callbacks",
                         "context": "download_metadata appears on callbacks as downloads_with_metadata."
+                    },
+                    {
+                        "doc_id": "docs-action-types-python-script-action",
+                        "context": "ctx.save_download() is the script-side download method."
                     }
                 ],
-                "referenced_by": []
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-action-types-python-script-action",
+                        "context": "Python script docs link here for the download registry and metadata."
+                    }
+                ]
             },
             "entities": {
                 "systems": [],

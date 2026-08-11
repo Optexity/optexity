@@ -12,6 +12,7 @@ Optexity can download files from websites and upload files to forms.
 | Click download link | `click_element` with `expect_download=true` |
 | Select export option | `select_option` with `expect_download=true` |
 | Save page as PDF | `download_url_as_pdf` |
+| Save bytes from a script | `ctx.save_download()` in a `python_script` |
 
 ---
 
@@ -58,7 +59,37 @@ Attach freeform JSON to a download when using `expect_download`. Values support 
 }
 ```
 
-Metadata is keyed by the final filename and returned on callbacks as optional `downloads_with_metadata` (see [Callbacks](/docs/advanced/callbacks)). Only `click_element` / `select_option` with `expect_download` support this field.
+Metadata is keyed by the final filename and returned on callbacks as optional `downloads_with_metadata` (see [Callbacks](/docs/advanced/callbacks)). On interaction actions, only `click_element` / `select_option` with `expect_download` support this field; from a Python script, pass `metadata=` to `ctx.save_download()`.
+
+---
+
+## Save a File from a Python Script
+
+When a script has already fetched or assembled the bytes — an API response, a
+CSV it built, pages it reassembled into a PDF — it can register the file
+directly instead of routing it back through the browser:
+
+```json
+{
+  "type": "action_node",
+  "extraction_action": {
+    "python_script": {
+      "script": "async def code_fn(axtree, browser, ctx):\n    page = await ctx.get_page()\n    csv = await page.evaluate(\"() => fetch('/export.csv').then(r => r.text())\")\n    await ctx.save_download('export_{index}.csv', csv, metadata={'kind': 'export'})\n    return {\"saved\": 1}",
+      "output_variable_names": ["saved"],
+      "extraction_format": {"saved": "int"}
+    }
+  }
+}
+```
+
+The file is uploaded and its metadata persisted exactly as for `expect_download`
+downloads. This replaces the older workaround of base64-ing bytes into a `Blob`,
+injecting an `<a download>` anchor, and adding a second `click_element` node to
+click it — which cost a screenshot, an axtree capture and a trajectory upload per
+file.
+
+See [Python Script Action](/docs/action-types/python-script-action#the-script-context-ctx)
+for the full `ctx` reference.
 
 ---
 

@@ -160,7 +160,7 @@ class ActionNode(BaseModel):
         if self.extraction_action:
             self.extraction_action.replace(pattern, replacement)
         if self.python_script_action:
-            pass
+            self.python_script_action.replace(pattern, replacement)
         if self.powershell_action:
             self.powershell_action.replace(pattern, replacement)
         if self.sleep_action:

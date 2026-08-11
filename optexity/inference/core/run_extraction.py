@@ -8,6 +8,7 @@ import httpx
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
 from optexity.inference.core.run_interaction import _get_error_handler
 from optexity.inference.core.run_two_fa import run_two_fa_action
+from optexity.inference.core.script_context import ScriptContext, call_script_fn
 from optexity.inference.infra.browser import Browser
 from optexity.inference.infra.browser_health import fetch_browser_state_for_classifier
 from optexity.inference.models import get_llm_model_with_fallback
@@ -501,7 +502,22 @@ async def handle_python_script_extraction(
     exec(python_script_extraction.script, {}, local_vars)
     code_fn = local_vars["code_fn"]
     axtree = memory.browser_states[-1].axtree
-    result = await code_fn(axtree, browser)
+    ctx = ScriptContext(task=task, memory=memory, browser=browser)
+    call = call_script_fn(code_fn, (axtree, browser), ctx)
+
+    if python_script_extraction.timeout_seconds is not None:
+        try:
+            result = await asyncio.wait_for(
+                call, timeout=python_script_extraction.timeout_seconds
+            )
+        except asyncio.TimeoutError:
+            raise TimeoutError(
+                f"Python script extraction exceeded its "
+                f"timeout_seconds={python_script_extraction.timeout_seconds}"
+            )
+    else:
+        result = await call
+
     if result is not None:
         memory.variables.output_data.append(
             OutputData(

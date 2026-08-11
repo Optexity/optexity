@@ -453,7 +453,7 @@ async def run_action_node(
             )
         elif action_node.python_script_action:
             await run_python_script_action(
-                action_node.python_script_action, memory, browser
+                action_node.python_script_action, memory, browser, task
             )
         elif action_node.sleep_action:
             await run_sleep_action(action_node.sleep_action)
