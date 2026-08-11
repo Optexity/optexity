@@ -42,6 +42,14 @@ class LLMQueryAction(LLMAction):
 class PythonScriptAction(BaseModel):
     execution_code: str
 
+    def replace(self, pattern: str, replacement: str):
+        # Placeholders are substituted into the raw source before Python parses
+        # it, matching extraction_action.python_script. Without this, {index}
+        # inside a for_loop_node never resolves even though it does for every
+        # other action type.
+        self.execution_code = self.execution_code.replace(pattern, replacement)
+        return self
+
 
 class SleepAction(BaseModel):
     sleep_time: float

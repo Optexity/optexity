@@ -162,13 +162,18 @@ class Memory(BaseModel):
     # Sparse map of final download filename -> freeform metadata from
     # expect_download actions that set download_metadata.
     download_metadata: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    # Scratch space shared across python_script nodes within a single run.
+    # Each script node is exec'd with fresh globals, so this is how a prep node
+    # hands a work list to per-iteration nodes without a window.__foo round trip.
+    # Holds arbitrary Python objects; never serialized.
+    state: dict[str, Any] = Field(default_factory=dict)
     final_screenshot: str | None = Field(default=None)
     system_info_tracking: list[SystemInfo] = Field(default_factory=list)
     unique_child_arn: str
 
     model_config = {
         "arbitrary_types_allowed": True,
-        "exclude": {"download_lock"},
+        "exclude": {"download_lock", "state"},
     }
 
     def update_system_info(self):

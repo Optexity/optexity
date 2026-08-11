@@ -88,6 +88,9 @@ class PythonScriptExtraction(BaseModel):
     script: str
     extraction_format: dict | None = None
     output_variable_names: list[str] | None = None
+    # Without this a hung script silently consumes the whole
+    # Task.max_timeout_in_minutes budget with no indication of which node stalled.
+    timeout_seconds: float | None = Field(default=None, gt=0)
 
     @field_validator("script")
     @classmethod

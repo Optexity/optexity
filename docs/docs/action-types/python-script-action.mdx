@@ -9,13 +9,17 @@ description: Execute custom Python code against the live browser page
 
 - **Use when**: Built-in actions are insufficient (complex DOM manipulation, custom scrolling, dispatching browser events, reading element properties).
 - **Execution**: The runner `exec`s your script, finds an async function named `code_fn`, and calls it with the current Playwright `page`.
-- **No output**: This action does not return or store data. To extract data with custom code, use [`extraction_action.python_script`](#python-script-extraction).
+- **No return value**: The value returned by `code_fn` is discarded. To extract data with custom code, use [`extraction_action.python_script`](#python-script-extraction). To emit a file, add a [`ctx`](#the-script-context-ctx) argument and call `ctx.save_download()`.
 
 ## Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `execution_code` | `str` | Python source that defines an async `code_fn(page)` |
+
+`execution_code` supports the same `{variable[0]}` / `{index}` substitution as
+other actions, so a `python_script_action` inside a `for_loop_node` can read
+`{index}` directly.
 
 ## Script Contract
 
@@ -106,6 +110,7 @@ To extract data from the page using custom code, use `python_script` inside an `
 | `script` | `str` | Required | Python source defining `async def code_fn(axtree, browser)` |
 | `extraction_format` | `dict \| None` | `None` | Expected output structure (required when `output_variable_names` is set) |
 | `output_variable_names` | `list[str] \| None` | `None` | Promote returned dict keys to `generated_variables` |
+| `timeout_seconds` | `float \| None` | `None` | Fail the node if the script runs longer than this. Unset means the script is bounded only by the task's `max_timeout_in_minutes` |
 
 ### Script Contract
 
@@ -122,12 +127,119 @@ The returned dict is stored as `OutputData` and, if `output_variable_names` is s
 All keys in `output_variable_names` must exist in `extraction_format`, or schema validation will fail.
 </Tip>
 
+<Warning>
+Put `import` statements **inside** `code_fn`, not at the top of the script. The
+script is `exec`'d with separate globals and locals, so a module-level import
+lands somewhere `code_fn`'s body cannot see it and you get `NameError` at
+runtime.
+
+```python
+async def code_fn(axtree, browser):
+    import json          # correct
+    ...
+```
+</Warning>
+
+---
+
+## The Script Context (`ctx`)
+
+Both script types can request an extra `ctx` argument by **naming it** in the
+signature. Add `ctx` (or `context`) and you get it; omit it and nothing changes.
+
+```python
+async def code_fn(axtree, browser, ctx):     # extraction
+async def code_fn(page, ctx):                # python_script_action
+```
+
+Opting in is by parameter name, not position — an existing third parameter
+called something else will never receive the context.
+
+### `ctx.save_download()` — emit a file as a task download
+
+Previously only `click_element` / `select_option` with `expect_download` could
+produce a downloadable file, so scripts that had already built the bytes had to
+push them back into the page as a `Blob`, inject an `<a download>` anchor, and
+add a second node to click it. `ctx.save_download()` removes that round trip.
+
+```python
+async def code_fn(axtree, browser, ctx):
+    page = await ctx.get_page()
+    csv = await fetch_export(page)
+    await ctx.save_download(
+        "patient_demographics.csv",
+        csv,
+        metadata={"provider": "{provider_name[0]}", "kind": "export"},
+    )
+    return {"saved": 1}
+```
+
+```python
+await ctx.save_download(filename, content=None, *, path=None, metadata=None)
+```
+
+| Argument | Description |
+|----------|-------------|
+| `filename` | Required. Sanitized (path separators and control characters replaced, whitespace collapsed, truncated to 150 chars) and de-duplicated with a `_2`, `_3`, … suffix if it already exists |
+| `content` | `bytes` or `str` held in memory. Text is encoded as UTF-8 |
+| `path` | A file already on disk, **moved** into the downloads directory. Provide exactly one of `content` or `path` |
+| `metadata` | Freeform JSON stored against the final filename, same as `download_metadata` on a click. Values support `{variable[0]}` substitution, resolved when the file is saved |
+
+Returns the final `Path`, which may differ from `filename` after sanitizing or
+de-duplication. Raises if the resulting file is empty or missing; nothing
+partial is left behind.
+
+The file is uploaded with the task's other downloads and its metadata is
+returned as `downloads_with_metadata` — identical to the `expect_download` path,
+because it uses the same download registry. See
+[Downloads & Files](/docs/advanced/downloads-files).
+
+<Note>
+Unlike `expect_download`, `filename` is required — there is no browser-supplied
+name to fall back on, and defaulting to a UUID would only hide mistakes.
+</Note>
+
+### `ctx.state` — share data between script nodes
+
+Each script node is `exec`'d with fresh globals, so nothing survives between
+nodes by default. `ctx.state` is a plain dict scoped to the run — use it instead
+of stashing work lists on `window`, which costs a JS round trip per read and is
+lost on navigation.
+
+```python
+# prep node
+async def code_fn(axtree, browser, ctx):
+    ctx.state["labs"] = labs            # any Python object
+    return {"iterations": list(range(len(labs)))}
+
+# per-iteration node
+async def code_fn(axtree, browser, ctx):
+    lab = ctx.state["labs"][{index}]
+```
+
+### Other members
+
+| Member | Description |
+|--------|-------------|
+| `await ctx.get_page()` | The live Playwright page |
+| `ctx.variables` | Variables produced by earlier nodes, before substitution |
+| `ctx.input_parameters` / `ctx.unique_parameters` | The task's parameters |
+| `ctx.downloads_dir` | The task's downloads directory as a `Path` |
+| `ctx.log(msg, level="info")` | Log to the task logs |
+
+`ctx.log` tags each line with the current step index (e.g. `[python_script
+step=12] ...`) so lines from different nodes or loop iterations can be told
+apart, and writes it via the standard logger — pass `level="warning"` or
+`level="error"` for anything more severe than routine progress. These lines
+land in `optexity.log`, viewable in the dashboard's task logs "Logs" panel.
+
 ---
 
 ## Action vs Extraction — Which to Use
 
 | Scenario | Use |
 |----------|-----|
+| Save a computed or fetched file as a task download | either, with `ctx.save_download()` |
 | Scroll, dispatch events, manipulate DOM | `python_script_action` |
 | Extract and store data from the page | `extraction_action.python_script` |
 | Simple text / table extraction | `extraction_action.llm` |
