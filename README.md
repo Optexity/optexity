@@ -339,7 +339,16 @@ git clone -b feature/deterministic-cache https://github.com/rangerfc56-sys/optex
 git clone -b feature/deterministic-cache https://github.com/rangerfc56-sys/browser-use.git
 
 python3 -m venv .venv && source .venv/bin/activate
-pip install -e ./browser-use -e ./optexity
+# `optexity` depends on PyPI `optexity-browser-use`, which also installs a
+# physical `browser_use/` tree into site-packages and conflicts with this fork.
+# Install optexity, remove that shadow package, then install the local fork.
+pip install -e ./optexity
+pip uninstall -y optexity-browser-use browser-use || true
+rm -rf .venv/lib/python*/site-packages/browser_use
+pip install -e ./browser-use
+python -c "import browser_use; print('browser_use ->', browser_use.__file__)"
+# Expected path contains the cloned fork, e.g. .../browser-use/browser_use/__init__.py
+# NOT .../site-packages/browser_use/...
 optexity install-browsers
 
 export OPTEXITY_API_KEY=... GOOGLE_API_KEY=... DEPLOYMENT=dev
