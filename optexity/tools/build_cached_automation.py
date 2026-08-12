@@ -194,14 +194,22 @@ def build_action_node(record: dict[str, Any], trace: list[str]) -> ActionNode:
 
 
 def build_automation(
-    kept: list[dict[str, Any]], url: str, browser_channel: str, backend: str, trace: list[str]
+    kept: list[dict[str, Any]],
+    url: str,
+    browser_channel: str,
+    backend: str,
+    trace: list[str],
+    input_parameters: dict[str, list[str | int | float | bool]] | None = None,
 ) -> Automation:
     nodes = [build_action_node(record, trace) for record in kept]
     return Automation(
         url=url,
         browser_channel=browser_channel,
         backend=backend,
-        parameters=Parameters(input_parameters={}, generated_parameters={}),
+        parameters=Parameters(
+            input_parameters=input_parameters or {},
+            generated_parameters={},
+        ),
         nodes=nodes,
         automation_description="Deterministic cache built by build_cached_automation.py from a filtered browser-use export.",
     )
@@ -231,18 +239,31 @@ def main(argv: list[str] | None = None) -> int:
     url = args.url
     browser_channel = "chromium"
     backend = "browser-use"
+    input_parameters: dict[str, list[str | int | float | bool]] = {}
     base_path = Path(args.base_automation)
-    if url is None:
-        if not base_path.exists():
-            parser.error(f"--url not given and base automation not found at {base_path}")
+    if base_path.exists():
         base = json.loads(base_path.read_text(encoding="utf-8"))
-        url = base["url"]
+        if url is None:
+            url = base["url"]
         browser_channel = base.get("browser_channel", browser_channel)
         backend = base.get("backend", backend)
+        # Preserve the base automation's input_parameters so the Task
+        # re-validation in the worker subprocess still matches the keys the
+        # server allocated (e.g. first_name on the roboform recording).
+        input_parameters = (base.get("parameters") or {}).get("input_parameters") or {}
+    if url is None:
+        parser.error(f"--url not given and base automation not found at {base_path}")
 
     trace: list[str] = []
     try:
-        automation = build_automation(kept, url=url, browser_channel=browser_channel, backend=backend, trace=trace)
+        automation = build_automation(
+            kept,
+            url=url,
+            browser_channel=browser_channel,
+            backend=backend,
+            trace=trace,
+            input_parameters=input_parameters,
+        )
     except LocatorResolutionError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

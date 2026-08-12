@@ -10,7 +10,11 @@
   "reuse_page_if_already_on_url": false,
   "take_final_screenshot": true,
   "parameters": {
-    "input_parameters": {},
+    "input_parameters": {
+      "first_name": [
+        "myname"
+      ]
+    },
     "secure_parameters": {},
     "generated_parameters": {}
   },

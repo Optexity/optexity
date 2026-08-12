@@ -458,13 +458,24 @@ async def task_processor():
                         )
                     continue
 
-            # Local-override hook (test harness only): if test_automation.json
-            # exists in the working directory, load it in place of whatever
-            # automation was just fetched from the server, so a hand-authored or
-            # cached automation can be exercised without touching the server-side
-            # recording.
-            local_override_path = pathlib.Path("test_automation.json")
-            if local_override_path.exists():
+            # Local-override hook (test harness only): prefer the Phase-4 cached
+            # automation when present, otherwise fall back to the agentic
+            # test_automation.json. Either file, if found in the working
+            # directory, replaces whatever automation was just fetched from the
+            # server so a hand-authored or cached automation can be exercised
+            # without touching the server-side recording.
+            local_override_path = next(
+                (
+                    pathlib.Path(name)
+                    for name in (
+                        "test_automation_cached.json",
+                        "test_automation.json",
+                    )
+                    if pathlib.Path(name).exists()
+                ),
+                None,
+            )
+            if local_override_path is not None:
                 with open(local_override_path) as f:
                     task.automation = Automation.model_validate(json.load(f))
                 logger.info(
