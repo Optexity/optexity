@@ -458,6 +458,20 @@ async def task_processor():
                         )
                     continue
 
+            # Local-override hook (test harness only): if test_automation.json
+            # exists in the working directory, load it in place of whatever
+            # automation was just fetched from the server, so a hand-authored or
+            # cached automation can be exercised without touching the server-side
+            # recording.
+            local_override_path = pathlib.Path("test_automation.json")
+            if local_override_path.exists():
+                with open(local_override_path) as f:
+                    task.automation = Automation.model_validate(json.load(f))
+                logger.info(
+                    f"Loaded local override automation from {local_override_path} "
+                    f"for task {task.task_id}"
+                )
+
             task_running = True
             last_task_start_time = datetime.now(timezone.utc)
             current_task_timeout_minutes = task.max_timeout_in_minutes
