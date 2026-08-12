@@ -430,8 +430,8 @@ locators and values) on attempt 1/3.
 
 ### PR links
 
-- Optexity: _(filled after `gh pr create`)_
-- browser-use: _(filled after `gh pr create`)_
+- Optexity: https://github.com/rangerfc56-sys/optexity/pull/1
+- browser-use: https://github.com/rangerfc56-sys/browser-use/pull/1
 
 ## License
 
