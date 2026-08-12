@@ -281,166 +281,97 @@ Check out our examples directory for sample automations:
 
 ## Deterministic Cache (`feature/deterministic-cache`)
 
-Take-home pipeline: run an agentic browser-use task **once**, export stable
-element identity (never bracket indices), filter exploration noise, emit a
-schema-valid Optexity `Automation` JSON, then replay with **0 LLM calls**.
+Run an agentic browser task **once**, record what it did, then replay it with
+**zero LLM calls**. Same result, faster and deterministic.
 
-Companion fork: [`rangerfc56-sys/browser-use`](https://github.com/rangerfc56-sys/browser-use)
-branch `feature/deterministic-cache` (export + step filter).
+Needs the matching [`rangerfc56-sys/browser-use`](https://github.com/rangerfc56-sys/browser-use)
+fork (branch `feature/deterministic-cache`) for the record + filter steps.
 
-### Architecture
+### How it works
 
 ```
-  ┌──────────────┐   OPTEXITY_CACHE_EXPORT=1    ┌─────────────────────┐
-  │ Agentic run  │ ───────────────────────────► │ cached_run_<ts>.json │
-  │ (browser-use │                              │ + _raw.json          │
-  │  + Gemini)   │                              └──────────┬──────────┘
-  └──────────────┘                                         │
-                                                           ▼
-                                                ┌─────────────────────┐
-                                                │ filter_steps()      │
-                                                │ (rule-based)        │
-                                                └──────────┬──────────┘
-                                                           ▼
-                                                ┌─────────────────────┐
-                                                │ build_cached_       │
-                                                │ automation.py       │
-                                                │ → locator tiers     │
-                                                └──────────┬──────────┘
-                                                           ▼
-  ┌──────────────┐   local override             ┌─────────────────────┐
-  │ /inference   │ ◄────────────────────────────│ test_automation_    │
-  │ 0 LLM replay │                              │ cached.json         │
-  └──────┬───────┘                              └─────────────────────┘
-         ▼
-  verify_form_fill / verify_final_page  (content, not exit code)
+agentic run  →  export actions  →  filter noise  →  build locators  →  replay (0 LLM)
+ (Gemini)       cached_run.json    keep real steps   test_..._cached.json   /inference
 ```
 
-Key files:
-
-| Piece | Location |
+| Step | File |
 | --- | --- |
-| Local override hook | `optexity/inference/child_process.py` (`OPTEXITY_LOCAL_AUTOMATION` or well-known JSON names) |
-| Action export | `browser_use/cache/action_export.py` |
-| Step filter | `browser_use/cache/step_filter.py` |
-| Locator builder | `optexity/tools/build_cached_automation.py` |
-| LLM auto-builder (Bonus A) | `optexity/tools/llm_build_automation.py` |
-| Verify | `optexity/tools/verify_form_fill.py`, `verify_final_page.py` |
-| Metrics | `metrics.md` |
+| Export what the agent did | `browser_use/cache/action_export.py` |
+| Drop the useless steps | `browser_use/cache/step_filter.py` |
+| Turn steps into Playwright locators | `optexity/tools/build_cached_automation.py` |
+| Load the cache instead of the LLM | `optexity/inference/child_process.py` |
+| Build the cache via LLM (bonus) | `optexity/tools/llm_build_automation.py` |
+| Check the replay actually worked | `optexity/tools/verify_form_fill.py`, `verify_final_page.py` |
 
-### Reproduce roboform cached replay (reviewer path)
+### Try it (roboform)
 
-Requires editable installs of **both** forks on `feature/deterministic-cache`,
-plus `OPTEXITY_API_KEY`, `GOOGLE_API_KEY`, `DEPLOYMENT=dev`.
+Needs both forks installed editable, plus `OPTEXITY_API_KEY`, `GOOGLE_API_KEY`,
+`DEPLOYMENT=dev`.
 
 ```bash
-# 1) Clone BOTH forks at the feature branch
 git clone -b feature/deterministic-cache https://github.com/rangerfc56-sys/optexity.git
 git clone -b feature/deterministic-cache https://github.com/rangerfc56-sys/browser-use.git
 
 python3 -m venv .venv && source .venv/bin/activate
-# `optexity` depends on PyPI `optexity-browser-use`, which also installs a
-# physical `browser_use/` tree into site-packages and conflicts with this fork.
-# Install optexity, remove that shadow package, then install the local fork.
+# optexity ships its own browser_use copy; remove it so the fork wins.
 pip install -e ./optexity
 pip uninstall -y optexity-browser-use browser-use || true
 rm -rf .venv/lib/python*/site-packages/browser_use
 pip install -e ./browser-use
-python -c "import browser_use; print('browser_use ->', browser_use.__file__)"
-# Expected path contains the cloned fork, e.g. .../browser-use/browser_use/__init__.py
-# NOT .../site-packages/browser_use/...
 optexity install-browsers
 
 export OPTEXITY_API_KEY=... GOOGLE_API_KEY=... DEPLOYMENT=dev
 
-# 2) Start inference from the optexity repo root (override files live here).
-#    Pin the roboform cache so stockanalysis files do not shadow it:
+# start the server with the roboform cache pinned
 cd optexity
 export OPTEXITY_LOCAL_AUTOMATION=test_automation_cached.json
 optexity inference --port 9000 --child_process_id 0
 
-# 3) In another shell — allocate the recording endpoint (keys must match
-#    first_name; override swaps the automation body):
-curl -s http://localhost:9000/inference \
-  -H 'Content-Type: application/json' \
+# in another shell: fire the task, then verify the fields
+curl -s http://localhost:9000/inference -H 'Content-Type: application/json' \
   -d '{"endpoint_name":"fill_roboform_test_form-3b699ebe","input_parameters":{"first_name":["myname"]},"unique_parameter_names":[]}'
-
-# 4) After the task goes idle, content-verify (standalone Playwright):
 python -m optexity.tools.verify_form_fill
 ```
 
-Expected: worker log shows `Loaded local override automation from test_automation_cached.json`,
-**no** `Starting a browser-use agent` / `provider=gemini`, and verify_form_fill **PASS**.
+You should see `Loaded local override automation ...`, no Gemini calls, and
+`verify_form_fill` **PASS**.
 
-### Locator fallback chain (why this order)
+### Design choices
 
-First match wins in `build_cached_automation.resolve_locator`:
+**Locators** — pick the most stable handle available, in order:
+`id` → `name` → `placeholder`/`data-*`/`aria-label` → role + text → `xpath`.
+Never browser-use bracket indices (`[67]`, per-run only). Never xpath inside
+shadow DOM (it can't reach in) — the builder errors instead.
 
-1. **id** — most stable unique handle when present  
-2. **name** — common on forms; survived roboform  
-3. **placeholder / data-testid / data-title / aria-label** — attribute selectors from the export  
-4. **role + visible text** — accessible name; `a` tags infer `link` when role is missing  
-5. **xpath** — last resort, and **only if `in_shadow_dom` is false**
+**Filter** — plain rules, each logged with a reason:
+drop non-actions and failures, merge click-then-type and type-then-Enter,
+keep the last action when an element was touched twice. Rules over an LLM
+because it's cheap and auditable; swapping in an LLM filter later is possible.
 
-Why not start at xpath? Brittle under layout churn. Why not bracket indices
-(`[67]`)? They are per-run ephemera in browser-use’s DOM index — hard rule 1.
+**Waits** — no `time.sleep()`. When a step changed the page, the cache sets
+`end_sleep_time`, which Optexity runs as `wait_for_load_state("load")`. If the
+URL lags behind the click, the builder adds a `go_to_url` using the real
+recorded URL.
 
-### Shadow DOM / xpath caveat
+### Results
 
-Playwright xpath does **not** pierce shadow roots. Export records
-`element.in_shadow_dom`. If that flag is true and tiers 1–4 miss, the builder
-raises instead of emitting xpath (hard rule 2). Prefer id/name/CSS inside shadow trees.
+| Site | Agentic | Cached (avg of 3) | LLM calls |
+| --- | --- | --- | --- |
+| Roboform | ~100 s | ~24 s (~4×) | 4 → **0** |
+| Stockanalysis (NVDA Financials) | 64 s | ~24 s (~2.7×) | 5 → **0** |
 
-### Filter rules (why)
+Details: [`metrics.md`](metrics.md). LLM auto-builder vs hand-built: no diffs
+([`llm_vs_handbuilt_diff.md`](llm_vs_handbuilt_diff.md)).
 
-`RuleBasedStepFilter` (`browser_use/cache/step_filter.py`), applied in order:
+### Left out on purpose
 
-1. Drop non-mutating / non-browser actions (`done`, extract, …)  
-2. Drop failed actions (`success == false`)  
-3. Merge click-to-focus → following `input_text` on the same `element_hash`; merge
-   `input_text` → Enter `key_press` into one step with `press_enter=true`  
-4. Same element acted on multiple times → **keep last** successful action (wrong-then-correct)  
-5. Keep remaining mutating actions  
+- Iterative verify/repair loop (Bonus B) — validate + retry already enough.
+- LLM-based filter — rules are simpler and traceable.
 
-Why rules, not an LLM filter? Deterministic, cheap, auditable (every keep/discard
-is logged with a reason). The `StepFilter` protocol still allows an LLM swap later.
+### PRs
 
-### Wait strategy
-
-Export sets `caused_navigation` when the next history step’s URL differs.
-Builder sets `end_sleep_time=5.0` on those nodes (and on `press_enter` search
-submits). Optexity’s runner maps that to `page.wait_for_load_state("load", timeout=…)`
-— **not** a bare `time.sleep()`. When URL change lags the credited action
-(stockanalysis Enter), the builder may also insert `go_to_url` using the
-export’s `page_url` (never an invented URL).
-
-### Metrics (agentic vs cached)
-
-| Site | Agentic wall | Agentic LLM | Cached wall (avg×3) | Cached LLM | Verify |
-| --- | --- | --- | --- | --- | --- |
-| Roboform | ~100 s | 4 | ~23.9 s (~4.2×) | **0** | fields read-back PASS |
-| Stockanalysis NVDA Financials | 64.0 s | 5 | ~23.6 s (~2.7×) | **0** | final URL/text PASS |
-
-Full tables and task ids: [`metrics.md`](metrics.md).
-
-### LLM auto-builder (Bonus A)
-
-See `optexity/tools/llm_build_automation.py` and [`llm_vs_handbuilt_diff.md`](llm_vs_handbuilt_diff.md).
-Against Phase 3 roboform ground truth: **no structural diffs** (same 4 `name=`
-locators and values) on attempt 1/3.
-
-### Deliberately left out
-
-| Item | Why |
-| --- | --- |
-| Bonus B iterative verify/repair loop | Phases 0–5 already green; capped effort — schema validate+retry in Bonus A is enough |
-| LLM-based step filter | Rule filter is deterministic and logged; protocol exists for a later swap |
-| Caching bracket indices | Per-run noise; would break every replay |
-
-### PR links
-
-- Optexity: https://github.com/rangerfc56-sys/optexity/pull/1
-- browser-use: https://github.com/rangerfc56-sys/browser-use/pull/1
+- [optexity#1](https://github.com/rangerfc56-sys/optexity/pull/1)
+- [browser-use#1](https://github.com/rangerfc56-sys/browser-use/pull/1)
 
 ## License
 
