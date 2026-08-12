@@ -363,11 +363,6 @@ recorded URL.
 Details: [`metrics.md`](metrics.md). LLM auto-builder vs hand-built: no diffs
 ([`llm_vs_handbuilt_diff.md`](llm_vs_handbuilt_diff.md)).
 
-### Left out on purpose
-
-- Iterative verify/repair loop (Bonus B) — validate + retry already enough.
-- LLM-based filter — rules are simpler and traceable.
-
 ### PRs
 
 - [optexity#1](https://github.com/rangerfc56-sys/optexity/pull/1)
