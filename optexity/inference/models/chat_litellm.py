@@ -123,16 +123,21 @@ class ChatLiteLLM(BaseChatModel):
 
     @overload
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: None = None
+        self, messages: list[BaseMessage], output_format: None = None, **kwargs: Any
     ) -> ChatInvokeCompletion[str]: ...
 
     @overload
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: type[T]
+        self, messages: list[BaseMessage], output_format: type[T], **kwargs: Any
     ) -> ChatInvokeCompletion[T]: ...
 
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: type[T] | None = None
+        self,
+        messages: list[BaseMessage],
+        output_format: type[T] | None = None,
+        # BaseChatModel's protocol declares **kwargs for forward-compat callers
+        # (e.g. Agent passes session_id); litellm has no use for them here.
+        **kwargs: Any,
     ) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
         try:
             response = await litellm.acompletion(
