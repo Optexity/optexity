@@ -458,25 +458,26 @@ async def task_processor():
                         )
                     continue
 
-            # Local-override hook (test harness only): prefer the Phase-4 cached
-            # automation when present, otherwise fall back to the agentic
-            # test_automation.json. Either file, if found and valid, replaces
-            # the server-fetched automation. On any failure (bad JSON, schema
-            # error, or input/secure parameter key mismatch with the allocated
-            # Task) we keep the server automation so the task still runs via
-            # the normal LLM path — never abort the processor for a bad local
-            # file.
-            local_override_path = next(
+            # Local-override hook (test harness only). Preference order:
+            # 1) OPTEXITY_LOCAL_AUTOMATION=<path> when set and the file exists
+            # 2) otherwise the first present of the well-known test filenames
+            #    (stockanalysis cached → stockanalysis agentic → roboform cached
+            #    → roboform agentic). Fail-soft: bad JSON / schema / parameter
+            #    key mismatch keeps the server automation (LLM path).
+            env_override = os.environ.get("OPTEXITY_LOCAL_AUTOMATION", "").strip()
+            candidates: list[str] = []
+            if env_override:
+                candidates.append(env_override)
+            candidates.extend(
                 (
-                    pathlib.Path(name)
-                    for name in (
-                        "test_automation_2_cached.json",
-                        "test_automation_2.json",
-                        "test_automation_cached.json",
-                        "test_automation.json",
-                    )
-                    if pathlib.Path(name).exists()
-                ),
+                    "test_automation_2_cached.json",
+                    "test_automation_2.json",
+                    "test_automation_cached.json",
+                    "test_automation.json",
+                )
+            )
+            local_override_path = next(
+                (pathlib.Path(name) for name in candidates if pathlib.Path(name).exists()),
                 None,
             )
             if local_override_path is not None:
