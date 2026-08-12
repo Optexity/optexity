@@ -279,6 +279,34 @@ Check out our examples directory for sample automations:
 - [Healthcare Form Automation](https://docs.optexity.com/examples/healthcare/peachstate-medicaid)
 - [QA Testing](https://docs.optexity.com/examples/qa_testing/supabase-login)
 
+## Deterministic cache — LLM auto-builder (Phase 6 / Bonus A)
+
+`optexity/tools/llm_build_automation.py` asks Gemini for a full cached
+`Automation` JSON from a filtered browser-use export + the pydantic schema +
+1–2 valid examples, then retries on `Automation.model_validate` failures (max 3).
+
+```bash
+python -m optexity.tools.llm_build_automation \
+  --input cached_run_<ts>.json \
+  --output test_automation_cached_llm.json \
+  --ground-truth test_automation_cached.json \
+  --base-automation test_automation.json
+```
+
+### LLM vs hand-built ground truth (roboform)
+
+Source run: export `cached_run_20260812_162626_555327.json` →
+`test_automation_cached_llm.json` vs Phase 3 `test_automation_cached.json`
+(model `gemini/gemini-3.5-flash-lite`). Few-shot examples were a minimal stub
+plus `test_automation_2_cached.json` (stockanalysis) — **not** the roboform
+ground truth.
+
+Result (see `llm_vs_handbuilt_diff.md`): **no structural diffs** in
+`url` / node kind / `command` / typed `value` / `press_enter` (4 input nodes,
+same `name=` locators and values as the hand-built cache).
+
+Bonus B (iterative verify/repair loop) was **skipped** on purpose.
+
 ## License
 
 This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
