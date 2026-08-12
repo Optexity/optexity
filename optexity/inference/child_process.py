@@ -460,14 +460,18 @@ async def task_processor():
 
             # Local-override hook (test harness only): prefer the Phase-4 cached
             # automation when present, otherwise fall back to the agentic
-            # test_automation.json. Either file, if found in the working
-            # directory, replaces whatever automation was just fetched from the
-            # server so a hand-authored or cached automation can be exercised
-            # without touching the server-side recording.
+            # test_automation.json. Either file, if found and valid, replaces
+            # the server-fetched automation. On any failure (bad JSON, schema
+            # error, or input/secure parameter key mismatch with the allocated
+            # Task) we keep the server automation so the task still runs via
+            # the normal LLM path — never abort the processor for a bad local
+            # file.
             local_override_path = next(
                 (
                     pathlib.Path(name)
                     for name in (
+                        "test_automation_2_cached.json",
+                        "test_automation_2.json",
                         "test_automation_cached.json",
                         "test_automation.json",
                     )
@@ -476,12 +480,38 @@ async def task_processor():
                 None,
             )
             if local_override_path is not None:
-                with open(local_override_path) as f:
-                    task.automation = Automation.model_validate(json.load(f))
-                logger.info(
-                    f"Loaded local override automation from {local_override_path} "
-                    f"for task {task.task_id}"
-                )
+                try:
+                    with open(local_override_path) as f:
+                        override = Automation.model_validate(json.load(f))
+                    for override_params, task_params, label in (
+                        (
+                            override.parameters.input_parameters,
+                            task.input_parameters,
+                            "input_parameters",
+                        ),
+                        (
+                            override.parameters.secure_parameters,
+                            task.secure_parameters,
+                            "secure_parameters",
+                        ),
+                    ):
+                        if override_params.keys() != task_params.keys():
+                            raise ValueError(
+                                f"{label} key mismatch: override has "
+                                f"{set(override_params.keys())}, task has "
+                                f"{set(task_params.keys())}"
+                            )
+                    task.automation = override
+                    logger.info(
+                        f"Loaded local override automation from {local_override_path} "
+                        f"for task {task.task_id}"
+                    )
+                except Exception as override_err:
+                    logger.warning(
+                        f"Ignoring local override {local_override_path} for task "
+                        f"{task.task_id} ({override_err}); continuing with "
+                        f"server-fetched automation"
+                    )
 
             task_running = True
             last_task_start_time = datetime.now(timezone.utc)

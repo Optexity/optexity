@@ -45,3 +45,54 @@ Content verification (`python -m optexity.tools.verify_form_fill`): **PASS** —
 | Wall time | ~100 s | ~23.9 s (**~4.2× faster**) |
 | LLM calls | 4 | **0** |
 | Correctness | fill observed in agent log | 3/3 success + read-back PASS |
+
+---
+
+# Metrics — agentic vs cached (stockanalysis / NVDA Financials)
+
+Site: https://stockanalysis.com/  
+Flow: search NVDA → open NVDA page → Financials tab  
+Final URL must contain `/stocks/nvda/financials`
+
+## Agentic run (browser-use + Gemini)
+
+Source: Phase 5 agentic export, task `b6490b75-1075-47c3-85bd-649999c7b3b1`  
+(server log 22:37:24 → 22:38:20 IST on 2026-08-12; allocate→idle wall 64.0 s)
+
+| Metric | Value |
+| --- | --- |
+| Wall time | **64.0 s** |
+| LLM calls | **5** (`📍 Step 1`–`5`; each step is one Gemini `ainvoke`) |
+| Tokens | not exposed in worker logs for this run |
+| Outcome | success; exporter wrote search input + Enter + clicks + done |
+
+## Cached run (deterministic Playwright commands, 0 LLM)
+
+Source: Phase 5 / T5, override=`test_automation_2_cached.json`, 3 consecutive `/inference` runs  
+(server log 22:43:43 → 22:44:49 IST on 2026-08-12)
+
+| Run | task_id | Wall time (allocate → idle) | Status | LLM calls |
+| --- | --- | --- | --- | --- |
+| 1 | `a0f2c336-6d7c-40ad-8f98-37c99c245f99` | 24.2 s | success | **0** |
+| 2 | `883710e5-49df-4fb4-81a9-a3cb79a2e5c1` | 23.4 s | success | **0** |
+| 3 | `7df12063-6a37-4382-bc3e-52c477491c9f` | 23.3 s | success | **0** |
+
+LLM-call greps on the cached-run server log (all must be 0):
+
+| Pattern | Count |
+| --- | --- |
+| `Starting a browser-use agent` | 0 |
+| `provider=gemini` | 0 |
+| `ChatLiteLLM` / `ainvoke` / `litellm.acompletion` | 0 |
+| `agentic_task` | 0 |
+| `prompt_tokens` / `TokenUsage` | 0 |
+
+Content verification (`python -m optexity.tools.verify_final_page`): **PASS** — final URL contains `/stocks/nvda/financials` and body contains `Financials`.
+
+## Delta
+
+| | Agentic | Cached (avg of 3) |
+| --- | --- | --- |
+| Wall time | 64.0 s | ~23.6 s (**~2.7× faster**) |
+| LLM calls | 5 | **0** |
+| Correctness | Financials page reached in agent log | 3/3 success + final-page PASS |

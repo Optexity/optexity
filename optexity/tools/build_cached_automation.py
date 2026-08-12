@@ -83,6 +83,16 @@ def resolve_locator(element: dict[str, Any] | None) -> tuple[str, str, str]:
             f"placeholder={placeholder!r}",
         )
 
+    data_attrs = element.get("data_attrs") or {}
+    for data_key in ("data-testid", "data-title", "data-name"):
+        data_val = data_attrs.get(data_key)
+        if data_val:
+            return (
+                f"locator({_attr_selector(data_key, data_val)!r}).first",
+                f"tier3:{data_key}",
+                f"data_attrs.{data_key}={data_val!r}",
+            )
+
     aria_label = element.get("aria_label")
     if aria_label:
         return (
@@ -91,16 +101,10 @@ def resolve_locator(element: dict[str, Any] | None) -> tuple[str, str, str]:
             f"aria_label={aria_label!r}",
         )
 
-    data_testid = (element.get("data_attrs") or {}).get("data-testid")
-    if data_testid:
-        return (
-            f"locator({_attr_selector('data-testid', data_testid)!r}).first",
-            "tier3:data-testid",
-            f"data_attrs.data-testid={data_testid!r}",
-        )
-
     role = element.get("role")
     visible_text = element.get("visible_text")
+    if not role and (element.get("tag") or "").lower() == "a" and visible_text:
+        role = "link"
     if role and visible_text:
         return (
             f"get_by_role({role!r}, name={visible_text!r}).first",
@@ -136,6 +140,12 @@ def _prompt_for(action_type: str, element: dict[str, Any] | None, typed_value: s
     return f"Interact with '{label}'"
 
 
+def _norm_url(url: str | None) -> str:
+    if not url:
+        return ""
+    return url.rstrip("/")
+
+
 def build_action_node(record: dict[str, Any], trace: list[str]) -> ActionNode:
     action_type = record["action_type"]
     element = record.get("element")
@@ -161,9 +171,14 @@ def build_action_node(record: dict[str, Any], trace: list[str]) -> ActionNode:
         if action_type == "input_text":
             interaction_action = InteractionAction(
                 input_text=InputTextAction(
-                    command=command, input_text=typed_value, prompt_instructions=prompt_instructions
+                    command=command,
+                    input_text=typed_value,
+                    prompt_instructions=prompt_instructions,
+                    press_enter=bool(record.get("press_enter")),
                 )
             )
+            if record.get("press_enter"):
+                trace.append(f"step={step_index}: press_enter=True (merged from following Enter key_press)")
         elif action_type == "click":
             interaction_action = InteractionAction(
                 click_element=ClickElementAction(command=command, prompt_instructions=prompt_instructions)
@@ -180,15 +195,17 @@ def build_action_node(record: dict[str, Any], trace: list[str]) -> ActionNode:
             raise LocatorResolutionError(f"unsupported action_type for cached replay: {action_type!r}")
 
     node_kwargs: dict[str, Any] = {"type": "action_node", "interaction_action": interaction_action}
-    if record.get("caused_navigation"):
+    if record.get("caused_navigation") or record.get("press_enter"):
         # ActionNode already sleeps `end_sleep_time` seconds after every action
         # (schema default 5.0s, capped at 30s) - that existing field is the
         # wait mechanism, so post-navigation settling needs no new node type
         # and no sleep_action/sleep() call. Set it explicitly here (even
         # though 5.0 is already the default) so the wait is visible in the
         # emitted JSON and in --trace instead of relying on an implicit default.
+        # press_enter search submits often navigate asynchronously too.
         node_kwargs["end_sleep_time"] = 5.0
-        trace.append(f"step={step_index}: caused_navigation=True -> end_sleep_time=5.0 (built-in post-action wait)")
+        why = "caused_navigation=True" if record.get("caused_navigation") else "press_enter=True"
+        trace.append(f"step={step_index}: {why} -> end_sleep_time=5.0 (built-in post-action wait)")
 
     return ActionNode(**node_kwargs)
 
@@ -201,7 +218,37 @@ def build_automation(
     trace: list[str],
     input_parameters: dict[str, list[str | int | float | bool]] | None = None,
 ) -> Automation:
-    nodes = [build_action_node(record, trace) for record in kept]
+    nodes: list[ActionNode] = []
+    current_url = url
+    for record in kept:
+        page_url = record.get("page_url")
+        # If this action was performed on a different page than we are currently
+        # on, insert a go_to_url sourced from the export's page_url (the URL the
+        # agent was actually on). Covers cases where navigation happened via a
+        # failed/discarded click or a delayed Enter submit.
+        if page_url and _norm_url(page_url) != _norm_url(current_url):
+            nav_record = {
+                "step_index": record.get("step_index"),
+                "action_type": "navigate",
+                "typed_value": page_url,
+                "caused_navigation": True,
+            }
+            nodes.append(build_action_node(nav_record, trace))
+            trace.append(
+                f"step={record.get('step_index')}: inserted go_to_url({page_url!r}) "
+                f"because export page_url differs from current {current_url!r}"
+            )
+            current_url = page_url
+
+        nodes.append(build_action_node(record, trace))
+
+        if record.get("action_type") == "navigate" and record.get("typed_value"):
+            current_url = record["typed_value"]
+        elif record.get("next_page_url") and (
+            record.get("caused_navigation") or record.get("press_enter")
+        ):
+            current_url = record["next_page_url"]
+
     return Automation(
         url=url,
         browser_channel=browser_channel,
