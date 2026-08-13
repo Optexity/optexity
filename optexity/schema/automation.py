@@ -83,7 +83,87 @@ class SecureParameter(BaseModel):
         return self
 
 
-class ActionNode(BaseModel):
+class VariableSubstitution:
+    """``{name[i]}`` substitution shared by node types that accept variables.
+
+    Subclasses implement ``replace``, which decides where in the node a pattern
+    can appear; this resolves the run's variables to concrete strings (including
+    fetching secure values) and feeds them through it.
+    """
+
+    def replace(self, pattern: str, replacement: str | int | float | bool | None):
+        raise NotImplementedError
+
+    async def replace_variables(
+        self,
+        variables: dict[str, list[str | SecureParameter]],
+        workspace_id: str | None = None,
+        api_key: str | None = None,
+    ):
+        for key, values in variables.items():
+            if not isinstance(values, list):
+                continue  # skip non-list values (e.g., api_call response dicts)
+
+            for index, value in enumerate(values):
+                pattern = f"{{{key}[{index}]}}"
+
+                if value is None:
+                    # A None value (e.g. a failed locator extraction) cannot be
+                    # substituted into a string. Skip it instead of crashing the
+                    # whole flow on an unrelated variable. The raw None is kept in
+                    # generated_variables, so if/else conditions still evaluate it
+                    # natively (falsy) via evaluate_condition().
+                    continue
+
+                str_value = str(value)
+
+                if isinstance(value, SecureParameter):
+                    if value.onepassword:
+                        str_value = await get_onepassword_value(
+                            value.onepassword.vault_name,
+                            value.onepassword.item_name,
+                            value.onepassword.field_name,
+                            workspace_id,
+                            api_key,
+                        )
+                        if value.onepassword.type == "totp_secret":
+                            str_value = get_totp_code(
+                                str_value, value.onepassword.digits
+                            )
+
+                    elif value.amazon_secrets_manager:
+                        asm = value.amazon_secrets_manager
+                        str_value = await get_aws_secret_value(
+                            asm.secret_name,
+                            asm.region_name,
+                            asm.key,
+                            workspace_id,
+                            api_key,
+                        )
+                        if asm.type == "totp_secret":
+                            assert asm.digits is not None
+                            str_value = get_totp_code(str_value, asm.digits)
+                    elif value.totp:
+                        str_value = get_totp_code(
+                            value.totp.totp_secret, value.totp.digits
+                        )
+
+                elif (
+                    isinstance(value, str)
+                    or isinstance(value, int)
+                    or isinstance(value, float)
+                    or isinstance(value, bool)
+                ):
+                    str_value = str(value)
+                else:
+                    raise ValueError(f"Invalid value type for {key}: {type(value)}")
+
+                self.replace(pattern, str_value)
+
+        return self
+
+
+class ActionNode(VariableSubstitution, BaseModel):
     type: Literal["action_node"]
     interaction_action: InteractionAction | None = None
     assertion_action: AssertionAction | None = None
@@ -176,72 +256,36 @@ class ActionNode(BaseModel):
 
         return self
 
-    async def replace_variables(
-        self,
-        variables: dict[str, list[str | SecureParameter]],
-        workspace_id: str | None = None,
-        api_key: str | None = None,
-    ):
-        for key, values in variables.items():
-            if not isinstance(values, list):
-                continue  # skip non-list values (e.g., api_call response dicts)
 
-            for index, value in enumerate(values):
-                pattern = f"{{{key}[{index}]}}"
+def _replace_in_value(value: Any, pattern: str, replacement: str) -> Any:
+    if isinstance(value, str):
+        return value.replace(pattern, replacement)
+    if isinstance(value, list):
+        return [_replace_in_value(item, pattern, replacement) for item in value]
+    if isinstance(value, dict):
+        return {k: _replace_in_value(v, pattern, replacement) for k, v in value.items()}
+    return value
 
-                if value is None:
-                    # A None value (e.g. a failed locator extraction) cannot be
-                    # substituted into a string. Skip it instead of crashing the
-                    # whole flow on an unrelated variable. The raw None is kept in
-                    # generated_variables, so if/else conditions still evaluate it
-                    # natively (falsy) via evaluate_condition().
-                    continue
 
-                str_value = str(value)
+class PrivateNode(VariableSubstitution, BaseModel):
+    """Calls a handler contributed by an installed plugin package.
 
-                if isinstance(value, SecureParameter):
-                    if value.onepassword:
-                        str_value = await get_onepassword_value(
-                            value.onepassword.vault_name,
-                            value.onepassword.item_name,
-                            value.onepassword.field_name,
-                            workspace_id,
-                            api_key,
-                        )
-                        if value.onepassword.type == "totp_secret":
-                            str_value = get_totp_code(
-                                str_value, value.onepassword.digits
-                            )
+    ``handler`` and ``inputs`` are deliberately untyped here: the public schema
+    cannot know what a closed-source distribution provides, so the registry
+    resolves the name and the handler's own model validates the inputs at
+    execution time. See ``optexity.private_nodes``.
+    """
 
-                    elif value.amazon_secrets_manager:
-                        asm = value.amazon_secrets_manager
-                        str_value = await get_aws_secret_value(
-                            asm.secret_name,
-                            asm.region_name,
-                            asm.key,
-                            workspace_id,
-                            api_key,
-                        )
-                        if asm.type == "totp_secret":
-                            assert asm.digits is not None
-                            str_value = get_totp_code(str_value, asm.digits)
-                    elif value.totp:
-                        str_value = get_totp_code(
-                            value.totp.totp_secret, value.totp.digits
-                        )
+    type: Literal["private_node"]
+    handler: str
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    output_variable_names: list[str] | None = None
+    before_sleep_time: float = 0.0
+    end_sleep_time: float = 0.0
 
-                elif (
-                    isinstance(value, str)
-                    or isinstance(value, int)
-                    or isinstance(value, float)
-                    or isinstance(value, bool)
-                ):
-                    str_value = str(value)
-                else:
-                    raise ValueError(f"Invalid value type for {key}: {type(value)}")
-
-                self.replace(pattern, str_value)
-
+    def replace(self, pattern: str, replacement: str | int | float | bool | None):
+        replacement_str = "" if replacement is None else str(replacement)
+        self.inputs = _replace_in_value(self.inputs, pattern, replacement_str)
         return self
 
 
@@ -309,13 +353,21 @@ class ForLoopNode(BaseModel):
     )
     nodes: list[
         Annotated[
-            ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef,
+            ActionNode
+            | IfElseNodeRef
+            | ForLoopNodeRef
+            | AssertLocatorNodeRef
+            | PrivateNode,
             Field(discriminator="type"),
         ]
     ]
     reset_nodes: list[
         Annotated[
-            ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef,
+            ActionNode
+            | IfElseNodeRef
+            | ForLoopNodeRef
+            | AssertLocatorNodeRef
+            | PrivateNode,
             Field(discriminator="type"),
         ]
     ] = []
@@ -405,6 +457,7 @@ class ForLoopNode(BaseModel):
                     or isinstance(item, ForLoopNode)
                     or isinstance(item, IfElseNode)
                     or isinstance(item, AssertLocatorNode)
+                    or isinstance(item, PrivateNode)
                 ):
                     new_nodes.append(item)
                     continue
@@ -454,9 +507,11 @@ class ForLoopNode(BaseModel):
 class IfElseNode(BaseModel):
     type: Literal["if_else_node"]
     condition: str
-    if_nodes: list[ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef]
+    if_nodes: list[
+        ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef | PrivateNode
+    ]
     else_nodes: list[
-        ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef
+        ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef | PrivateNode
     ] = []
 
     def replace(self, pattern: str, replacement: str | int | float | bool | None):
@@ -489,6 +544,7 @@ class IfElseNode(BaseModel):
                     or isinstance(item, ForLoopNode)
                     or isinstance(item, IfElseNode)
                     or isinstance(item, AssertLocatorNode)
+                    or isinstance(item, PrivateNode)
                 ):
                     new_nodes.append(item)
                     continue
@@ -607,7 +663,7 @@ class Automation(BaseModel):
     parameters: Parameters
     nodes: list[
         Annotated[
-            ActionNode | ForLoopNode | IfElseNode | AssertLocatorNode,
+            ActionNode | ForLoopNode | IfElseNode | AssertLocatorNode | PrivateNode,
             Field(discriminator="type"),
         ]
     ]
@@ -615,7 +671,7 @@ class Automation(BaseModel):
     automation_endpoint: str | None = None
     post_processing_nodes: list[
         Annotated[
-            ActionNode | ForLoopNode | IfElseNode | AssertLocatorNode,
+            ActionNode | ForLoopNode | IfElseNode | AssertLocatorNode | PrivateNode,
             Field(discriminator="type"),
         ]
     ] = []
@@ -632,6 +688,7 @@ class Automation(BaseModel):
                 or isinstance(item, ForLoopNode)
                 or isinstance(item, IfElseNode)
                 or isinstance(item, AssertLocatorNode)
+                or isinstance(item, PrivateNode)
             ):
                 new_nodes.append(item)
                 continue

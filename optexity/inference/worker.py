@@ -3,6 +3,7 @@ import os
 import sys
 
 from optexity.inference.core.run_automation import run_automation
+from optexity.private_nodes import load_plugins
 from optexity.schema.enums import ExitCodes
 from optexity.schema.task import Task
 
@@ -21,6 +22,10 @@ def _force_exit(code: int) -> None:
 
 
 async def main():
+    # Nodes execute in this process, so private_node handlers must be registered
+    # here — registering them in the parent service would not reach the executor.
+    load_plugins()
+
     task = Task.model_validate_json(sys.argv[1])
     unique_child_arn = sys.argv[2]
     child_process_id = int(sys.argv[3])

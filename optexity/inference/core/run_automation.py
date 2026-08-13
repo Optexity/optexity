@@ -8,6 +8,7 @@ import traceback
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
@@ -46,15 +47,18 @@ from optexity.inference.core.run_misc import (
     run_sleep_action,
 )
 from optexity.inference.core.run_python_script import run_python_script_action
+from optexity.inference.core.script_context import ScriptContext
 from optexity.inference.core.variable_resolver import resolve_api_variables_in_node
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import normalize_model
+from optexity.private_nodes import HandlerRegistry
 from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
 from optexity.schema.automation import (
     ActionNode,
     AssertLocatorNode,
     ForLoopNode,
     IfElseNode,
+    PrivateNode,
 )
 from optexity.schema.memory import BrowserState, ForLoopStatus, Memory, OutputData
 from optexity.schema.task import Task
@@ -523,6 +527,97 @@ async def sleep_for_page_to_load(browser: Browser, sleep_time: float):
         pass
 
 
+async def run_private_node(
+    private_node: PrivateNode,
+    task: Task,
+    memory: Memory,
+    browser: Browser,
+):
+    """Execute one ``private_node`` through a plugin-registered handler.
+
+    Mirrors ``run_action_node``'s variable substitution and step accounting so a
+    private node behaves like any other node inside loops and conditionals. The
+    handler name is resolved lazily here, so an automation referencing a handler
+    this deployment does not have fails only at this node.
+    """
+    memory.update_system_info()
+    await asyncio.sleep(private_node.before_sleep_time)
+
+    memory.automation_state.step_index += 1
+    memory.automation_state.try_index = 0
+
+    await private_node.replace_variables(task.input_parameters)
+    await private_node.replace_variables(
+        task.secure_parameters, task.workspace_id, task.api_key
+    )
+    await private_node.replace_variables(memory.variables.generated_variables)
+    resolve_api_variables_in_node(private_node, memory.variables.generated_variables)
+
+    spec = HandlerRegistry.get(private_node.handler)
+    inputs = (
+        spec.inputs_model.model_validate(private_node.inputs)
+        if spec.inputs_model is not None
+        else private_node.inputs
+    )
+
+    logger.debug(
+        f"-----Running private node {memory.automation_state.step_index} "
+        f"({private_node.handler})-----"
+    )
+
+    try:
+        result = await spec.run(inputs, ScriptContext(task, memory, browser))
+    except Exception as e:
+        logger.error(f"Error running private node {private_node.handler}: {e}")
+        raise
+
+    _store_private_node_result(private_node, result, memory)
+
+    await sleep_for_page_to_load(browser, private_node.end_sleep_time)
+    logger.debug(
+        f"-----Finished private node {memory.automation_state.step_index}-----"
+    )
+    memory.update_system_info()
+
+
+def _store_private_node_result(
+    private_node: PrivateNode, result: Any, memory: Memory
+) -> None:
+    """Publish a handler's return value the same way extraction nodes do.
+
+    With one name the whole result is bound to it; with several the result must
+    be a dict and each name is looked up in it.
+    """
+    names = private_node.output_variable_names
+    if not names:
+        return
+
+    if len(names) == 1:
+        values = {names[0]: result}
+    elif isinstance(result, dict):
+        missing = [name for name in names if name not in result]
+        if missing:
+            raise ValueError(
+                f"private node {private_node.handler} did not return "
+                f"{missing} (returned keys: {sorted(result)})"
+            )
+        values = {name: result[name] for name in names}
+    else:
+        raise ValueError(
+            f"private node {private_node.handler} declares "
+            f"{len(names)} output_variable_names, so it must return a dict; "
+            f"got {type(result).__name__}"
+        )
+
+    for name, value in values.items():
+        memory.variables.generated_variables[name] = (
+            value if isinstance(value, list) else [value]
+        )
+        memory.variables.output_data.append(
+            OutputData(unique_identifier=name, json_data={name: value})
+        )
+
+
 def evaluate_condition(condition: str, memory: Memory, task: Task) -> bool:
     # Allow variable references to be optionally wrapped in curly braces,
     # e.g. "not {is_user_logged_in[0]}" is equivalent to "not is_user_logged_in[0]".
@@ -577,6 +672,9 @@ async def handle_if_else_node(
             await handle_assert_locator_node(
                 node, memory, task, browser, full_automation
             )
+        elif isinstance(node, PrivateNode):
+            full_automation.append(node.model_dump())
+            await run_private_node(node, task, memory, browser)
 
     logger.debug(f"Finished handling if else node {if_else_node.condition}")
     memory.update_system_info()
@@ -596,6 +694,9 @@ async def _run_for_loop_child_node(
         await handle_if_else_node(node, memory, task, browser, full_automation)
     elif isinstance(node, AssertLocatorNode):
         await handle_assert_locator_node(node, memory, task, browser, full_automation)
+    elif isinstance(node, PrivateNode):
+        full_automation.append(node.model_dump())
+        await run_private_node(node, task, memory, browser)
     else:
         full_automation.append(node.model_dump())
         await run_action_node(node, task, memory, browser)
@@ -867,7 +968,7 @@ async def _run_nodes(
     browser: Browser,
     full_automation: list,
 ):
-    """Dispatch a list of nodes (ActionNode, ForLoopNode, IfElseNode, or AssertLocatorNode) for execution."""
+    """Dispatch a list of nodes (ActionNode, ForLoopNode, IfElseNode, AssertLocatorNode, or PrivateNode) for execution."""
     for node in nodes:
         if isinstance(node, ForLoopNode):
             await handle_for_loop_node(node, memory, task, browser, full_automation)
@@ -877,6 +978,9 @@ async def _run_nodes(
             await handle_assert_locator_node(
                 node, memory, task, browser, full_automation
             )
+        elif isinstance(node, PrivateNode):
+            full_automation.append(node.model_dump())
+            await run_private_node(node, task, memory, browser)
         else:
             full_automation.append(node.model_dump())
             await run_action_node(node, task, memory, browser)
