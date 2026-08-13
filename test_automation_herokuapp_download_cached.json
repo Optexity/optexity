@@ -1,0 +1,44 @@
+{
+  "browser_channel": "chromium",
+  "backend": "browser-use",
+  "allow_cookies": false,
+  "max_retries": 0,
+  "expected_downloads": 1,
+  "remove_empty_nodes_in_axtree": true,
+  "url": "https://the-internet.herokuapp.com/download",
+  "reuse_page_if_already_on_url": false,
+  "take_final_screenshot": true,
+  "parameters": {
+    "input_parameters": {},
+    "secure_parameters": {},
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 10,
+        "max_timeout_seconds_per_try": 1.0,
+        "verify_before_step": true,
+        "click_element": {
+          "command": "get_by_text(\"image.png\")",
+          "prompt_instructions": "",
+          "skip_command": false,
+          "skip_prompt": false,
+          "assert_locator_presence": false,
+          "double_click": false,
+          "expect_download": true,
+          "download_filename": "e04b2293-78b3-401c-b3b8-ed4f251702f9",
+          "button": "left",
+          "mouse_click": false,
+          "force": false
+        }
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    }
+  ],
+  "post_processing_nodes": []
+}

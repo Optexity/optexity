@@ -1,0 +1,20 @@
+{
+    "url": "https://www.saucedemo.com/",
+    "parameters": {
+      "input_parameters": {
+      },
+      "generated_parameters": {}
+    },
+    "nodes": [
+      {
+        "type": "action_node",
+        "interaction_action": {
+          "agentic_task": {
+            "task": "Log in using username 'standard_user' and password 'secret_sauce', then confirm the login succeeded",
+            "max_steps": 10,
+            "backend": "browser_use"
+          }
+        }
+      }
+    ]
+  }

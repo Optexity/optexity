@@ -1,0 +1,20 @@
+{
+    "url": "https://the-internet.herokuapp.com/download",
+    "parameters": {
+      "input_parameters": {
+      },
+      "generated_parameters": {}
+    },
+    "nodes": [
+      {
+        "type": "action_node",
+        "interaction_action": {
+          "agentic_task": {
+            "task": "Click the first file link in the list to download it",
+            "max_steps": 10,
+            "backend": "browser_use"
+          }
+        }
+      }
+    ]
+  }

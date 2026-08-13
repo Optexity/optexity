@@ -24,6 +24,21 @@ async def handle_agentic_task(
 
     if agentic_task_action.backend == "browser_use":
 
+        # Cache-hit check: skip constructing browser_use.Agent entirely when a verified
+        # deterministic replacement already exists for this automation_key. Best-effort --
+        # never allowed to affect a live run. CloseOverlayPopupAction is excluded (a
+        # fallback utility, not a cacheable user-authored step).
+        if type(agentic_task_action) is AgenticTask and task.automation is not None:
+            try:
+                from optexity.inference.core.interaction.agentic_cache.pipeline import (
+                    try_serve_from_cache,
+                )
+
+                if await try_serve_from_cache(agentic_task_action, task, memory, browser):
+                    return None
+            except Exception as e:
+                logger.warning(f"agentic_cache: cache-hit check failed (non-fatal): {e}")
+
         if isinstance(agentic_task_action, CloseOverlayPopupAction):
             tools = Tools(
                 exclude_actions=[
@@ -71,6 +86,30 @@ async def handle_agentic_task(
         logger.debug(f"Finally running agentic task on browser_use {browser.cdp_url} ")
         history = await agent.run(max_steps=agentic_task_action.max_steps)
         logger.debug(f"Agentic task completed on browser_use {browser.cdp_url} ")
+
+        # Best-effort capture of this run into the deterministic-node cache. Never allowed
+        # to affect a live run: any failure here is swallowed and logged, not raised.
+        # CloseOverlayPopupAction is a generic fallback utility, not a user-authored
+        # automation step, so it's excluded from caching.
+        if type(agentic_task_action) is AgenticTask and task.automation is not None:
+            try:
+                from optexity.inference.core.interaction.agentic_cache.pipeline import (
+                    capture_and_verify,
+                )
+
+                await capture_and_verify(
+                    history=history,
+                    task=task,
+                    memory=memory,
+                    browser=browser,
+                    url=task.automation.url,
+                    task_text=agentic_task_action.task,
+                    source_run_id=task.task_id,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"agentic_cache: failed to capture/verify trace (non-fatal): {e}"
+                )
 
         agent.stop()
         if agent.browser_session:

@@ -252,6 +252,16 @@ async def run_automation_in_process(
             f"Starting worker attempt {attempt_index + 1}/{total_attempts} (attempts_left={attempts_left})"
         )
 
+        # LOCAL WINDOWS DEV SHIM: os.setsid (POSIX process-group leader) doesn't
+        # exist on native Windows. CREATE_NEW_PROCESS_GROUP is the Windows
+        # equivalent for the kill-the-whole-group semantics used below on
+        # timeout. Revert/exclude this platform branch before submitting a PR
+        # for the actual assignment feature -- it's unrelated environment glue.
+        _spawn_kwargs = (
+            {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+            if sys.platform == "win32"
+            else {"preexec_fn": os.setsid}
+        )
         proc = await asyncio.create_subprocess_exec(
             sys.executable,
             worker_path,
@@ -260,12 +270,12 @@ async def run_automation_in_process(
             str(child_process_id),
             str(_cdp_url),
             str(attempts_left),
-            preexec_fn=os.setsid,
             env={
                 **os.environ,
                 "CHILD_FASTAPI_PORT": str(_child_fastapi_port),
                 "CHILD_PROCESS_ID": str(child_process_id),
             },
+            **_spawn_kwargs,
         )
         running_task_processes[task.task_id] = proc
 
@@ -281,7 +291,15 @@ async def run_automation_in_process(
                     f"Automation timed out after {task.max_timeout_in_minutes} minutes in process"
                 )
                 try:
-                    os.killpg(proc.pid, signal.SIGKILL)
+                    if sys.platform == "win32":
+                        # LOCAL WINDOWS DEV SHIM: see spawn site above.
+                        subprocess.run(
+                            ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                            check=False,
+                            capture_output=True,
+                        )
+                    else:
+                        os.killpg(proc.pid, signal.SIGKILL)
                 except Exception as exc:
                     logger.warning(
                         f"Failed to SIGKILL worker process group for task "
@@ -457,6 +475,36 @@ async def task_processor():
                             f"Failed to report task {task.task_id} failure: {fail_err}"
                         )
                     continue
+
+            # DEV ONLY: override the automation from the control plane with a
+            # local file so automations can be iterated on without dashboard access.
+            # Must run here (not in the /inference handler) because the fetch
+            # above unconditionally overwrites task.automation just before run.
+            if os.path.exists("test_automation.json"):
+                with open("test_automation.json", "r") as f:
+                    automation = json.load(f)
+                task.automation = Automation.model_validate(automation)
+                # Task.validate_unique_parameters requires input_parameters/
+                # secure_parameters to have exactly the keys the automation
+                # declares; re-sync now since the endpoint_name used to
+                # allocate this task belongs to a different (real) automation.
+                task.input_parameters = {
+                    k: task.input_parameters.get(k, [])
+                    for k in task.automation.parameters.input_parameters
+                }
+                task.secure_parameters = {
+                    k: task.secure_parameters.get(k, [])
+                    for k in task.automation.parameters.secure_parameters
+                }
+                logger.info(
+                    f"DEV OVERRIDE applied for task {task.task_id}: "
+                    f"url={task.automation.url} nodes={len(task.automation.nodes)}"
+                )
+            else:
+                logger.info(
+                    f"DEV OVERRIDE not applied (no test_automation.json found "
+                    f"in cwd={os.getcwd()})"
+                )
 
             task_running = True
             last_task_start_time = datetime.now(timezone.utc)

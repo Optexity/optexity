@@ -52,6 +52,11 @@ class Settings(LLMSettings):
 
     DOWNLOAD_TIMEOUT_SECONDS: float = 200.0
 
+    # Local-dev cache of synthesized deterministic nodes for agentic_task automations.
+    # Resolved relative to cwd, mirroring the existing test_automation.json dev-override
+    # convention -- not yet a prod-ready location.
+    AGENTIC_CACHE_DB_PATH: str = "agentic_cache.sqlite3"
+
     UPLOAD_CONNECT_TIMEOUT_SECONDS: float = 30.0
     UPLOAD_WRITE_TIMEOUT_SECONDS: float = 300.0
     UPLOAD_READ_TIMEOUT_SECONDS: float = 600.0

@@ -476,7 +476,14 @@ class ActualBrowser:
             self.playwright = None
 
     def get_extension_paths(self) -> list[str]:
-        cache_dir = pathlib.Path("/tmp/extensions")
+        # .resolve() matters on Windows: "/tmp/extensions" is drive-relative (no
+        # drive letter), and unlike user_data_dir (resolved internally by
+        # patchright before spawning), these paths are baked directly into raw
+        # --load-extension= CLI args below with no resolution step of our own.
+        # Chrome then resolves the bare path against its own process's current
+        # drive (typically C:), not the drive these files actually live on,
+        # and fails to find the extension.
+        cache_dir = pathlib.Path("/tmp/extensions").resolve()
         cache_dir.mkdir(parents=True, exist_ok=True)
         extension_paths = []
         loaded_extension_names = []

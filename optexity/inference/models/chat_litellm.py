@@ -123,17 +123,24 @@ class ChatLiteLLM(BaseChatModel):
 
     @overload
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: None = None
+        self, messages: list[BaseMessage], output_format: None = None, **kwargs: Any
     ) -> ChatInvokeCompletion[str]: ...
 
     @overload
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: type[T]
+        self, messages: list[BaseMessage], output_format: type[T], **kwargs: Any
     ) -> ChatInvokeCompletion[T]: ...
 
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: type[T] | None = None
+        self,
+        messages: list[BaseMessage],
+        output_format: type[T] | None = None,
+        **kwargs: Any,
     ) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
+        # BaseChatModel.ainvoke's ABC signature is (messages, output_format,
+        # **kwargs) -- browser-use's Agent always passes session_id (meant for
+        # its own cloud-routing ChatBrowserUse backend). litellm has no use
+        # for it, so accept and drop whatever extra kwargs show up here.
         try:
             response = await litellm.acompletion(
                 **self._request(messages, output_format)

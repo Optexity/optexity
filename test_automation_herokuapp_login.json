@@ -1,0 +1,20 @@
+{
+    "url": "https://the-internet.herokuapp.com/login",
+    "parameters": {
+      "input_parameters": {
+      },
+      "generated_parameters": {}
+    },
+    "nodes": [
+      {
+        "type": "action_node",
+        "interaction_action": {
+          "agentic_task": {
+            "task": "Log in using username 'tomsmith' and password 'SuperSecretPassword!', then confirm the login succeeded",
+            "max_steps": 12,
+            "backend": "browser_use"
+          }
+        }
+      }
+    ]
+  }

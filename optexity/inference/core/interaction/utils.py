@@ -428,6 +428,13 @@ class LocatorExtraction:
         return cands[0][2] if cands else "<index-only: no locator available>"
 
     @classmethod
+    def scored_candidates(cls, element) -> list[tuple[int, str, str]]:
+        """Public entry point for ``_scored_candidates``, for callers outside this module
+        (e.g. agentic-trace synthesis) that need the full ranked ``(score, kind, locator)``
+        list rather than just the top pick or the ``page.<locator><method>`` strings."""
+        return cls._scored_candidates(element)
+
+    @classmethod
     def locator_candidates(cls, element, method: str) -> list[dict]:
         """All viable locators for the element as copy-pasteable ``page.<locator><method>``
         expressions, best-first, each tagged with its ``kind`` and stability ``score`` —
