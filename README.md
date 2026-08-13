@@ -15,7 +15,7 @@
 
 ### 1. Create an Account
 
-Head to [dashboard.optexity.com](https://dashboard.optexity.com) and sign up for a free account.
+Head to [dashboard.optexity.com](https://dashboard.optexity.com) and sign up for a free account
 
 ### 2. Get Your API Key
 
