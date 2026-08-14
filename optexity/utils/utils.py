@@ -15,6 +15,22 @@ from pydantic import create_model
 
 logger = logging.getLogger(__name__)
 
+_SCHEMA_TYPES = {
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "dict": dict,
+    "list": list,
+}
+
+
+def _schema_type(name: str):
+    try:
+        return _SCHEMA_TYPES[name]
+    except KeyError as error:
+        raise ValueError(f"Unsupported extraction schema type: {name!r}") from error
+
 
 def decrypt_fernet_payload(encrypted_data: str) -> dict:
     FERNET_SECRET_KEY = os.getenv("FERNET_SECRET_KEY")
@@ -86,7 +102,7 @@ def build_model(schema: dict, model_name="AutoModel"):
     fields = {}
     for key, value in schema.items():
         if isinstance(value, str):  # primitive type
-            py_type = eval(value)  # e.g., "str" -> str
+            py_type = _schema_type(value)
             fields[key] = (Optional[py_type], None)
         elif isinstance(value, dict):  # nested object
             sub_model = build_model(value, model_name=f"{model_name}_{key}")
@@ -96,7 +112,9 @@ def build_model(schema: dict, model_name="AutoModel"):
                 sub_model = build_model(value[0], model_name=f"{model_name}_{key}")
                 fields[key] = (Optional[List[sub_model]], None)
             else:  # list of primitives
-                py_type = eval(value[0])
+                if not value:
+                    raise ValueError(f"List schema for {key!r} must contain one type")
+                py_type = _schema_type(value[0])
                 fields[key] = (Optional[List[py_type]], None)
     return create_model(model_name, **fields)
 

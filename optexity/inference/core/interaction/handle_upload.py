@@ -6,6 +6,7 @@ import tempfile
 from urllib.parse import unquote, urlparse
 
 from optexity.exceptions import ElementNotFoundInAxtreeException
+from optexity.guardrails.enforcement import authorize_external_request
 from optexity.inference.core.interaction.handle_command import (
     command_based_action_with_retry,
 )
@@ -53,7 +54,10 @@ def _derive_suffix(
 async def _download_to_temp_file(url: str, browser: Browser) -> str:
     logger.debug(f"Downloading upload file from {url}")
     try:
-        resp = await browser.context.request.get(url, timeout=_DOWNLOAD_TIMEOUT_MS)
+        authorize_external_request(url, action="download")
+        resp = await browser.get_api_request_context().get(
+            url, timeout=_DOWNLOAD_TIMEOUT_MS, max_redirects=0
+        )
     except Exception as e:
         raise RuntimeError(f"Failed to download upload file from {url}: {e}") from e
 

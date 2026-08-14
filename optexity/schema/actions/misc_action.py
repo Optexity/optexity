@@ -76,7 +76,8 @@ class SetVariableAction(BaseModel):
     """Set a value in generated_variables.
 
     Use `value` for a static value, or `expression` for a computed value
-    (evaluated after variable replacement, e.g. "{counter[0]} + 1").
+    (evaluated after variable replacement with a non-executable arithmetic and
+    comparison expression grammar, e.g. "{counter[0]} + 1").
 
     When `output_variable_name` is set, the value is also appended to
     ``output_data`` under that key.

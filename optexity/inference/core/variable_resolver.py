@@ -11,6 +11,8 @@ import logging
 import re
 from typing import Any
 
+from optexity.guardrails.expressions import safe_evaluate
+
 logger = logging.getLogger(__name__)
 
 # Matches {identifier.path} where path must start with a dot-segment.
@@ -102,38 +104,8 @@ def evaluate_poll_condition(condition: str, response: dict) -> bool:
     are resolved before evaluation.
     """
 
-    def _resolve_identifier(match: re.Match) -> str:
-        """Replace an identifier or dot-path with its resolved value."""
-        full_path = match.group(0)
-        segments = full_path.split(".")
-        root = segments[0]
-
-        # Only resolve if root is a key in the response
-        if root not in response:
-            return full_path
-
-        if len(segments) == 1:
-            # Top-level key like "status_code"
-            resolved = response[root]
-        else:
-            # Dot-path like "body.status"
-            resolved = _resolve_path(response, "." + full_path)
-
-        if resolved is None:
-            return "None"
-        if isinstance(resolved, str):
-            return repr(resolved)
-        if isinstance(resolved, (dict, list)):
-            return repr(resolved)
-        return str(resolved)
-
-    # Match identifiers: standalone words or dot-paths, optionally with [N]
-    resolved_condition = re.sub(
-        r"\b([a-zA-Z_]\w*(?:\.\w+)*(?:\[\d+\])?)\b", _resolve_identifier, condition
-    )
-
     try:
-        return bool(eval(resolved_condition))  # noqa: S307
+        return bool(safe_evaluate(condition, response))
     except Exception as e:
-        logger.warning(f"Poll condition eval failed: '{resolved_condition}' -> {e}")
+        logger.warning(f"Poll condition evaluation failed: '{condition}' -> {e}")
         return False

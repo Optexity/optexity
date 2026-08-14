@@ -2062,6 +2062,56 @@
             "reading_priority": 4,
             "when_to_use": "Select when the query is about advanced for_loop patterns, iterating over dynamically extracted lists, healthcare portal automation, or multi-field data extraction in loops.",
             "embedding_hint": "healthcare Medicaid for_loop dynamic extraction iteration authorization insurance"
+        },
+        {
+            "id": "docs-advanced-ai-action-guardrails",
+            "path": "docs/advanced/ai-action-guardrails.mdx",
+            "title": "AI Action Guardrails",
+            "summary": "Documents the deterministic capability policy for AI-driven browser automation: same-origin domain enforcement, action allow and deny lists, upload path controls, secret redaction, sensitive-data destinations, prompt-injection detection, resource limits, browser-use tool restrictions, and JSONL audit events. Guardrails operate autonomously without a human approval step and do not alter CAPTCHA behavior.",
+            "gist": "Authorize every AI and browser capability through deterministic, fail-closed workflow policies.",
+            "keywords": [
+                "AI guardrails",
+                "action policy",
+                "allowed_domains",
+                "allowed_actions",
+                "blocked_actions",
+                "prompt injection",
+                "secret redaction",
+                "data loss prevention",
+                "resource limits",
+                "audit trail",
+                "fail closed"
+            ],
+            "document_type": "guide",
+            "tags": ["advanced", "security", "AI", "guardrails", "policy"],
+            "relationships": {
+                "depends_on": ["docs-building-automations-automation-structure"],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-agentic-tasks",
+                        "context": "Agentic tasks are constrained by the action and browser-use tool capability manifest."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-parameters",
+                        "context": "Sensitive parameter names and resolved secure values feed the redaction policy."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["Optexity Guardrail Engine", "Playwright", "browser-use"],
+                "apis": [],
+                "data_models": [
+                    "GuardrailPolicy",
+                    "DataProtectionPolicy",
+                    "PromptInjectionPolicy",
+                    "ResourceLimits",
+                    "GuardrailAuditEvent"
+                ]
+            },
+            "reading_priority": 1,
+            "when_to_use": "Select when configuring AI action permissions, allowed navigation domains, prompt-injection protection, secret handling, sensitive-data destinations, autonomous allow or deny decisions, runtime limits, or guardrail audit logs.",
+            "embedding_hint": "AI action guardrails deterministic authorization domain allowlist action capability prompt injection secret redaction DLP resource limit JSONL audit fail closed autonomous"
         }
     ]
 }

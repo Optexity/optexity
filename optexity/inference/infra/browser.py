@@ -16,6 +16,9 @@ from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import Download, Locator, Page, Request, Response
 
+from optexity.guardrails.context import get_guardrail_runtime
+from optexity.guardrails.exceptions import GuardrailViolation
+from optexity.guardrails.expressions import safe_locator_from_command
 from optexity.inference.models.chat_litellm import build_agent_llm
 from optexity.schema.memory import Memory, NetworkRequest, NetworkResponse
 from optexity.utils.settings import settings
@@ -61,6 +64,18 @@ class Browser:
         self.network_calls: list[NetworkResponse | NetworkRequest] = []
         self.temp_downloads_dir = f"/tmp/temp_downloads"
         self._download_cdp_session = None
+        self._guard_navigation_handler = None
+
+    def get_api_request_context(
+        self,
+    ) -> (
+        playwright.async_api.APIRequestContext | patchright.async_api.APIRequestContext
+    ):
+        """Return the context-bound HTTP client after browser initialization."""
+        context = self.context
+        if context is None:
+            raise RuntimeError("Browser context is not initialized")
+        return context.request
 
     async def start(self):
         logger.debug("Starting browser")
@@ -82,6 +97,28 @@ class Browser:
             else:
                 for i in range(len(self.context.pages) - 1, 0, -1):
                     await self.context.pages[i].close()
+
+            runtime = get_guardrail_runtime()
+            if runtime is not None and runtime.policy.enabled:
+
+                async def _guard_navigation(route, request):
+                    if (
+                        request.is_navigation_request()
+                        and request.resource_type == "document"
+                    ):
+                        try:
+                            runtime.authorize_navigation_request(request.url)
+                        except GuardrailViolation:
+                            logger.warning(
+                                "Blocked document navigation by guardrail: %s",
+                                request.url,
+                            )
+                            await route.abort("blockedbyclient")
+                            return
+                    await route.continue_()
+
+                self._guard_navigation_handler = _guard_navigation
+                await self.context.route("**/*", _guard_navigation)
 
             # TODO: remove this handling from browseruse
             async def _safe_handle_dialog(dialog):
@@ -156,6 +193,13 @@ class Browser:
 
     async def stop(self, force: bool = False):
 
+        if self.context is not None and self._guard_navigation_handler is not None:
+            try:
+                await self.context.unroute("**/*", self._guard_navigation_handler)
+            except Exception:
+                pass
+            self._guard_navigation_handler = None
+
         if self._download_cdp_session is not None:
             try:
                 await self._download_cdp_session.detach()
@@ -219,6 +263,12 @@ class Browser:
         if len(pages) == self.previous_total_pages:
             return False, total_time
 
+        runtime = get_guardrail_runtime()
+        if runtime is not None and runtime.policy.enabled:
+            new_tab_count = max(0, len(pages) - self.previous_total_pages)
+            if new_tab_count:
+                runtime.consume("tabs", new_tab_count)
+
         tabs = await self.backend_agent.browser_session.get_tabs()
 
         for tab in tabs[::-1]:
@@ -276,7 +326,7 @@ class Browser:
         page = await self.get_current_page()
         if page is None:
             return None
-        locator: Locator = eval(f"page.{command}")
+        locator: Locator = safe_locator_from_command(page, command)
         return locator
 
     def get_xpath_from_index(self, index: int) -> str:

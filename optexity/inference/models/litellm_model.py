@@ -91,7 +91,9 @@ def _pdf_to_base64(pdf_url: str | Path) -> str:
     if is_local_path(pdf_url):
         raw = Path(str(pdf_url)).read_bytes()
     elif is_url(pdf_url):
-        raw = httpx.get(str(pdf_url)).content
+        response = httpx.get(str(pdf_url), follow_redirects=False, timeout=30.0)
+        response.raise_for_status()
+        raw = response.content
     else:
         raise ValueError(f"Invalid pdf_url: {pdf_url}")
     return base64.standard_b64encode(raw).decode("utf-8")

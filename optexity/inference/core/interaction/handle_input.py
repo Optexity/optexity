@@ -5,6 +5,7 @@ from optexity.exceptions import (
     AxtreeIndexActionFailedException,
     ElementNotFoundInAxtreeException,
 )
+from optexity.guardrails.context import get_guardrail_runtime
 from optexity.inference.agents.input_text_prediction.input_text_prediction import (
     InputTextPredictionAgent,
 )
@@ -91,6 +92,16 @@ async def handle_input_text(
             memory,
             task,
         )
+        runtime = get_guardrail_runtime()
+        if runtime is not None and input_text_action.input_text is not None:
+            current_url = await browser.get_current_page_url()
+            runtime.authorize_action(
+                "input",
+                source="ai_model",
+                current_url=current_url,
+                target_url=current_url,
+                data=input_text_action.input_text,
+            )
 
     if input_text_action.input_text is None:
         logger.debug(
