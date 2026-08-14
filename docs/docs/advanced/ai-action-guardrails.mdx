@@ -1,0 +1,146 @@
+---
+title: AI Action Guardrails
+description: Deterministic policies for domains, actions, sensitive data, prompt injection, and runtime limits.
+---
+
+Optexity authorizes AI and browser actions through deterministic policy code.
+The model may propose an action, but it cannot grant itself a capability.
+
+Guardrails are enabled by default. When `allowed_domains` is empty, the hostname
+from the automation's starting `url` is the only allowed domain (including its
+subdomains). Redirects and click-triggered document navigations are checked at
+the browser network layer before the destination document is fetched.
+
+## Policy properties
+
+| Property               | Type                 | Default                | Description                                      |
+| ---------------------- | -------------------- | ---------------------- | ------------------------------------------------ |
+| `enabled`              | `bool`               | `true`                 | Enables policy evaluation and auditing           |
+| `mode`                 | `enforce \| audit`   | `enforce`              | Denies violations or records them without denial |
+| `allowed_domains`      | `list[str]`          | Starting URL hostname  | Permitted top-level navigation destinations      |
+| `allow_subdomains`     | `bool`               | `true`                 | Includes subdomains of each permitted domain     |
+| `allowed_actions`      | `set[str]`           | Safe browser actions   | Capabilities the workflow may exercise           |
+| `blocked_actions`      | `set[str]`           | Code and file actions  | Capabilities denied even if otherwise allowed    |
+| `allowed_upload_roots` | `list[str]`          | Task directory         | Filesystem roots from which files may be uploaded |
+| `data_protection`      | `object`             | Secret-safe defaults   | LLM, screenshot, file, and data-flow controls    |
+| `prompt_injection`     | `object`             | Enabled, block mode    | Controls untrusted instruction detection         |
+| `limits`               | `object`             | Bounded runtime limits | Caps LLM, agent, navigation, tab, and file usage |
+
+## Example policy
+
+Add `guardrails` to an automation:
+
+```json
+{
+  "url": "https://portal.example.com/login",
+  "guardrails": {
+    "enabled": true,
+    "mode": "enforce",
+    "allowed_domains": [
+      "portal.example.com",
+      "login.example.com"
+    ],
+    "allow_subdomains": true,
+    "allowed_actions": [
+      "agentic_task",
+      "api_call",
+      "assertion",
+      "check",
+      "click",
+      "close_tab",
+      "download",
+      "extract",
+      "go_back",
+      "hover",
+      "input",
+      "key_press",
+      "llm_query",
+      "navigate",
+      "scroll",
+      "select",
+      "set_variable",
+      "sleep",
+      "switch_tab",
+      "uncheck",
+      "upload"
+    ],
+    "blocked_actions": [
+      "evaluate",
+      "powershell",
+      "private_node",
+      "python_script",
+      "read_file",
+      "replace_file",
+      "write_file"
+    ],
+    "allowed_upload_roots": ["/opt/optexity-approved-uploads"],
+    "data_protection": {
+      "redact_secrets_from_llm": true,
+      "allow_screenshots_to_llm": false,
+      "allow_files_to_llm": false,
+      "store_screenshots_in_trajectory": false,
+      "store_llm_conversations": false,
+      "block_sensitive_data_cross_domain": true,
+      "sensitive_data_domains": ["portal.example.com"]
+    },
+    "prompt_injection": {
+      "enabled": true,
+      "action": "block"
+    },
+    "limits": {
+      "max_llm_calls": 100,
+      "max_api_calls": 50,
+      "max_agentic_steps": 20,
+      "max_navigations": 50,
+      "max_tabs": 10,
+      "max_uploads": 10,
+      "max_downloads": 25
+    }
+  }
+}
+```
+
+`mode: "enforce"` denies violations. `mode: "audit"` records the decision but
+allows execution, which is useful when evaluating a policy against existing
+recordings. Production workflows should use enforce mode.
+
+## Migrating existing workflows
+
+Guardrails use secure defaults. Existing workflows must declare every login,
+SSO, API, CDN-document, and upload-source domain they intentionally use.
+Workflows that need Python, PowerShell, or plugin-backed private nodes must
+remove that capability from `blocked_actions` and add it to `allowed_actions`;
+prefer typed public actions instead.
+Start with `mode: "audit"`, inspect `guardrails.jsonl`, then switch to
+`mode: "enforce"` after the manifest covers the expected behavior.
+
+## Audit trail
+
+Every decision is written as structured JSON Lines to
+`<task>/logs/guardrails.jsonl`. Events contain the decision, policy code,
+action, source, and URLs. Action payloads and secret values are never written.
+
+## Prompt injection and secrets
+
+High-confidence instruction-hijacking patterns in untrusted LLM input are
+blocked, redacted, or audited according to `prompt_injection.action`. Values
+whose parameter names match password, token, secret, credential, API-key, and
+similar patterns are removed before LLM calls. Resolved 1Password, AWS Secrets
+Manager, and TOTP values are registered for the same redaction.
+
+Screenshot and file forwarding are independent capabilities because text
+redaction cannot reliably remove secrets from pixels or arbitrary documents.
+When file forwarding is enabled, local files must still be inside an allowed
+root and remote files must still be hosted on an allowed domain. Remote file
+fetches and workflow API calls do not follow redirects; add and call the final
+destination explicitly instead.
+
+General browser-use agents cannot use their opaque `upload_file` tool. File
+uploads must use a typed Optexity `upload_file` action so the engine can inspect
+and authorize the source path before execution.
+
+## Autonomous operation
+
+Guardrails make allow/deny decisions automatically. They do not introduce a
+human-approval step. CAPTCHA behavior and the existing human-in-loop action are
+outside this policy layer and remain unchanged.

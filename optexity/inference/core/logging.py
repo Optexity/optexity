@@ -13,6 +13,7 @@ from urllib.parse import urljoin
 import aiofiles
 import httpx
 
+from optexity.guardrails.context import get_guardrail_runtime
 from optexity.schema.automation import ActionNode
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
@@ -479,24 +480,39 @@ async def save_latest_memory_state_locally(
         # step's action has completed (or failed) — so it is the action-completion time.
         completed_at = datetime.now(timezone.utc).isoformat()
         browser_state = memory.browser_states[-1]
+        guardrail_runtime = get_guardrail_runtime()
+
+        def redact(value):
+            if guardrail_runtime is None:
+                return value
+            return guardrail_runtime.redact_value(value)
+
         automation_state = memory.automation_state
         step_directory = (
             task.logs_directory / f"step_{str(automation_state.step_index)}"
         )
         step_directory.mkdir(parents=True, exist_ok=True)
 
-        if browser_state.screenshot:
+        store_step_screenshot = (
+            guardrail_runtime is None
+            or guardrail_runtime.policy.data_protection.store_screenshots_in_trajectory
+        )
+        if browser_state.screenshot and store_step_screenshot:
             await save_screenshot(
                 browser_state.screenshot, step_directory / "screenshot.png"
             )
-        else:
+        elif not browser_state.screenshot:
             logger.warning(
                 "No screenshot found for step %s", automation_state.step_index
             )
 
         state_dict = {
             "title": browser_state.title,
-            "url": browser_state.url,
+            "url": (
+                guardrail_runtime._safe_audit_url(browser_state.url)
+                if guardrail_runtime is not None
+                else browser_state.url
+            ),
             "step_index": automation_state.step_index,
             "try_index": automation_state.try_index,
             "completed_at": completed_at,
@@ -510,37 +526,41 @@ async def save_latest_memory_state_locally(
         }
 
         async with aiofiles.open(step_directory / "state.json", "w") as f:
-            await f.write(json.dumps(state_dict, indent=4))
+            await f.write(json.dumps(redact(state_dict), indent=4))
 
         if browser_state.axtree:
             async with aiofiles.open(step_directory / "axtree.txt", "w") as f:
-                await f.write(browser_state.axtree)
+                await f.write(redact(browser_state.axtree))
 
         if browser_state.final_prompt:
             async with aiofiles.open(step_directory / "final_prompt.txt", "w") as f:
-                await f.write(browser_state.final_prompt)
+                await f.write(redact(browser_state.final_prompt))
 
         if browser_state.llm_response:
             async with aiofiles.open(step_directory / "llm_response.json", "w") as f:
-                await f.write(json.dumps(browser_state.llm_response, indent=4))
+                await f.write(json.dumps(redact(browser_state.llm_response), indent=4))
 
         if browser_state.locator_candidates:
             async with aiofiles.open(
                 step_directory / "locator_candidates.json", "w"
             ) as f:
-                await f.write(json.dumps(browser_state.locator_candidates, indent=4))
+                await f.write(
+                    json.dumps(redact(browser_state.locator_candidates), indent=4)
+                )
 
         if node:
             async with aiofiles.open(step_directory / "action_node.json", "w") as f:
                 await f.write(
                     json.dumps(
-                        node.model_dump(exclude_none=True, exclude_defaults=True),
+                        redact(
+                            node.model_dump(exclude_none=True, exclude_defaults=True)
+                        ),
                         indent=4,
                     )
                 )
 
         async with aiofiles.open(step_directory / "input_parameters.json", "w") as f:
-            await f.write(json.dumps(task.input_parameters, indent=4))
+            await f.write(json.dumps(redact(task.input_parameters), indent=4))
 
         async with aiofiles.open(step_directory / "secure_parameters.json", "w") as f:
             secure_parameters = {
@@ -550,22 +570,26 @@ async def save_latest_memory_state_locally(
                 ]
                 for key, value in task.secure_parameters.items()
             }
-            await f.write(json.dumps(secure_parameters, indent=4))
+            await f.write(json.dumps(redact(secure_parameters), indent=4))
 
         async with aiofiles.open(step_directory / "generated_variables.json", "w") as f:
-            await f.write(json.dumps(memory.variables.generated_variables, indent=4))
+            await f.write(
+                json.dumps(redact(memory.variables.generated_variables), indent=4)
+            )
 
         async with aiofiles.open(step_directory / "output_data.json", "w") as f:
             await f.write(
                 json.dumps(
-                    [
-                        output_data.model_dump(
-                            exclude_none=True,
-                            exclude={"screenshot"},
-                            exclude_defaults=True,
-                        )
-                        for output_data in memory.variables.output_data
-                    ],
+                    redact(
+                        [
+                            output_data.model_dump(
+                                exclude_none=True,
+                                exclude={"screenshot"},
+                                exclude_defaults=True,
+                            )
+                            for output_data in memory.variables.output_data
+                        ]
+                    ),
                     indent=4,
                 )
             )

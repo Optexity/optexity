@@ -8,6 +8,7 @@ from typing import Optional
 import litellm
 from pydantic import BaseModel
 
+from optexity.guardrails.llm import prepare_llm_call
 from optexity.schema.token_usage import TokenUsage
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ class LLMModel:
         self, prompt: str, system_instruction: Optional[str] = None
     ) -> tuple[str, TokenUsage]:
 
+        prompt, system_instruction, _, _ = prepare_llm_call(prompt, system_instruction)
         max_retries = 3
         for i in range(max_retries):
             try:
@@ -100,6 +102,9 @@ class LLMModel:
         system_instruction: Optional[str] = None,
     ) -> tuple[BaseModel, TokenUsage]:
 
+        prompt, system_instruction, screenshot, pdf_url = prepare_llm_call(
+            prompt, system_instruction, screenshot, pdf_url
+        )
         total_token_usage = TokenUsage()
         max_retries = 3
         last_exception = ""

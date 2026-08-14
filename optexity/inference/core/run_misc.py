@@ -2,6 +2,7 @@ import asyncio
 import logging
 import traceback
 
+from optexity.guardrails.expressions import safe_evaluate
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.misc_action import (
@@ -55,7 +56,10 @@ async def run_set_variable_action(
     if set_variable_action.value is not None:
         value = set_variable_action.value
     else:
-        value = eval(set_variable_action.expression)  # noqa: S307
+        # Variable placeholders have already been resolved by the workflow
+        # resolver. Evaluate only the remaining data expression grammar; never
+        # hand workflow-authored text to the Python interpreter.
+        value = safe_evaluate(set_variable_action.expression, {})
     memory.variables.generated_variables[name] = [value]
     _maybe_append_output_data(memory, set_variable_action.output_variable_name, value)
     logger.debug(

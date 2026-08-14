@@ -15,6 +15,14 @@ from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from patchright.async_api import expect as playwright_expect
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
+from optexity.guardrails.context import reset_guardrail_runtime, set_guardrail_runtime
+from optexity.guardrails.enforcement import (
+    authorize_action_node,
+    authorize_private_node,
+)
+from optexity.guardrails.expressions import safe_evaluate
+from optexity.guardrails.logging import GuardrailRedactionFilter
+from optexity.guardrails.runtime import GuardrailRuntime
 from optexity.inference.core.for_loop_placeholders import (
     expand_iteration_placeholders,
 )
@@ -148,6 +156,9 @@ async def run_automation(
     browser = None
     in_browser_setup = False
     entered_workflow = False
+    guardrail_runtime = GuardrailRuntime.from_task(task)
+    guardrail_token = set_guardrail_runtime(guardrail_runtime)
+    file_handler.addFilter(GuardrailRedactionFilter())
 
     try:
         if task.retry_count == 0:
@@ -198,7 +209,11 @@ async def run_automation(
 
             page = await browser.get_current_page()
             await asyncio.sleep(5)
-            await browser.go_to_url("https://ip.oxylabs.io/location")
+            guardrail_runtime.temporarily_allow_domain("ip.oxylabs.io")
+            try:
+                await browser.go_to_url("https://ip.oxylabs.io/location")
+            finally:
+                guardrail_runtime.remove_temporary_domain("ip.oxylabs.io")
 
             ip_info = await page.evaluate("""
                 async () => {
@@ -262,20 +277,28 @@ async def run_automation(
         task.status = "failed"
 
     finally:
-        if task.retry_count == task.automation.max_retries or task.status == "success":
-            if task and task.status == "running":
-                task.status = "failed"
-                task.error = "Task could not catch browser exception"
-            if task and memory and browser:
-                await run_final_downloads_check(task, memory, browser)
-                await run_post_processing_nodes(task, memory, browser)
-            if memory and browser:
-                await run_final_logging(task, memory, browser, child_process_id)
-        if browser is not None:
-            try:
-                await asyncio.wait_for(browser.stop(), timeout=30)
-            except Exception as e:
-                logger.error(f"Error/timeout stopping browser after automation: {e}")
+        try:
+            if (
+                task.retry_count == task.automation.max_retries
+                or task.status == "success"
+            ):
+                if task and task.status == "running":
+                    task.status = "failed"
+                    task.error = "Task could not catch browser exception"
+                if task and memory and browser:
+                    await run_final_downloads_check(task, memory, browser)
+                    await run_post_processing_nodes(task, memory, browser)
+                if memory and browser:
+                    await run_final_logging(task, memory, browser, child_process_id)
+            if browser is not None:
+                try:
+                    await asyncio.wait_for(browser.stop(), timeout=30)
+                except Exception as e:
+                    logger.error(
+                        f"Error/timeout stopping browser after automation: {e}"
+                    )
+        finally:
+            reset_guardrail_runtime(guardrail_token)
 
     logger.info(f"Task {task.task_id} completed with status {task.status}")
     file_handler.flush()
@@ -429,6 +452,9 @@ async def run_action_node(
     await action_node.replace_variables(memory.variables.generated_variables)
     resolve_api_variables_in_node(action_node, memory.variables.generated_variables)
 
+    if action_node.interaction_action is None:
+        await authorize_action_node(action_node, browser)
+
     # ## TODO: optimize this by taking screenshot and axtree only if needed
     # browser_state_summary = await browser.get_browser_state_summary()
 
@@ -543,6 +569,8 @@ async def run_private_node(
     memory.update_system_info()
     await asyncio.sleep(private_node.before_sleep_time)
 
+    await authorize_private_node(private_node, browser)
+
     memory.automation_state.step_index += 1
     memory.automation_state.try_index = 0
 
@@ -635,7 +663,7 @@ def evaluate_condition(condition: str, memory: Memory, task: Task) -> bool:
     normalized_condition = re.sub(
         r"\{(([A-Za-z_]\w*)(?:\[[^{}\[\]]+\])?)\}", _unwrap, condition
     )
-    return eval(normalized_condition, {}, scope)
+    return bool(safe_evaluate(normalized_condition, scope))
 
 
 async def handle_if_else_node(
@@ -643,7 +671,7 @@ async def handle_if_else_node(
     memory: Memory,
     task: Task,
     browser: Browser,
-    full_automation: list[ActionNode],
+    full_automation: list[dict[str, Any]],
 ):
     memory.update_system_info()
     logger.debug(
@@ -685,7 +713,7 @@ async def _run_for_loop_child_node(
     memory: Memory,
     task: Task,
     browser: Browser,
-    full_automation: list,
+    full_automation: list[dict[str, Any]],
 ):
     """Dispatch one expanded child of a for_loop_node (body or reset)."""
     if isinstance(node, ForLoopNode):
@@ -788,7 +816,7 @@ async def handle_for_loop_node(
     memory: Memory,
     task: Task,
     browser: Browser,
-    full_automation: list[ActionNode],
+    full_automation: list[dict[str, Any]],
 ):
     memory.update_system_info()
     index_variable_name = for_loop_node.index_variable_name
@@ -915,7 +943,7 @@ async def handle_assert_locator_node(
     memory: Memory,
     task: Task,
     browser: Browser,
-    full_automation: list,
+    full_automation: list[dict[str, Any]],
 ):
     memory.update_system_info()
     memory.automation_state.step_index += 1
@@ -966,7 +994,7 @@ async def _run_nodes(
     task: Task,
     memory: Memory,
     browser: Browser,
-    full_automation: list,
+    full_automation: list[dict[str, Any]],
 ):
     """Dispatch a list of nodes (ActionNode, ForLoopNode, IfElseNode, AssertLocatorNode, or PrivateNode) for execution."""
     for node in nodes:

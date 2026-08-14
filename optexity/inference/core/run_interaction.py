@@ -9,6 +9,10 @@ from optexity.exceptions import (
     ElementNotFoundInAxtreeException,
     ExpectedDownloadFailedException,
 )
+from optexity.guardrails.enforcement import (
+    authorize_download_destination,
+    authorize_interaction,
+)
 from optexity.inference.agents.error_handler.error_handler import ErrorHandlerAgent
 from optexity.inference.core.interaction.agentic_fallback import (
     run_axtree_fallback_agent,
@@ -64,6 +68,8 @@ async def run_interaction_action(
 ):
     if retries_left <= 0:
         return
+
+    await authorize_interaction(interaction_action, browser)
 
     logger.debug(
         f"---------Running interaction action {interaction_action.model_dump_json(exclude_none=True, exclude_defaults=True)}---------"
@@ -264,8 +270,9 @@ async def handle_download_url_as_pdf(
     download_path = (
         task.downloads_directory / download_url_as_pdf_action.download_filename
     )
+    authorize_download_destination(download_path)
 
-    resp = await browser.context.request.get(pdf_url)
+    resp = await browser.get_api_request_context().get(pdf_url, max_redirects=0)
 
     if not resp.ok:
         logger.error(f"Failed to download PDF: {resp.status}")

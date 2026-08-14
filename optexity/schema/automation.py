@@ -3,6 +3,8 @@ from typing import Annotated, Any, ForwardRef, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from optexity.guardrails.context import get_guardrail_runtime
+from optexity.guardrails.models import GuardrailPolicy
 from optexity.schema.actions.assertion_action import AssertionAction
 from optexity.schema.actions.captcha_action import CaptchaAction
 from optexity.schema.actions.extraction_action import ExtractionAction
@@ -147,6 +149,10 @@ class VariableSubstitution:
                         str_value = get_totp_code(
                             value.totp.totp_secret, value.totp.digits
                         )
+
+                    runtime = get_guardrail_runtime()
+                    if runtime is not None:
+                        runtime.register_sensitive_value(str_value)
 
                 elif (
                     isinstance(value, str)
@@ -595,7 +601,7 @@ class AssertLocatorNode(BaseModel):
     """Evaluate a Playwright locator assertion and store the boolean result.
 
     The locator is evaluated against `page` via Browser.get_locator_from_command
-    (same `eval("page." + command)` style used by interaction actions). If the
+    (the same restricted Playwright locator grammar used by interaction actions). If the
     assertion holds within `timeout` seconds the result is True, otherwise False.
     The boolean is stored in generated_variables under `output_variable_name`
     (as a single-element list, e.g. {output_variable_name: [True]}) so it can be
@@ -660,6 +666,9 @@ class Automation(BaseModel):
     # Any mismatch or health-check failure falls back to the normal cold flow.
     reuse_page_if_already_on_url: bool = False
     take_final_screenshot: bool = True
+    # Deterministic capability manifest enforced around all AI/browser actions.
+    # Empty allowed_domains derives a same-origin policy from ``url``.
+    guardrails: GuardrailPolicy = Field(default_factory=GuardrailPolicy)
     parameters: Parameters
     nodes: list[
         Annotated[

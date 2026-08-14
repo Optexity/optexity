@@ -88,10 +88,11 @@ async def make_api_request(
     body: dict | str | None = None,
     query_params: dict[str, str] | None = None,
     timeout: float = 30.0,
+    follow_redirects: bool = True,
 ) -> dict[str, Any]:
     """Make an HTTP request and return a result dict with status_code, headers, and body."""
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
+        async with httpx.AsyncClient(follow_redirects=follow_redirects) as client:
             kwargs: dict[str, Any] = {
                 "method": method,
                 "url": url,

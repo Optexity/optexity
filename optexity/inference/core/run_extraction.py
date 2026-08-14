@@ -5,6 +5,10 @@ import traceback
 import aiofiles
 import httpx
 
+from optexity.guardrails.enforcement import (
+    authorize_download_destination,
+    authorize_external_request,
+)
 from optexity.inference.core.interaction.handle_agentic_task import handle_agentic_task
 from optexity.inference.core.run_interaction import _get_error_handler
 from optexity.inference.core.run_two_fa import run_two_fa_action
@@ -550,7 +554,12 @@ async def download_request(
     network_call: NetworkRequest, download_filename: str, task: Task, memory: Memory
 ):
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
+        authorize_external_request(
+            network_call.url,
+            action="download",
+            data={"headers": network_call.headers, "body": network_call.body},
+        )
+        async with httpx.AsyncClient(follow_redirects=False) as client:
             response = await client.request(
                 network_call.method,
                 network_call.url,
@@ -562,6 +571,7 @@ async def download_request(
 
         # Save raw response to PDF
         download_path = task.downloads_directory / download_filename
+        authorize_download_destination(download_path)
         async with aiofiles.open(download_path, "wb") as f:
             await f.write(response.content)
 
@@ -631,6 +641,16 @@ async def handle_api_call_extraction(
 
     logger.info(f"API call: {api_call_extraction.method} {api_call_extraction.url}")
 
+    request_data = {
+        "headers": api_call_extraction.headers,
+        "body": api_call_extraction.body,
+        "query_params": api_call_extraction.query_params,
+    }
+    authorize_external_request(
+        api_call_extraction.url,
+        action="api_call",
+        data=request_data,
+    )
     result = await make_api_request(
         url=api_call_extraction.url,
         method=api_call_extraction.method,
@@ -638,10 +658,9 @@ async def handle_api_call_extraction(
         body=api_call_extraction.body,
         query_params=api_call_extraction.query_params,
         timeout=api_call_extraction.timeout,
+        follow_redirects=False,
     )
-    logger.info(
-        f"API response: status_code={result.get('status_code')}, body={result.get('body')}"
-    )
+    logger.info("API response: status_code=%s", result.get("status_code"))
 
     if api_call_extraction.poll_condition and "error" not in result:
         for attempt in range(1, api_call_extraction.max_poll_attempts):
@@ -656,6 +675,11 @@ async def handle_api_call_extraction(
                 f"- condition not met, waiting {api_call_extraction.poll_interval}s"
             )
             await asyncio.sleep(api_call_extraction.poll_interval)
+            authorize_external_request(
+                api_call_extraction.url,
+                action="api_call",
+                data=request_data,
+            )
             result = await make_api_request(
                 url=api_call_extraction.url,
                 method=api_call_extraction.method,
@@ -663,9 +687,12 @@ async def handle_api_call_extraction(
                 body=api_call_extraction.body,
                 query_params=api_call_extraction.query_params,
                 timeout=api_call_extraction.timeout,
+                follow_redirects=False,
             )
             logger.info(
-                f"Poll attempt {attempt} response: status_code={result.get('status_code')}, body={result.get('body')}"
+                "Poll attempt %s response: status_code=%s",
+                attempt,
+                result.get("status_code"),
             )
 
             if "error" in result:

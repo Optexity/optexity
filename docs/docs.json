@@ -71,7 +71,8 @@
                             "/docs/advanced/totp-integration",
                             "/docs/advanced/orchestration",
                             "/docs/advanced/proxy-setup",
-                            "/docs/advanced/model-configuration"
+                            "/docs/advanced/model-configuration",
+                            "/docs/advanced/ai-action-guardrails"
                         ]
                     },
                     {

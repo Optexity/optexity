@@ -24,6 +24,7 @@ from browser_use.llm.schema import SchemaOptimizer
 from browser_use.llm.views import ChatInvokeCompletion, ChatInvokeUsage
 from pydantic import BaseModel
 
+from optexity.guardrails.llm import sanitize_serialized_messages
 from optexity.utils.llm_settings import llm_settings, resolve_llm_api_key
 
 from .litellm_model import litellm_fallbacks, reasoning_effort_for
@@ -82,9 +83,11 @@ class ChatLiteLLM(BaseChatModel):
     def _request(
         self, messages: list[BaseMessage], output_format: type[T] | None
     ) -> dict[str, Any]:
+        serialized_messages = OpenAIMessageSerializer.serialize_messages(messages)
+        serialized_messages = sanitize_serialized_messages(serialized_messages)
         body: dict[str, Any] = {
             "model": self.model,
-            "messages": OpenAIMessageSerializer.serialize_messages(messages),
+            "messages": serialized_messages,
             "api_key": resolve_llm_api_key(self.model),
             # browser-use retries each step itself; letting litellm retry too
             # would multiply the attempts out.
