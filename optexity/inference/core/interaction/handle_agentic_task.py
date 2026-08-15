@@ -1,6 +1,7 @@
 import logging
 
 from browser_use import Agent, BrowserSession, Tools
+from browser_use.agent.history_compiler import compile_history_to_action_cache
 
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import normalize_model
@@ -15,6 +16,7 @@ from optexity.schema.task import Task
 logger = logging.getLogger(__name__)
 
 AGENT_HISTORY_FILENAME = "raw_history.json"
+AGENT_ACTION_CACHE_FILENAME = "browser_use_action_cache.json"
 
 
 async def handle_agentic_task(
@@ -81,6 +83,18 @@ async def handle_agentic_task(
                 len(history),
                 history_path,
             )
+            cache_path = step_directory / AGENT_ACTION_CACHE_FILENAME
+            try:
+                compile_history_to_action_cache(
+                    history_path,
+                    cache_path,
+                    task_instruction=agentic_task_action.task,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to compile browser-use agent history cache from %s",
+                    history_path,
+                )
             logger.debug(f"Agentic task completed on browser_use {browser.cdp_url} ")
             return history
         finally:
