@@ -17,7 +17,10 @@ from optexity.inference.core.interaction.utils import (
     handle_download,
     highlight_element_and_screenshot,
 )
-from optexity.inference.infra.browser import Browser
+from optexity.inference.infra.browser import (
+    Browser,
+    serialize_dom_state_for_llm,
+)
 from optexity.schema.actions.interaction_action import (
     CheckAction,
     ClickElementAction,
@@ -130,7 +133,8 @@ async def command_based_action_with_retry(
                     summary = await browser.get_browser_state_summary(
                         include_screenshot=False
                     )
-                    axtree = summary.dom_state.llm_representation(
+                    axtree = serialize_dom_state_for_llm(
+                        summary.dom_state,
                         remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
                     )
                     logger.debug(

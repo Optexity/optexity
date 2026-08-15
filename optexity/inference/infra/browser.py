@@ -1,11 +1,12 @@
 import asyncio
 import base64
+import inspect
 import json
 import logging
 import os
 import re
 import shutil
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 import patchright.async_api
@@ -21,6 +22,40 @@ from optexity.schema.memory import Memory, NetworkRequest, NetworkResponse
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+def serialize_dom_state_for_llm(
+    dom_state: Any, *, remove_empty_nodes: bool = True
+) -> str:
+    """Serialize DOM text with both supported browser-use method signatures.
+
+    Compatibility flow:
+
+        Optexity
+          ├─ legacy browser-use supports ``remove_empty_nodes`` → pass the flag
+          └─ current browser-use removed the argument              → use defaults
+
+    Signature inspection avoids catching ``TypeError`` broadly, so a genuine
+    failure inside browser-use's serializer is still raised to the caller.
+    """
+
+    llm_representation = dom_state.llm_representation
+    parameters = inspect.signature(llm_representation).parameters.values()
+    supports_remove_empty_nodes = any(
+        parameter.name == "remove_empty_nodes"
+        or parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters
+    )
+
+    if supports_remove_empty_nodes:
+        return llm_representation(remove_empty_nodes=remove_empty_nodes)
+
+    if not remove_empty_nodes:
+        logger.warning(
+            "Installed browser-use does not support remove_empty_nodes=False; "
+            "using its default DOM serializer"
+        )
+    return llm_representation()
 
 
 class Browser:
@@ -322,12 +357,22 @@ class Browser:
         if self.backend_agent is None:
             raise ValueError("Backend agent is not set")
 
-        browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
-            include_screenshot=include_screenshot,  # default True even if use_vision=False so cloud sync is useful (it's fast now anyway); pass False when only the axtree is needed
-            include_recent_events=False,
-            cached=False,
-            include_full_page=include_full_page,
+        get_state_summary = (
+            self.backend_agent.browser_session.get_browser_state_summary
         )
+        state_summary_kwargs = {
+            "include_screenshot": include_screenshot,  # default True even if use_vision=False so cloud sync is useful (it's fast now anyway); pass False when only the axtree is needed
+            "include_recent_events": False,
+            "cached": False,
+        }
+
+        # optexity-browser-use 0.9 accepted ``include_full_page``, while the
+        # newer local browser-use fork does not. Only pass it when the installed
+        # BrowserSession implementation supports it.
+        if "include_full_page" in inspect.signature(get_state_summary).parameters:
+            state_summary_kwargs["include_full_page"] = include_full_page
+
+        browser_state_summary = await get_state_summary(**state_summary_kwargs)
 
         return browser_state_summary
 

@@ -16,7 +16,10 @@ from optexity.inference.core.interaction.utils import (
     get_index_from_prompt,
     update_screenshot_with_highlight,
 )
-from optexity.inference.infra.browser import Browser
+from optexity.inference.infra.browser import (
+    Browser,
+    serialize_dom_state_for_llm,
+)
 from optexity.inference.models import get_llm_model_with_fallback
 from optexity.schema.actions.interaction_action import InputTextAction
 from optexity.schema.memory import BrowserState, Memory
@@ -45,7 +48,8 @@ async def llm_input_text_prediction(
         url=browser_state_summary.url,
         screenshot=browser_state_summary.screenshot,
         title=browser_state_summary.title,
-        axtree=browser_state_summary.dom_state.llm_representation(
+        axtree=serialize_dom_state_for_llm(
+            browser_state_summary.dom_state,
             remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
         ),
     )
