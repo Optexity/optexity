@@ -123,17 +123,30 @@ class ChatLiteLLM(BaseChatModel):
 
     @overload
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: None = None
+        self,
+        messages: list[BaseMessage],
+        output_format: None = None,
+        **kwargs: Any,
     ) -> ChatInvokeCompletion[str]: ...
 
     @overload
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: type[T]
+        self,
+        messages: list[BaseMessage],
+        output_format: type[T],
+        **kwargs: Any,
     ) -> ChatInvokeCompletion[T]: ...
 
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: type[T] | None = None
+        self,
+        messages: list[BaseMessage],
+        output_format: type[T] | None = None,
+        **kwargs: Any,
     ) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
+        # Newer browser-use versions pass run-scoped metadata such as
+        # ``session_id`` through BaseChatModel. LiteLLM does not need that
+        # metadata for its provider request, but accepting it keeps this adapter
+        # compatible with browser-use's current protocol.
         try:
             response = await litellm.acompletion(
                 **self._request(messages, output_format)
