@@ -14,6 +14,8 @@ from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
 
+AGENT_HISTORY_FILENAME = "raw_history.json"
+
 
 async def handle_agentic_task(
     agentic_task_action: AgenticTask | CloseOverlayPopupAction,
@@ -23,7 +25,6 @@ async def handle_agentic_task(
 ):
 
     if agentic_task_action.backend == "browser_use":
-
         if isinstance(agentic_task_action, CloseOverlayPopupAction):
             tools = Tools(
                 exclude_actions=[
@@ -53,7 +54,7 @@ async def handle_agentic_task(
         )
 
         step_directory = (
-            task.logs_directory / f"step_{str(memory.automation_state.step_index)}"
+            task.logs_directory / f"step_{memory.automation_state.step_index!s}"
         )
         step_directory.mkdir(parents=True, exist_ok=True)
 
@@ -68,16 +69,25 @@ async def handle_agentic_task(
         )
         logger.debug(f"Starting browser session for agentic task {browser.cdp_url} ")
         await agent.browser_session.start()
-        logger.debug(f"Finally running agentic task on browser_use {browser.cdp_url} ")
-        history = await agent.run(max_steps=agentic_task_action.max_steps)
-        logger.debug(f"Agentic task completed on browser_use {browser.cdp_url} ")
-
-        agent.stop()
-        if agent.browser_session:
-            await agent.browser_session.stop()
-            await agent.browser_session.reset()
-
-        return history
+        try:
+            logger.debug(
+                f"Finally running agentic task on browser_use {browser.cdp_url} "
+            )
+            history = await agent.run(max_steps=agentic_task_action.max_steps)
+            history_path = step_directory / AGENT_HISTORY_FILENAME
+            agent.save_history(history_path)
+            logger.info(
+                "Saved browser-use agent history with %d steps to %s",
+                len(history),
+                history_path,
+            )
+            logger.debug(f"Agentic task completed on browser_use {browser.cdp_url} ")
+            return history
+        finally:
+            agent.stop()
+            if agent.browser_session:
+                await agent.browser_session.stop()
+                await agent.browser_session.reset()
 
     elif agentic_task_action.backend == "browserbase":
         raise NotImplementedError("Browserbase is not supported yet")
