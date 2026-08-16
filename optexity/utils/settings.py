@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Literal
 
 from pydantic import AliasChoices, Field, model_validator
@@ -51,6 +52,19 @@ class Settings(LLMSettings):
     BROWSER_USE_API_KEY: str | None = None
 
     DOWNLOAD_TIMEOUT_SECONDS: float = 200.0
+
+    # Cross-run procedural memory is opt-in while the local take-home store is
+    # being validated. Production deployments should point this at a durable,
+    # shared implementation rather than worker-local storage.
+    LEARNING_MEMORY_ENABLED: bool = False
+    LEARNING_MEMORY_DIRECTORY: Path | None = None
+    LEARNING_MEMORY_SOFT_TARGET_MS: float = Field(default=50.0, gt=0)
+    LEARNING_MEMORY_CANDIDATE_TIMEOUT_MS: float = Field(default=250.0, gt=0)
+    LEARNING_MEMORY_REPAIR_BUDGET_MS: float = Field(default=750.0, gt=0)
+    LEARNING_MEMORY_MAX_ALTERNATIVES: int = Field(default=2, ge=0, le=10)
+    LEARNING_MEMORY_MAX_VERSIONS: int = Field(default=5, ge=1, le=50)
+    LEARNING_MEMORY_ALLOW_UNRESOLVED_SELECT_OPTIONS: bool = False
+    LEARNING_MEMORY_ALLOW_LITERAL_PASSWORD_INPUTS: bool = False
 
     UPLOAD_CONNECT_TIMEOUT_SECONDS: float = 30.0
     UPLOAD_WRITE_TIMEOUT_SECONDS: float = 300.0

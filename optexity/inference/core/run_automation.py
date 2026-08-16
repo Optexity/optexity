@@ -32,6 +32,13 @@ from optexity.inference.core.logging import (
     save_trajectory_in_server,
     start_task_in_server,
 )
+from optexity.inference.core.learning_memory import (
+    ACTION_CACHE_FILENAME,
+    LEARNING_SESSION_STATE_KEY,
+    create_learning_session,
+    get_learning_session,
+    is_cacheable_agentic_node,
+)
 from optexity.inference.core.run_assertion import run_assertion_action
 from optexity.inference.core.run_extraction import run_extraction_action
 from optexity.inference.core.run_human_in_loop import run_human_in_loop_action
@@ -149,6 +156,7 @@ async def run_automation(
     logger.info(f"Task {task.task_id} started running")
     memory = None
     browser = None
+    learning_session = None
     in_browser_setup = False
     entered_workflow = False
 
@@ -157,6 +165,9 @@ async def run_automation(
             await start_task_in_server(task)
 
         memory = Memory(unique_child_arn=unique_child_arn)
+        learning_session = create_learning_session(task)
+        if learning_session is not None:
+            memory.state[LEARNING_SESSION_STATE_KEY] = learning_session
         memory.update_system_info()
 
         def _get_browser():
@@ -235,12 +246,25 @@ async def run_automation(
         entered_workflow = True
         await _run_nodes(automation.nodes, task, memory, browser, full_automation)
 
+        if learning_session is not None:
+            await learning_session.finalize_success(browser, memory)
+
         task.status = "success"
     except AssertionError as e:
+        if learning_session is not None:
+            try:
+                await learning_session.finalize_failure(e)
+            except Exception:
+                logger.exception("Failed to finalize learning-memory failure")
         logger.error(f"Assertion error: {e}")
         task.error = str(e)
         task.status = "failed"
     except Exception as e:
+        if learning_session is not None:
+            try:
+                await learning_session.finalize_failure(e)
+            except Exception:
+                logger.exception("Failed to finalize learning-memory failure")
         if is_driver_closed_error(e):
             logger.error(f"Driver closed error: {e}, restarting browser")
             if browser is not None:
@@ -418,6 +442,7 @@ async def run_action_node(
     task: Task,
     memory: Memory,
     browser: Browser,
+    interaction_retries_left: int = 2,
 ):
     memory.update_system_info()
     await asyncio.sleep(action_node.before_sleep_time)
@@ -453,7 +478,11 @@ async def run_action_node(
             await browser.clear_network_calls()
 
             await run_interaction_action(
-                action_node.interaction_action, task, memory, browser, 2
+                action_node.interaction_action,
+                task,
+                memory,
+                browser,
+                interaction_retries_left,
             )
         elif action_node.extraction_action:
             await run_extraction_action(
@@ -971,9 +1000,12 @@ async def _run_nodes(
     memory: Memory,
     browser: Browser,
     full_automation: list,
+    path_prefix: str = "nodes",
+    enable_learning: bool = True,
 ):
     """Dispatch a list of nodes (ActionNode, ForLoopNode, IfElseNode, AssertLocatorNode, or PrivateNode) for execution."""
-    for node in nodes:
+    for node_index, node in enumerate(nodes):
+        node_path = f"{path_prefix}[{node_index}]"
         if isinstance(node, ForLoopNode):
             await handle_for_loop_node(node, memory, task, browser, full_automation)
         elif isinstance(node, IfElseNode):
@@ -986,9 +1018,89 @@ async def _run_nodes(
             full_automation.append(node.model_dump())
             await run_private_node(node, task, memory, browser)
         else:
+            learning_session = get_learning_session(memory) if enable_learning else None
+            safe_learning_boundary = bool(
+                path_prefix == "nodes"
+                and node_index == len(nodes) - 1
+                and task.automation is not None
+                and not task.automation.post_processing_nodes
+            )
+            if (
+                learning_session is not None
+                and isinstance(node, ActionNode)
+                and is_cacheable_agentic_node(node)
+                and not safe_learning_boundary
+            ):
+                logger.info(
+                    "Skipping learning memory for %s: the first checkpoint "
+                    "requires a final top-level agentic node with no "
+                    "post-processing nodes",
+                    node_path,
+                )
+            source_node_for_memory = (
+                node.model_copy(deep=True)
+                if (
+                    learning_session is not None
+                    and safe_learning_boundary
+                    and isinstance(node, ActionNode)
+                    and is_cacheable_agentic_node(node)
+                )
+                else None
+            )
+            if learning_session is not None and source_node_for_memory is not None:
+                learning_started_at = datetime.now(timezone.utc)
+                learning_started_monotonic = time.monotonic()
+                learning_token_usage_before = memory.token_usage.model_copy(deep=True)
+                entry_url = await browser.get_current_page_url()
+                workflow, compatibility = learning_session.workflow_context(
+                    source_node_for_memory,
+                    node_path,
+                    memory,
+                    entry_url,
+                )
+                replayed = await learning_session.replay_if_available(
+                    node_path=node_path,
+                    workflow=workflow,
+                    compatibility=compatibility,
+                    memory=memory,
+                    browser=browser,
+                    full_automation=full_automation,
+                    execute_node=lambda cached_node, retries: run_action_node(
+                        cached_node,
+                        task,
+                        memory,
+                        browser,
+                        interaction_retries_left=retries,
+                    ),
+                )
+                if replayed:
+                    continue
+
             full_automation.append(node.model_dump())
             await run_action_node(node, task, memory, browser)
+            if learning_session is not None and source_node_for_memory is not None:
+                cache_path = (
+                    task.logs_directory
+                    / f"step_{memory.automation_state.step_index!s}"
+                    / ACTION_CACHE_FILENAME
+                )
+                learning_session.record_discovery(
+                    workflow=workflow,
+                    compatibility=compatibility,
+                    cache_path=cache_path,
+                    started_at=learning_started_at,
+                    started_monotonic=learning_started_monotonic,
+                    token_usage_before=learning_token_usage_before,
+                )
 
 
 async def run_post_processing_nodes(task: Task, memory: Memory, browser: Browser):
-    await _run_nodes(task.automation.post_processing_nodes, task, memory, browser, [])
+    await _run_nodes(
+        task.automation.post_processing_nodes,
+        task,
+        memory,
+        browser,
+        [],
+        path_prefix="post_processing_nodes",
+        enable_learning=False,
+    )

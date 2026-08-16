@@ -12,6 +12,7 @@ from optexity.schema.actions.interaction_action import (
 )
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
+from optexity.schema.token_usage import TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,16 @@ async def handle_agentic_task(
                 f"Finally running agentic task on browser_use {browser.cdp_url} "
             )
             history = await agent.run(max_steps=agentic_task_action.max_steps)
+            if history.usage is not None:
+                memory.token_usage += TokenUsage(
+                    input_tokens=history.usage.total_prompt_tokens,
+                    output_tokens=history.usage.total_completion_tokens,
+                    total_tokens=history.usage.total_tokens,
+                    calculated_total_tokens=history.usage.total_tokens,
+                    input_cost=history.usage.total_prompt_cost,
+                    output_cost=history.usage.total_completion_cost,
+                    total_cost=history.usage.total_cost,
+                )
             history_path = step_directory / AGENT_HISTORY_FILENAME
             agent.save_history(history_path)
             logger.info(
