@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
+from typing import Literal
 
 from optexity.inference.core.automation_cache.locator_commands import (
     validate_playwright_locator_command,
@@ -222,7 +223,11 @@ async def prepare_action_node(
 ) -> PreparedNode:
     """Choose one validated locator without performing the real action."""
 
-    if learned_step.strategy == LearnedStepStrategy.DIRECT:
+    if learned_step.strategy in {
+        LearnedStepStrategy.DIRECT,
+        LearnedStepStrategy.LOCATOR_LLM,
+        LearnedStepStrategy.AGENTIC,
+    }:
         return PreparedNode(
             node=node.model_copy(deep=True),
             events=[],
@@ -249,59 +254,155 @@ async def prepare_action_node(
         )
 
     primary_index = learned_step.chosen_candidate_index or 0
-    candidate_indexes = [primary_index]
-    candidate_indexes.extend(
-        index for index in range(len(learned_step.candidates)) if index != primary_index
+    state_priority = {
+        "active": 0,
+        "trial": 1,
+        "degraded": 2,
+    }
+    candidate_indexes = sorted(
+        range(len(learned_step.candidates)),
+        key=lambda index: (
+            state_priority[learned_step.candidates[index].state.value],
+            0 if index == primary_index else 1,
+            learned_step.candidates[index].validation_failures
+            - learned_step.candidates[index].validation_successes,
+            learned_step.candidates[index].original_rank,
+        ),
     )
     candidate_indexes = candidate_indexes[: 1 + policy.max_alternatives]
 
-    events: list[LocatorValidationEvent] = []
-    repair_started = time.monotonic()
     select_values: list[str] = []
     if field_name == "select_option" and node.interaction_action is not None:
         select_action = node.interaction_action.select_option
         if select_action is not None:
             select_values = list(select_action.select_values or [])
 
-    for candidate_index in candidate_indexes:
-        elapsed_repair_ms = (time.monotonic() - repair_started) * 1000
-        remaining_ms = policy.repair_budget_ms - elapsed_repair_ms
-        if remaining_ms <= 0:
-            break
-        candidate = learned_step.candidates[candidate_index]
-        event = await _validate_candidate(
-            command=candidate.command,
-            node_index=learned_step.node_index,
-            candidate_index=candidate_index,
-            requirements=requirements,
-            select_values=select_values,
-            browser=browser,
-            timeout_ms=min(policy.candidate_timeout_ms, remaining_ms),
-            soft_target_ms=policy.soft_validation_target_ms,
-        )
-        events.append(event)
-        if event.outcome != LocatorValidationOutcome.PASSED:
-            continue
+    async def validate_once(
+        attempt: Literal["immediate", "after_readiness_wait"],
+        *,
+        page_ready: bool | None = None,
+    ) -> tuple[PreparedNode | None, list[LocatorValidationEvent]]:
+        attempt_events: list[LocatorValidationEvent] = []
+        repair_started = time.monotonic()
+        for candidate_index in candidate_indexes:
+            remaining_ms = policy.repair_budget_ms - (
+                (time.monotonic() - repair_started) * 1000
+            )
+            if remaining_ms <= 0:
+                break
+            candidate = learned_step.candidates[candidate_index]
+            event = await _validate_candidate(
+                command=candidate.command,
+                node_index=learned_step.node_index,
+                candidate_index=candidate_index,
+                requirements=requirements,
+                select_values=select_values,
+                browser=browser,
+                timeout_ms=min(policy.candidate_timeout_ms, remaining_ms),
+                soft_target_ms=policy.soft_validation_target_ms,
+                validation_attempt=attempt,
+            )
+            event.page_ready = page_ready
+            if (
+                attempt == "after_readiness_wait"
+                and page_ready is False
+                and event.outcome
+                in {
+                    LocatorValidationOutcome.NO_MATCH,
+                    LocatorValidationOutcome.TIMED_OUT,
+                }
+            ):
+                event.outcome = LocatorValidationOutcome.PAGE_NOT_READY
+                event.explanation = "Page was still not ready after the bounded wait"
+            attempt_events.append(event)
+            if event.outcome != LocatorValidationOutcome.PASSED:
+                continue
 
-        prepared = node.model_copy(deep=True)
-        prepared_data = locator_action(prepared)
-        assert prepared_data is not None
-        _, prepared_action, _ = prepared_data
-        prepared_action.command = candidate.command
-        prepared_action.skip_command = False
-        prepared_action.skip_prompt = True
-        prepared_action.assert_locator_presence = True
-        return PreparedNode(
-            node=prepared,
-            events=events,
-            selected_candidate_index=candidate_index,
-            selected_command=candidate.command,
+            prepared = node.model_copy(deep=True)
+            prepared_data = locator_action(prepared)
+            assert prepared_data is not None
+            _, prepared_action, _ = prepared_data
+            prepared_action.command = candidate.command
+            prepared_action.skip_command = False
+            prepared_action.skip_prompt = True
+            prepared_action.assert_locator_presence = True
+            return (
+                PreparedNode(
+                    node=prepared,
+                    events=attempt_events,
+                    selected_candidate_index=candidate_index,
+                    selected_command=candidate.command,
+                ),
+                attempt_events,
+            )
+        return None, attempt_events
+
+    prepared, events = await validate_once("immediate")
+    if prepared is not None:
+        return prepared
+
+    retryable = bool(events) and all(
+        event.outcome
+        in {
+            LocatorValidationOutcome.NO_MATCH,
+            LocatorValidationOutcome.TIMED_OUT,
+        }
+        for event in events
+    )
+    if retryable:
+        primary_command = learned_step.candidates[primary_index].command
+        page_ready = await _wait_once_for_page_readiness(
+            browser,
+            primary_command,
+            timeout_ms=policy.readiness_wait_ms,
         )
+        prepared, retry_events = await validate_once(
+            "after_readiness_wait",
+            page_ready=page_ready,
+        )
+        events.extend(retry_events)
+        if prepared is not None:
+            return PreparedNode(
+                node=prepared.node,
+                events=events,
+                selected_candidate_index=prepared.selected_candidate_index,
+                selected_command=prepared.selected_command,
+            )
 
     raise LocatorResolutionError(
         f"No locator candidate passed for learned step {learned_step.node_index}",
         events,
     )
+
+
+async def _wait_once_for_page_readiness(
+    browser: Browser,
+    command: str,
+    *,
+    timeout_ms: float,
+) -> bool:
+    """Wait once for the expected target, then report generic page readiness."""
+
+    async def _wait() -> bool:
+        locator = await browser.get_locator_from_command(command)
+        if locator is not None:
+            try:
+                await locator.first.wait_for(state="attached", timeout=timeout_ms)
+                return True
+            except Exception as exc:
+                if "closed" in str(exc).lower():
+                    raise
+
+        page = await browser.get_current_page()
+        if page is None or page.url in {"about:blank", "chrome-error://chromewebdata/"}:
+            return False
+        ready_state = await page.evaluate("document.readyState")
+        return ready_state == "complete"
+
+    try:
+        return await asyncio.wait_for(_wait(), timeout=max(timeout_ms, 1.0) / 1000)
+    except TimeoutError:
+        return False
 
 
 async def verify_action_effect(
@@ -377,6 +478,7 @@ async def _validate_candidate(
     browser: Browser,
     timeout_ms: float,
     soft_target_ms: float,
+    validation_attempt: Literal["immediate", "after_readiness_wait"] = "immediate",
 ) -> LocatorValidationEvent:
     started = time.monotonic()
     deadline = started + max(timeout_ms, 1.0) / 1000
@@ -462,6 +564,7 @@ async def _validate_candidate(
         exceeded_soft_target=elapsed_ms > soft_target_ms,
         matched_count=matched_count,
         explanation=explanation,
+        validation_attempt=validation_attempt,
     )
 
 

@@ -35,8 +35,10 @@ from optexity.schema.actions.interaction_action import (
     GoToUrlAction,
     InteractionAction,
     ScrollAction,
+    ScrollToTextAction,
+    SearchAction,
 )
-from optexity.schema.memory import BrowserState, Memory, OutputData
+from optexity.schema.memory import Memory, OutputData
 from optexity.schema.task import Task
 
 _error_handler_cache: dict[tuple, ErrorHandlerAgent] = {}
@@ -132,9 +134,13 @@ async def run_interaction_action(
                 interaction_action.download_url_as_pdf, task, memory, browser
             )
         elif interaction_action.agentic_task:
-            await handle_agentic_task(
+            history = await handle_agentic_task(
                 interaction_action.agentic_task, task, memory, browser
             )
+            if history is None or history.is_successful() is not True:
+                raise RuntimeError(
+                    "The scoped Browser Use fallback did not confirm success"
+                )
         elif interaction_action.close_overlay_popup:
             await handle_agentic_task(
                 interaction_action.close_overlay_popup, task, memory, browser
@@ -162,6 +168,10 @@ async def run_interaction_action(
             await handle_key_press(interaction_action.key_press, memory, browser)
         elif interaction_action.scroll:
             await handle_scroll(interaction_action.scroll, memory, browser)
+        elif interaction_action.scroll_to_text:
+            await handle_scroll_to_text(interaction_action.scroll_to_text, browser)
+        elif interaction_action.search:
+            await handle_search(interaction_action.search, browser)
     except ElementNotFoundInAxtreeException as e:
         await handle_element_not_found_in_axtree(
             e, interaction_action, task, memory, browser
@@ -177,6 +187,50 @@ async def handle_scroll(
 ):
     page = await browser.get_current_page()
     if page is None:
+        raise RuntimeError("Cannot scroll: no page available")
+
+    if scroll_action.pages is not None:
+        if scroll_action.command is None:
+            if browser.backend_agent is None:
+                raise RuntimeError(
+                    "Cannot scroll: Browser Use action runtime is unavailable"
+                )
+            action_model = browser.backend_agent.ActionModel(
+                scroll={  # pyright: ignore[reportCallIssue]
+                    "down": scroll_action.down,
+                    "pages": scroll_action.pages,
+                },
+            )
+            results = await browser.backend_agent.multi_act([action_model])
+            if not results:
+                raise RuntimeError("Browser Use returned no result for scroll")
+            if results[0].error:
+                raise RuntimeError(f"Browser Use scroll failed: {results[0].error}")
+            return
+
+        locator = await browser.get_locator_from_command(scroll_action.command)
+        if locator is None or await locator.count() != 1:
+            raise RuntimeError(
+                "Element-scoped scroll locator did not match exactly one element"
+            )
+        if not await locator.is_visible():
+            raise RuntimeError("Element-scoped scroll target is not visible")
+        bounding_box = await locator.bounding_box()
+        if bounding_box is None:
+            raise RuntimeError("Element-scoped scroll target has no bounding box")
+        await page.mouse.move(
+            bounding_box["x"] + bounding_box["width"] / 2,
+            bounding_box["y"] + bounding_box["height"] / 2,
+        )
+        viewport_height = await page.evaluate("window.innerHeight || 1000")
+        direction = 1 if scroll_action.down else -1
+        full_pages = int(scroll_action.pages)
+        fraction = scroll_action.pages - full_pages
+        for _ in range(full_pages):
+            await page.mouse.wheel(0, direction * viewport_height)
+            await asyncio.sleep(0.15)
+        if fraction:
+            await page.mouse.wheel(0, direction * int(viewport_height * fraction))
         return
 
     # direction: down = positive, up = negative
@@ -203,6 +257,47 @@ async def handle_scroll(
 
         await page.mouse.wheel(0, direction * 2000)
         await page.wait_for_timeout(300)
+
+
+async def handle_scroll_to_text(
+    scroll_to_text_action: ScrollToTextAction,
+    browser: Browser,
+):
+    if browser.backend_agent is None:
+        raise RuntimeError(
+            "Cannot find text: Browser Use action runtime is unavailable"
+        )
+    action_model = browser.backend_agent.ActionModel(
+        find_text={  # pyright: ignore[reportCallIssue]
+            "text": scroll_to_text_action.text
+        }
+    )
+    results = await browser.backend_agent.multi_act([action_model])
+    if not results:
+        raise RuntimeError("Browser Use returned no result for find_text")
+    if results[0].error:
+        raise RuntimeError(f"Browser Use find_text failed: {results[0].error}")
+    extracted_content = results[0].extracted_content or ""
+    if "not found" in extracted_content.lower():
+        raise RuntimeError(
+            f"Browser Use find_text did not find the requested text: {extracted_content}"
+        )
+
+
+async def handle_search(search_action: SearchAction, browser: Browser):
+    if browser.backend_agent is None:
+        raise RuntimeError("Cannot search: Browser Use action runtime is unavailable")
+    action_model = browser.backend_agent.ActionModel(
+        search={  # pyright: ignore[reportCallIssue]
+            "query": search_action.query,
+            "engine": search_action.engine,
+        },
+    )
+    results = await browser.backend_agent.multi_act([action_model])
+    if not results:
+        raise RuntimeError("Browser Use returned no result for search")
+    if results[0].error:
+        raise RuntimeError(f"Browser Use search failed: {results[0].error}")
 
 
 async def handle_close_tabs_until(
@@ -233,7 +328,40 @@ async def handle_close_tabs_until(
 async def handle_go_to_url(
     go_to_url_action: GoToUrlAction, task: Task, memory: Memory, browser: Browser
 ):
-    await browser.go_to_url(go_to_url_action.url)
+    page_before = await browser.get_current_page()
+    if page_before is None:
+        raise RuntimeError(
+            f"Cannot navigate to {go_to_url_action.url}: no page available"
+        )
+    previous_url = page_before.url
+
+    if browser.backend_agent is None:
+        raise RuntimeError("Cannot navigate: Browser Use action runtime is unavailable")
+    action_model = browser.backend_agent.ActionModel(
+        navigate={  # pyright: ignore[reportCallIssue]
+            "url": go_to_url_action.url,
+            "new_tab": go_to_url_action.new_tab,
+        },
+    )
+    results = await browser.backend_agent.multi_act([action_model])
+    if not results:
+        raise RuntimeError("Browser Use returned no result for navigate")
+    if results[0].error:
+        raise RuntimeError(f"Browser Use navigation failed: {results[0].error}")
+    if go_to_url_action.new_tab:
+        await browser.handle_new_tabs(max_wait_time=2.0)
+
+    page_after = await browser.get_current_page()
+    if page_after is None:
+        raise RuntimeError(
+            f"Navigation to {go_to_url_action.url} left no active page available"
+        )
+    resulting_url = page_after.url
+    if resulting_url != go_to_url_action.url and resulting_url == previous_url:
+        raise RuntimeError(
+            f"Navigation to {go_to_url_action.url} did not change the current URL "
+            f"from {previous_url}"
+        )
 
 
 async def handle_go_back(
@@ -241,8 +369,24 @@ async def handle_go_back(
 ):
     page = await browser.get_current_page()
     if page is None:
-        return
-    await page.go_back()
+        raise RuntimeError("Cannot go back: no page available")
+
+    previous_url = page.url
+    if browser.backend_agent is None:
+        raise RuntimeError("Cannot go back: Browser Use action runtime is unavailable")
+    action_model = browser.backend_agent.ActionModel(
+        go_back={},  # pyright: ignore[reportCallIssue]
+    )
+    results = await browser.backend_agent.multi_act([action_model])
+    if not results:
+        raise RuntimeError("Browser Use returned no result for go_back")
+    if results[0].error:
+        raise RuntimeError(f"Browser Use go_back failed: {results[0].error}")
+
+    if page.url == previous_url:
+        raise RuntimeError(
+            f"Go back did not change the current URL from {previous_url}"
+        )
 
 
 async def handle_download_url_as_pdf(
@@ -389,13 +533,13 @@ async def handle_assert_locator_presence_error(
         memory.token_usage += token_usage
 
         if response.error_type == "website_not_loaded":
-            logger.debug(f"Website not loaded, retrying after 5 seconds")
+            logger.debug("Website not loaded, retrying after 5 seconds")
             await asyncio.sleep(5)
             await run_interaction_action(
                 interaction_action, task, memory, browser, retries_left - 1
             )
         elif response.error_type == "overlay_popup_blocking":
-            logger.debug(f"Overlay popup blocking, closing overlay popup and retrying")
+            logger.debug("Overlay popup blocking, closing overlay popup and retrying")
             close_overlay_popup_action = CloseOverlayPopupAction()
             await handle_agentic_task(close_overlay_popup_action, task, memory, browser)
             await run_interaction_action(

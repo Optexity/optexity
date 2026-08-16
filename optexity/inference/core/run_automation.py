@@ -23,6 +23,13 @@ from optexity.inference.core.interaction.utils import (
     _wait_for_file_stable,
     clean_download,
 )
+from optexity.inference.core.learning_memory import (
+    ACTION_CACHE_FILENAME,
+    LEARNING_SESSION_STATE_KEY,
+    create_learning_session,
+    get_learning_session,
+    is_cacheable_agentic_node,
+)
 from optexity.inference.core.logging import (
     complete_task_in_server,
     initiate_callback,
@@ -31,13 +38,6 @@ from optexity.inference.core.logging import (
     save_output_data_in_server,
     save_trajectory_in_server,
     start_task_in_server,
-)
-from optexity.inference.core.learning_memory import (
-    ACTION_CACHE_FILENAME,
-    LEARNING_SESSION_STATE_KEY,
-    create_learning_session,
-    get_learning_session,
-    is_cacheable_agentic_node,
 )
 from optexity.inference.core.run_assertion import run_assertion_action
 from optexity.inference.core.run_extraction import run_extraction_action
@@ -411,7 +411,7 @@ async def run_final_logging(
                     title=browser_state_summary.title,
                     axtree=serialize_dom_state_for_llm(
                         browser_state_summary.dom_state,
-                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree,
                     ),
                 )
             )
@@ -1062,6 +1062,7 @@ async def _run_nodes(
                     node_path=node_path,
                     workflow=workflow,
                     compatibility=compatibility,
+                    source_node=source_node_for_memory,
                     memory=memory,
                     browser=browser,
                     full_automation=full_automation,

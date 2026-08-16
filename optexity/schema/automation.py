@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping, Sequence
 from typing import Annotated, Any, ForwardRef, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -96,7 +97,10 @@ class VariableSubstitution:
 
     async def replace_variables(
         self,
-        variables: dict[str, list[str | SecureParameter]],
+        variables: Mapping[
+            str,
+            Sequence[str | int | float | bool | SecureParameter | None],
+        ],
         workspace_id: str | None = None,
         api_key: str | None = None,
     ):

@@ -60,11 +60,18 @@ class Settings(LLMSettings):
     LEARNING_MEMORY_DIRECTORY: Path | None = None
     LEARNING_MEMORY_SOFT_TARGET_MS: float = Field(default=50.0, gt=0)
     LEARNING_MEMORY_CANDIDATE_TIMEOUT_MS: float = Field(default=250.0, gt=0)
+    LEARNING_MEMORY_READINESS_WAIT_MS: float = Field(default=3000.0, gt=0, le=10000)
     LEARNING_MEMORY_REPAIR_BUDGET_MS: float = Field(default=750.0, gt=0)
     LEARNING_MEMORY_MAX_ALTERNATIVES: int = Field(default=2, ge=0, le=10)
     LEARNING_MEMORY_MAX_VERSIONS: int = Field(default=5, ge=1, le=50)
     LEARNING_MEMORY_ALLOW_UNRESOLVED_SELECT_OPTIONS: bool = False
     LEARNING_MEMORY_ALLOW_LITERAL_PASSWORD_INPUTS: bool = False
+    LEARNING_MEMORY_RESOLUTION_STRATEGY: Literal[
+        "deterministic_only", "deterministic_then_llm"
+    ] = "deterministic_then_llm"
+    LEARNING_MEMORY_RESOLVER_LLM_MODEL: str | None = None
+    LEARNING_MEMORY_JUDGE_LLM_MODEL: str | None = None
+    LEARNING_MEMORY_AGENTIC_FALLBACK_MAX_STEPS: int = Field(default=8, ge=1, le=12)
 
     UPLOAD_CONNECT_TIMEOUT_SECONDS: float = 30.0
     UPLOAD_WRITE_TIMEOUT_SECONDS: float = 300.0

@@ -1,5 +1,5 @@
 from optexity.inference.infra.browser import Browser
-from optexity.schema.actions.interaction_action import KeyPressAction, KeyPressType
+from optexity.schema.actions.interaction_action import KeyPressAction
 from optexity.schema.memory import Memory
 
 
@@ -8,35 +8,25 @@ async def handle_key_press(
     memory: Memory,
     browser: Browser,
 ):
-    page = await browser.get_current_page()
-    if page is None:
-        return
+    if browser.backend_agent is None:
+        raise RuntimeError(
+            "Cannot send keys: Browser Use action runtime is unavailable"
+        )
 
-    if keypress_action.type == KeyPressType.ENTER:
-        await page.keyboard.press("Enter")
-    if keypress_action.type == KeyPressType.TAB:
-        await page.keyboard.press("Tab")
-    if keypress_action.type == KeyPressType.ZERO:
-        await page.keyboard.press("0")
-    if keypress_action.type == KeyPressType.ONE:
-        await page.keyboard.press("1")
-    if keypress_action.type == KeyPressType.TWO:
-        await page.keyboard.press("2")
-    if keypress_action.type == KeyPressType.THREE:
-        await page.keyboard.press("3")
-    if keypress_action.type == KeyPressType.FOUR:
-        await page.keyboard.press("4")
-    if keypress_action.type == KeyPressType.FIVE:
-        await page.keyboard.press("5")
-    if keypress_action.type == KeyPressType.SIX:
-        await page.keyboard.press("6")
-    if keypress_action.type == KeyPressType.SEVEN:
-        await page.keyboard.press("7")
-    if keypress_action.type == KeyPressType.EIGHT:
-        await page.keyboard.press("8")
-    if keypress_action.type == KeyPressType.NINE:
-        await page.keyboard.press("9")
-    if keypress_action.type == KeyPressType.SLASH:
-        await page.keyboard.press("/")
-    if keypress_action.type == KeyPressType.SPACE:
-        await page.keyboard.press("Space")
+    keys = keypress_action.keys
+    if keys is None:
+        if isinstance(keypress_action.type, list):
+            keys = "+".join(keypress_action.type)
+        else:
+            keys = keypress_action.type
+    if not keys:
+        raise RuntimeError("Cannot send keys: no key sequence was provided")
+
+    action_model = browser.backend_agent.ActionModel(
+        send_keys={"keys": keys},  # pyright: ignore[reportCallIssue]
+    )
+    results = await browser.backend_agent.multi_act([action_model])
+    if not results:
+        raise RuntimeError("Browser Use returned no result for send_keys")
+    if results[0].error:
+        raise RuntimeError(f"Browser Use send_keys failed: {results[0].error}")

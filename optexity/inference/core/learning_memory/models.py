@@ -31,7 +31,9 @@ class WorkflowVersionStatus(str, Enum):
 
 class LearnedStepStrategy(str, Enum):
     LOCATOR = "locator"
+    LOCATOR_LLM = "locator_llm"
     DIRECT = "direct"
+    AGENTIC = "agentic"
     UNSUPPORTED = "unsupported"
 
 
@@ -53,6 +55,7 @@ class LocatorCandidateState(str, Enum):
 
 class LocatorValidationOutcome(str, Enum):
     PASSED = "passed"
+    PAGE_NOT_READY = "page_not_ready"
     NO_MATCH = "no_match"
     MULTIPLE_MATCHES = "multiple_matches"
     CAPABILITY_MISMATCH = "capability_mismatch"
@@ -63,7 +66,10 @@ class LocatorValidationOutcome(str, Enum):
 
 class ReplayOutcome(str, Enum):
     PASSED = "passed"
+    PAGE_NOT_READY = "page_not_ready"
     ACTION_FAILED = "action_failed"
+    JUDGE_REJECTED = "judge_rejected"
+    JUDGE_UNAVAILABLE = "judge_unavailable"
     SIGNATURE_MISMATCH = "signature_mismatch"
     WORKFLOW_FAILED = "workflow_failed"
     DISCOVERY_REGISTERED = "discovery_registered"
@@ -84,7 +90,7 @@ class WorkflowIdentity(LearningMemoryModel):
 class SourceCompatibility(LearningMemoryModel):
     source_node_fingerprint: str
     source_automation_fingerprint: str
-    input_binding_fingerprint: str
+    parameter_schema_fingerprint: str
     starting_origin: str
     entry_url_fingerprint: str
 
@@ -109,6 +115,7 @@ class PageSignature(LearningMemoryModel):
 class LearningPolicy(LearningMemoryModel):
     soft_validation_target_ms: float = Field(default=50.0, gt=0)
     candidate_timeout_ms: float = Field(default=250.0, gt=0)
+    readiness_wait_ms: float = Field(default=3000.0, gt=0, le=10000)
     repair_budget_ms: float = Field(default=750.0, gt=0)
     max_alternatives: int = Field(default=2, ge=0, le=10)
     max_versions: int = Field(default=5, ge=1, le=50)
@@ -192,7 +199,7 @@ class WorkflowVersion(LearningMemoryModel):
 
 
 class WorkflowMemoryDocument(LearningMemoryModel):
-    format_version: Literal["1.0"] = "1.0"
+    format_version: Literal["1.1"] = "1.1"
     revision: int = Field(default=0, ge=0)
     workflow: WorkflowIdentity
     active_generation: int | None = Field(default=None, ge=1)
@@ -231,13 +238,21 @@ class LocatorValidationEvent(LearningMemoryModel):
     exceeded_soft_target: bool
     matched_count: int | None = Field(default=None, ge=0)
     explanation: str | None = None
+    validation_attempt: Literal["immediate", "after_readiness_wait"] = "immediate"
+    page_ready: bool | None = None
 
 
 class RunObservation(LearningMemoryModel):
     task_id: str
     workflow: WorkflowIdentity
     generation: int | None = Field(default=None, ge=1)
-    run_kind: Literal["memory_miss", "discovery", "draft_replay", "active_replay"]
+    run_kind: Literal[
+        "memory_miss",
+        "discovery",
+        "draft_replay",
+        "active_replay",
+        "rollback_replay",
+    ]
     outcome: ReplayOutcome
     started_at: datetime = Field(default_factory=utc_now)
     completed_at: datetime = Field(default_factory=utc_now)
@@ -246,6 +261,8 @@ class RunObservation(LearningMemoryModel):
     signature_matches: bool | None = None
     locator_events: list[LocatorValidationEvent] = Field(default_factory=list)
     selected_commands: dict[int, str] = Field(default_factory=dict)
+    judge_verdict: bool | None = None
+    judge_reasoning: str | None = None
     failure_reason: str | None = None
 
 

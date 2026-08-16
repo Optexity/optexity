@@ -12,6 +12,9 @@ from urllib.parse import quote
 from pydantic import ValidationError
 
 from optexity.inference.core.learning_memory.models import (
+    LocatorCandidateState,
+    LocatorValidationEvent,
+    LocatorValidationOutcome,
     RunObservation,
     RunObservationFile,
     SourceCompatibility,
@@ -69,33 +72,39 @@ class LocalLearningMemoryStore:
         workflow: WorkflowIdentity,
         compatibility: SourceCompatibility,
     ) -> WorkflowVersion | None:
+        versions = self.select_replay_versions(workflow, compatibility)
+        return versions[0] if versions else None
+
+    def select_replay_versions(
+        self,
+        workflow: WorkflowIdentity,
+        compatibility: SourceCompatibility,
+    ) -> list[WorkflowVersion]:
+        """Return canary, active, then rollback versions for one real run."""
+
         document = self.load(workflow)
         if document is None:
-            return None
+            return []
 
-        compatible_active = [
+        compatible = [
             version
             for version in document.versions
-            if version.status == WorkflowVersionStatus.ACTIVE
-            and version.compatibility == compatibility
+            if version.compatibility == compatibility
         ]
-        if compatible_active:
-            return max(
-                compatible_active, key=lambda version: version.generation
-            ).model_copy(deep=True)
-
-        compatible_drafts = [
-            version
-            for version in document.versions
-            if version.status == WorkflowVersionStatus.DRAFT
-            and version.compatibility == compatibility
-        ]
-        if compatible_drafts:
-            return max(
-                compatible_drafts, key=lambda version: version.generation
-            ).model_copy(deep=True)
-
-        return None
+        ordered: list[WorkflowVersion] = []
+        for status in (
+            WorkflowVersionStatus.DRAFT,
+            WorkflowVersionStatus.ACTIVE,
+            WorkflowVersionStatus.SUPERSEDED,
+        ):
+            ordered.extend(
+                sorted(
+                    (version for version in compatible if version.status == status),
+                    key=lambda version: version.generation,
+                    reverse=True,
+                )
+            )
+        return [version.model_copy(deep=True) for version in ordered]
 
     def create_draft(
         self,
@@ -122,6 +131,7 @@ class LocalLearningMemoryStore:
                     "updated_at": utc_now(),
                 },
             )
+            self._inherit_candidate_evidence(document, created)
             document.versions.append(created)
             document.next_generation = generation + 1
             self._prune_versions(document)
@@ -156,7 +166,6 @@ class LocalLearningMemoryStore:
                 WorkflowVersionStatus.REJECTED,
                 WorkflowVersionStatus.QUARANTINED,
                 WorkflowVersionStatus.DEGRADED,
-                WorkflowVersionStatus.SUPERSEDED,
             }:
                 raise LearningMemoryStoreError(
                     f"Cannot record success for {stored.status.value} memory"
@@ -203,11 +212,24 @@ class LocalLearningMemoryStore:
         task_id: str,
         reason: str,
         signature_mismatch: bool = False,
+        locator_events: list[LocatorValidationEvent] | None = None,
+        selected_candidate_indexes: dict[int, int] | None = None,
+        failed_node_index: int | None = None,
+        expected_version: WorkflowVersion | None = None,
     ) -> WorkflowVersion:
         directory = self._workflow_directory(workflow)
         with self._locked(directory):
             document = self._required_document(workflow)
-            version = self._required_version(document, generation).model_copy(deep=True)
+            stored = self._required_version(document, generation)
+            if expected_version is not None and (
+                stored.status != expected_version.status
+                or stored.updated_at != expected_version.updated_at
+            ):
+                raise LearningMemoryStoreError(
+                    "Learning-memory version changed during replay; refusing "
+                    "to overwrite the newer outcome"
+                )
+            version = stored.model_copy(deep=True)
             now = utc_now()
             version.stats.failed_full_runs += 1
             version.stats.consecutive_failures += 1
@@ -215,6 +237,13 @@ class LocalLearningMemoryStore:
             version.stats.last_run_at = now
             version.updated_at = now
             version.last_failure_reason = reason
+            self._apply_locator_failure_evidence(
+                version,
+                locator_events or [],
+                selected_candidate_indexes or {},
+                failed_node_index=failed_node_index,
+                reason=reason,
+            )
 
             if signature_mismatch:
                 version.status = WorkflowVersionStatus.QUARANTINED
@@ -231,6 +260,107 @@ class LocalLearningMemoryStore:
             self._replace_version(document, version)
             self._persist_document(document)
             return version.model_copy(deep=True)
+
+    @staticmethod
+    def _inherit_candidate_evidence(
+        document: WorkflowMemoryDocument,
+        created: WorkflowVersion,
+    ) -> None:
+        """Carry objective locator outcomes into a newly discovered generation."""
+
+        prior_versions = sorted(
+            (
+                version
+                for version in document.versions
+                if version.compatibility == created.compatibility
+            ),
+            key=lambda version: version.generation,
+            reverse=True,
+        )
+        for step in created.steps:
+            for candidate in step.candidates:
+                inherited = next(
+                    (
+                        old_candidate
+                        for old_version in prior_versions
+                        for old_step in old_version.steps
+                        if old_step.source_step_number == step.source_step_number
+                        and old_step.optexity_action == step.optexity_action
+                        for old_candidate in old_step.candidates
+                        if old_candidate.command == candidate.command
+                    ),
+                    None,
+                )
+                if inherited is not None:
+                    candidate.state = inherited.state
+                    candidate.validation_successes = inherited.validation_successes
+                    candidate.validation_failures = inherited.validation_failures
+                    candidate.full_run_successes = inherited.full_run_successes
+                    candidate.last_latency_ms = inherited.last_latency_ms
+                    candidate.last_failure_reason = inherited.last_failure_reason
+                    candidate.last_validated_at = inherited.last_validated_at
+
+            if step.candidates:
+                step.chosen_candidate_index = min(
+                    range(len(step.candidates)),
+                    key=lambda index: (
+                        step.candidates[index].state == LocatorCandidateState.DEGRADED,
+                        -step.candidates[index].full_run_successes,
+                        step.candidates[index].validation_failures
+                        - step.candidates[index].validation_successes,
+                        step.candidates[index].original_rank,
+                    ),
+                )
+
+    @staticmethod
+    def _apply_locator_failure_evidence(
+        version: WorkflowVersion,
+        events: list[LocatorValidationEvent],
+        selected_candidate_indexes: dict[int, int],
+        *,
+        failed_node_index: int | None,
+        reason: str,
+    ) -> None:
+        now = utc_now()
+        uncertain = {
+            LocatorValidationOutcome.PAGE_NOT_READY,
+            LocatorValidationOutcome.TIMED_OUT,
+        }
+        for event in events:
+            if event.node_index >= len(version.steps):
+                raise LearningMemoryStoreError(
+                    "Locator event references an unknown step"
+                )
+            step = version.steps[event.node_index]
+            if event.candidate_index >= len(step.candidates):
+                raise LearningMemoryStoreError(
+                    "Locator event references an unknown candidate"
+                )
+            candidate = step.candidates[event.candidate_index]
+            if candidate.command != event.command:
+                raise LearningMemoryStoreError(
+                    "Locator event command does not match persisted evidence"
+                )
+            candidate.last_latency_ms = event.elapsed_ms
+            candidate.last_validated_at = now
+            if event.outcome == LocatorValidationOutcome.PASSED:
+                candidate.validation_successes += 1
+            elif event.outcome not in uncertain:
+                candidate.validation_failures += 1
+                candidate.last_failure_reason = event.explanation or event.outcome.value
+                if candidate.state == LocatorCandidateState.ACTIVE:
+                    candidate.state = LocatorCandidateState.DEGRADED
+
+        if failed_node_index is None:
+            return
+        candidate_index = selected_candidate_indexes.get(failed_node_index)
+        if candidate_index is None:
+            return
+        step = version.steps[failed_node_index]
+        candidate = step.candidates[candidate_index]
+        candidate.validation_failures += 1
+        candidate.last_failure_reason = reason
+        candidate.state = LocatorCandidateState.DEGRADED
 
     def append_observation(
         self,

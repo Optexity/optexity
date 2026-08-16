@@ -1,4 +1,3 @@
-import re
 from enum import Enum, unique
 from typing import Any, Literal
 from uuid import uuid4
@@ -219,6 +218,8 @@ class DownloadUrlAsPdfAction(BaseModel):
 class ScrollAction(BaseModel):
     down: bool = True  # True to scroll down, False to scroll up
     amount: int = -1  ## -1 means scroll max amount
+    pages: float | None = Field(default=None, gt=0, le=10)
+    command: str | None = None
     prompt_instructions: str | None = (
         None  # optional; used by computer-vision / recorded workflows
     )
@@ -227,6 +228,14 @@ class ScrollAction(BaseModel):
     def validate_amount(self):
         if self.amount is None or (self.amount < 0 and self.amount != -1):
             raise ValueError("amount must be -1 or positive")
+        if self.pages is not None and self.amount != -1:
+            raise ValueError(
+                "pages and an explicit pixel amount are mutually exclusive"
+            )
+        if self.command is not None and self.pages is None:
+            raise ValueError("command is only supported for viewport-page scrolling")
+        if self.command is not None and not self.command.strip():
+            raise ValueError("command cannot be empty")
         return self
 
     def replace(self, pattern: str, replacement: str):
@@ -234,6 +243,23 @@ class ScrollAction(BaseModel):
             self.prompt_instructions = self.prompt_instructions.replace(
                 pattern, replacement
             )
+        return self
+
+
+class ScrollToTextAction(BaseModel):
+    text: str = Field(min_length=1, max_length=4096)
+
+    def replace(self, pattern: str, replacement: str):
+        self.text = self.text.replace(pattern, replacement)
+        return self
+
+
+class SearchAction(BaseModel):
+    query: str = Field(min_length=1, max_length=4096)
+    engine: Literal["duckduckgo", "google", "bing"]
+
+    def replace(self, pattern: str, replacement: str):
+        self.query = self.query.replace(pattern, replacement)
         return self
 
 
@@ -333,10 +359,13 @@ class KeyPressType(str, Enum):
 
 
 class KeyPressAction(BaseAction):
-    type: str | list[str]
+    type: str | list[str] | None = None
+    keys: str | None = Field(default=None, min_length=1, max_length=256)
 
     @model_validator(mode="after")
     def validate_key_combination(self):
+        if (self.type is None) == (self.keys is None):
+            raise ValueError("Exactly one of type or keys must be provided")
         if isinstance(self.type, str):
             assert self.type in KEY_NAMES, f"Invalid key: {self.type}"
         elif isinstance(self.type, list):
@@ -355,7 +384,8 @@ class KeyPressAction(BaseAction):
                     if isinstance(key, str):
                         key = key.replace(pattern, replacement).strip('"')
 
-        return self
+        if self.keys:
+            self.keys = self.keys.replace(pattern, replacement).strip('"')
 
 
 class AgenticTask(BaseModel):
@@ -391,6 +421,8 @@ class InteractionAction(BaseModel):
     hover: HoverAction | None = None
     download_url_as_pdf: DownloadUrlAsPdfAction | None = None
     scroll: ScrollAction | None = None
+    scroll_to_text: ScrollToTextAction | None = None
+    search: SearchAction | None = None
     upload_file: UploadFileAction | None = None
     go_to_url: GoToUrlAction | None = None
     go_back: GoBackAction | None = None
@@ -414,6 +446,8 @@ class InteractionAction(BaseModel):
             "hover": self.hover,
             "download_url_as_pdf": self.download_url_as_pdf,
             "scroll": self.scroll,
+            "scroll_to_text": self.scroll_to_text,
+            "search": self.search,
             "upload_file": self.upload_file,
             "go_to_url": self.go_to_url,
             "go_back": self.go_back,
@@ -429,7 +463,7 @@ class InteractionAction(BaseModel):
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of click_element, input_text, select_option, check, uncheck, hover, download_url_as_pdf, scroll, upload_file, go_to_url, go_back, switch_tab, close_current_tab, close_all_but_last_tab, close_tabs_until, key_press, or agentic_task must be provided"
+                "Exactly one supported interaction action must be provided"
             )
 
         if not self.max_tries and (
@@ -468,6 +502,10 @@ class InteractionAction(BaseModel):
             self.upload_file.replace(pattern, replacement)
         if self.scroll:
             self.scroll.replace(pattern, replacement)
+        if self.scroll_to_text:
+            self.scroll_to_text.replace(pattern, replacement)
+        if self.search:
+            self.search.replace(pattern, replacement)
         if self.key_press:
             self.key_press.replace(pattern, replacement)
 

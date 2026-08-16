@@ -1,24 +1,45 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, unquote, urlparse
 
-from browser_use.agent.history_compiler import BrowserUseActionCache
+from browser_use.agent.history_compiler import (
+    BrowserUseActionCache,
+    DeterministicStepCandidate,
+)
 
-from optexity.inference.core.automation_cache.converter import convert_action_cache
+from optexity.inference.core.automation_cache.automatic_conversion import (
+    automatically_convert_action_cache,
+    write_automatic_conversion_artifacts,
+)
+from optexity.inference.core.automation_cache.models import (
+    ActionCacheConversionError,
+    AutomationConversionResult,
+    ConversionMode,
+)
+from optexity.inference.core.automation_cache.resolution_models import (
+    LLMResolverConfig,
+    ResolutionStrategy,
+)
 from optexity.inference.core.learning_memory.capabilities import (
     LocatorResolutionError,
     locator_action,
     prepare_action_node,
     verify_action_effect,
+)
+from optexity.inference.core.learning_memory.judge import (
+    ReplayJudgeUnavailable,
+    judge_learning_replay,
 )
 from optexity.inference.core.learning_memory.models import (
     LearnedStep,
@@ -42,7 +63,10 @@ from optexity.inference.core.learning_memory.store import (
     LocalLearningMemoryStore,
 )
 from optexity.inference.infra.browser import Browser
-from optexity.inference.infra.browser_health import is_driver_closed_error
+from optexity.inference.infra.browser_health import (
+    is_browser_session_poisoned_error,
+    is_driver_closed_error,
+)
 from optexity.schema.automation import ActionNode, Automation
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
@@ -53,6 +77,9 @@ logger = logging.getLogger(__name__)
 
 LEARNING_SESSION_STATE_KEY = "learning_memory_session"
 ACTION_CACHE_FILENAME = "browser_use_action_cache.json"
+_PARAMETER_REFERENCE_PATTERN = re.compile(
+    r"\{(?P<name>[A-Za-z_]\w*)\[(?P<index>\d+)\]\}"
+)
 
 
 class LearningReplayError(RuntimeError):
@@ -74,7 +101,8 @@ class PendingDiscovery:
 class PendingReplay:
     workflow: WorkflowIdentity
     version: WorkflowVersion
-    run_kind: Literal["draft_replay", "active_replay"]
+    run_kind: Literal["draft_replay", "active_replay", "rollback_replay"]
+    task_instruction: str
     started_at: datetime
     started_monotonic: float
     replay_token_usage: TokenUsage
@@ -96,6 +124,7 @@ def create_learning_session(task: Task) -> LearningMemorySession | None:
     policy = LearningPolicy(
         soft_validation_target_ms=settings.LEARNING_MEMORY_SOFT_TARGET_MS,
         candidate_timeout_ms=settings.LEARNING_MEMORY_CANDIDATE_TIMEOUT_MS,
+        readiness_wait_ms=settings.LEARNING_MEMORY_READINESS_WAIT_MS,
         repair_budget_ms=settings.LEARNING_MEMORY_REPAIR_BUDGET_MS,
         max_alternatives=settings.LEARNING_MEMORY_MAX_ALTERNATIVES,
         max_versions=settings.LEARNING_MEMORY_MAX_VERSIONS,
@@ -148,7 +177,7 @@ class LearningMemorySession:
 
         assert task.automation is not None
         self.source_automation_fingerprint = _fingerprint(
-            task.automation.model_dump(mode="json")
+            _parameter_agnostic_automation_payload(task.automation)
         )
 
     def workflow_context(
@@ -177,17 +206,26 @@ class LearningMemorySession:
         compatibility = SourceCompatibility(
             source_node_fingerprint=_fingerprint(node.model_dump(mode="json")),
             source_automation_fingerprint=self.source_automation_fingerprint,
-            input_binding_fingerprint=_fingerprint(
+            parameter_schema_fingerprint=_fingerprint(
                 {
-                    "input_parameters": self.task.input_parameters,
-                    "secure_parameters": self.task.model_dump(
-                        mode="json", include={"secure_parameters"}
-                    ).get("secure_parameters", {}),
-                    "generated_parameters": memory.variables.generated_variables,
+                    "input_parameters": _parameter_contract(self.task.input_parameters),
+                    "secure_parameters": _parameter_contract(
+                        self.task.secure_parameters
+                    ),
+                    "generated_parameters": _parameter_contract(
+                        memory.variables.generated_variables
+                    ),
                 }
             ),
             starting_origin=origin,
-            entry_url_fingerprint=_fingerprint(entry_url),
+            entry_url_fingerprint=_fingerprint(
+                _stable_entry_context(
+                    self.task.automation.url,
+                    entry_url,
+                    input_parameters=self.task.input_parameters,
+                    generated_parameters=memory.variables.generated_variables,
+                )
+            ),
         )
         return workflow, compatibility
 
@@ -197,13 +235,14 @@ class LearningMemorySession:
         node_path: str,
         workflow: WorkflowIdentity,
         compatibility: SourceCompatibility,
+        source_node: ActionNode,
         memory: Memory,
         browser: Browser,
         full_automation: list,
         execute_node: Callable[[ActionNode, int], Awaitable[None]],
     ) -> bool:
         try:
-            version = self.store.select_replay_version(workflow, compatibility)
+            versions = self.store.select_replay_versions(workflow, compatibility)
         except LearningMemoryStoreError:
             # A stale/corrupt local memory must never block the original agent.
             logger.exception(
@@ -211,26 +250,63 @@ class LearningMemorySession:
                 workflow.recording_id,
                 node_path,
             )
-            version = None
-        if version is None:
+            versions = []
+        if not versions:
             self.memory_misses.append((workflow, utc_now()))
             return False
 
-        run_kind: Literal["draft_replay", "active_replay"] = (
-            "draft_replay"
-            if version.status == WorkflowVersionStatus.DRAFT
-            else "active_replay"
+        task_instruction = await _resolved_agentic_instruction(
+            source_node,
+            self.task,
+            memory,
         )
+        for version in versions:
+            replay_outcome = await self._replay_version(
+                workflow=workflow,
+                version=version,
+                task_instruction=task_instruction,
+                memory=memory,
+                browser=browser,
+                full_automation=full_automation,
+                execute_node=execute_node,
+            )
+            if replay_outcome == "passed":
+                return True
+            if replay_outcome == "fallback":
+                return False
+        return False
+
+    async def _replay_version(
+        self,
+        *,
+        workflow: WorkflowIdentity,
+        version: WorkflowVersion,
+        task_instruction: str,
+        memory: Memory,
+        browser: Browser,
+        full_automation: list,
+        execute_node: Callable[[ActionNode, int], Awaitable[None]],
+    ) -> Literal["passed", "try_next", "fallback"]:
+
+        run_kind: Literal["draft_replay", "active_replay", "rollback_replay"]
+        if version.status == WorkflowVersionStatus.DRAFT:
+            run_kind = "draft_replay"
+        elif version.status == WorkflowVersionStatus.ACTIVE:
+            run_kind = "active_replay"
+        else:
+            run_kind = "rollback_replay"
         started_at = utc_now()
         started_monotonic = time.monotonic()
         token_usage_before = memory.token_usage.model_copy(deep=True)
         events: list[LocatorValidationEvent] = []
         selected_indexes: dict[int, int] = {}
         selected_commands: dict[int, str] = {}
-        executed_nodes = 0
+        action_started = False
+        current_node_index: int | None = None
 
         try:
             for node_index, cached_node in enumerate(version.automation.nodes):
+                current_node_index = node_index
                 if not isinstance(cached_node, ActionNode):
                     raise LearningReplayError(
                         "Learning replay currently supports ordered ActionNode entries"
@@ -248,8 +324,8 @@ class LearningMemorySession:
                 if prepared.selected_command is not None:
                     selected_commands[node_index] = prepared.selected_command
                 full_automation.append(prepared.node.model_dump())
+                action_started = True
                 await execute_node(prepared.node, 1)
-                executed_nodes += 1
                 await verify_action_effect(
                     prepared.node,
                     prepared.selected_command,
@@ -261,13 +337,35 @@ class LearningMemorySession:
                 events.extend(exc.events)
             reason = f"{type(exc).__name__}: {exc}"
             infrastructure_failure = is_driver_closed_error(exc)
-            if not infrastructure_failure:
-                self.store.record_failure(
-                    workflow,
-                    version.generation,
-                    task_id=str(self.task.task_id),
-                    reason=reason,
-                )
+            retry_events = [
+                event
+                for event in events
+                if event.validation_attempt == "after_readiness_wait"
+            ]
+            page_not_ready = bool(retry_events) and all(
+                event.outcome
+                in {
+                    LocatorValidationOutcome.PAGE_NOT_READY,
+                    LocatorValidationOutcome.TIMED_OUT,
+                }
+                for event in retry_events
+            )
+            if not infrastructure_failure and not page_not_ready:
+                try:
+                    self.store.record_failure(
+                        workflow,
+                        version.generation,
+                        task_id=str(self.task.task_id),
+                        reason=reason,
+                        locator_events=events,
+                        selected_candidate_indexes=selected_indexes,
+                        failed_node_index=(
+                            current_node_index if action_started else None
+                        ),
+                        expected_version=version,
+                    )
+                except Exception:
+                    logger.exception("Failed to persist learned replay failure")
                 self.failed_generations.add((workflow.node_path, version.generation))
             self._append_observation(
                 RunObservation(
@@ -278,7 +376,11 @@ class LearningMemorySession:
                     outcome=(
                         ReplayOutcome.INFRASTRUCTURE_FAILED
                         if infrastructure_failure
-                        else ReplayOutcome.ACTION_FAILED
+                        else (
+                            ReplayOutcome.PAGE_NOT_READY
+                            if page_not_ready
+                            else ReplayOutcome.ACTION_FAILED
+                        )
                     ),
                     started_at=started_at,
                     completed_at=utc_now(),
@@ -291,14 +393,14 @@ class LearningMemorySession:
             )
             if infrastructure_failure:
                 raise
-            if isinstance(exc, LocatorResolutionError) and executed_nodes == 0:
-                # No cached side effect has occurred, so the original Browser
-                # Use node can safely repair the workflow in this same run.
+            if isinstance(exc, LocatorResolutionError) and not action_started:
                 logger.info(
-                    "Cached locator validation failed before execution; "
-                    "falling back to fresh agentic discovery"
+                    "Cached locator validation failed before execution for "
+                    "generation %d (%s)",
+                    version.generation,
+                    "page not ready" if page_not_ready else "hard locator miss",
                 )
-                return False
+                return "fallback" if page_not_ready else "try_next"
             raise LearningReplayError(
                 "Cached replay failed; the next run will use fresh agentic discovery"
             ) from exc
@@ -307,6 +409,7 @@ class LearningMemorySession:
             workflow=workflow,
             version=version,
             run_kind=run_kind,
+            task_instruction=task_instruction,
             started_at=started_at,
             started_monotonic=started_monotonic,
             replay_token_usage=memory.token_usage - token_usage_before,
@@ -315,7 +418,7 @@ class LearningMemorySession:
             selected_commands=selected_commands,
         )
         self.pending_replays.append(pending)
-        return True
+        return "passed"
 
     def record_discovery(
         self,
@@ -351,31 +454,59 @@ class LearningMemorySession:
             self._append_memory_misses()
             self._finalized = True
             return
+        signature: PageSignature | None = None
         try:
             signature = await capture_page_signature(browser)
         except Exception:
-            if self.pending_replays:
-                raise
-            # Capturing first-run evidence is best-effort. The user-visible
-            # Browser Use task already succeeded, so a missing page/body must
-            # only skip draft creation, never fail the workflow.
             logger.exception(
-                "Could not capture the learning-memory discovery signature"
+                "Could not capture supplemental learning-memory page signature"
             )
-            self._append_memory_misses()
-            self._finalized = True
-            return
+            if not self.pending_replays:
+                self._append_memory_misses()
+                self._finalized = True
+                return
 
         for pending in self.pending_replays:
-            if not pending.version.source_final_signature.matches(signature):
-                reason = "Replay final page signature does not match discovery"
-                self.store.record_failure(
-                    pending.workflow,
-                    pending.version.generation,
-                    task_id=str(self.task.task_id),
-                    reason=reason,
-                    signature_mismatch=True,
+            signature_matches = (
+                signature is not None
+                and pending.version.source_final_signature.matches(signature)
+            )
+            try:
+                judge_evidence = await judge_learning_replay(
+                    task_instruction=pending.task_instruction,
+                    task=self.task,
+                    browser=browser,
+                    memory=memory,
+                    model_name=settings.LEARNING_MEMORY_JUDGE_LLM_MODEL,
                 )
+            except ReplayJudgeUnavailable as exc:
+                reason = str(exc)
+                self._append_observation(
+                    _replay_observation(
+                        pending,
+                        task_id=str(self.task.task_id),
+                        outcome=ReplayOutcome.JUDGE_UNAVAILABLE,
+                        signature_matches=signature_matches,
+                        failure_reason=reason,
+                    )
+                )
+                self._finalized = True
+                raise LearningReplayError(reason) from exc
+
+            pending.replay_token_usage += judge_evidence.token_usage
+            judgement = judge_evidence.judgement
+            if not judgement.successful:
+                reason = f"Replay judge rejected the workflow: {judgement.reasoning}"
+                try:
+                    self.store.record_failure(
+                        pending.workflow,
+                        pending.version.generation,
+                        task_id=str(self.task.task_id),
+                        reason=reason,
+                        expected_version=pending.version,
+                    )
+                except Exception:
+                    logger.exception("Failed to persist replay-judge rejection")
                 self.failed_generations.add(
                     (pending.workflow.node_path, pending.version.generation)
                 )
@@ -383,8 +514,10 @@ class LearningMemorySession:
                     _replay_observation(
                         pending,
                         task_id=str(self.task.task_id),
-                        outcome=ReplayOutcome.SIGNATURE_MISMATCH,
-                        signature_matches=False,
+                        outcome=ReplayOutcome.JUDGE_REJECTED,
+                        signature_matches=signature_matches,
+                        judge_verdict=False,
+                        judge_reasoning=judgement.reasoning,
                         failure_reason=reason,
                     )
                 )
@@ -392,19 +525,15 @@ class LearningMemorySession:
                 raise LearningReplayError(reason)
 
             updated = _apply_successful_locator_choices(pending)
-            zero_llm_replay = (
-                pending.replay_token_usage.total_tokens == 0
-                and pending.replay_token_usage.calculated_total_tokens == 0
-            )
             store_failure: str | None = None
             try:
                 self.store.record_success(
                     pending.workflow,
                     updated,
                     task_id=str(self.task.task_id),
-                    promote=zero_llm_replay,
+                    promote=True,
                 )
-            except LearningMemoryStoreError as exc:
+            except Exception as exc:  # noqa: BLE001 - persistence is best-effort
                 # The replay and final signature already passed. A concurrent
                 # memory update must not change the user-visible task outcome.
                 store_failure = f"Learning-memory update skipped: {exc}"
@@ -414,14 +543,25 @@ class LearningMemorySession:
                     pending,
                     task_id=str(self.task.task_id),
                     outcome=ReplayOutcome.PASSED,
-                    signature_matches=True,
+                    signature_matches=signature_matches,
+                    judge_verdict=True,
+                    judge_reasoning=judgement.reasoning,
                     failure_reason=store_failure,
                 )
             )
 
         for discovery in self.pending_discoveries:
+            if signature is None:
+                logger.warning(
+                    "Skipping learning-memory draft without a discovery signature"
+                )
+                continue
             try:
-                version = self._compile_discovery(discovery, signature)
+                version = await self._compile_discovery(
+                    discovery,
+                    signature,
+                    memory,
+                )
                 created = self.store.create_draft(discovery.workflow, version)
                 self._append_observation(
                     RunObservation(
@@ -458,18 +598,24 @@ class LearningMemorySession:
         if self._finalized:
             return
         reason = f"{type(error).__name__}: {error}"
-        infrastructure_failure = is_driver_closed_error(error)
+        infrastructure_failure = is_browser_session_poisoned_error(error)
         for pending in self.pending_replays:
             key = (pending.workflow.node_path, pending.version.generation)
             if key in self.failed_generations:
                 continue
             if not infrastructure_failure:
-                self.store.record_failure(
-                    pending.workflow,
-                    pending.version.generation,
-                    task_id=str(self.task.task_id),
-                    reason=reason,
-                )
+                try:
+                    self.store.record_failure(
+                        pending.workflow,
+                        pending.version.generation,
+                        task_id=str(self.task.task_id),
+                        reason=reason,
+                        locator_events=pending.locator_events,
+                        selected_candidate_indexes=pending.selected_candidate_indexes,
+                        expected_version=pending.version,
+                    )
+                except Exception:
+                    logger.exception("Failed to persist workflow-level replay failure")
             self._append_observation(
                 _replay_observation(
                     pending,
@@ -485,16 +631,29 @@ class LearningMemorySession:
             )
         self._finalized = True
 
-    def _compile_discovery(
+    async def _compile_discovery(
         self,
         discovery: PendingDiscovery,
         signature: PageSignature,
+        memory: Memory,
     ) -> WorkflowVersion:
         cache = BrowserUseActionCache.model_validate_json(
             discovery.cache_path.read_text(encoding="utf-8")
         )
-        conversion = convert_action_cache(
+        resolver_config = LLMResolverConfig(
+            strategy=ResolutionStrategy(settings.LEARNING_MEMORY_RESOLUTION_STRATEGY),
+            model_name=settings.LEARNING_MEMORY_RESOLVER_LLM_MODEL,
+            agentic_fallback_max_steps=(
+                settings.LEARNING_MEMORY_AGENTIC_FALLBACK_MAX_STEPS
+            ),
+        )
+        outcome = await asyncio.to_thread(
+            automatically_convert_action_cache,
             cache,
+            resolver_config=resolver_config,
+            source_input_parameters=self.task.input_parameters,
+            inherited_provider=self.task.llm_provider,
+            inherited_model_name=self.task.llm_model_name,
             allow_unvalidated_locators=True,
             allow_unresolved_select_options=(
                 settings.LEARNING_MEMORY_ALLOW_UNRESOLVED_SELECT_OPTIONS
@@ -503,7 +662,30 @@ class LearningMemorySession:
                 settings.LEARNING_MEMORY_ALLOW_LITERAL_PASSWORD_INPUTS
             ),
         )
+        memory.token_usage += outcome.resolution.token_usage
+        await asyncio.to_thread(
+            write_automatic_conversion_artifacts,
+            outcome,
+            discovery.cache_path.parent,
+        )
+        if outcome.conversion is None:
+            raise ActionCacheConversionError(
+                "Automatic conversion retained unresolved source steps",
+                outcome.final_plan.problems,
+                plan=outcome.final_plan,
+            )
+        conversion = outcome.conversion
+        _validate_parameterized_conversion(conversion, self.task)
         strict_automation = _strict_automation(conversion.automation)
+        missing_runtime_parameters = (
+            strict_automation.parameters.input_parameters.keys()
+            - self.task.input_parameters.keys()
+        )
+        if missing_runtime_parameters:
+            raise ActionCacheConversionError(
+                "Generated Automation requires runtime input parameters that the "
+                f"source workflow does not declare: {sorted(missing_runtime_parameters)}"
+            )
         candidates_by_number = {
             candidate.candidate_number: candidate
             for candidate in cache.deterministic_step_candidates
@@ -529,6 +711,12 @@ class LearningMemorySession:
                 else None
             )
             if action_data is None:
+                interaction = node.interaction_action
+                strategy = (
+                    LearnedStepStrategy.AGENTIC
+                    if interaction is not None and interaction.agentic_task is not None
+                    else LearnedStepStrategy.DIRECT
+                )
                 learned_steps.append(
                     LearnedStep(
                         node_index=node_index,
@@ -539,14 +727,28 @@ class LearningMemorySession:
                             converted, "browser_use_action", None
                         ),
                         optexity_action=converted.optexity_action,
-                        strategy=LearnedStepStrategy.DIRECT,
+                        strategy=strategy,
                     )
                 )
                 continue
-            if candidate is None:
-                raise ValueError(
-                    f"Locator node {node_index} has no cache candidate provenance"
+            if not isinstance(candidate, DeterministicStepCandidate):
+                if (
+                    candidate is not None
+                    or converted.conversion_mode != ConversionMode.LLM_LOCATOR_ASSISTED
+                ):
+                    raise ValueError(
+                        f"Locator node {node_index} has no cache candidate provenance"
+                    )
+                learned_steps.append(
+                    LearnedStep(
+                        node_index=node_index,
+                        source_step_number=converted.source_step_number,
+                        browser_use_action=converted.browser_use_action,
+                        optexity_action=converted.optexity_action,
+                        strategy=LearnedStepStrategy.LOCATOR_LLM,
+                    )
                 )
+                continue
             _, _, requirements = action_data
             commands = [
                 option.playwright_command
@@ -638,7 +840,19 @@ def _strict_automation(automation: Automation) -> Automation:
             continue
         _, action, _ = action_data
         if action.command is None:
-            raise ValueError("A strict learned locator action requires a command")
+            if (
+                action.skip_command
+                and not action.skip_prompt
+                and action.prompt_instructions
+            ):
+                # A schema-constrained resolver may deliberately leave one
+                # element action to Optexity's narrow locator LLM. It remains a
+                # hybrid draft and cannot be promoted as a zero-token replay.
+                continue
+            raise ValueError(
+                "A learned locator action requires either a cache command or a "
+                "prompt-only locator strategy"
+            )
         action.skip_command = False
         action.skip_prompt = True
         action.assert_locator_presence = True
@@ -695,6 +909,8 @@ def _replay_observation(
     task_id: str,
     outcome: ReplayOutcome,
     signature_matches: bool | None,
+    judge_verdict: bool | None = None,
+    judge_reasoning: str | None = None,
     failure_reason: str | None = None,
 ) -> RunObservation:
     return RunObservation(
@@ -710,8 +926,29 @@ def _replay_observation(
         signature_matches=signature_matches,
         locator_events=pending.locator_events,
         selected_commands=pending.selected_commands,
+        judge_verdict=judge_verdict,
+        judge_reasoning=judge_reasoning,
         failure_reason=failure_reason,
     )
+
+
+async def _resolved_agentic_instruction(
+    source_node: ActionNode,
+    task: Task,
+    memory: Memory,
+) -> str:
+    """Resolve current non-secret values for the final semantic judge."""
+
+    resolved = source_node.model_copy(deep=True)
+    await resolved.replace_variables(task.input_parameters)
+    await resolved.replace_variables(memory.variables.generated_variables)
+    interaction = resolved.interaction_action
+    if interaction is None or interaction.agentic_task is None:
+        raise LearningReplayError("Learning replay lost its source agentic task")
+    instruction = interaction.agentic_task.task.strip()
+    if not instruction:
+        raise LearningReplayError("Learning replay source task is blank")
+    return instruction
 
 
 def _fingerprint(payload: Any) -> str:
@@ -724,3 +961,158 @@ def _fingerprint(payload: Any) -> str:
         default=str,
     )
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _parameter_contract(parameters: dict[str, list[Any]]) -> dict[str, Any]:
+    """Fingerprint binding shape while excluding all runtime parameter values."""
+
+    return {
+        name: {
+            "arity": len(values),
+            "types": [_parameter_value_type(value) for value in values],
+        }
+        for name, values in sorted(parameters.items())
+    }
+
+
+def _parameter_agnostic_automation_payload(automation: Automation) -> dict[str, Any]:
+    """Fingerprint workflow structure while excluding declared parameter values."""
+
+    payload = automation.model_dump(mode="json")
+    parameters = automation.parameters
+    payload["parameters"] = {
+        "input_parameters": _parameter_contract(parameters.input_parameters),
+        "secure_parameters": _parameter_contract(parameters.secure_parameters),
+        "generated_parameters": _parameter_contract(parameters.generated_parameters),
+    }
+    return payload
+
+
+def _validate_parameterized_conversion(
+    conversion: AutomationConversionResult,
+    task: Task,
+) -> None:
+    """Reject learned actions that cannot be rebound by the next task run."""
+
+    available = task.input_parameters
+    declared = conversion.automation.parameters.input_parameters
+    unavailable = sorted(set(declared) - set(available))
+    if unavailable:
+        raise ValueError(
+            "Converted memory introduced parameters unavailable to the workflow: "
+            + ", ".join(unavailable)
+        )
+
+    value_actions = {"input_text", "select_option", "upload_file", "search"}
+    for step in conversion.converted_steps:
+        if step.optexity_action in value_actions and not step.parameter_references:
+            raise ValueError(
+                f"Converted {step.optexity_action} step {step.source_step_number} "
+                "retained a runtime value instead of a parameter reference"
+            )
+        for reference in step.parameter_references:
+            match = _PARAMETER_REFERENCE_PATTERN.fullmatch(reference)
+            if match is None:
+                raise ValueError(f"Invalid learned parameter reference: {reference!r}")
+            name = match.group("name")
+            index = int(match.group("index"))
+            if name not in available or index >= len(available[name]):
+                raise ValueError(
+                    f"Learned parameter {reference!r} is unavailable in this workflow"
+                )
+
+
+def _parameter_value_type(value: Any) -> str:
+    for secure_provider in ("onepassword", "amazon_secrets_manager", "totp"):
+        if getattr(value, secure_provider, None) is not None:
+            return f"secure:{secure_provider}"
+    return type(value).__name__
+
+
+def _stable_entry_context(
+    starting_url: str,
+    entry_url: str,
+    *,
+    input_parameters: dict[str, list[Any]] | None = None,
+    generated_parameters: dict[str, list[Any]] | None = None,
+) -> dict[str, Any]:
+    """Build a value-agnostic but state-sensitive page-entry identity.
+
+    Browser startup can expose either ``about:blank`` or Chromium's certificate
+    error page before the same initial navigation settles. Treating those as
+    different workflows prevents memory reuse.
+
+    Runtime parameter values can also legitimately appear in a URL path or query.
+    Exact URL matching would create a separate compatibility version for every
+    value. Replace only complete URL components whose value maps unambiguously to
+    one declared parameter. Static route, origin, and query-key differences remain
+    part of the safety boundary.
+    """
+
+    references_by_value = _unique_runtime_parameter_references(
+        input_parameters or {},
+        generated_parameters or {},
+    )
+
+    if entry_url in {"about:blank", "chrome-error://chromewebdata/"}:
+        return {
+            "state": "initial_navigation_pending",
+            "target_url": _parameter_agnostic_url(
+                starting_url,
+                references_by_value,
+            ),
+        }
+    return {
+        "state": "page",
+        "url": _parameter_agnostic_url(entry_url, references_by_value),
+    }
+
+
+def _unique_runtime_parameter_references(
+    input_parameters: dict[str, list[Any]],
+    generated_parameters: dict[str, list[Any]],
+) -> dict[str, str]:
+    """Return only value-to-parameter mappings that are safe to canonicalize."""
+
+    references: dict[str, list[str]] = {}
+    for parameters in (input_parameters, generated_parameters):
+        for name, values in sorted(parameters.items()):
+            for index, value in enumerate(values):
+                if not isinstance(value, (str, int, float, bool)):
+                    continue
+                text = str(value)
+                if not text:
+                    continue
+                references.setdefault(text, []).append(f"{{{name}[{index}]}}")
+    return {
+        value: matches[0]
+        for value, matches in references.items()
+        if len(set(matches)) == 1
+    }
+
+
+def _parameter_agnostic_url(
+    url: str,
+    references_by_value: dict[str, str],
+) -> dict[str, Any]:
+    """Canonicalize exact parameter-valued URL segments without weakening routes."""
+
+    parsed = urlparse(url)
+
+    def canonicalize(component: str) -> str:
+        decoded = unquote(component)
+        return references_by_value.get(decoded, decoded)
+
+    return {
+        "scheme": parsed.scheme.casefold(),
+        "netloc": parsed.netloc.casefold(),
+        "path_segments": [canonicalize(segment) for segment in parsed.path.split("/")],
+        "query": sorted(
+            (
+                canonicalize(key),
+                canonicalize(value),
+            )
+            for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        ),
+        "fragment": canonicalize(parsed.fragment),
+    }

@@ -93,20 +93,26 @@ async def command_based_action_with_retry(
             locator = await browser.get_locator_from_command(action.command)
             if locator is None:
                 continue
-            if try_index == 0:
+            if try_index == 0 and not isinstance(action, UploadFileAction):
                 try:
                     await locator.wait_for(
                         state="visible", timeout=max_timeout_seconds_per_try * 1000
                     )
-                except Exception as e:
+                except Exception:
                     pass
-            is_visible = await locator.is_visible()
-
-            if is_visible:
-                await locator.scroll_into_view_if_needed(
-                    timeout=max_timeout_seconds_per_try * 1000
+            if isinstance(action, UploadFileAction):
+                is_actionable = (
+                    await locator.count() == 1 and await locator.is_enabled()
                 )
-                await asyncio.sleep(0.05)
+            else:
+                is_actionable = await locator.is_visible()
+
+            if is_actionable:
+                if not isinstance(action, UploadFileAction):
+                    await locator.scroll_into_view_if_needed(
+                        timeout=max_timeout_seconds_per_try * 1000
+                    )
+                    await asyncio.sleep(0.05)
 
                 try:
                     page = await browser.get_current_page()
@@ -135,7 +141,7 @@ async def command_based_action_with_retry(
                     )
                     axtree = serialize_dom_state_for_llm(
                         summary.dom_state,
-                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree,
                     )
                     logger.debug(
                         f"Command-step axtree capture took "
@@ -216,7 +222,7 @@ async def command_based_action_with_retry(
                 return
             else:
                 await asyncio.sleep(max_timeout_seconds_per_try)
-                last_error = f"error: locator not visible"
+                last_error = "error: locator not visible"
         except ExpectedDownloadFailedException:
             # The action ran but expect_download=True produced no file. Do not
             # retry or downgrade to a string error; fail the task with the fixed
