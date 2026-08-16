@@ -4,7 +4,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from optexity.schema.automation import ActionNode, Automation
+from optexity.schema.automation import ActionNode, Automation, SecureParameter
 
 
 class ConversionModel(BaseModel):
@@ -160,6 +160,10 @@ class AutomationConversionPlan(ConversionModel):
     status: AutomationConversionPlanStatus
     starting_url: str
     input_parameters: dict[str, list[str | int | float | bool]] = Field(
+        default_factory=dict
+    )
+    secure_parameters: dict[str, list[SecureParameter]] = Field(default_factory=dict)
+    generated_parameters: dict[str, list[str | int | float | bool | None]] = Field(
         default_factory=dict
     )
     ordered_steps: list[PlannedStep]

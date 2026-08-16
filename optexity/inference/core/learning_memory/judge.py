@@ -43,6 +43,7 @@ ambiguous evidence. Do not assume that an action succeeded merely because it ran
 async def judge_learning_replay(
     *,
     task_instruction: str,
+    execution_trace: list[str],
     task: Task,
     browser: Browser,
     memory: Memory,
@@ -55,9 +56,18 @@ async def judge_learning_replay(
         raise ReplayJudgeUnavailable("Could not capture final browser evidence")
 
     browser_state = memory.browser_states[-1]
+    trace = "\n".join(
+        f"{index}. {action}" for index, action in enumerate(execution_trace, start=1)
+    )
     prompt = f"""[TASK]
 {task_instruction}
 [/TASK]
+
+[REPLAY_EXECUTION_TRACE]
+The following ordered actions completed without a runtime error. This proves
+dispatch and order only; use the final browser state to verify their outcome.
+{trace}
+[/REPLAY_EXECUTION_TRACE]
 
 [FINAL_BROWSER_STATE]
 URL: {browser_state.url}

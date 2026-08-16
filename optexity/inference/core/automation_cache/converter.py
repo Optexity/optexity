@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import tempfile
 import urllib.parse
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from browser_use.agent.history_compiler import (
@@ -55,15 +54,17 @@ from optexity.inference.core.automation_cache.models import (
     StepResolution,
     UnconvertedStep,
 )
-from optexity.schema.automation import Automation, Parameters
+from optexity.inference.core.automation_cache.parameters import (
+    ParameterAllocator,
+    RuntimeParameterBinding,
+    is_parameter_reference,
+)
+from optexity.schema.automation import Automation, Parameters, SecureParameter
 
 SUPPORTED_CACHE_FORMAT_VERSIONS = frozenset({"1.1", "1.2", "1.3"})
 DEFAULT_ACTION_MAX_TRIES = 10
 DEFAULT_ACTION_TIMEOUT_SECONDS = 1.0
 DEFAULT_PAGE_TRANSITION_WAIT_SECONDS = 0.5
-_PARAMETER_REFERENCE_PATTERN = re.compile(
-    r"\{(?P<name>[A-Za-z_][A-Za-z0-9_]*)\[(?P<index>[0-9]+)\]\}"
-)
 
 
 def plan_action_cache_conversion(
@@ -71,6 +72,12 @@ def plan_action_cache_conversion(
     *,
     step_resolutions: Mapping[int, StepResolution] | None = None,
     source_input_parameters: Mapping[str, list[str | int | float | bool]] | None = None,
+    runtime_parameter_bindings: Sequence[RuntimeParameterBinding] | None = None,
+    source_secure_parameters: Mapping[str, list[SecureParameter]] | None = None,
+    source_generated_parameters: (
+        Mapping[str, list[str | int | float | bool | None]] | None
+    ) = None,
+    preserve_unmatched_literals: bool = False,
     allow_unvalidated_locators: bool = False,
     allow_unresolved_select_options: bool = False,
     allow_literal_password_inputs: bool = False,
@@ -351,6 +358,11 @@ def plan_action_cache_conversion(
             and observed_step.element_used.locator_relevant_attributes.get("type")
             == "password"
             and not allow_literal_password_inputs
+            and not _value_has_runtime_parameter(
+                candidate.playwright_action.input_text,
+                source_input_parameters=source_input_parameters,
+                runtime_parameter_bindings=runtime_parameter_bindings,
+            )
         ):
             planned_steps.append(
                 _planned_unresolved_step(
@@ -365,11 +377,13 @@ def plan_action_cache_conversion(
             continue
         if (
             isinstance(candidate.playwright_action, PlaywrightUploadAction)
-            and _PARAMETER_REFERENCE_PATTERN.fullmatch(
-                candidate.playwright_action.file_path
-            )
-            is None
+            and not is_parameter_reference(candidate.playwright_action.file_path)
             and not allow_literal_upload_paths
+            and not _value_has_runtime_parameter(
+                candidate.playwright_action.file_path,
+                source_input_parameters=source_input_parameters,
+                runtime_parameter_bindings=runtime_parameter_bindings,
+            )
         ):
             planned_steps.append(
                 _planned_unresolved_step(
@@ -534,9 +548,13 @@ def plan_action_cache_conversion(
             )
         )
 
-    planned_steps, input_parameters = _parameterize_planned_steps(
+    planned_steps, parameters = _parameterize_planned_steps(
         planned_steps,
         source_input_parameters=source_input_parameters,
+        runtime_parameter_bindings=runtime_parameter_bindings,
+        source_secure_parameters=source_secure_parameters,
+        source_generated_parameters=source_generated_parameters,
+        preserve_unmatched_literals=preserve_unmatched_literals,
     )
 
     if global_problems or any(
@@ -558,7 +576,9 @@ def plan_action_cache_conversion(
     return AutomationConversionPlan(
         status=status,
         starting_url=cache.original_run.starting_url or "",
-        input_parameters=input_parameters,
+        input_parameters=parameters.input_parameters,
+        secure_parameters=parameters.secure_parameters,
+        generated_parameters=parameters.generated_parameters,
         ordered_steps=planned_steps,
         global_problems=global_problems,
         uses_unvalidated_locators=any(
@@ -576,6 +596,12 @@ def convert_action_cache(
     *,
     step_resolutions: Mapping[int, StepResolution] | None = None,
     source_input_parameters: Mapping[str, list[str | int | float | bool]] | None = None,
+    runtime_parameter_bindings: Sequence[RuntimeParameterBinding] | None = None,
+    source_secure_parameters: Mapping[str, list[SecureParameter]] | None = None,
+    source_generated_parameters: (
+        Mapping[str, list[str | int | float | bool | None]] | None
+    ) = None,
+    preserve_unmatched_literals: bool = False,
     allow_unvalidated_locators: bool = False,
     allow_unresolved_select_options: bool = False,
     allow_literal_password_inputs: bool = False,
@@ -590,6 +616,10 @@ def convert_action_cache(
         cache,
         step_resolutions=step_resolutions,
         source_input_parameters=source_input_parameters,
+        runtime_parameter_bindings=runtime_parameter_bindings,
+        source_secure_parameters=source_secure_parameters,
+        source_generated_parameters=source_generated_parameters,
+        preserve_unmatched_literals=preserve_unmatched_literals,
         allow_unvalidated_locators=allow_unvalidated_locators,
         allow_unresolved_select_options=allow_unresolved_select_options,
         allow_literal_password_inputs=allow_literal_password_inputs,
@@ -608,10 +638,11 @@ def convert_action_cache(
     automation = Automation.model_validate(
         {
             "url": plan.starting_url,
-            "parameters": Parameters(
-                input_parameters=plan.input_parameters,
-                generated_parameters={},
-            ).model_dump(mode="json"),
+            "parameters": {
+                "input_parameters": plan.input_parameters,
+                "secure_parameters": plan.secure_parameters,
+                "generated_parameters": plan.generated_parameters,
+            },
             "nodes": [node.model_dump(mode="json") for node in plan.nodes],
             "max_retries": 0,
         }
@@ -636,6 +667,12 @@ def convert_action_cache_file(
     automation_path: str | Path,
     *,
     source_input_parameters: Mapping[str, list[str | int | float | bool]] | None = None,
+    runtime_parameter_bindings: Sequence[RuntimeParameterBinding] | None = None,
+    source_secure_parameters: Mapping[str, list[SecureParameter]] | None = None,
+    source_generated_parameters: (
+        Mapping[str, list[str | int | float | bool | None]] | None
+    ) = None,
+    preserve_unmatched_literals: bool = False,
     allow_unvalidated_locators: bool = False,
     allow_unresolved_select_options: bool = False,
     allow_literal_password_inputs: bool = False,
@@ -668,6 +705,10 @@ def convert_action_cache_file(
     result = convert_action_cache(
         cache,
         source_input_parameters=source_input_parameters,
+        runtime_parameter_bindings=runtime_parameter_bindings,
+        source_secure_parameters=source_secure_parameters,
+        source_generated_parameters=source_generated_parameters,
+        preserve_unmatched_literals=preserve_unmatched_literals,
         allow_unvalidated_locators=allow_unvalidated_locators,
         allow_unresolved_select_options=allow_unresolved_select_options,
         allow_literal_password_inputs=allow_literal_password_inputs,
@@ -691,52 +732,26 @@ def convert_action_cache_file(
     return result
 
 
-class _InputParameterAllocator:
-    """Create stable parameter references without persisting recorded values."""
-
-    def __init__(
-        self,
-        source_input_parameters: Mapping[str, list[str | int | float | bool]] | None,
-    ) -> None:
-        self._source = source_input_parameters or {}
-        self.parameters: dict[str, list[str | int | float | bool]] = {}
-
-    def bind(self, value: str, *, source_step_number: int, suffix: str) -> str:
-        existing = _PARAMETER_REFERENCE_PATTERN.fullmatch(value)
-        if existing is not None:
-            name = existing.group("name")
-            self.parameters.setdefault(name, [])
-            return value
-
-        matches = [
-            (name, index)
-            for name, values in self._source.items()
-            for index, candidate in enumerate(values)
-            if str(candidate) == value
-        ]
-        if len(matches) == 1:
-            name, index = matches[0]
-            self.parameters.setdefault(name, [])
-            return f"{{{name}[{index}]}}"
-
-        base_name = f"step_{source_step_number}_{suffix}"
-        name = base_name
-        collision_index = 2
-        while name in self.parameters or name in self._source:
-            name = f"{base_name}_{collision_index}"
-            collision_index += 1
-        self.parameters[name] = []
-        return f"{{{name}[0]}}"
-
-
 def _parameterize_planned_steps(
     planned_steps: list[PlannedStep],
     *,
     source_input_parameters: Mapping[str, list[str | int | float | bool]] | None,
-) -> tuple[list[PlannedStep], dict[str, list[str | int | float | bool]]]:
+    runtime_parameter_bindings: Sequence[RuntimeParameterBinding] | None,
+    source_secure_parameters: Mapping[str, list[SecureParameter]] | None,
+    source_generated_parameters: (
+        Mapping[str, list[str | int | float | bool | None]] | None
+    ),
+    preserve_unmatched_literals: bool = False,
+) -> tuple[list[PlannedStep], Parameters]:
     """Replace value-bearing action data with typed Optexity parameters."""
 
-    allocator = _InputParameterAllocator(source_input_parameters)
+    allocator = ParameterAllocator(
+        source_input_parameters=source_input_parameters,
+        runtime_bindings=runtime_parameter_bindings,
+        source_secure_parameters=source_secure_parameters,
+        source_generated_parameters=source_generated_parameters,
+        preserve_unmatched_literals=preserve_unmatched_literals,
+    )
     parameterized_steps: list[PlannedStep] = []
     for planned_step in planned_steps:
         if planned_step.node is None or planned_step.converted_step is None:
@@ -755,7 +770,8 @@ def _parameterize_planned_steps(
                     suffix="input_text",
                 )
                 interaction.input_text.input_text = reference
-                references.append(reference)
+                if is_parameter_reference(reference):
+                    references.append(reference)
         elif interaction is not None and interaction.select_option is not None:
             values = interaction.select_option.select_values or []
             parameterized_values: list[str] = []
@@ -770,7 +786,8 @@ def _parameterize_planned_steps(
                     ),
                 )
                 parameterized_values.append(reference)
-                references.append(reference)
+                if is_parameter_reference(reference):
+                    references.append(reference)
                 prompt = interaction.select_option.prompt_instructions
                 if prompt:
                     interaction.select_option.prompt_instructions = prompt.replace(
@@ -779,15 +796,21 @@ def _parameterize_planned_steps(
                     )
             interaction.select_option.select_values = parameterized_values
         elif interaction is not None and interaction.upload_file is not None:
-            value = interaction.upload_file.file_path
+            value = (
+                interaction.upload_file.file_path or interaction.upload_file.file_url
+            )
             if value is not None:
                 reference = allocator.bind(
                     value,
                     source_step_number=planned_step.source_step_number,
                     suffix="upload_file",
                 )
-                interaction.upload_file.file_path = reference
-                references.append(reference)
+                if interaction.upload_file.file_path is not None:
+                    interaction.upload_file.file_path = reference
+                else:
+                    interaction.upload_file.file_url = reference
+                if is_parameter_reference(reference):
+                    references.append(reference)
         elif interaction is not None and interaction.search is not None:
             reference = allocator.bind(
                 interaction.search.query,
@@ -795,7 +818,65 @@ def _parameterize_planned_steps(
                 suffix="search_query",
             )
             interaction.search.query = reference
-            references.append(reference)
+            if is_parameter_reference(reference):
+                references.append(reference)
+        elif interaction is not None and interaction.go_to_url is not None:
+            reference = allocator.bind(
+                interaction.go_to_url.url,
+                source_step_number=planned_step.source_step_number,
+                suffix="navigation_url",
+            )
+            interaction.go_to_url.url = reference
+            if is_parameter_reference(reference):
+                references.append(reference)
+        elif interaction is not None and interaction.scroll_to_text is not None:
+            reference = allocator.bind(
+                interaction.scroll_to_text.text,
+                source_step_number=planned_step.source_step_number,
+                suffix="find_text",
+            )
+            interaction.scroll_to_text.text = reference
+            if is_parameter_reference(reference):
+                references.append(reference)
+        elif (
+            interaction is not None
+            and interaction.key_press is not None
+            and interaction.key_press.keys is not None
+        ):
+            reference = allocator.bind(
+                interaction.key_press.keys,
+                source_step_number=planned_step.source_step_number,
+                suffix="key_press",
+            )
+            interaction.key_press.keys = reference
+            if is_parameter_reference(reference):
+                references.append(reference)
+        elif (
+            interaction is not None
+            and interaction.close_tabs_until is not None
+            and interaction.close_tabs_until.matching_url is not None
+        ):
+            reference = allocator.bind(
+                interaction.close_tabs_until.matching_url,
+                source_step_number=planned_step.source_step_number,
+                suffix="matching_url",
+            )
+            interaction.close_tabs_until.matching_url = reference
+            if is_parameter_reference(reference):
+                references.append(reference)
+        elif (
+            interaction is not None
+            and interaction.download_url_as_pdf is not None
+            and interaction.download_url_as_pdf.url is not None
+        ):
+            reference = allocator.bind(
+                interaction.download_url_as_pdf.url,
+                source_step_number=planned_step.source_step_number,
+                suffix="download_url",
+            )
+            interaction.download_url_as_pdf.url = reference
+            if is_parameter_reference(reference):
+                references.append(reference)
 
         parameterized_steps.append(
             planned_step.model_copy(
@@ -809,6 +890,28 @@ def _parameterize_planned_steps(
         )
 
     return parameterized_steps, allocator.parameters
+
+
+def _value_has_runtime_parameter(
+    value: str,
+    *,
+    source_input_parameters: Mapping[str, list[str | int | float | bool]] | None,
+    runtime_parameter_bindings: Sequence[RuntimeParameterBinding] | None,
+) -> bool:
+    """Return whether a sensitive value will be replaced before persistence."""
+
+    references = {
+        f"{{{name}[{index}]}}"
+        for name, values in (source_input_parameters or {}).items()
+        for index, candidate in enumerate(values)
+        if str(candidate) == value
+    }
+    references.update(
+        binding.reference
+        for binding in runtime_parameter_bindings or ()
+        if str(binding.value) == value
+    )
+    return len(references) == 1
 
 
 def _validate_cache_header(cache: BrowserUseActionCache) -> None:

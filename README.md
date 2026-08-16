@@ -10,6 +10,7 @@
 - 🔄 **Workflow Automation**: Chain multiple actions together for complex browser workflows
 - 🚀 **API-First**: Run automations via REST API with simple JSON requests
 - 🎨 **Dashboard**: Manage and monitor your automations through the Optexity dashboard
+- 🧠 **Procedural Memory (opt-in)**: Learn, validate, version, and replay successful Browser Use workflows across runs. See [LEARNING_MEMORY.md](LEARNING_MEMORY.md).
 
 ## Quick Start
 

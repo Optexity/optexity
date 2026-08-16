@@ -4,7 +4,6 @@ import asyncio
 import hashlib
 import json
 import logging
-import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -26,6 +25,13 @@ from optexity.inference.core.automation_cache.models import (
     ActionCacheConversionError,
     AutomationConversionResult,
     ConversionMode,
+)
+from optexity.inference.core.automation_cache.parameters import (
+    ParameterKind,
+    RuntimeParameterBinding,
+    find_parameter_references,
+    is_parameter_reference,
+    parameter_name,
 )
 from optexity.inference.core.automation_cache.resolution_models import (
     LLMResolverConfig,
@@ -62,6 +68,7 @@ from optexity.inference.core.learning_memory.store import (
     LearningMemoryStoreError,
     LocalLearningMemoryStore,
 )
+from optexity.inference.core.variable_resolver import resolve_api_variables_in_node
 from optexity.inference.infra.browser import Browser
 from optexity.inference.infra.browser_health import (
     is_browser_session_poisoned_error,
@@ -77,9 +84,6 @@ logger = logging.getLogger(__name__)
 
 LEARNING_SESSION_STATE_KEY = "learning_memory_session"
 ACTION_CACHE_FILENAME = "browser_use_action_cache.json"
-_PARAMETER_REFERENCE_PATTERN = re.compile(
-    r"\{(?P<name>[A-Za-z_]\w*)\[(?P<index>\d+)\]\}"
-)
 
 
 class LearningReplayError(RuntimeError):
@@ -95,6 +99,7 @@ class PendingDiscovery:
     started_at: datetime
     started_monotonic: float
     token_usage_before: TokenUsage
+    source_node: ActionNode
 
 
 @dataclass(slots=True)
@@ -312,8 +317,19 @@ class LearningMemorySession:
                         "Learning replay currently supports ordered ActionNode entries"
                     )
                 learned_step = version.steps[node_index]
+                bound_node = cached_node.model_copy(deep=True)
+                await bound_node.replace_variables(self.task.input_parameters)
+                await bound_node.replace_variables(
+                    self.task.secure_parameters,
+                    self.task.workspace_id,
+                    self.task.api_key,
+                )
+                await bound_node.replace_variables(memory.variables.generated_variables)
+                resolve_api_variables_in_node(
+                    bound_node, memory.variables.generated_variables
+                )
                 prepared = await prepare_action_node(
-                    cached_node,
+                    bound_node,
                     learned_step,
                     browser,
                     self.policy,
@@ -429,6 +445,7 @@ class LearningMemorySession:
         started_at: datetime,
         started_monotonic: float,
         token_usage_before: TokenUsage,
+        source_node: ActionNode,
     ) -> None:
         if not cache_path.exists():
             logger.warning(
@@ -444,6 +461,7 @@ class LearningMemorySession:
                 started_at=started_at,
                 started_monotonic=started_monotonic,
                 token_usage_before=token_usage_before,
+                source_node=source_node.model_copy(deep=True),
             )
         )
 
@@ -454,6 +472,11 @@ class LearningMemorySession:
             self._append_memory_misses()
             self._finalized = True
             return
+        if self.pending_replays:
+            await _wait_for_replay_settle(
+                browser,
+                timeout_ms=self.policy.readiness_wait_ms,
+            )
         signature: PageSignature | None = None
         try:
             signature = await capture_page_signature(browser)
@@ -474,6 +497,7 @@ class LearningMemorySession:
             try:
                 judge_evidence = await judge_learning_replay(
                     task_instruction=pending.task_instruction,
+                    execution_trace=_replay_execution_trace(pending),
                     task=self.task,
                     browser=browser,
                     memory=memory,
@@ -640,6 +664,13 @@ class LearningMemorySession:
         cache = BrowserUseActionCache.model_validate_json(
             discovery.cache_path.read_text(encoding="utf-8")
         )
+        _require_verified_source_run(cache)
+        runtime_bindings = await _runtime_parameter_bindings(
+            discovery.source_node,
+            self.task,
+            memory,
+        )
+        assert self.task.automation is not None
         resolver_config = LLMResolverConfig(
             strategy=ResolutionStrategy(settings.LEARNING_MEMORY_RESOLUTION_STRATEGY),
             model_name=settings.LEARNING_MEMORY_RESOLVER_LLM_MODEL,
@@ -651,7 +682,12 @@ class LearningMemorySession:
             automatically_convert_action_cache,
             cache,
             resolver_config=resolver_config,
-            source_input_parameters=self.task.input_parameters,
+            runtime_parameter_bindings=runtime_bindings,
+            source_secure_parameters=self.task.secure_parameters,
+            source_generated_parameters=(
+                self.task.automation.parameters.generated_parameters
+            ),
+            preserve_unmatched_literals=True,
             inherited_provider=self.task.llm_provider,
             inherited_model_name=self.task.llm_model_name,
             allow_unvalidated_locators=True,
@@ -675,16 +711,36 @@ class LearningMemorySession:
                 plan=outcome.final_plan,
             )
         conversion = outcome.conversion
-        _validate_parameterized_conversion(conversion, self.task)
+        _validate_parameterized_conversion(
+            conversion,
+            self.task,
+            memory,
+            runtime_bindings,
+        )
         strict_automation = _strict_automation(conversion.automation)
-        missing_runtime_parameters = (
+        missing_input_parameters = (
             strict_automation.parameters.input_parameters.keys()
             - self.task.input_parameters.keys()
         )
-        if missing_runtime_parameters:
+        missing_secure_parameters = (
+            strict_automation.parameters.secure_parameters.keys()
+            - self.task.secure_parameters.keys()
+        )
+        missing_generated_parameters = (
+            strict_automation.parameters.generated_parameters.keys()
+            - memory.variables.generated_variables.keys()
+        )
+        if (
+            missing_input_parameters
+            or missing_secure_parameters
+            or missing_generated_parameters
+        ):
             raise ActionCacheConversionError(
-                "Generated Automation requires runtime input parameters that the "
-                f"source workflow does not declare: {sorted(missing_runtime_parameters)}"
+                "Generated Automation requires runtime parameters that the source "
+                "workflow does not provide: "
+                f"input={sorted(missing_input_parameters)}, "
+                f"secure={sorted(missing_secure_parameters)}, "
+                f"generated={sorted(missing_generated_parameters)}"
             )
         candidates_by_number = {
             candidate.candidate_number: candidate
@@ -864,6 +920,98 @@ def _strict_automation(automation: Automation) -> Automation:
     return Automation.model_validate(strict.model_dump(mode="json"))
 
 
+async def _wait_for_replay_settle(browser: Browser, *, timeout_ms: float) -> None:
+    """Best-effort bounded wait for async page work before semantic judging."""
+
+    page = await browser.get_current_page()
+    if page is None:
+        return
+    deadline = time.monotonic() + max(timeout_ms, 1.0) / 1000
+
+    async def snapshot() -> tuple[int, int, int, int]:
+        values = await page.evaluate("""
+            () => [
+              (document.body?.innerText || '').length,
+              (document.documentElement?.innerHTML || '').length,
+              document.getElementsByTagName('*').length,
+              performance.getEntriesByType('resource').length,
+            ]
+            """)
+        if not isinstance(values, list) or len(values) != 4:
+            raise RuntimeError("Unexpected replay-settle snapshot shape")
+        return (
+            int(values[0]),
+            int(values[1]),
+            int(values[2]),
+            int(values[3]),
+        )
+
+    try:
+        previous = await snapshot()
+    except Exception as exc:  # noqa: BLE001 - judge remains the correctness gate
+        logger.debug("Replay settle snapshot was unavailable: %s", exc)
+        return
+    try:
+        remaining_ms = max((deadline - time.monotonic()) * 1000, 1.0)
+        await page.wait_for_load_state("networkidle", timeout=remaining_ms)
+    except Exception as exc:  # noqa: BLE001 - judge remains the correctness gate
+        logger.debug("Replay settle wait ended without network idle: %s", exc)
+
+    changed = False
+    stable_since = time.monotonic()
+    while time.monotonic() < deadline:
+        await asyncio.sleep(min(0.2, max(deadline - time.monotonic(), 0)))
+        try:
+            current = await snapshot()
+        except Exception as exc:  # noqa: BLE001 - judge remains the correctness gate
+            logger.debug("Replay settle snapshot ended early: %s", exc)
+            return
+        if current != previous:
+            changed = True
+            previous = current
+            stable_since = time.monotonic()
+            continue
+        if changed and time.monotonic() - stable_since >= 0.5:
+            return
+
+
+def _replay_execution_trace(pending: PendingReplay) -> list[str]:
+    """Describe successful replay dispatches without exposing values or prompts."""
+
+    trace: list[str] = []
+    for step, node in zip(
+        pending.version.steps,
+        pending.version.automation.nodes,
+        strict=True,
+    ):
+        if step.capability is not None:
+            action_name = step.capability.value
+        elif isinstance(node, ActionNode) and node.interaction_action is not None:
+            payload = node.interaction_action.model_dump(
+                mode="json",
+                exclude_none=True,
+            )
+            action_name = next(
+                (
+                    name
+                    for name in payload
+                    if name
+                    not in {
+                        "max_tries",
+                        "max_timeout_seconds_per_try",
+                        "verify_before_step",
+                    }
+                ),
+                "interaction_action",
+            )
+        elif isinstance(node, ActionNode) and node.sleep_action is not None:
+            action_name = "sleep"
+        else:
+            action_name = "action"
+        trace.append(f"{action_name} completed")
+    return trace
+
+
 def _apply_successful_locator_choices(pending: PendingReplay) -> WorkflowVersion:
     updated = pending.version.model_copy(deep=True)
     now = utc_now()
@@ -988,38 +1136,179 @@ def _parameter_agnostic_automation_payload(automation: Automation) -> dict[str, 
     return payload
 
 
+def _require_verified_source_run(cache: BrowserUseActionCache) -> None:
+    """Require an explicit Browser Use judge pass before creating memory."""
+
+    if not cache.all_observed_steps:
+        raise ActionCacheConversionError("The action cache contains no source steps")
+    terminal_result = cache.all_observed_steps[-1].browser_action_result
+    if terminal_result.judge_verdict is not True:
+        raise ActionCacheConversionError(
+            "Learning memory requires an explicit successful Browser Use judge "
+            "verdict; an unavailable judge may be cached for audit but cannot "
+            "create a replay draft"
+        )
+
+
+async def _runtime_parameter_bindings(
+    source_node: ActionNode,
+    task: Task,
+    memory: Memory,
+) -> list[RuntimeParameterBinding]:
+    """Resolve source placeholders ephemerally without persisting their values."""
+
+    serialized = source_node.model_dump_json()
+    references = find_parameter_references(serialized)
+    bindings: list[RuntimeParameterBinding] = []
+    for reference in sorted(references):
+        name = parameter_name(reference)
+        kinds = [
+            kind
+            for kind, namespace in (
+                (ParameterKind.INPUT, task.input_parameters),
+                (ParameterKind.SECURE, task.secure_parameters),
+                (ParameterKind.GENERATED, memory.variables.generated_variables),
+            )
+            if name in namespace
+        ]
+        if len(kinds) != 1:
+            raise ActionCacheConversionError(
+                f"Runtime parameter {name!r} must belong to exactly one namespace"
+            )
+
+        probe = source_node.model_copy(deep=True)
+        interaction = probe.interaction_action
+        if interaction is None or interaction.agentic_task is None:
+            raise ActionCacheConversionError(
+                "Learning discovery lost its source agentic task"
+            )
+        interaction.agentic_task.task = reference
+        kind = kinds[0]
+        if kind == ParameterKind.INPUT:
+            await probe.replace_variables(task.input_parameters)
+        elif kind == ParameterKind.SECURE:
+            await probe.replace_variables(
+                task.secure_parameters,
+                task.workspace_id,
+                task.api_key,
+            )
+        else:
+            await probe.replace_variables(memory.variables.generated_variables)
+            resolve_api_variables_in_node(
+                probe,
+                memory.variables.generated_variables,
+            )
+
+        resolved_interaction = probe.interaction_action
+        assert resolved_interaction is not None
+        resolved_action = resolved_interaction.agentic_task
+        assert resolved_action is not None
+        resolved_value = resolved_action.task
+        if resolved_value == reference:
+            raise ActionCacheConversionError(
+                f"Runtime parameter {reference!r} could not be resolved for learning"
+            )
+        bindings.append(
+            RuntimeParameterBinding(
+                reference=reference,
+                value=resolved_value,
+                kind=kind,
+            )
+        )
+    return bindings
+
+
 def _validate_parameterized_conversion(
     conversion: AutomationConversionResult,
     task: Task,
+    memory: Memory,
+    runtime_bindings: list[RuntimeParameterBinding],
 ) -> None:
     """Reject learned actions that cannot be rebound by the next task run."""
 
-    available = task.input_parameters
-    declared = conversion.automation.parameters.input_parameters
-    unavailable = sorted(set(declared) - set(available))
-    if unavailable:
+    parameters = conversion.automation.parameters
+    unavailable_input = sorted(
+        set(parameters.input_parameters) - set(task.input_parameters)
+    )
+    unavailable_secure = sorted(
+        set(parameters.secure_parameters) - set(task.secure_parameters)
+    )
+    unavailable_generated = sorted(
+        set(parameters.generated_parameters) - set(memory.variables.generated_variables)
+    )
+    if unavailable_input or unavailable_secure or unavailable_generated:
         raise ValueError(
             "Converted memory introduced parameters unavailable to the workflow: "
-            + ", ".join(unavailable)
+            f"input={unavailable_input}, secure={unavailable_secure}, "
+            f"generated={unavailable_generated}"
         )
 
-    value_actions = {"input_text", "select_option", "upload_file", "search"}
-    for step in conversion.converted_steps:
-        if step.optexity_action in value_actions and not step.parameter_references:
+    available_references = {binding.reference for binding in runtime_bindings}
+    runtime_values = {str(binding.value) for binding in runtime_bindings}
+    for node, step in zip(
+        conversion.automation.nodes,
+        conversion.converted_steps,
+        strict=True,
+    ):
+        if not isinstance(node, ActionNode):
+            continue
+        values = _value_action_values(node)
+        references = {value for value in values if is_parameter_reference(value)}
+        if references != set(step.parameter_references):
             raise ValueError(
-                f"Converted {step.optexity_action} step {step.source_step_number} "
-                "retained a runtime value instead of a parameter reference"
+                f"Converted step {step.source_step_number} has inconsistent "
+                "parameter provenance"
             )
-        for reference in step.parameter_references:
-            match = _PARAMETER_REFERENCE_PATTERN.fullmatch(reference)
-            if match is None:
-                raise ValueError(f"Invalid learned parameter reference: {reference!r}")
-            name = match.group("name")
-            index = int(match.group("index"))
-            if name not in available or index >= len(available[name]):
+        for reference in references:
+            if reference not in available_references:
                 raise ValueError(
                     f"Learned parameter {reference!r} is unavailable in this workflow"
                 )
+        leaked_runtime_values = sorted(
+            value
+            for value in values
+            if not is_parameter_reference(value) and value in runtime_values
+        )
+        if leaked_runtime_values:
+            raise ValueError(
+                f"Converted step {step.source_step_number} retained a runtime "
+                "value instead of its parameter reference"
+            )
+
+
+def _value_action_values(node: ActionNode) -> list[str]:
+    """Return replay values whose parameter provenance must be checked."""
+
+    interaction = node.interaction_action
+    if interaction is None:
+        return []
+    if interaction.input_text is not None:
+        value = interaction.input_text.input_text
+        return [value] if value is not None else []
+    if interaction.select_option is not None:
+        return list(interaction.select_option.select_values or [])
+    if interaction.upload_file is not None:
+        value = interaction.upload_file.file_path or interaction.upload_file.file_url
+        return [value] if value is not None else []
+    if interaction.search is not None:
+        return [interaction.search.query]
+    if interaction.go_to_url is not None:
+        return [interaction.go_to_url.url]
+    if interaction.scroll_to_text is not None:
+        return [interaction.scroll_to_text.text]
+    if interaction.key_press is not None and interaction.key_press.keys is not None:
+        return [interaction.key_press.keys]
+    if (
+        interaction.close_tabs_until is not None
+        and interaction.close_tabs_until.matching_url is not None
+    ):
+        return [interaction.close_tabs_until.matching_url]
+    if (
+        interaction.download_url_as_pdf is not None
+        and interaction.download_url_as_pdf.url is not None
+    ):
+        return [interaction.download_url_as_pdf.url]
+    return []
 
 
 def _parameter_value_type(value: Any) -> str:

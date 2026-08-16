@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from browser_use.agent.history_compiler import BrowserUseActionCache
@@ -22,11 +22,13 @@ from optexity.inference.core.automation_cache.models import (
     ConversionMode,
     StepResolution,
 )
+from optexity.inference.core.automation_cache.parameters import RuntimeParameterBinding
 from optexity.inference.core.automation_cache.resolution_models import (
     LLMResolutionResult,
     LLMResolverConfig,
 )
 from optexity.inference.models.llm_model import LLMModel
+from optexity.schema.automation import SecureParameter
 
 
 class AutomaticConversionOutcome(BaseModel):
@@ -52,6 +54,12 @@ def automatically_convert_action_cache(
     inherited_model_name: str | None = None,
     model: LLMModel | None = None,
     source_input_parameters: Mapping[str, list[str | int | float | bool]] | None = None,
+    runtime_parameter_bindings: Sequence[RuntimeParameterBinding] | None = None,
+    source_secure_parameters: Mapping[str, list[SecureParameter]] | None = None,
+    source_generated_parameters: (
+        Mapping[str, list[str | int | float | bool | None]] | None
+    ) = None,
+    preserve_unmatched_literals: bool = False,
     allow_unvalidated_locators: bool = False,
     allow_unresolved_select_options: bool = False,
     allow_literal_password_inputs: bool = False,
@@ -68,6 +76,10 @@ def automatically_convert_action_cache(
     initial_plan = plan_action_cache_conversion(
         cache,
         source_input_parameters=source_input_parameters,
+        runtime_parameter_bindings=runtime_parameter_bindings,
+        source_secure_parameters=source_secure_parameters,
+        source_generated_parameters=source_generated_parameters,
+        preserve_unmatched_literals=preserve_unmatched_literals,
         allow_unvalidated_locators=allow_unvalidated_locators,
         allow_unresolved_select_options=allow_unresolved_select_options,
         allow_literal_password_inputs=allow_literal_password_inputs,
@@ -104,6 +116,10 @@ def automatically_convert_action_cache(
             cache,
             step_resolutions=step_resolutions,
             source_input_parameters=source_input_parameters,
+            runtime_parameter_bindings=runtime_parameter_bindings,
+            source_secure_parameters=source_secure_parameters,
+            source_generated_parameters=source_generated_parameters,
+            preserve_unmatched_literals=preserve_unmatched_literals,
             allow_unvalidated_locators=allow_unvalidated_locators,
             allow_unresolved_select_options=allow_unresolved_select_options,
             allow_literal_password_inputs=allow_literal_password_inputs,
@@ -115,6 +131,10 @@ def automatically_convert_action_cache(
         conversion = convert_action_cache(
             cache,
             source_input_parameters=source_input_parameters,
+            runtime_parameter_bindings=runtime_parameter_bindings,
+            source_secure_parameters=source_secure_parameters,
+            source_generated_parameters=source_generated_parameters,
+            preserve_unmatched_literals=preserve_unmatched_literals,
             step_resolutions={
                 resolved_step.source_step_number: StepResolution(
                     source_step_number=resolved_step.source_step_number,

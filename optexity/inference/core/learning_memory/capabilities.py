@@ -141,18 +141,22 @@ _PROBE_SCRIPT = """
     options.some((option) => option.label === wanted || option.value === wanted)
   );
 
+  const structurePassed =
+    (args.capability !== 'input' || inputCompatible)
+    && (args.capability !== 'select' || selectCompatible)
+    && (!args.checkableRequired || checkable)
+    && (!args.fileInputRequired || fileInput);
   const capabilityPassed =
-    (!args.visibleRequired || visible)
+    structurePassed
+    && (!args.visibleRequired || visible)
     && (!args.enabledRequired || enabled)
     && (!args.editableRequired || editable)
-    && (!args.checkableRequired || checkable)
-    && (!args.fileInputRequired || fileInput)
-    && (args.capability !== 'input' || inputCompatible)
-    && (args.capability !== 'select' || (selectCompatible && selectValuesPresent));
+    && (args.capability !== 'select' || selectValuesPresent);
 
   return {
     count,
     capabilityPassed,
+    structurePassed,
     visible,
     enabled,
     editable,
@@ -354,6 +358,8 @@ async def prepare_action_node(
         page_ready = await _wait_once_for_page_readiness(
             browser,
             primary_command,
+            requirements=requirements,
+            select_values=select_values,
             timeout_ms=policy.readiness_wait_ms,
         )
         prepared, retry_events = await validate_once(
@@ -379,19 +385,35 @@ async def _wait_once_for_page_readiness(
     browser: Browser,
     command: str,
     *,
+    requirements: LocatorRequirements,
+    select_values: list[str],
     timeout_ms: float,
 ) -> bool:
-    """Wait once for the expected target, then report generic page readiness."""
+    """Wait once for the expected target to become capability-ready."""
 
     async def _wait() -> bool:
         locator = await browser.get_locator_from_command(command)
         if locator is not None:
-            try:
-                await locator.first.wait_for(state="attached", timeout=timeout_ms)
-                return True
-            except Exception as exc:
-                if "closed" in str(exc).lower():
-                    raise
+            deadline = time.monotonic() + max(timeout_ms, 1.0) / 1000
+            while True:
+                probe = await locator.evaluate_all(
+                    _PROBE_SCRIPT,
+                    {
+                        "capability": requirements.capability.value,
+                        "visibleRequired": requirements.visible_required,
+                        "enabledRequired": requirements.enabled_required,
+                        "editableRequired": requirements.editable_required,
+                        "checkableRequired": requirements.checkable_required,
+                        "fileInputRequired": requirements.file_input_required,
+                        "selectValues": select_values,
+                    },
+                )
+                if probe.get("count") == 1 and probe.get("capabilityPassed", False):
+                    return True
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                await asyncio.sleep(min(0.1, remaining))
 
         page = await browser.get_current_page()
         if page is None or page.url in {"about:blank", "chrome-error://chromewebdata/"}:
@@ -540,7 +562,15 @@ async def _validate_candidate(
             elif matched_count > 1:
                 outcome = LocatorValidationOutcome.MULTIPLE_MATCHES
             elif not probe.get("capabilityPassed", False):
-                outcome = LocatorValidationOutcome.CAPABILITY_MISMATCH
+                # A uniquely matched, structurally compatible element may still
+                # be hydrating, hidden, disabled, or waiting for select options.
+                # Treat that as bounded readiness work instead of permanently
+                # degrading an otherwise valid cached locator.
+                outcome = (
+                    LocatorValidationOutcome.TIMED_OUT
+                    if probe.get("structurePassed", False)
+                    else LocatorValidationOutcome.CAPABILITY_MISMATCH
+                )
                 explanation = json_safe_probe_explanation(probe)
             else:
                 outcome = LocatorValidationOutcome.PASSED
@@ -571,6 +601,7 @@ async def _validate_candidate(
 def json_safe_probe_explanation(probe: dict) -> str:
     keys = (
         "visible",
+        "structurePassed",
         "enabled",
         "editable",
         "inputCompatible",

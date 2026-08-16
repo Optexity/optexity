@@ -1,7 +1,6 @@
 import logging
 
 from browser_use import Agent, BrowserSession, Tools
-from browser_use.agent.history_compiler import compile_history_to_action_cache
 
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import normalize_model
@@ -96,11 +95,28 @@ async def handle_agentic_task(
             )
             cache_path = step_directory / AGENT_ACTION_CACHE_FILENAME
             try:
+                # The compiler lives in the paired Browser Use take-home fork.
+                # Import it only after a run completes so the published Optexity
+                # dependency remains usable when cache learning is not installed.
+                from browser_use.agent.history_compiler import (
+                    compile_history_to_action_cache,
+                )
+
                 compile_history_to_action_cache(
                     history_path,
                     cache_path,
                     task_instruction=agentic_task_action.task,
                 )
+            except ModuleNotFoundError as exc:
+                if exc.name == "browser_use.agent.history_compiler":
+                    logger.info(
+                        "Skipping browser-use action-cache compilation because the "
+                        "optional history compiler is unavailable"
+                    )
+                else:
+                    logger.exception(
+                        "Browser-use history compiler dependency is unavailable"
+                    )
             except Exception:
                 logger.exception(
                     "Failed to compile browser-use agent history cache from %s",

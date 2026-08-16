@@ -13,12 +13,18 @@ from optexity.inference.core.automation_cache.models import (
     AutomationConversionPlan,
     AutomationConversionResult,
 )
+from optexity.inference.core.automation_cache.parameters import (
+    ParameterKind,
+    RuntimeParameterBinding,
+)
 
 __all__ = (
     "ActionCacheConversionError",
     "AutomaticConversionOutcome",
     "AutomationConversionPlan",
     "AutomationConversionResult",
+    "ParameterKind",
+    "RuntimeParameterBinding",
     "automatically_convert_action_cache",
     "convert_action_cache",
     "convert_action_cache_file",

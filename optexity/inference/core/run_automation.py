@@ -72,7 +72,6 @@ from optexity.schema.automation import (
 )
 from optexity.schema.memory import BrowserState, ForLoopStatus, Memory, OutputData
 from optexity.schema.task import Task
-from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +208,6 @@ async def run_automation(
         memory.update_system_info()
 
         if task.use_proxy and not reuse_page:
-
             page = await browser.get_current_page()
             await asyncio.sleep(5)
             await browser.go_to_url("https://ip.oxylabs.io/location")
@@ -1019,6 +1017,11 @@ async def _run_nodes(
             await run_private_node(node, task, memory, browser)
         else:
             learning_session = get_learning_session(memory) if enable_learning else None
+            workflow = None
+            compatibility = None
+            learning_started_at = None
+            learning_started_monotonic = None
+            learning_token_usage_before = None
             safe_learning_boundary = bool(
                 path_prefix == "nodes"
                 and node_index == len(nodes) - 1
@@ -1080,6 +1083,11 @@ async def _run_nodes(
             full_automation.append(node.model_dump())
             await run_action_node(node, task, memory, browser)
             if learning_session is not None and source_node_for_memory is not None:
+                assert workflow is not None
+                assert compatibility is not None
+                assert learning_started_at is not None
+                assert learning_started_monotonic is not None
+                assert learning_token_usage_before is not None
                 cache_path = (
                     task.logs_directory
                     / f"step_{memory.automation_state.step_index!s}"
@@ -1092,6 +1100,7 @@ async def _run_nodes(
                     started_at=learning_started_at,
                     started_monotonic=learning_started_monotonic,
                     token_usage_before=learning_token_usage_before,
+                    source_node=source_node_for_memory,
                 )
 
 
