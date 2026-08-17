@@ -1,7 +1,11 @@
 # Bump the 4th version component on every merge to main, publish to PyPI, create
-# a GitHub Release, and push a Docker image to GHCR.
+# a GitHub Release, push a Docker image to GHCR, and notify optexity-internal
+# so it can build the closed-source layered image on top.
 #
-# Setup: Add PyPI API token as repository or organization secret PYPI_API_TOKEN.
+# Setup: Add PyPI API token as repository or organization secret PYPI_API_TOKEN,
+# and a PAT scoped to optexity-internal as secret INTERNAL_DISPATCH_TOKEN (used
+# to fire the repository_dispatch that triggers optexity-internal's
+# deploy-private-image.yml).
 # To avoid loops, the workflow skips when the last commit is the automated version bump.
 #
 # Testing: Actions → "Release to PyPI and GitHub" → "Run workflow" with "Dry run" checked.
@@ -157,3 +161,11 @@ jobs:
                   build-args: |
                       OPTEXITY_VERSION=${{ needs.release.outputs.new_version }}
                       CACHE_BREAK=${{ github.sha }}
+
+            - name: Notify optexity-internal
+              run: |
+                  curl -sf -X POST \
+                      -H "Authorization: Bearer ${{ secrets.INTERNAL_DISPATCH_TOKEN }}" \
+                      -H "Accept: application/vnd.github+json" \
+                      https://api.github.com/repos/Optexity/optexity-internal/dispatches \
+                      -d '{"event_type":"optexity-image-published"}'
