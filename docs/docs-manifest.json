@@ -1304,8 +1304,8 @@
             "id": "docs-building-automations-automation-structure",
             "path": "docs/building-automations/automation-structure.mdx",
             "title": "Automation Structure",
-            "summary": "Defines the top-level schema of an Optexity automation JSON/Python object. Documents all root properties: url, browser_channel (chromium vs chrome), os_emulation (null/windows/linux), max_retries, expected_downloads, reuse_page_if_already_on_url, parameters, and nodes. Explains the four node types (action_node, for_loop_node, if_else_node, assert_locator_node), the declarative execution model, and important semantics like max_retries counting total attempts and AssertionError bypassing retries. Covers reuse_page_if_already_on_url, the dedicated-only flag that skips pre-run navigation when the warm browser is already on the automation's url, for portals that error out on page reload.",
-            "gist": "Top-level automation schema: url, browser_channel, os_emulation, max_retries, reuse_page_if_already_on_url, parameters, and four node types.",
+            "summary": "Defines the top-level schema of an Optexity automation JSON/Python object. Documents all root properties: url, browser_channel (chromium vs chrome), os_emulation (null/windows/linux), max_retries, expected_downloads, reuse_page_if_already_on_url, parameters, and nodes. Explains the node types (action_node, for_loop_node, if_else_node, private_node), the declarative execution model, and important semantics like max_retries counting total attempts and AssertionError bypassing retries. Covers reuse_page_if_already_on_url, the dedicated-only flag that skips pre-run navigation when the warm browser is already on the automation's url, for portals that error out on page reload.",
+            "gist": "Top-level automation schema: url, browser_channel, os_emulation, max_retries, reuse_page_if_already_on_url, parameters, and node types including private_node.",
             "keywords": [
                 "automation",
                 "structure",
@@ -1322,7 +1322,8 @@
                 "dedicated",
                 "parameters",
                 "nodes",
-                "declarative"
+                "declarative",
+                "private_node"
             ],
             "document_type": "reference",
             "tags": ["building-automations", "schema", "structure", "configuration"],
@@ -1340,6 +1341,10 @@
                     {
                         "doc_id": "docs-building-automations-if-else-node",
                         "context": "Automation structure lists if_else_node as a node type."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-private-node",
+                        "context": "Automation structure lists private_node as a node type."
                     },
                     {
                         "doc_id": "docs-building-automations-parameters",
@@ -1367,6 +1372,55 @@
             "reading_priority": 2,
             "when_to_use": "Select when the query is about the top-level automation schema, browser_channel options, OS emulation, max_retries semantics, skipping the initial navigation on a dedicated run for portals that break on reload, or the overall structure of an automation JSON/Python object.",
             "embedding_hint": "automation schema structure url browser_channel os_emulation max_retries reuse_page_if_already_on_url skip navigation reload nodes declarative"
+        },
+        {
+            "id": "docs-building-automations-private-node",
+            "path": "docs/building-automations/private-node.mdx",
+            "title": "Private Node",
+            "summary": "Documents the private_node node type, which runs a closed-source handler built and maintained by Optexity (e.g. a portal-specific EHR/claims integration) instead of a public action type. Explains that private_node behaves like any other node with handler, inputs, and output_variable_names properties, but that its implementation cannot be viewed and it will not execute against a local install of the public optexity SDK — it only runs on Optexity's cloud infrastructure where the closed-source handler package is installed. Lists example registered handlers (the ecw.* portal: resolve_patient_id, list_lab_orders, download_lab_reports, list_di_orders, list_patient_docs, list_progress_notes) and explains why these handlers are closed-source (proprietary portal endpoints/session logic) and why using one locally fails with a handler-not-registered error.",
+            "gist": "private_node: closed-source handler node (e.g. ecw.* portal actions), same input/output shape as other nodes, runs only on Optexity's cloud infrastructure — cannot be viewed or run locally.",
+            "keywords": [
+                "private_node",
+                "private node",
+                "closed-source",
+                "handler",
+                "optexity-private",
+                "portal",
+                "ecw",
+                "handler not registered",
+                "cloud infrastructure",
+                "inputs",
+                "output_variable_names"
+            ],
+            "document_type": "reference",
+            "tags": ["building-automations", "private-node", "closed-source", "schema"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-building-automations-for-loop-node",
+                        "context": "A private_node can be placed inside a for_loop_node."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-if-else-node",
+                        "context": "A private_node can be placed inside an if_else_node branch."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-automation-structure",
+                        "context": "Automation structure lists private_node as a node type."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": ["optexity-private"],
+                "apis": [],
+                "data_models": ["PrivateNode", "handler", "inputs", "output_variable_names"]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about private_node, closed-source handlers, why a node's implementation can't be viewed, why a node fails locally with a handler-not-registered error, or example handlers like ecw.resolve_patient_id.",
+            "embedding_hint": "private_node closed-source handler optexity-private portal ecw cloud infrastructure handler not registered local install"
         },
         {
             "id": "docs-building-automations-for-loop-node",

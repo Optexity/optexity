@@ -1,0 +1,65 @@
+---
+title: Private Node
+description: Closed-source node handlers that run only on Optexity's cloud infrastructure
+---
+
+A `private_node` runs a closed-source handler built, maintained, and updated by Optexity — typically a portal-specific integration (e.g. an EHR or claims portal) that's too specialized or proprietary to ship in the public SDK. Inside an automation it behaves like any other node: it takes `inputs`, runs, and can bind its result to `output_variable_names` for later nodes to use.
+
+<Warning>
+`private_node` handlers are closed-source. You cannot view their implementation, and a `private_node` will not run against a local install of the public `optexity` SDK — it only executes on Optexity's cloud infrastructure, where the private handler package is installed.
+</Warning>
+
+## Structure
+
+```json
+{
+  "type": "private_node",
+  "handler": "ecw.list_lab_orders",
+  "inputs": {
+    "patient_id": "{patient_id[0]}"
+  },
+  "output_variable_names": ["lab_orders"]
+}
+```
+
+## Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `handler` | `str` | — | Registered handler name, in `<portal>.<action>` form |
+| `inputs` | `dict[str, Any]` | `{}` | Inputs passed to the handler; the shape is defined by the handler, not the public schema |
+| `output_variable_names` | `list[str] \| None` | `null` | Variable names the handler's return value is bound to, same as an extraction node |
+| `before_sleep_time` | `float` | `0.0` | Seconds to wait before running the handler |
+| `end_sleep_time` | `float` | `0.0` | Seconds to wait after running the handler |
+
+## Examples
+
+Private handlers are grouped into portals — one integration per stateful session (login, cached tokens, base URL). A few handlers that exist today:
+
+| Handler | Purpose |
+|---------|---------|
+| `ecw.resolve_patient_id` | Resolve a patient's internal ID from search criteria |
+| `ecw.list_lab_orders` | List a patient's lab orders |
+| `ecw.download_lab_reports` | Download lab report files for a patient |
+| `ecw.list_di_orders` | List a patient's diagnostic imaging orders |
+| `ecw.list_patient_docs` | List documents on a patient's chart |
+| `ecw.list_progress_notes` | List a patient's progress notes |
+
+```json
+{
+  "type": "private_node",
+  "handler": "ecw.resolve_patient_id",
+  "inputs": {
+    "first_name": "{first_name[0]}",
+    "last_name": "{last_name[0]}",
+    "dob": "{dob[0]}"
+  },
+  "output_variable_names": ["patient_id"]
+}
+```
+
+Like any other node, a `private_node` can be placed inside a [for-loop node](/docs/building-automations/for-loop-node) or [if-else node](/docs/building-automations/if-else-node), and its outputs can be referenced by later nodes using `{variable_name}` interpolation.
+
+<Info>
+Optexity builds, maintains, and updates all private node handlers. Available handlers depend on what's registered in your Optexity deployment — contact the Optexity team if you need a handler for a portal that isn't listed here, or if an existing handler needs updating (e.g. after a portal changes its UI).
+</Info>
