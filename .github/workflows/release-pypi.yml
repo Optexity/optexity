@@ -164,8 +164,14 @@ jobs:
 
             - name: Notify optexity-internal
               run: |
-                  curl -sf -X POST \
+                  HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST \
                       -H "Authorization: Bearer ${{ secrets.INTERNAL_DISPATCH_TOKEN }}" \
                       -H "Accept: application/vnd.github+json" \
                       https://api.github.com/repos/Optexity/optexity-internal/dispatches \
-                      -d '{"event_type":"optexity-image-published"}'
+                      -d '{"event_type":"optexity-image-published"}')
+                  if [ "$HTTP_CODE" -ge 400 ]; then
+                    echo "::error::Dispatch to optexity-internal failed with HTTP $HTTP_CODE"
+                    cat response.txt
+                    exit 1
+                  fi
+                  echo "Dispatch succeeded with HTTP $HTTP_CODE"
