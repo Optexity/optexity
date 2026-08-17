@@ -13,7 +13,7 @@ from urllib.parse import urljoin
 import aiofiles
 import httpx
 
-from optexity.schema.automation import ActionNode
+from optexity.schema.automation import ActionNode, PrivateNode
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
 from optexity.schema.token_usage import TokenUsage
@@ -468,6 +468,43 @@ async def initiate_callback(task: Task):
         )
     except Exception as e:
         logger.error("Callback for task %s failed: %s", task.task_id, e)
+
+
+async def save_private_node_state_locally(
+    task: Task, memory: Memory, private_node: PrivateNode
+):
+    """Write a lightweight step folder for a private node.
+
+    No screenshot, AX tree, or browser state — private handlers run too often
+    for that, and capturing would leak the previous public step's artifacts.
+    """
+    try:
+        completed_at = datetime.now(timezone.utc).isoformat()
+        automation_state = memory.automation_state
+        step_directory = (
+            task.logs_directory / f"step_{str(automation_state.step_index)}"
+        )
+        step_directory.mkdir(parents=True, exist_ok=True)
+
+        state_dict = {
+            "step_index": automation_state.step_index,
+            "try_index": automation_state.try_index,
+            "completed_at": completed_at,
+            "started_at": (task.started_at.isoformat() if task.started_at else None),
+        }
+
+        async with aiofiles.open(step_directory / "state.json", "w") as f:
+            await f.write(json.dumps(state_dict, indent=4))
+
+        async with aiofiles.open(step_directory / "private_node.json", "w") as f:
+            await f.write(
+                json.dumps(
+                    {"type": "private_node", "handler": private_node.handler},
+                    indent=4,
+                )
+            )
+    except Exception as e:
+        logger.error(f"Failed to save private node state locally: {e}")
 
 
 async def save_latest_memory_state_locally(
