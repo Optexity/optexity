@@ -19,7 +19,8 @@ Automation
 └── nodes[]              # Sequence of actions
     ├── action_node
     ├── for_loop_node
-    └── if_else_node
+    ├── if_else_node
+    └── private_node
 ```
 
 ## Complete Example
@@ -63,7 +64,7 @@ Automation
 | `expected_downloads` | `int` | `0` | Number of expected downloads (automation waits for completion) |
 | `reuse_page_if_already_on_url` | `bool` | `false` | Start on the existing page instead of navigating, when a dedicated browser is already on `url`. See [Reuse Page If Already On URL](#reuse-page-if-already-on-url) |
 | `parameters` | `Parameters` | — | Input, secure, and generated variables |
-| `nodes` | `list[action_node \| for_loop_node \| if_else_node]` | — | Ordered list of actions |
+| `nodes` | `list[action_node \| for_loop_node \| if_else_node \| private_node]` | — | Ordered list of actions |
 
 ## Parameters
 
@@ -108,6 +109,7 @@ See [Parameters](/docs/building-automations/parameters) for detailed usage.
 | `action_node` | Single atomic action | [Action Node](/docs/building-automations/action-node) |
 | `for_loop_node` | Iterate over list values or locator matches | [For Loop Node](/docs/building-automations/for-loop-node) |
 | `if_else_node` | Conditional execution | [If Else Node](/docs/building-automations/if-else-node) |
+| `private_node` | Closed-source handler, runs only on Optexity's servers | [Private Node](/docs/building-automations/private-node) |
 
 ## Browser Channel
 
