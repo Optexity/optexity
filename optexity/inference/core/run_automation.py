@@ -29,6 +29,7 @@ from optexity.inference.core.logging import (
     save_downloads_in_server,
     save_latest_memory_state_locally,
     save_output_data_in_server,
+    save_private_node_state_locally,
     save_trajectory_in_server,
     start_task_in_server,
 )
@@ -553,25 +554,27 @@ async def run_private_node(
     await private_node.replace_variables(memory.variables.generated_variables)
     resolve_api_variables_in_node(private_node, memory.variables.generated_variables)
 
-    spec = HandlerRegistry.get(private_node.handler)
-    inputs = (
-        spec.inputs_model.model_validate(private_node.inputs)
-        if spec.inputs_model is not None
-        else private_node.inputs
-    )
-
     logger.debug(
         f"-----Running private node {memory.automation_state.step_index} "
         f"({private_node.handler})-----"
     )
 
     try:
+        spec = HandlerRegistry.get(private_node.handler)
+        inputs = (
+            spec.inputs_model.model_validate(private_node.inputs)
+            if spec.inputs_model is not None
+            else private_node.inputs
+        )
         result = await spec.run(inputs, ScriptContext(task, memory, browser))
+        _store_private_node_result(private_node, result, memory)
     except Exception as e:
         logger.error(f"Error running private node {private_node.handler}: {e}")
         raise
-
-    _store_private_node_result(private_node, result, memory)
+    finally:
+        await save_private_node_state_locally(task, memory, private_node)
+        if memory.automation_state.step_index % 5 == 0:
+            await save_trajectory_in_server(task)
 
     await sleep_for_page_to_load(browser, private_node.end_sleep_time)
     logger.debug(
