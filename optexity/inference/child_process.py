@@ -458,6 +458,62 @@ async def task_processor():
                         )
                     continue
 
+            # Local-override hook (test harness only). Preference order:
+            # 1) OPTEXITY_LOCAL_AUTOMATION=<path> when set and the file exists
+            # 2) otherwise the first present of the well-known test filenames
+            #    (stockanalysis cached → stockanalysis agentic → roboform cached
+            #    → roboform agentic). Fail-soft: bad JSON / schema / parameter
+            #    key mismatch keeps the server automation (LLM path).
+            env_override = os.environ.get("OPTEXITY_LOCAL_AUTOMATION", "").strip()
+            candidates: list[str] = []
+            if env_override:
+                candidates.append(env_override)
+            candidates.extend(
+                (
+                    "test_automation_2_cached.json",
+                    "test_automation_2.json",
+                    "test_automation_cached.json",
+                    "test_automation.json",
+                )
+            )
+            local_override_path = next(
+                (pathlib.Path(name) for name in candidates if pathlib.Path(name).exists()),
+                None,
+            )
+            if local_override_path is not None:
+                try:
+                    with open(local_override_path) as f:
+                        override = Automation.model_validate(json.load(f))
+                    for override_params, task_params, label in (
+                        (
+                            override.parameters.input_parameters,
+                            task.input_parameters,
+                            "input_parameters",
+                        ),
+                        (
+                            override.parameters.secure_parameters,
+                            task.secure_parameters,
+                            "secure_parameters",
+                        ),
+                    ):
+                        if override_params.keys() != task_params.keys():
+                            raise ValueError(
+                                f"{label} key mismatch: override has "
+                                f"{set(override_params.keys())}, task has "
+                                f"{set(task_params.keys())}"
+                            )
+                    task.automation = override
+                    logger.info(
+                        f"Loaded local override automation from {local_override_path} "
+                        f"for task {task.task_id}"
+                    )
+                except Exception as override_err:
+                    logger.warning(
+                        f"Ignoring local override {local_override_path} for task "
+                        f"{task.task_id} ({override_err}); continuing with "
+                        f"server-fetched automation"
+                    )
+
             task_running = True
             last_task_start_time = datetime.now(timezone.utc)
             current_task_timeout_minutes = task.max_timeout_in_minutes

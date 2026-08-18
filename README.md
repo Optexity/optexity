@@ -279,6 +279,95 @@ Check out our examples directory for sample automations:
 - [Healthcare Form Automation](https://docs.optexity.com/examples/healthcare/peachstate-medicaid)
 - [QA Testing](https://docs.optexity.com/examples/qa_testing/supabase-login)
 
+## Deterministic Cache (`feature/deterministic-cache`)
+
+Run an agentic browser task **once**, record what it did, then replay it with
+**zero LLM calls**. Same result, faster and deterministic.
+
+Needs the matching [`rangerfc56-sys/browser-use`](https://github.com/rangerfc56-sys/browser-use)
+fork (branch `feature/deterministic-cache`) for the record + filter steps.
+
+### How it works
+
+```
+agentic run  →  export actions  →  filter noise  →  build locators  →  replay (0 LLM)
+ (Gemini)       cached_run.json    keep real steps   test_..._cached.json   /inference
+```
+
+| Step | File |
+| --- | --- |
+| Export what the agent did | `browser_use/cache/action_export.py` |
+| Drop the useless steps | `browser_use/cache/step_filter.py` |
+| Turn steps into Playwright locators | `optexity/tools/build_cached_automation.py` |
+| Load the cache instead of the LLM | `optexity/inference/child_process.py` |
+| Build the cache via LLM (bonus) | `optexity/tools/llm_build_automation.py` |
+| Check the replay actually worked | `optexity/tools/verify_form_fill.py`, `verify_final_page.py` |
+
+### Try it (roboform)
+
+Needs both forks installed editable, plus `OPTEXITY_API_KEY`, `GOOGLE_API_KEY`,
+`DEPLOYMENT=dev`.
+
+```bash
+git clone -b feature/deterministic-cache https://github.com/rangerfc56-sys/optexity.git
+git clone -b feature/deterministic-cache https://github.com/rangerfc56-sys/browser-use.git
+
+python3 -m venv .venv && source .venv/bin/activate
+# optexity ships its own browser_use copy; remove it so the fork wins.
+pip install -e ./optexity
+pip uninstall -y optexity-browser-use browser-use || true
+rm -rf .venv/lib/python*/site-packages/browser_use
+pip install -e ./browser-use
+optexity install-browsers
+
+export OPTEXITY_API_KEY=... GOOGLE_API_KEY=... DEPLOYMENT=dev
+
+# start the server with the roboform cache pinned
+cd optexity
+export OPTEXITY_LOCAL_AUTOMATION=test_automation_cached.json
+optexity inference --port 9000 --child_process_id 0
+
+# in another shell: fire the task, then verify the fields
+curl -s http://localhost:9000/inference -H 'Content-Type: application/json' \
+  -d '{"endpoint_name":"fill_roboform_test_form-3b699ebe","input_parameters":{"first_name":["myname"]},"unique_parameter_names":[]}'
+python -m optexity.tools.verify_form_fill
+```
+
+You should see `Loaded local override automation ...`, no Gemini calls, and
+`verify_form_fill` **PASS**.
+
+### Design choices
+
+**Locators** — pick the most stable handle available, in order:
+`id` → `name` → `placeholder`/`data-*`/`aria-label` → role + text → `xpath`.
+Never browser-use bracket indices (`[67]`, per-run only). Never xpath inside
+shadow DOM (it can't reach in) — the builder errors instead.
+
+**Filter** — plain rules, each logged with a reason:
+drop non-actions and failures, merge click-then-type and type-then-Enter,
+keep the last action when an element was touched twice. Rules over an LLM
+because it's cheap and auditable; swapping in an LLM filter later is possible.
+
+**Waits** — no `time.sleep()`. When a step changed the page, the cache sets
+`end_sleep_time`, which Optexity runs as `wait_for_load_state("load")`. If the
+URL lags behind the click, the builder adds a `go_to_url` using the real
+recorded URL.
+
+### Results
+
+| Site | Agentic | Cached (avg of 3) | LLM calls |
+| --- | --- | --- | --- |
+| Roboform | ~100 s | ~24 s (~4×) | 4 → **0** |
+| Stockanalysis (NVDA Financials) | 64 s | ~24 s (~2.7×) | 5 → **0** |
+
+Details: [`metrics.md`](metrics.md). LLM auto-builder vs hand-built: no diffs
+([`llm_vs_handbuilt_diff.md`](llm_vs_handbuilt_diff.md)).
+
+### PRs
+
+- [optexity#1](https://github.com/rangerfc56-sys/optexity/pull/1)
+- [browser-use#1](https://github.com/rangerfc56-sys/browser-use/pull/1)
+
 ## License
 
 This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
