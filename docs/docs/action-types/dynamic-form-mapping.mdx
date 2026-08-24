@@ -22,10 +22,10 @@ This action does **not** send the live browser session. Your endpoint receives J
 | `source` | `list["axtree" \| "screenshot"]` | `["axtree"]` | Page context used for extraction |
 | `callback_url` | `FormMappingCallbackUrl` | Required | Endpoint that receives extracted keys and returns values |
 | `include_screenshot` | `bool` | `true` | Attach a base64 PNG of the current page |
-| `full_page_screenshot` | `bool` | `false` | Capture the full scrolled page instead of the viewport. Ignored when `include_screenshot` is `false` |
+| `full_page_screenshot` | `bool` | `false` | Capture the full scrolled page instead of the viewport, for both LLM extraction (`source` includes `"screenshot"`) and the payload. Ignored for the payload when `include_screenshot` is `false` |
 | `include_axtree` | `bool` | `false` | Attach the page accessibility tree |
 | `include_live_stream_url` | `bool` | `false` | Attach a dashboard URL to the live browser stream |
-| `max_wait_time` | `float` | `60` | Seconds to wait for the HTTP response. Must be `> 0` and `<= 600` |
+| `max_wait_time` | `float` | `60` | Seconds to wait for the HTTP response. Must be `> 0` and `<= 120`. Supported range is about 30–60s (ALB and most proxies idle-timeout around 60s) |
 | `output_variable_name` | `str` | `"form_values"` | Generated variable that stores the returned mapping |
 | `llm_model_name` | `str \| None` | `None` | LiteLLM model string. Falls back to the task model |
 | `llm_provider` | `str \| None` | `None` | Deprecated — prefix the provider in `llm_model_name` instead |
@@ -76,7 +76,7 @@ The extracted JSON is POSTed as `extracted_fields` with no extra transformation,
 | `username` | `str \| None` | HTTP basic auth username |
 | `password` | `str \| None` | HTTP basic auth password |
 
-`url` is SSRF-checked (no private/internal hosts). `{variable[0]}` substitution works on all four fields.
+`url` is SSRF-checked (no private/internal hosts). Redirects are not followed. `{variable[0]}` substitution works on all four fields.
 
 ## Request Payload
 
@@ -99,7 +99,7 @@ Optexity POSTs JSON. Optional fields are present and set to `null` when disabled
 | `extracted_fields` | Always | LLM extraction result, same shape as `extraction_format` |
 | `screenshot` | `include_screenshot: true` | Raw base64 PNG (no `data:image/png;base64,` prefix). Viewport unless `full_page_screenshot` is `true` |
 | `axtree` | `include_axtree: true` | Accessibility tree string |
-| `live_stream_url` | `include_live_stream_url: true` | Dashboard page at `/task-logs?task_id=...`. Requires an Optexity login; useful for a human, not for a machine mapper |
+| `live_stream_url` | `include_live_stream_url: true` | Dashboard page at `/task-logs?task_id=...` (no `&hitl=true`). The live tab works for any running task without a HITL notify; `&hitl=true` only adds the Done button used by `human_in_loop_action`. Requires an Optexity login; useful for a human, not for a machine mapper |
 
 Turn screenshot sending off when your mapper only needs the extracted keys:
 
@@ -116,7 +116,7 @@ Turn screenshot sending off when your mapper only needs the extracted keys:
 
 ## Response Contract
 
-The HTTP response body **is** the mapping. A 2xx status with JSON is required:
+The HTTP response body **is** the mapping: a JSON object whose values are strings, numbers, or booleans. Nested objects, arrays, and `null` are rejected. Serialized size is capped at 64KB.
 
 ```json
 {
@@ -133,7 +133,7 @@ generated_variables.form_values = ['{"Date of Birth":"1990-01-01","Member ID":"A
 
 Use `{form_values[0]}` in later nodes. The variable is overwritten each time this action runs (including inside a loop). You do not need to declare `form_values` under `generated_parameters`.
 
-Non-2xx, non-JSON, or a timeout raises `DynamicFormMappingException` and fails the task. `max_wait_time` is capped at 600 seconds because that is the hard task timeout.
+Non-2xx, redirect, non-JSON, invalid shape, oversized body, or a timeout raises `DynamicFormMappingException` and fails the task. Keep `max_wait_time` in the 30–60s range; values above 120s are rejected. This action holds one HTTP request — it is not a HITL-style poll, so it is not suitable for a human sitting on the live stream deciding values.
 
 ## Filling the Form
 

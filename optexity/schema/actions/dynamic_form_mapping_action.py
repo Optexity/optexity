@@ -57,7 +57,7 @@ class DynamicFormMappingAction(LLMAction):
     full_page_screenshot: bool = False
     include_axtree: bool = False
     include_live_stream_url: bool = False
-    max_wait_time: float = Field(default=60.0, gt=0, le=600)
+    max_wait_time: float = Field(default=60.0, gt=0, le=120)
     output_variable_name: str = "form_values"
 
     def build_model(self):

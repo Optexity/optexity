@@ -700,7 +700,7 @@
             "id": "docs-action-types-dynamic-form-mapping",
             "path": "docs/action-types/dynamic-form-mapping.mdx",
             "title": "Dynamic Form Mapping",
-            "summary": "Documents dynamic_form_mapping_action, which extracts unknown form field keys from the current page with an LLM, POSTs them to a customer endpoint (optionally with screenshot, axtree, and live-stream URL), waits for a JSON key-value mapping in the HTTP response, and stores it as generated_variables.form_values for a later agentic_task to fill the form. Covers extraction_instructions/extraction_format, callback_url auth, include_screenshot, full_page_screenshot, include_axtree, include_live_stream_url, max_wait_time, output_variable_name, the request/response contract, and a complete extract-then-fill example.",
+            "summary": "Documents dynamic_form_mapping_action, which extracts unknown form field keys from the current page with an LLM, POSTs them to a customer endpoint (optionally with screenshot, axtree, and live-stream URL), waits for a JSON object of scalar key-value pairs in the HTTP response (no redirects, max 64KB, max_wait_time <= 120s), and stores it as generated_variables.form_values for a later agentic_task to fill the form. Covers extraction_instructions/extraction_format, callback_url auth, include_screenshot, full_page_screenshot, include_axtree, include_live_stream_url, output_variable_name, the request/response contract, and a complete extract-then-fill example.",
             "gist": "Extract dynamic form keys, POST them to your endpoint, store the returned mapping as form_values for an agentic_task.",
             "keywords": [
                 "dynamic form",

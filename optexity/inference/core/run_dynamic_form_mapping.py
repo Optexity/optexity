@@ -1,5 +1,6 @@
 import json
 import logging
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
@@ -15,14 +16,46 @@ from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
+_MAX_FORM_VALUES_BYTES = 64 * 1024
+_SCALAR_TYPES = (str, int, float, bool)
+
+
+def _redact_callback_url(url: str) -> str:
+    """Log-safe URL: drop userinfo, query string, and fragment."""
+    parts = urlsplit(url)
+    hostname = parts.hostname or ""
+    netloc = f"{hostname}:{parts.port}" if parts.port else hostname
+    return urlunsplit((parts.scheme, netloc, parts.path, "", ""))
+
 
 def _serialize_form_values(body) -> str:
-    if isinstance(body, str):
-        return body
-    return json.dumps(body, ensure_ascii=False)
+    if not isinstance(body, dict):
+        raise DynamicFormMappingException(
+            "Dynamic form mapping callback must return a JSON object of "
+            f"string keys to scalar values, got {type(body).__name__}"
+        )
+    for key, value in body.items():
+        if not isinstance(key, str):
+            raise DynamicFormMappingException(
+                "Dynamic form mapping callback keys must be strings, "
+                f"got {type(key).__name__}"
+            )
+        if not isinstance(value, _SCALAR_TYPES):
+            raise DynamicFormMappingException(
+                f"Dynamic form mapping value for {key!r} must be a string, "
+                f"number, or boolean, got {type(value).__name__}"
+            )
+    serialized = json.dumps(body, ensure_ascii=False)
+    if len(serialized.encode("utf-8")) > _MAX_FORM_VALUES_BYTES:
+        raise DynamicFormMappingException(
+            "Dynamic form mapping response exceeds " f"{_MAX_FORM_VALUES_BYTES} bytes"
+        )
+    return serialized
 
 
 def _live_stream_url(task: Task) -> str:
+    # Same live tab as any running task. Do not append &hitl=true — that flag
+    # only adds the HITL Done button and requires a prior /human_in_loop notify.
     return f"{settings.FRONTEND_URL.rstrip('/')}/task-logs?task_id={task.task_id}"
 
 
@@ -43,6 +76,7 @@ async def run_dynamic_form_mapping_action(
         extraction_instructions=action.extraction_instructions,
         llm_provider=action.llm_provider,
         llm_model_name=action.llm_model_name,
+        include_full_page=action.full_page_screenshot,
     )
     extraction_output = await handle_llm_extraction(
         llm_extraction,
@@ -57,10 +91,15 @@ async def run_dynamic_form_mapping_action(
 
     screenshot = None
     if action.include_screenshot:
-        screenshot = await browser.get_screenshot(full_page=action.full_page_screenshot)
+        if memory.browser_states:
+            screenshot = memory.browser_states[-1].screenshot
+        if screenshot is None:
+            screenshot = await browser.get_screenshot(
+                full_page=action.full_page_screenshot
+            )
         if screenshot is None:
             logger.warning(
-                "Failed to capture screenshot for dynamic form mapping " "on task %s",
+                "Failed to capture screenshot for dynamic form mapping on task %s",
                 task.task_id,
             )
 
@@ -68,7 +107,12 @@ async def run_dynamic_form_mapping_action(
     if action.include_axtree:
         axtree = memory.browser_states[-1].axtree if memory.browser_states else None
         if axtree is None:
-            summary = await fetch_browser_state_for_classifier(browser, memory, task)
+            summary = await fetch_browser_state_for_classifier(
+                browser,
+                memory,
+                task,
+                include_full_page=action.full_page_screenshot,
+            )
             if summary is not None and memory.browser_states:
                 axtree = memory.browser_states[-1].axtree
 
@@ -84,6 +128,7 @@ async def run_dynamic_form_mapping_action(
 
     callback = action.callback_url
     validate_callback_url_ssrf(callback.url)
+    safe_url = _redact_callback_url(callback.url)
 
     headers: dict[str, str] = {}
     auth = None
@@ -97,7 +142,7 @@ async def run_dynamic_form_mapping_action(
         "(include_screenshot=%s, full_page_screenshot=%s, "
         "include_axtree=%s, include_live_stream_url=%s, "
         "extracted_fields_keys=%s, screenshot_bytes=%s)",
-        callback.url,
+        safe_url,
         task.task_id,
         action.include_screenshot,
         action.full_page_screenshot,
@@ -116,18 +161,24 @@ async def run_dynamic_form_mapping_action(
             action.max_wait_time, connect=min(10.0, action.max_wait_time)
         )
         async with httpx.AsyncClient(
-            timeout=timeout, follow_redirects=True, auth=auth
+            timeout=timeout, follow_redirects=False, auth=auth
         ) as client:
             response = await client.post(callback.url, headers=headers, json=payload)
     except httpx.TimeoutException as e:
         raise DynamicFormMappingException(
             f"Dynamic form mapping timed out after {action.max_wait_time}s "
-            f"waiting for {callback.url}: {e}"
+            f"waiting for {safe_url}"
         ) from e
     except httpx.HTTPError as e:
         raise DynamicFormMappingException(
-            f"Dynamic form mapping request to {callback.url} failed: {e}"
+            f"Dynamic form mapping request to {safe_url} failed: " f"{type(e).__name__}"
         ) from e
+
+    if 300 <= response.status_code < 400:
+        raise DynamicFormMappingException(
+            f"Dynamic form mapping callback returned HTTP {response.status_code} "
+            f"(redirects are not followed): {safe_url}"
+        )
 
     if response.status_code < 200 or response.status_code >= 300:
         body_preview = response.text[:500]
@@ -142,11 +193,6 @@ async def run_dynamic_form_mapping_action(
         raise DynamicFormMappingException(
             f"Dynamic form mapping callback returned non-JSON body: {e}"
         ) from e
-
-    if response_body is None:
-        raise DynamicFormMappingException(
-            "Dynamic form mapping callback returned JSON null"
-        )
 
     serialized = _serialize_form_values(response_body)
     var_name = action.output_variable_name
