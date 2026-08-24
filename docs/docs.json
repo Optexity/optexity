@@ -84,6 +84,7 @@
             },
             {
                 "tab": "API Reference",
+                "openapi": "/openapi.json",
                 "groups": [
                     {
                         "group": "Schema Reference",
@@ -91,7 +92,6 @@
                     },
                     {
                         "group": "HTTP API",
-                        "openapi": "openapi.json",
                         "pages": [
                             "POST /api/v1/inference",
                             "GET /api/v1/task_status",
