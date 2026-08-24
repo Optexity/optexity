@@ -221,6 +221,10 @@
                     {
                         "doc_id": "docs-building-automations-parameters",
                         "context": "Variable substitution in agentic task strings uses parameters syntax."
+                    },
+                    {
+                        "doc_id": "docs-action-types-dynamic-form-mapping",
+                        "context": "Dynamic form mapping stores form_values for an agentic_task to fill unknown form fields."
                     }
                 ],
                 "referenced_by": [
@@ -691,6 +695,61 @@
             "reading_priority": 3,
             "when_to_use": "Select when the query is about pausing an automation for human input, HITL nodes, live browser handoff, or the max_wait_time property.",
             "embedding_hint": "human in the loop HITL pause resume live session browser handoff max_wait_time timeout"
+        },
+        {
+            "id": "docs-action-types-dynamic-form-mapping",
+            "path": "docs/action-types/dynamic-form-mapping.mdx",
+            "title": "Dynamic Form Mapping",
+            "summary": "Documents dynamic_form_mapping_action, which extracts unknown form field keys from the current page with an LLM, POSTs them to a customer endpoint (optionally with screenshot, axtree, and live-stream URL), waits for a JSON key-value mapping in the HTTP response, and stores it as generated_variables.form_values for a later agentic_task to fill the form. Covers extraction_instructions/extraction_format, callback_url auth, include_screenshot, full_page_screenshot, include_axtree, include_live_stream_url, max_wait_time, output_variable_name, the request/response contract, and a complete extract-then-fill example.",
+            "gist": "Extract dynamic form keys, POST them to your endpoint, store the returned mapping as form_values for an agentic_task.",
+            "keywords": [
+                "dynamic form",
+                "dynamic_form_mapping_action",
+                "form_values",
+                "callback_url",
+                "extracted_fields",
+                "screenshot",
+                "full_page_screenshot",
+                "agentic_task",
+                "questionnaire",
+                "key-value mapping"
+            ],
+            "document_type": "guide",
+            "tags": ["action-types", "misc-actions", "forms", "extraction", "callback", "agentic"],
+            "relationships": {
+                "depends_on": [
+                    "docs-building-automations-action-node",
+                    "docs-action-types-extraction-action"
+                ],
+                "references": [
+                    {
+                        "doc_id": "docs-action-types-agentic-tasks",
+                        "context": "The typical consumer of form_values is an agentic_task whose prompt includes {form_values[0]}."
+                    },
+                    {
+                        "doc_id": "docs-advanced-callbacks",
+                        "context": "This action's callback_url is a mid-run request/response endpoint, separate from the task completion callback."
+                    }
+                ],
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-building-automations-action-node",
+                        "context": "Action node lists dynamic_form_mapping_action as a supported action type."
+                    }
+                ]
+            },
+            "entities": {
+                "systems": [],
+                "apis": [],
+                "data_models": [
+                    "dynamic_form_mapping_action",
+                    "FormMappingCallbackUrl",
+                    "DynamicFormMappingException"
+                ]
+            },
+            "reading_priority": 3,
+            "when_to_use": "Select when the query is about filling dynamic forms, unknown form field labels, posting extracted keys to a customer webhook for value mapping, form_values, or pairing extraction with an agentic_task fill step.",
+            "embedding_hint": "dynamic form mapping extract questionnaire fields callback webhook form_values agentic_task screenshot axtree"
         },
         {
             "id": "docs-advanced-aws-secrets-manager",
@@ -1282,6 +1341,10 @@
                     {
                         "doc_id": "docs-action-types-agentic-tasks",
                         "context": "Action node can contain agentic_task."
+                    },
+                    {
+                        "doc_id": "docs-action-types-dynamic-form-mapping",
+                        "context": "Action node can contain dynamic_form_mapping_action."
                     }
                 ],
                 "referenced_by": [

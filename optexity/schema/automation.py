@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from optexity.schema.actions.assertion_action import AssertionAction
 from optexity.schema.actions.captcha_action import CaptchaAction
+from optexity.schema.actions.dynamic_form_mapping_action import DynamicFormMappingAction
 from optexity.schema.actions.extraction_action import ExtractionAction
 from optexity.schema.actions.interaction_action import InteractionAction
 from optexity.schema.actions.misc_action import (
@@ -95,6 +96,7 @@ class ActionNode(BaseModel):
     captcha_action: CaptchaAction | None = None
     misc_action: MiscAction | None = None
     human_in_loop_action: HumanInLoopAction | None = None
+    dynamic_form_mapping_action: DynamicFormMappingAction | None = None
     before_sleep_time: float = 0.0
     end_sleep_time: float = 5.0
     expect_new_tab: bool = False
@@ -115,12 +117,13 @@ class ActionNode(BaseModel):
             "captcha_action": self.captcha_action,
             "misc_action": self.misc_action,
             "human_in_loop_action": self.human_in_loop_action,
+            "dynamic_form_mapping_action": self.dynamic_form_mapping_action,
         }
         non_null = [k for k, v in provided.items() if v is not None]
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, powershell_action, sleep_action, fail_state_action, captcha_action, misc_action, human_in_loop_action must be provided"
+                "Exactly one of interaction_action, assertion_action, extraction_action, python_script_action, powershell_action, sleep_action, fail_state_action, captcha_action, misc_action, human_in_loop_action, dynamic_form_mapping_action must be provided"
             )
 
         assert (
@@ -135,11 +138,19 @@ class ActionNode(BaseModel):
         user_set = self.__pydantic_fields_set__
 
         if "end_sleep_time" not in user_set:
-            if self.assertion_action or self.extraction_action:
+            if (
+                self.assertion_action
+                or self.extraction_action
+                or self.dynamic_form_mapping_action
+            ):
                 self.end_sleep_time = 0.0
 
         if "before_sleep_time" not in user_set:
-            self.before_sleep_time = 3.0 if self.extraction_action else 0.0
+            self.before_sleep_time = (
+                3.0
+                if self.extraction_action or self.dynamic_form_mapping_action
+                else 0.0
+            )
 
         if self.expect_new_tab:
             assert (
@@ -173,6 +184,8 @@ class ActionNode(BaseModel):
             self.misc_action.replace(pattern, replacement)
         if self.human_in_loop_action:
             pass
+        if self.dynamic_form_mapping_action:
+            self.dynamic_form_mapping_action.replace(pattern, replacement)
 
         return self
 

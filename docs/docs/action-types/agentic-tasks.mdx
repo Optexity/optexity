@@ -199,3 +199,5 @@ Best pattern: use static actions for predictable steps, agentic for uncertainty:
 | Start low on max_steps | Increase if agent can't complete |
 | Review execution logs | Refine task descriptions based on results |
 | Use vision selectively | Only when visual context is necessary |
+
+When field labels are not known at authoring time, fetch values first with [Dynamic Form Mapping](/docs/action-types/dynamic-form-mapping) and pass `{form_values[0]}` into the agentic task prompt.

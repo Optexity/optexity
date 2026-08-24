@@ -69,6 +69,8 @@ def _summarize_action_node(node: ActionNode) -> str | None:
         return "solve captcha"
     if node.human_in_loop_action is not None:
         return "human-in-loop step"
+    if node.dynamic_form_mapping_action is not None:
+        return "dynamic form mapping"
     if node.python_script_action is not None:
         return "python script"
     if node.sleep_action is not None:
