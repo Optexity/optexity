@@ -91,7 +91,7 @@
                     },
                     {
                         "group": "HTTP API",
-                        "openapi": "https://api.optexity.com/openapi.json",
+                        "openapi": "openapi.json",
                         "pages": [
                             "POST /api/v1/inference",
                             "GET /api/v1/task_status",
