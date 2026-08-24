@@ -28,6 +28,7 @@ class Settings(LLMSettings):
     INTEGRATION_SECRETS_ENDPOINT: str = "api/v1/integration-secrets/{type}/encrypt"
     HUMAN_IN_LOOP_ENDPOINT: str = "api/v1/human_in_loop"
     GET_RECORDING_ENDPOINT: str = "api/v1/recording/{recording_id}"
+    FRONTEND_URL: str = "https://app.optexity.com"
 
     FERNET_SECRET_KEY: str | None = None  # required when using integration secrets
 

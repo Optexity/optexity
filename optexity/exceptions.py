@@ -28,6 +28,14 @@ class HumanInLoopTimeoutException(Exception):
         self.message = message
 
 
+class DynamicFormMappingException(Exception):
+    """Raised when a dynamic form mapping callback fails or times out."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
 class ExpectedDownloadFailedException(Exception):
     """Raised when a node has expect_download=True but the action did not
     produce a downloaded file. This fails the task with a fixed message."""

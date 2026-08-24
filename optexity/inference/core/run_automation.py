@@ -34,6 +34,9 @@ from optexity.inference.core.logging import (
     start_task_in_server,
 )
 from optexity.inference.core.run_assertion import run_assertion_action
+from optexity.inference.core.run_dynamic_form_mapping import (
+    run_dynamic_form_mapping_action,
+)
 from optexity.inference.core.run_extraction import run_extraction_action
 from optexity.inference.core.run_human_in_loop import run_human_in_loop_action
 from optexity.inference.core.run_interaction import (
@@ -475,6 +478,10 @@ async def run_action_node(
         elif action_node.human_in_loop_action:
             await run_human_in_loop_action(
                 action_node.human_in_loop_action, task, memory
+            )
+        elif action_node.dynamic_form_mapping_action:
+            await run_dynamic_form_mapping_action(
+                action_node.dynamic_form_mapping_action, task, memory, browser
             )
         elif action_node.misc_action:
             misc = action_node.misc_action

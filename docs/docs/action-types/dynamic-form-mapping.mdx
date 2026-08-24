@@ -1,0 +1,219 @@
+---
+title: Dynamic Form Mapping
+description: Extract dynamic form fields, ask your endpoint for values, and fill the form with an agentic task
+---
+
+Use `dynamic_form_mapping_action` when a form's fields are not known at authoring time. The action extracts the field keys from the current page, POSTs them to your endpoint, and stores the returned mapping so a later `agentic_task` can fill the form.
+
+## Overview
+
+- **Use when**: Questionnaires, eligibility forms, or other pages whose labels change per run, and your backend already knows how to map those labels to values.
+- **How it works**: LLM extraction reads the page, Optexity POSTs the extracted keys (plus optional screenshot, axtree, and live-stream URL) to your endpoint, then waits for a JSON mapping in the HTTP response.
+- **Next step**: An `agentic_task` whose prompt references `{form_values[0]}` (or whatever you set as `output_variable_name`).
+
+This action does **not** send the live browser session. Your endpoint receives JSON only.
+
+## Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `extraction_instructions` | `str` | Required | Prompt telling the LLM which fields to extract |
+| `extraction_format` | `dict` | Required | Schema of the extracted keys, same as `extraction_action.llm` |
+| `source` | `list["axtree" \| "screenshot"]` | `["axtree"]` | Page context used for extraction |
+| `callback_url` | `FormMappingCallbackUrl` | Required | Endpoint that receives extracted keys and returns values |
+| `include_screenshot` | `bool` | `true` | Attach a base64 PNG of the current page |
+| `full_page_screenshot` | `bool` | `false` | Capture the full scrolled page instead of the viewport, for both LLM extraction (`source` includes `"screenshot"`) and the payload. Ignored for the payload when `include_screenshot` is `false` |
+| `include_axtree` | `bool` | `false` | Attach the page accessibility tree |
+| `include_live_stream_url` | `bool` | `false` | Attach a dashboard URL to the live browser stream |
+| `max_wait_time` | `float` | `60` | Seconds to wait for the HTTP response. Must be `> 0` and `<= 120`. Supported range is about 30–60s (ALB and most proxies idle-timeout around 60s) |
+| `output_variable_name` | `str` | `"form_values"` | Generated variable that stores the returned mapping |
+| `llm_model_name` | `str \| None` | `None` | LiteLLM model string. Falls back to the task model |
+| `llm_provider` | `str \| None` | `None` | Deprecated — prefix the provider in `llm_model_name` instead |
+
+Default `before_sleep_time` is `3.0` seconds and default `end_sleep_time` is `0.0`, matching extraction actions.
+
+## JSON Example
+
+```json
+{
+  "type": "action_node",
+  "dynamic_form_mapping_action": {
+    "extraction_instructions": "Extract the question fields from the patient questionnaire. Ignore the provider questionnaire.",
+    "extraction_format": {
+      "form_fields": "List[str]"
+    },
+    "callback_url": {
+      "url": "https://customer.example.com/form-values"
+    }
+  }
+}
+```
+
+## Extraction Schema
+
+`extraction_format` describes the **keys** you send to your endpoint, not the values that come back. Use one list or one object of lists — the same type-annotated dict as [LLM extraction](/docs/action-types/extraction-action).
+
+```json
+"extraction_format": {
+  "form_fields": "List[str]"
+}
+```
+
+```json
+"extraction_instructions": "Extract the question fields from the patient questionnaire. Ignore the provider questionnaire."
+```
+
+The extracted JSON is POSTed as `extracted_fields` with no extra transformation, so your mapper can key off whatever schema you defined.
+
+## Callback URL
+
+`callback_url` is this action's endpoint. It is separate from the task completion callback.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `url` | `str` | HTTPS endpoint that receives the POST and returns the mapping |
+| `api_key` | `str \| None` | Sent as `x-api-key`. Cannot be combined with username/password |
+| `username` | `str \| None` | HTTP basic auth username |
+| `password` | `str \| None` | HTTP basic auth password |
+
+`url` is SSRF-checked (no private/internal hosts). Redirects are not followed. `{variable[0]}` substitution works on all four fields.
+
+## Request Payload
+
+Optexity POSTs JSON. Optional fields are present and set to `null` when disabled, so the schema is stable:
+
+```json
+{
+  "task_id": "abc123",
+  "extracted_fields": {
+    "form_fields": ["Date of Birth", "Member ID"]
+  },
+  "screenshot": "<base64 png>",
+  "axtree": null,
+  "live_stream_url": null
+}
+```
+
+| Field | When set | Notes |
+|-------|----------|-------|
+| `extracted_fields` | Always | LLM extraction result, same shape as `extraction_format` |
+| `screenshot` | `include_screenshot: true` | Raw base64 PNG (no `data:image/png;base64,` prefix). Viewport unless `full_page_screenshot` is `true` |
+| `axtree` | `include_axtree: true` | Accessibility tree string |
+| `live_stream_url` | `include_live_stream_url: true` | Dashboard page at `/task-logs?task_id=...` (no `&hitl=true`). The live tab works for any running task without a HITL notify; `&hitl=true` only adds the Done button used by `human_in_loop_action`. Requires an Optexity login; useful for a human, not for a machine mapper |
+
+Turn screenshot sending off when your mapper only needs the extracted keys:
+
+```json
+{
+  "dynamic_form_mapping_action": {
+    "include_screenshot": false,
+    "full_page_screenshot": false,
+    "include_axtree": false,
+    "include_live_stream_url": false
+  }
+}
+```
+
+## Response Contract
+
+The HTTP response body **is** the mapping: a JSON object whose values are strings, numbers, or booleans. Nested objects, arrays, and `null` are rejected. Serialized size is capped at 64KB.
+
+```json
+{
+  "Date of Birth": "1990-01-01",
+  "Member ID": "ABC123"
+}
+```
+
+Optexity stores that body as a JSON string in a one-element list:
+
+```text
+generated_variables.form_values = ['{"Date of Birth":"1990-01-01","Member ID":"ABC123"}']
+```
+
+Use `{form_values[0]}` in later nodes. The variable is overwritten each time this action runs (including inside a loop). You do not need to declare `form_values` under `generated_parameters`.
+
+Non-2xx, redirect, non-JSON, invalid shape, oversized body, or a timeout raises `DynamicFormMappingException` and fails the task. Keep `max_wait_time` in the 30–60s range; values above 120s are rejected. This action holds one HTTP request — it is not a HITL-style poll, so it is not suitable for a human sitting on the live stream deciding values.
+
+## Filling the Form
+
+Follow the mapping action with an `agentic_task` whose prompt includes the stored JSON:
+
+```json
+{
+  "type": "action_node",
+  "interaction_action": {
+    "agentic_task": {
+      "task": "Fill every visible field using this mapping. Do not submit.\n{form_values[0]}",
+      "max_steps": 15,
+      "backend": "browser_use"
+    }
+  }
+}
+```
+
+See [Agentic Tasks](/docs/action-types/agentic-tasks) for `max_steps` and task phrasing.
+
+## Complete Example
+
+```json
+{
+  "url": "https://portal.example.com/questionnaire",
+  "parameters": {
+    "input_parameters": {
+      "username": ["user@example.com"]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "dynamic_form_mapping_action": {
+        "extraction_instructions": "Extract the question fields from the patient questionnaire. Ignore the provider questionnaire.",
+        "extraction_format": {
+          "form_fields": "List[str]"
+        },
+        "callback_url": {
+          "url": "https://customer.example.com/form-values",
+          "api_key": "your-api-key"
+        },
+        "include_screenshot": true,
+        "full_page_screenshot": false,
+        "max_wait_time": 60,
+        "output_variable_name": "form_values"
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "Fill the form using {form_values[0]}. Do not submit.",
+          "max_steps": 15,
+          "backend": "browser_use"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"button\", name=\"Submit\")",
+          "prompt_instructions": "Click submit after the form is filled"
+        }
+      }
+    }
+  ]
+}
+```
+
+## Multiple Mappings
+
+Set `output_variable_name` when two mapping actions run in the same automation so the second does not overwrite the first:
+
+```json
+{
+  "output_variable_name": "patient_form_values"
+}
+```
+
+Then reference `{patient_form_values[0]}` in the matching `agentic_task`.
