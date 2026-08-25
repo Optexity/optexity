@@ -481,3 +481,10 @@ class Browser:
         except Exception as e:
             logger.error(f"Error taking screenshot: {e}", exc_info=True)
             return None
+
+    async def get_cookies(self):
+        if self.context is None:
+            return None
+
+        cookies = await self.context.cookies()
+        return cookies

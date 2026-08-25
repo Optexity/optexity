@@ -96,6 +96,8 @@ _CREATE_TASK_DIRS: bool = True
 
 
 class Task(BaseModel):
+    is_browser: bool = True
+    is_marketplace: bool = False
     task_id: TaskID
     user_id: UserID
     recording_id: RecordingID

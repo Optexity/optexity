@@ -9,7 +9,11 @@ logger = logging.getLogger(__name__)
 
 
 class Settings(LLMSettings):
+
+    MARKETPLACE_SERVER_URL: str = "http://localhost:9005"
+
     SERVER_URL: str = "https://api.optexity.com"
+
     HEALTH_ENDPOINT: str = "api/v1/health"
     INFERENCE_ENDPOINT: str = "api/v1/inference"
     ADD_EXAMPLE_ENDPOINT: str = "api/v1/add_example"
@@ -17,6 +21,8 @@ class Settings(LLMSettings):
     START_TASK_ENDPOINT: str = "api/v1/start_task"
     COMPLETE_TASK_ENDPOINT: str = "api/v1/complete_task"
     SAVE_OUTPUT_DATA_ENDPOINT: str = "api/v1/save_output_data"
+    SAVE_PROCESSED_COOKIE_DATA_ENDPOINT: str = "api/v1/save_processed_cookie_data"
+    GET_PROCESSED_COOKIE_DATA_ENDPOINT: str = "api/v1/get_processed_cookie_data"
     REQUEST_DOWNLOAD_UPLOAD_URLS_ENDPOINT: str = "api/v1/request_download_upload_urls"
     CONFIRM_DOWNLOADS_ENDPOINT: str = "api/v1/confirm_downloads"
     SAVE_TRAJECTORY_ENDPOINT: str = "api/v1/save_trajectory"

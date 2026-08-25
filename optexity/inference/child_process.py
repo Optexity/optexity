@@ -27,6 +27,7 @@ from optexity.inference.core.logging import (
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.inference.infra.browser_health import consume_browser_restart_request
+from optexity.inference.worker import is_browser_automation
 from optexity.schema.automation import Automation
 from optexity.schema.enums import ExitCodes
 from optexity.schema.inference import InferenceRequest
@@ -226,9 +227,14 @@ async def run_automation_in_process(
     logger.info(
         f"---------- Starting to run automation for task {task.task_id} ----------\n"
     )
-    assert task.automation is not None, f"Task {task.task_id} has no automation"
+    if task.is_browser:
+        assert task.automation is not None, f"Task {task.task_id} has no automation"
+        total_attempts = max(1, int(task.automation.max_retries) + 1)
+    else:
+        total_attempts = 1
+
     worker_path = pathlib.Path(__file__).parent / "worker.py"
-    total_attempts = max(1, int(task.automation.max_retries) + 1)
+
     returncode: int | None = None
 
     async def _run_attempt(attempt_index: int) -> int | None:
@@ -238,15 +244,18 @@ async def run_automation_in_process(
         attempts_left = total_attempts - attempt_index
         task.retry_count = attempt_index
 
-        log_system_info("Memory info before starting browser")
-        await setup_browser(task, unique_child_arn, child_process_id)
-        log_system_info("Memory info after starting browser")
+        if task.is_browser:
+            log_system_info("Memory info before starting browser")
+            await setup_browser(task, unique_child_arn, child_process_id)
+            log_system_info("Memory info after starting browser")
 
-        if _global_actual_browser is None:
-            raise ValueError("Browser is not setup")
-        _cdp_url = _global_actual_browser.cdp_url
-        if _cdp_url is None:
-            raise ValueError("CDP URL is not setup")
+            if _global_actual_browser is None:
+                raise ValueError("Browser is not setup")
+            _cdp_url = _global_actual_browser.cdp_url
+            if _cdp_url is None:
+                raise ValueError("CDP URL is not setup")
+        else:
+            _cdp_url = "empty"
 
         logger.info(
             f"Starting worker attempt {attempt_index + 1}/{total_attempts} (attempts_left={attempts_left})"
@@ -325,13 +334,14 @@ async def run_automation_in_process(
         )
         await asyncio.sleep(sleep_time)
 
-        # Force a browser restart before the next attempt (helps with crashed/poisoned sessions).
-        if _global_actual_browser is not None:
-            try:
-                await _global_actual_browser.stop(graceful=True)
-            except Exception:
-                pass
-            _global_actual_browser = None
+        if task.is_browser:
+            # Force a browser restart before the next attempt (helps with crashed/poisoned sessions).
+            if _global_actual_browser is not None:
+                try:
+                    await _global_actual_browser.stop(graceful=True)
+                except Exception:
+                    pass
+                _global_actual_browser = None
 
         return await _run_attempt(attempt_index + 1)
 
@@ -389,50 +399,65 @@ async def task_processor():
             # workflow changes after allocation are picked up. Client errors
             # (<500) retry 3x with 3s wait; 5xx / unreachable use up to 4 min
             # exponential backoff.
-            recording_url = settings.GET_RECORDING_ENDPOINT.format(
-                recording_id=task.recording_id
-            )
-            fetch_url = f"{settings.SERVER_URL.rstrip('/')}/{recording_url}"
             fetch_success = False
-            response, attempt = await request_with_backoff(
-                fetch_url,
-                headers={"x-api-key": task.api_key},
-                log_label=f"automation fetch for task {task.task_id}",
-            )
-            if response is not None:
-                try:
-                    data = response.json()
-                    task.automation = Automation.model_validate(data["automation"])
-                    # Use recording/workspace callback_url only if no per-task
-                    # override exists on either field (task_callback_url takes
-                    # priority; task.callback_url may have been set via x-callback-url
-                    # header and must not be overwritten).
-                    if (
-                        task.callback_url is None
-                        and not task.task_callback_url
-                        and data.get("callback_url")
-                    ):
-                        from optexity.schema.task import CallbackUrl
+            if task.is_marketplace:
+                from optexity.inference.worker import (
+                    get_automation,
+                    is_browser_automation,
+                )
 
-                        try:
-                            task.callback_url = CallbackUrl.model_validate(
-                                data["callback_url"]
-                            )
-                        except Exception as cb_err:
-                            logger.warning(
-                                f"Failed to parse callback_url for task "
-                                f"{task.task_id}: {cb_err}"
-                            )
-                    fetch_success = True
-                    logger.info(
-                        f"Fetched fresh automation for task {task.task_id} "
-                        f"(recording {task.recording_id})"
-                    )
-                except Exception as parse_err:
-                    logger.warning(
-                        f"Failed to parse automation response for task "
-                        f"{task.task_id}: {parse_err}"
-                    )
+                task.is_browser = is_browser_automation(task)
+                if task.is_browser:
+                    automation = get_automation(task)
+                    task.automation = automation
+                fetch_success = True
+
+            else:
+
+                recording_url = settings.GET_RECORDING_ENDPOINT.format(
+                    recording_id=task.recording_id
+                )
+                fetch_url = f"{settings.SERVER_URL.rstrip('/')}/{recording_url}"
+
+                response, attempt = await request_with_backoff(
+                    fetch_url,
+                    headers={"x-api-key": task.api_key},
+                    log_label=f"automation fetch for task {task.task_id}",
+                )
+                if response is not None:
+                    try:
+                        data = response.json()
+                        task.automation = Automation.model_validate(data["automation"])
+                        # Use recording/workspace callback_url only if no per-task
+                        # override exists on either field (task_callback_url takes
+                        # priority; task.callback_url may have been set via x-callback-url
+                        # header and must not be overwritten).
+                        if (
+                            task.callback_url is None
+                            and not task.task_callback_url
+                            and data.get("callback_url")
+                        ):
+                            from optexity.schema.task import CallbackUrl
+
+                            try:
+                                task.callback_url = CallbackUrl.model_validate(
+                                    data["callback_url"]
+                                )
+                            except Exception as cb_err:
+                                logger.warning(
+                                    f"Failed to parse callback_url for task "
+                                    f"{task.task_id}: {cb_err}"
+                                )
+                        fetch_success = True
+                        logger.info(
+                            f"Fetched fresh automation for task {task.task_id} "
+                            f"(recording {task.recording_id})"
+                        )
+                    except Exception as parse_err:
+                        logger.warning(
+                            f"Failed to parse automation response for task "
+                            f"{task.task_id}: {parse_err}"
+                        )
             if not fetch_success:
                 if task.automation is not None:
                     logger.warning(
