@@ -281,7 +281,15 @@ async def run_automation(
         task.status = "failed"
 
     finally:
-        if task.retry_count == task.automation.max_retries or task.status == "success":
+
+        if (
+            (
+                task.automation is not None
+                and task.retry_count == task.automation.max_retries
+            )
+            or task.status == "success"
+            or not task.is_browser
+        ):
             if task and task.status == "running":
                 task.status = "failed"
                 task.error = "Task could not catch browser exception"
@@ -393,6 +401,7 @@ async def run_final_logging(
 ):
 
     try:
+
         if task.is_browser and browser is not None:
             try:
                 memory.automation_state.step_index += 1
@@ -1041,6 +1050,24 @@ async def run_api_automation(task: Task, memory: Memory):
             raise Exception(f"Failed to run API automation: {response.text}")
         response_data = response.json()
 
-        print(response_data["data"])
+        function_path = response_data["function_path"]
+        function_name = response_data["function_name"]
 
-        return response_data["data"]
+        from importlib.util import spec_from_file_location, module_from_spec
+        from pathlib import Path
+
+        def load_function(filename: str, function_name: str):
+            path = Path(filename).resolve()
+
+            spec = spec_from_file_location(path.stem, path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Cannot import {path}")
+
+            module = module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            return getattr(module, function_name)
+
+        func = load_function(function_path, function_name)
+
+        await func(processed_cookie_data, task, memory)
