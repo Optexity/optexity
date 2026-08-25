@@ -109,7 +109,7 @@ async def get_cookies(task: Task) -> list[dict]:
 
 
 async def save_processed_cookie_data_in_server(task: Task, memory: Memory):
-    if not task.is_marketplace:
+    if not task.is_marketplace or not task.is_browser:
         return
 
     try:
