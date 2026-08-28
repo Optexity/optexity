@@ -377,20 +377,57 @@ async def run_automation_in_process(
         await delete_local_data(task)
 
 
+MARKETPLACE_ENDPOINT_PREFIX = "marketplace_"
+MARKETPLACE_FUNCTION_MARKER = "fn_"
+MARKETPLACE_AUTOMATION_MARKER = "automation_"
+
+
+def parse_marketplace_endpoint_name(endpoint_name: str) -> tuple[str, str, str] | None:
+    """Split a marketplace endpoint name into ``(kind, portal, target)``.
+
+    The namespace states its kind rather than implying it by omission:
+
+        marketplace_<portal>_fn_<function>          -> ("fn", portal, function)
+        marketplace_<portal>_automation_<workflow>  -> ("automation", portal, workflow)
+
+    Returns None for anything malformed, so a bad name is reported as such
+    instead of being dispatched half-parsed. Mirrored in opcloud's
+    `shared/marketplace.py` (this package cannot import it); keep both in step.
+    """
+    if not endpoint_name.startswith(MARKETPLACE_ENDPOINT_PREFIX):
+        return None
+    rest = endpoint_name[len(MARKETPLACE_ENDPOINT_PREFIX) :]
+    # The portal is always the first segment; the kind marker follows it.
+    portal, _, remainder = rest.partition("_")
+    if not portal or not remainder:
+        return None
+    if remainder.startswith(MARKETPLACE_FUNCTION_MARKER):
+        target = remainder[len(MARKETPLACE_FUNCTION_MARKER) :]
+        return ("fn", portal, target) if target else None
+    if remainder.startswith(MARKETPLACE_AUTOMATION_MARKER):
+        target = remainder[len(MARKETPLACE_AUTOMATION_MARKER) :]
+        return ("automation", portal, target) if target else None
+    return None
+
+
 async def run_marketplace_function(
     task: Task, unique_child_arn: str, child_process_id: int
 ) -> None:
     """Call a single `optexity_private.portals.<portal>.methods` function
     directly, with no browser/node graph — for endpoint_name
-    "marketplace_fn_<portal>_<function_name>". Cookie-requiring functions get
+    "marketplace_<portal>_fn_<function_name>". Cookie-requiring functions get
     `processed_cookie_data` fetched from the DB here, never from the caller.
     The dispatched function must be `async def` and return `(success, message)`.
     """
     memory: Memory | None = None
     try:
-        portal, function_name = task.endpoint_name.removeprefix(
-            "marketplace_fn_"
-        ).split("_", 1)
+        parsed = parse_marketplace_endpoint_name(task.endpoint_name)
+        if parsed is None or parsed[0] != "fn":
+            raise ValueError(
+                f"'{task.endpoint_name}' is not a marketplace function endpoint "
+                "(expected marketplace_<portal>_fn_<function_name>)"
+            )
+        _, portal, function_name = parsed
         module = importlib.import_module(f"optexity_private.portals.{portal}.methods")
         fn = getattr(module, function_name)
         if function_name.startswith("_") or not inspect.iscoroutinefunction(fn):
@@ -469,7 +506,9 @@ async def task_processor():
                 tasks_to_kill.remove(task.task_id)
                 continue
 
-            if task.endpoint_name.startswith("marketplace_fn_"):
+            marketplace = parse_marketplace_endpoint_name(task.endpoint_name)
+
+            if marketplace is not None and marketplace[0] == "fn":
                 task_running = True
                 last_task_start_time = datetime.now(timezone.utc)
                 current_task_timeout_minutes = task.max_timeout_in_minutes
@@ -477,14 +516,18 @@ async def task_processor():
                 continue
 
             automation_error: str | None = None
-            if task.endpoint_name.startswith("marketplace_"):
+            if task.endpoint_name.startswith(MARKETPLACE_ENDPOINT_PREFIX):
                 # Marketplace automations are plain .py modules shipped in
                 # optexity_private (worker image only) — built directly instead
                 # of fetching a recording-backed automation from opcloud.
                 fetch_success = False
                 try:
-                    rest = task.endpoint_name.removeprefix("marketplace_")
-                    portal, automation_name = rest.split("_", 1)
+                    if marketplace is None:
+                        raise ValueError(
+                            "expected marketplace_<portal>_fn_<function> or "
+                            "marketplace_<portal>_automation_<workflow>"
+                        )
+                    _, portal, automation_name = marketplace
                     module = importlib.import_module(
                         f"optexity_private.portals.{portal}.{automation_name}"
                     )
