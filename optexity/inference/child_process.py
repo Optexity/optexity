@@ -402,7 +402,24 @@ async def task_processor():
             if response is not None:
                 try:
                     data = response.json()
-                    task.automation = Automation.model_validate(data["automation"])
+                    from optexity.schema.automation import Automation
+                    # Which local automation to inject. Point OPTEXITY_LOCAL_AUTOMATION
+                    # at test_automation_cached.json to verify the deterministic
+                    # replay against the agentic run.
+                    automation_path = os.environ.get(
+                        "OPTEXITY_LOCAL_AUTOMATION", "test_automation.json"
+                    )
+                    with open(automation_path, "r") as f:
+                        automation = json.load(f)
+                        automation = Automation.model_validate(automation)
+                    # Task re-validation (on assignment) requires the automation's
+                    # declared input parameters to exactly match the parameters
+                    # the server-side task carries. Sync them so any dashboard
+                    # endpoint can be used to trigger this local override.
+                    automation.parameters.input_parameters = dict(
+                        task.input_parameters
+                    )
+                    task.automation = automation
                     # Use recording/workspace callback_url only if no per-task
                     # override exists on either field (task_callback_url takes
                     # priority; task.callback_url may have been set via x-callback-url

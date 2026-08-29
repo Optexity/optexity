@@ -45,9 +45,7 @@ async def llm_input_text_prediction(
         url=browser_state_summary.url,
         screenshot=browser_state_summary.screenshot,
         title=browser_state_summary.title,
-        axtree=browser_state_summary.dom_state.llm_representation(
-            remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-        ),
+        axtree=browser_state_summary.dom_state.llm_representation(),
     )
 
     try:

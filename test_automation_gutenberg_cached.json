@@ -1,0 +1,73 @@
+{
+  "url": "https://www.gutenberg.org/",
+  "parameters": {
+    "input_parameters": {},
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator(\"[name='query']\").first",
+          "prompt_instructions": "Enter 'Frankenstein' in input \"Search books\"",
+          "input_text": "Frankenstein",
+          "press_enter": false
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"button\", name=\"Go!\")",
+          "prompt_instructions": "Click button \"Go!\""
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator(\"[name='query']\").first",
+          "prompt_instructions": "Enter 'Frankenstein' in input \"Search books\"",
+          "input_text": "Frankenstein",
+          "press_enter": false
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "locator(\"xpath=html/body/div[1]/header/div[2]/form/button\").first",
+          "prompt_instructions": "Click button"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "locator(\"a[href='/ebooks/84']\").first",
+          "prompt_instructions": "Click a \"Frankenstein; or, the modern prometheus Mary Wollstonecraft Shelley 80366 downloads\""
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_text(\"Other formats & older devices\")",
+          "prompt_instructions": "Click summary \"Other formats & older devices\""
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "python_script_action": {
+        "execution_code": "async def code_fn(page, ctx):\n    data = await page.evaluate(\n        \"\"\"async () => {\n            const res = await fetch(\"https://www.gutenberg.org/cache/epub/84/pg84.txt\");\n            if (!res.ok) throw new Error('HTTP ' + res.status);\n            return Array.from(new Uint8Array(await res.arrayBuffer()));\n        }\"\"\"\n    )\n    await ctx.save_download(\"pg84.txt\", content=bytes(data))\n"
+      }
+    }
+  ]
+}
