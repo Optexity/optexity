@@ -294,3 +294,64 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 ---
 
 Made with ❤️ by the Optexity team
+
+---
+
+## Step-cache memory layer (local dev / take-home)
+
+This fork adds the optexity-side of the **step-cache memory layer**: a
+converter that turns a browser-use agent step cache into a Pydantic-validated,
+deterministic automation that replays the run with **zero LLM calls**.
+
+### Converter
+
+```bash
+python -m optexity.utils.step_cache_converter \
+  --cache agent_step_cache.json \
+  --out test_automation_cached.json
+```
+
+- Reads the cache written by the browser-use fork
+  (`browser_use.agent.step_cache`).
+- Builds the deterministic automation dict and validates it against the
+  `Automation` schema (fail-fast on un-representable commands).
+- Prints the classified summary (which redundant steps were skipped and why).
+- Optional `--url` to override the start URL.
+
+### Included automations (all cache-derived)
+
+| File | Flow |
+|---|---|
+| `test_automation.json` | Roboform agentic task (baseline) |
+| `test_automation_cached.json` | Same form as deterministic nodes — **0 LLM tokens** |
+| `test_automation_gutenberg.json` | Gutenberg search → book → download (agentic baseline) |
+| `test_automation_gutenberg_cached.json` | Same flow deterministically — real `pg84.txt` download, **0 LLM tokens** |
+
+### Local override hook
+
+`inference/child_process.py` injects a local automation in place of the
+server-fetched one. Default `test_automation.json`; override with:
+
+```bash
+export OPTEXITY_LOCAL_AUTOMATION=test_automation_cached.json
+```
+
+The override also syncs the automation's declared input parameters with the
+incoming task's, so any dashboard endpoint can trigger it without a
+"missing/extra keys" task-validation error.
+
+### Fork-adaptation fixes
+
+The browser-use GitHub fork is newer than what this package was originally
+written against. These changes adapt optexity to the fork's protocol:
+
+| File | Change |
+|---|---|
+| `models/chat_litellm.py` | `ainvoke` accepts `**kwargs` (browser-use's LLM protocol passes `session_id`); previously every step failed with `session_id` TypeError |
+| `core/interaction/{handle_command,handle_input,handle_select,utils}.py`, `core/run_automation.py` | Dropped the removed `remove_empty_nodes=` kwarg from `llm_representation()` |
+| `infra/browser.py` | Stop forwarding `include_full_page` (removed from fork's summary API) |
+
+### Metrics
+
+See [`metrics.md`](metrics.md) for the agentic-vs-deterministic comparison on
+both sites (wall time, LLM tokens, cost, downloads).
