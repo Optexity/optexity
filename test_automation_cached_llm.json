@@ -1,0 +1,115 @@
+{
+  "browser_channel": "chromium",
+  "backend": "browser-use",
+  "allow_cookies": false,
+  "max_retries": 0,
+  "expected_downloads": 0,
+  "remove_empty_nodes_in_axtree": true,
+  "url": "https://www.roboform.com/filling-test-all-fields",
+  "reuse_page_if_already_on_url": false,
+  "take_final_screenshot": true,
+  "parameters": {
+    "input_parameters": {},
+    "secure_parameters": {},
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 10,
+        "max_timeout_seconds_per_try": 1.0,
+        "verify_before_step": true,
+        "input_text": {
+          "command": "locator(\"[name='04fullname']\").first",
+          "prompt_instructions": "",
+          "skip_command": false,
+          "skip_prompt": false,
+          "assert_locator_presence": false,
+          "input_text": "myname",
+          "is_slider": false,
+          "fill_or_type": "fill",
+          "press_enter": false,
+          "click_before_input": true
+        }
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 10,
+        "max_timeout_seconds_per_try": 1.0,
+        "verify_before_step": true,
+        "input_text": {
+          "command": "locator(\"[name='10address1']\").first",
+          "prompt_instructions": "",
+          "skip_command": false,
+          "skip_prompt": false,
+          "assert_locator_presence": false,
+          "input_text": "xyz",
+          "is_slider": false,
+          "fill_or_type": "fill",
+          "press_enter": false,
+          "click_before_input": true
+        }
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 10,
+        "max_timeout_seconds_per_try": 1.0,
+        "verify_before_step": true,
+        "input_text": {
+          "command": "locator(\"[name='11address2']\").first",
+          "prompt_instructions": "",
+          "skip_command": false,
+          "skip_prompt": false,
+          "assert_locator_presence": false,
+          "input_text": "abc",
+          "is_slider": false,
+          "fill_or_type": "fill",
+          "press_enter": false,
+          "click_before_input": true
+        }
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 10,
+        "max_timeout_seconds_per_try": 1.0,
+        "verify_before_step": true,
+        "input_text": {
+          "command": "locator(\"[name='13adr_city']\").first",
+          "prompt_instructions": "",
+          "skip_command": false,
+          "skip_prompt": false,
+          "assert_locator_presence": false,
+          "input_text": "SF",
+          "is_slider": false,
+          "fill_or_type": "fill",
+          "press_enter": false,
+          "click_before_input": true
+        }
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    }
+  ],
+  "post_processing_nodes": []
+}

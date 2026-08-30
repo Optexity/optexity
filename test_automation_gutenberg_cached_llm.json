@@ -1,0 +1,141 @@
+{
+  "browser_channel": "chromium",
+  "backend": "browser-use",
+  "allow_cookies": false,
+  "max_retries": 0,
+  "expected_downloads": 0,
+  "remove_empty_nodes_in_axtree": true,
+  "url": "https://www.gutenberg.org/",
+  "reuse_page_if_already_on_url": false,
+  "take_final_screenshot": true,
+  "parameters": {
+    "input_parameters": {},
+    "secure_parameters": {},
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 10,
+        "max_timeout_seconds_per_try": 1.0,
+        "verify_before_step": true,
+        "input_text": {
+          "command": "locator(\"[name='query']\").first",
+          "prompt_instructions": "",
+          "skip_command": false,
+          "skip_prompt": false,
+          "assert_locator_presence": false,
+          "input_text": "Frankenstein",
+          "is_slider": false,
+          "fill_or_type": "fill",
+          "press_enter": false,
+          "click_before_input": true
+        }
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 10,
+        "max_timeout_seconds_per_try": 1.0,
+        "verify_before_step": true,
+        "click_element": {
+          "command": "get_by_role(\"button\", name=\"Go!\")",
+          "prompt_instructions": "",
+          "skip_command": false,
+          "skip_prompt": false,
+          "assert_locator_presence": false,
+          "double_click": false,
+          "expect_download": false,
+          "button": "left",
+          "mouse_click": false,
+          "force": false
+        }
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 10,
+        "max_timeout_seconds_per_try": 1.0,
+        "verify_before_step": true,
+        "go_to_url": {
+          "url": "https://www.gutenberg.org/ebooks/search/?query=Frankenstein+Mary+Shelley",
+          "new_tab": false
+        }
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 10,
+        "max_timeout_seconds_per_try": 1.0,
+        "verify_before_step": true,
+        "click_element": {
+          "command": "locator(\"a[href='/ebooks/84']\").first",
+          "prompt_instructions": "",
+          "skip_command": false,
+          "skip_prompt": false,
+          "assert_locator_presence": false,
+          "double_click": false,
+          "expect_download": false,
+          "button": "left",
+          "mouse_click": false,
+          "force": false
+        }
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "max_tries": 10,
+        "max_timeout_seconds_per_try": 1.0,
+        "verify_before_step": true,
+        "click_element": {
+          "command": "get_by_text(\"Other formats & older devices\")",
+          "prompt_instructions": "",
+          "skip_command": false,
+          "skip_prompt": false,
+          "assert_locator_presence": false,
+          "double_click": false,
+          "expect_download": false,
+          "button": "left",
+          "mouse_click": false,
+          "force": false
+        }
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    },
+    {
+      "type": "action_node",
+      "python_script_action": {
+        "execution_code": "async def code_fn(page, ctx):\n    data = await page.evaluate(\n        \"\"\"async () => {\n            const res = await fetch(\"https://www.gutenberg.org/cache/epub/84/pg84.txt\");\n            if (!res.ok) throw new Error('HTTP ' + res.status);\n            return Array.from(new Uint8Array(await res.arrayBuffer()));\n        }\"\"\"\n    )\n    await ctx.save_download(\"pg84.txt\", content=bytes(data))\n"
+      },
+      "before_sleep_time": 0.0,
+      "end_sleep_time": 5.0,
+      "expect_new_tab": false,
+      "max_new_tab_wait_time": 0.0
+    }
+  ],
+  "post_processing_nodes": []
+}
