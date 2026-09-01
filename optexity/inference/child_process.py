@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import pathlib
+import re
 import signal
 import subprocess
 import sys
@@ -377,18 +378,19 @@ async def run_automation_in_process(
         await delete_local_data(task)
 
 
-MARKETPLACE_ENDPOINT_PREFIX = "marketplace_"
-MARKETPLACE_FUNCTION_MARKER = "fn_"
-MARKETPLACE_AUTOMATION_MARKER = "automation_"
+MARKETPLACE_ENDPOINT_PREFIX = "marketplace/"
+# Guards the dynamic import below. A "." or ".." segment would walk the module
+# namespace straight out of optexity_private.portals; a leading underscore would
+# reach a private helper, which neither dispatch path should ever resolve.
+_MARKETPLACE_SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_]*$")
 
 
-def parse_marketplace_endpoint_name(endpoint_name: str) -> tuple[str, str, str] | None:
-    """Split a marketplace endpoint name into ``(kind, portal, target)``.
+def parse_marketplace_endpoint_name(endpoint_name: str) -> tuple[str, str] | None:
+    """Split ``marketplace/<portal>/<target>`` into ``(portal, target)``.
 
-    The namespace states its kind rather than implying it by omission:
-
-        marketplace_<portal>_fn_<function>          -> ("fn", portal, function)
-        marketplace_<portal>_automation_<workflow>  -> ("automation", portal, workflow)
+    Whether the target is a browser-free function or a node graph is carried by
+    ``task.is_browser``, not spelled into the name -- the name says what to run,
+    the flag says what it needs to run on.
 
     Returns None for anything malformed, so a bad name is reported as such
     instead of being dispatched half-parsed. Mirrored in opcloud's
@@ -396,18 +398,13 @@ def parse_marketplace_endpoint_name(endpoint_name: str) -> tuple[str, str, str] 
     """
     if not endpoint_name.startswith(MARKETPLACE_ENDPOINT_PREFIX):
         return None
-    rest = endpoint_name[len(MARKETPLACE_ENDPOINT_PREFIX) :]
-    # The portal is always the first segment; the kind marker follows it.
-    portal, _, remainder = rest.partition("_")
-    if not portal or not remainder:
+    parts = endpoint_name[len(MARKETPLACE_ENDPOINT_PREFIX) :].split("/")
+    if len(parts) != 2:
         return None
-    if remainder.startswith(MARKETPLACE_FUNCTION_MARKER):
-        target = remainder[len(MARKETPLACE_FUNCTION_MARKER) :]
-        return ("fn", portal, target) if target else None
-    if remainder.startswith(MARKETPLACE_AUTOMATION_MARKER):
-        target = remainder[len(MARKETPLACE_AUTOMATION_MARKER) :]
-        return ("automation", portal, target) if target else None
-    return None
+    if not all(_MARKETPLACE_SEGMENT_RE.match(part) for part in parts):
+        return None
+    portal, target = parts
+    return portal, target
 
 
 async def run_marketplace_function(
@@ -415,19 +412,20 @@ async def run_marketplace_function(
 ) -> None:
     """Call a single `optexity_private.portals.<portal>.methods` function
     directly, with no browser/node graph — for endpoint_name
-    "marketplace_<portal>_fn_<function_name>". Cookie-requiring functions get
-    `processed_cookie_data` fetched from the DB here, never from the caller.
-    The dispatched function must be `async def` and return `(success, message)`.
+    "marketplace/<portal>/<function_name>" run with is_browser false.
+    Cookie-requiring functions get `processed_cookie_data` fetched from the DB
+    here, never from the caller. The dispatched function must be `async def`
+    and return `(success, message)`.
     """
     memory: Memory | None = None
     try:
         parsed = parse_marketplace_endpoint_name(task.endpoint_name)
-        if parsed is None or parsed[0] != "fn":
+        if parsed is None:
             raise ValueError(
-                f"'{task.endpoint_name}' is not a marketplace function endpoint "
-                "(expected marketplace_<portal>_fn_<function_name>)"
+                f"'{task.endpoint_name}' is not a marketplace endpoint "
+                "(expected marketplace/<portal>/<function_name>)"
             )
-        _, portal, function_name = parsed
+        portal, function_name = parsed
         module = importlib.import_module(f"optexity_private.portals.{portal}.methods")
         fn = getattr(module, function_name)
         if function_name.startswith("_") or not inspect.iscoroutinefunction(fn):
@@ -508,7 +506,7 @@ async def task_processor():
 
             marketplace = parse_marketplace_endpoint_name(task.endpoint_name)
 
-            if marketplace is not None and marketplace[0] == "fn":
+            if marketplace is not None and not task.is_browser:
                 task_running = True
                 last_task_start_time = datetime.now(timezone.utc)
                 current_task_timeout_minutes = task.max_timeout_in_minutes
@@ -523,21 +521,27 @@ async def task_processor():
                 fetch_success = False
                 try:
                     if marketplace is None:
-                        raise ValueError(
-                            "expected marketplace_<portal>_fn_<function> or "
-                            "marketplace_<portal>_automation_<workflow>"
-                        )
-                    _, portal, automation_name = marketplace
+                        raise ValueError("expected marketplace/<portal>/<target>")
+                    portal, automation_name = marketplace
+                    # methods.py is the single resolution point for every
+                    # marketplace target; a browser one exposes a zero-arg
+                    # function returning its Automation.
                     module = importlib.import_module(
-                        f"optexity_private.portals.{portal}.{automation_name}"
+                        f"optexity_private.portals.{portal}.methods"
                     )
-                    task.automation = module.automation
+                    task.automation = getattr(module, automation_name)()
                     fetch_success = True
                     logger.info(
                         f"Loaded marketplace automation '{automation_name}' "
                         f"(portal={portal}) for task {task.task_id}"
                     )
-                except (ImportError, AttributeError, ValueError) as marketplace_err:
+                except (
+                    ImportError,
+                    AttributeError,
+                    ValueError,
+                    # getattr resolved something that isn't a zero-arg callable.
+                    TypeError,
+                ) as marketplace_err:
                     automation_error = (
                         f"Failed to load marketplace automation "
                         f"'{task.endpoint_name}': {marketplace_err}"

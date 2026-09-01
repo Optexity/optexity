@@ -129,6 +129,11 @@ class Task(BaseModel):
     task_callback_url: str | None = None
     task_callback_api_key: str | None = None
     is_dedicated: bool = False
+    # Marketplace targets only: true runs the target's node graph on the browser
+    # fleet, false dispatches it as a browser-free methods.py function. Carried
+    # from InferenceRequest so both opcloud's pool routing and child_process.py's
+    # dispatch read the same value.
+    is_browser: bool = False
     # Dedicated limits carried with the task when is_dedicated is set via the
     # request (no DB policy row). Ignored for non-dedicated tasks and when a
     # dedicated_service DB row governs the service.
