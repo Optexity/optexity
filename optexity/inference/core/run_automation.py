@@ -160,17 +160,18 @@ async def run_automation(
         memory = Memory(unique_child_arn=unique_child_arn)
         memory.update_system_info()
 
+        automation = task.automation
+
         def _get_browser():
             return Browser(
                 memory=memory,
                 cdp_url=cdp_url,
                 llm_model=normalize_model(task.llm_provider, task.llm_model_name),
+                enable_browser_alerts=automation.enable_browser_alerts,
             )
 
         browser = _get_browser()
         memory.update_system_info()
-
-        automation = task.automation
         memory.automation_state.step_index = -1
         memory.automation_state.try_index = 0
 

@@ -196,6 +196,7 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             ),
             os_emulation=task.automation.os_emulation,
             allow_cookies=task.automation.allow_cookies,
+            enable_browser_alerts=task.automation.enable_browser_alerts,
         )
         try:
             await _global_actual_browser.start()

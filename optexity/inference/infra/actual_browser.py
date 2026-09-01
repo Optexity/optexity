@@ -87,6 +87,7 @@ class ActualBrowser:
         proxy_session_id: str | None = None,
         os_emulation: OsEmulation = None,
         allow_cookies: bool = False,
+        enable_browser_alerts: bool = False,
     ):
         # self.chrome_path = find_chrome_binary(channel)
         self.user_data_dir = f"/tmp/userdata_{unique_child_arn}"
@@ -96,6 +97,7 @@ class ActualBrowser:
         self.use_proxy = use_proxy
         self.proxy_session_id = proxy_session_id
         self.os_emulation = os_emulation
+        self.enable_browser_alerts = enable_browser_alerts
         self.playwright = None
         self.context = None
         self.proc = None
@@ -338,9 +340,40 @@ class ActualBrowser:
 
                 await self._wait_for_cdp()
                 logger.debug("CDP ready")
+
+                if self.enable_browser_alerts:
+                    self._register_dialog_handler()
         except Exception as e:
             logger.error(f"Error starting actual browser: {e}")
             raise e
+
+    def _register_dialog_handler(self) -> None:
+        """Answer native JS dialogs on the launching client's own context.
+
+        Without this, this client (which stays connected for the whole task)
+        has no dialog listener at all, so Playwright's default (silent
+        auto-dismiss) applies here while optexity.Browser's separate,
+        reconnected CDP client explicitly accepts everything — two
+        disagreeing, uncoordinated answers to the same dialog. Registering
+        the same accept policy here too removes that disagreement.
+        """
+        if self.context is None:
+            return
+
+        async def _safe_handle_dialog(dialog):
+            logger.info(
+                f"[parent] JS dialog: type={dialog.type!r} message={dialog.message!r}"
+            )
+            try:
+                await dialog.accept()
+            except Exception as e:
+                if "No dialog is showing" not in str(e):
+                    logger.error(f"Error handling dialog (parent): {e}", exc_info=True)
+
+        self.context.on(
+            "dialog",
+            lambda dialog: asyncio.create_task(_safe_handle_dialog(dialog)),
+        )
 
     async def _wait_for_cdp(self, timeout=10):
         logger.debug("Waiting for CDP")
