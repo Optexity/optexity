@@ -1,4 +1,8 @@
+import httpx
+
+from optexity.inference.core.cookie_logging import get_processed_cookie_data_in_server
 import asyncio
+import json
 import logging
 import os
 import re
@@ -11,10 +15,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+import aiofiles
 from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from patchright.async_api import expect as playwright_expect
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
+from optexity.inference.core.cookie_logging import save_processed_cookie_data_in_server
 from optexity.inference.core.for_loop_placeholders import (
     expand_iteration_placeholders,
 )
@@ -139,7 +145,7 @@ async def run_automation(
     cdp_url: str,
     max_tries: int = 1,
 ):
-    assert task.automation is not None, f"Task {task.task_id} has no automation"
+
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
 
@@ -152,6 +158,7 @@ async def run_automation(
     browser = None
     in_browser_setup = False
     entered_workflow = False
+    automation = None
 
     try:
         if task.retry_count == 0:
@@ -167,74 +174,85 @@ async def run_automation(
                 llm_model=normalize_model(task.llm_provider, task.llm_model_name),
             )
 
-        browser = _get_browser()
-        memory.update_system_info()
+        if task.is_browser:
+            assert task.automation is not None, f"Task {task.task_id} has no automation"
+            browser = _get_browser()
 
-        automation = task.automation
-        memory.automation_state.step_index = -1
-        memory.automation_state.try_index = 0
+            memory.update_system_info()
 
-        reuse_page = False
-        try:
-            in_browser_setup = True
-            await browser.start()
+            automation = task.automation
+            memory.automation_state.step_index = -1
+            memory.automation_state.try_index = 0
 
-            # Opt-in fast path for portals that error out on any reload: if the
-            # dedicated browser is still on automation.url, keep that page and
-            # skip about:blank / the proxy check / the navigation below.
-            if task.is_dedicated and automation.reuse_page_if_already_on_url:
-                reuse_page = await _can_reuse_page(browser, automation.url)
+            reuse_page = False
+            try:
+                in_browser_setup = True
+                await browser.start()
+
+                # Opt-in fast path for portals that error out on any reload: if the
+                # dedicated browser is still on automation.url, keep that page and
+                # skip about:blank / the proxy check / the navigation below.
+                if task.is_dedicated and automation.reuse_page_if_already_on_url:
+                    reuse_page = await _can_reuse_page(browser, automation.url)
+
+                if not reuse_page:
+                    await browser.go_to_url("about:blank")
+            except Exception as e:
+                logger.error(
+                    f"Error going to about:blank on start: {e}, stopping browser and restarting"
+                )
+                raise e
+            # Browser bring-up (where connect_over_cdp lives) succeeded. Later
+            # pre-workflow steps (proxy IP check, initial navigation) are not browser
+            # health problems, so drop out of the unconditional-restart window.
+            in_browser_setup = False
+
+            memory.update_system_info()
+
+            if task.use_proxy and not reuse_page:
+
+                page = await browser.get_current_page()
+                await asyncio.sleep(5)
+                await browser.go_to_url("https://ip.oxylabs.io/location")
+
+                ip_info = await page.evaluate(
+                    """
+                    async () => {
+                    const res = await fetch("https://ip.oxylabs.io/location");
+                    return await res.json();
+                    }
+                    """
+                )
+                if isinstance(ip_info, dict):
+                    memory.variables.output_data.append(
+                        OutputData(unique_identifier="ip_info", json_data=ip_info)
+                    )
+                elif isinstance(ip_info, str):
+                    memory.variables.output_data.append(
+                        OutputData(unique_identifier="ip_info", text=ip_info)
+                    )
+                else:
+                    try:
+                        memory.variables.output_data.append(
+                            OutputData(unique_identifier="ip_info", text=str(ip_info))
+                        )
+                    except Exception as e:
+                        logger.error(f"Error getting IP info: {e}")
 
             if not reuse_page:
-                await browser.go_to_url("about:blank")
-        except Exception as e:
-            logger.error(
-                f"Error going to about:blank on start: {e}, stopping browser and restarting"
-            )
-            raise e
-        # Browser bring-up (where connect_over_cdp lives) succeeded. Later
-        # pre-workflow steps (proxy IP check, initial navigation) are not browser
-        # health problems, so drop out of the unconditional-restart window.
-        in_browser_setup = False
-        memory.update_system_info()
-
-        if task.use_proxy and not reuse_page:
-
-            page = await browser.get_current_page()
-            await asyncio.sleep(5)
-            await browser.go_to_url("https://ip.oxylabs.io/location")
-
-            ip_info = await page.evaluate("""
-                async () => {
-                const res = await fetch("https://ip.oxylabs.io/location");
-                return await res.json();
-                }
-                """)
-            if isinstance(ip_info, dict):
-                memory.variables.output_data.append(
-                    OutputData(unique_identifier="ip_info", json_data=ip_info)
-                )
-            elif isinstance(ip_info, str):
-                memory.variables.output_data.append(
-                    OutputData(unique_identifier="ip_info", text=ip_info)
-                )
-            else:
-                try:
-                    memory.variables.output_data.append(
-                        OutputData(unique_identifier="ip_info", text=str(ip_info))
-                    )
-                except Exception as e:
-                    logger.error(f"Error getting IP info: {e}")
-
-        if not reuse_page:
-            await browser.go_to_url(task.automation.url, retry_count=3)
+                await browser.go_to_url(task.automation.url, retry_count=3)
         memory.update_system_info()
         memory.automation_state.start_2fa_time = datetime.now(timezone.utc)
 
         full_automation = []
 
         entered_workflow = True
-        await _run_nodes(automation.nodes, task, memory, browser, full_automation)
+        if task.is_browser:
+            assert automation is not None, f"Task {task.task_id} has no automation"
+            assert browser is not None, f"Browser is not set"
+            await _run_nodes(automation.nodes, task, memory, browser, full_automation)
+        else:
+            await run_api_automation(task, memory)
 
         task.status = "success"
     except AssertionError as e:
@@ -266,14 +284,22 @@ async def run_automation(
         task.status = "failed"
 
     finally:
-        if task.retry_count == task.automation.max_retries or task.status == "success":
+
+        if (
+            (
+                task.automation is not None
+                and task.retry_count == task.automation.max_retries
+            )
+            or task.status == "success"
+            or not task.is_browser
+        ):
             if task and task.status == "running":
                 task.status = "failed"
                 task.error = "Task could not catch browser exception"
-            if task and memory and browser:
+            if task and memory and browser and task.is_browser:
                 await run_final_downloads_check(task, memory, browser)
                 await run_post_processing_nodes(task, memory, browser)
-            if memory and browser:
+            if memory:
                 await run_final_logging(task, memory, browser, child_process_id)
         if browser is not None:
             try:
@@ -374,33 +400,38 @@ async def run_final_downloads_check(task: Task, memory: Memory, browser: Browser
 
 
 async def run_final_logging(
-    task: Task, memory: Memory, browser: Browser, child_process_id: int
+    task: Task, memory: Memory, browser: Browser | None, child_process_id: int
 ):
 
     try:
-        try:
-            memory.automation_state.step_index += 1
-            browser_state_summary = await browser.get_browser_state_summary()
-            memory.browser_states.append(
-                BrowserState(
-                    url=browser_state_summary.url,
-                    screenshot=browser_state_summary.screenshot,
-                    title=browser_state_summary.title,
-                    axtree=browser_state_summary.dom_state.llm_representation(
-                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-                    ),
-                )
-            )
 
-            if task.automation.take_final_screenshot:
-                memory.final_screenshot = await browser.get_screenshot(full_page=True)
-        except Exception as e:
-            logger.error(f"Error getting final screenshot: {e}")
+        if task.is_browser and browser is not None:
+            try:
+                memory.automation_state.step_index += 1
+                browser_state_summary = await browser.get_browser_state_summary()
+                memory.browser_states.append(
+                    BrowserState(
+                        url=browser_state_summary.url,
+                        screenshot=browser_state_summary.screenshot,
+                        title=browser_state_summary.title,
+                        axtree=browser_state_summary.dom_state.llm_representation(
+                            remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
+                        ),
+                    )
+                )
+
+                if task.automation.take_final_screenshot:
+                    memory.final_screenshot = await browser.get_screenshot(
+                        full_page=True
+                    )
+            except Exception as e:
+                logger.error(f"Error getting final screenshot: {e}")
 
         await save_output_data_in_server(task, memory)
         await save_downloads_in_server(task, memory)
         await save_latest_memory_state_locally(task, memory, None)
         await save_trajectory_in_server(task)
+        await save_processed_cookie_data_in_server(task, memory)
         # Mark the task complete only after all artifacts (output data, downloads,
         # trajectory) are uploaded, since opcloud tears down this container's ECS
         # task as soon as complete_task is received, racing any uploads still in flight.
@@ -491,6 +522,15 @@ async def run_action_node(
                 await run_llm_query_action(misc.llm_query, memory, task)
             elif misc.count_locator:
                 await run_count_locator_action(misc.count_locator, memory, browser)
+
+        if browser is not None:
+            cookies = await browser.get_cookies()
+            if cookies is not None:
+                download_path = task.downloads_directory / "cookies.json"
+                async with aiofiles.open(download_path, "w") as f:
+                    await f.write(json.dumps(cookies))
+                if download_path not in memory.downloads:
+                    memory.downloads.append(download_path)
 
     except Exception as e:
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
@@ -998,3 +1038,43 @@ async def _run_nodes(
 
 async def run_post_processing_nodes(task: Task, memory: Memory, browser: Browser):
     await _run_nodes(task.automation.post_processing_nodes, task, memory, browser, [])
+
+
+async def run_api_automation(task: Task, memory: Memory):
+
+    processed_cookie_data = await get_processed_cookie_data_in_server(task)
+
+    request_body = {"processed_cookie_data": processed_cookie_data}
+    for key, value in task.input_parameters.items():
+        request_body[key] = value
+
+    with httpx.Client() as client:
+        response = client.post(
+            f"{settings.MARKETPLACE_SERVER_URL}/{task.endpoint_name}",
+            json=request_body,
+        )
+        if response.status_code != 200:
+            raise Exception(f"Failed to run API automation: {response.text}")
+        response_data = response.json()
+
+        function_path = response_data["function_path"]
+        function_name = response_data["function_name"]
+
+        from importlib.util import spec_from_file_location, module_from_spec
+        from pathlib import Path
+
+        def load_function(filename: str, function_name: str):
+            path = Path(filename).resolve()
+
+            spec = spec_from_file_location(path.stem, path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Cannot import {path}")
+
+            module = module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            return getattr(module, function_name)
+
+        func = load_function(function_path, function_name)
+
+        await func(processed_cookie_data, task, memory)

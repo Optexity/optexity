@@ -1,11 +1,45 @@
 import asyncio
+
 import os
 import sys
 
+
 from optexity.inference.core.run_automation import run_automation
 from optexity.private_nodes import load_plugins
+from optexity.schema.automation import Automation
 from optexity.schema.enums import ExitCodes
 from optexity.schema.task import Task
+from optexity.utils.settings import settings
+
+
+def is_browser_automation(task: Task) -> bool:
+    import httpx
+
+    with httpx.Client() as client:
+        response = client.post(
+            f"{settings.MARKETPLACE_SERVER_URL}/{task.endpoint_name}",
+            json={"get_type": True},
+        )
+        if response.status_code != 200:
+            raise Exception(f"Failed to get automation type: {response.text}")
+        if response.json()["type"] == "Browser":
+            return True
+    return False
+
+
+def get_automation(task: Task) -> Automation:
+    import httpx
+
+    with httpx.Client() as client:
+
+        response = client.post(
+            f"{settings.MARKETPLACE_SERVER_URL}/{task.endpoint_name}",
+        )
+        if response.status_code != 200:
+            raise Exception(f"Failed to get automation: {response.text}")
+
+        automation = Automation.model_validate(response.json()["data"])
+        return automation
 
 
 def _force_exit(code: int) -> None:
