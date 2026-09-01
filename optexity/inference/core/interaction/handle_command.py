@@ -130,9 +130,7 @@ async def command_based_action_with_retry(
                     summary = await browser.get_browser_state_summary(
                         include_screenshot=False
                     )
-                    axtree = summary.dom_state.llm_representation(
-                        remove_empty_nodes=task.automation.remove_empty_nodes_in_axtree
-                    )
+                    axtree = summary.dom_state.llm_representation()
                     logger.debug(
                         f"Command-step axtree capture took "
                         f"{(time.perf_counter() - axtree_capture_start) * 1000:.0f}ms "

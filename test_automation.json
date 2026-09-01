@@ -1,0 +1,20 @@
+{
+    "url": "https://www.roboform.com/filling-test-all-fields",
+    "parameters": {
+      "input_parameters": {
+      },
+      "generated_parameters": {}
+    },
+    "nodes": [
+      {
+        "type": "action_node",
+        "interaction_action": {
+          "agentic_task": {
+            "task": "fill the full name as myname, address line one as xyz and line 2 as abc, city as SF",
+            "max_steps": 15,
+            "backend": "browser_use"
+          }
+        }
+      }
+    ]
+  }

@@ -123,17 +123,19 @@ class ChatLiteLLM(BaseChatModel):
 
     @overload
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: None = None
+        self, messages: list[BaseMessage], output_format: None = None, **kwargs: Any
     ) -> ChatInvokeCompletion[str]: ...
 
     @overload
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: type[T]
+        self, messages: list[BaseMessage], output_format: type[T], **kwargs: Any
     ) -> ChatInvokeCompletion[T]: ...
 
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: type[T] | None = None
+        self, messages: list[BaseMessage], output_format: type[T] | None = None, **kwargs: Any
     ) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
+        # **kwargs is part of browser-use's LLM protocol (base.py): the Agent
+        # passes metadata like session_id for tracing. We accept and ignore it.
         try:
             response = await litellm.acompletion(
                 **self._request(messages, output_format)

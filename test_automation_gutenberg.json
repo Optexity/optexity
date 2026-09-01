@@ -1,0 +1,19 @@
+{
+  "url": "https://www.gutenberg.org",
+  "parameters": {
+    "input_parameters": {},
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "search for the book Frankenstein by Mary Shelley, open its book page, and download the 'Plain Text UTF-8' file",
+          "max_steps": 20,
+          "backend": "browser_use"
+        }
+      }
+    }
+  ]
+}
