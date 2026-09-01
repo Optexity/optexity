@@ -199,6 +199,9 @@ class ActualBrowser:
             "--disable-background-networking",
             "--disable-sync",
             "--disable-translate",
+            # /dev/shm is small by default under Docker/ECS; heavy pages can exhaust it
+            # and crash the renderer. This makes Chromium use /tmp-backed shared memory instead.
+            "--disable-dev-shm-usage",
             # ---- automation hygiene
             f"--remote-debugging-port={self.port}",
             "--remote-debugging-address=127.0.0.1",

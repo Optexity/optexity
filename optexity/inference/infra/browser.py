@@ -208,28 +208,51 @@ class Browser:
             return False, 0
 
         total_time = 0
-        while total_time < max_wait_time:
+        try:
+            while total_time < max_wait_time:
+                pages = self.context.pages
+                if len(pages) > self.previous_total_pages:
+                    break
+                await asyncio.sleep(1)
+                total_time += 1
+
             pages = self.context.pages
-            if len(pages) > self.previous_total_pages:
-                break
-            await asyncio.sleep(1)
-            total_time += 1
+            if len(pages) == self.previous_total_pages:
+                return False, total_time
 
-        pages = self.context.pages
-        if len(pages) == self.previous_total_pages:
+            # Give the new tab a moment to actually navigate/attach before handing it to
+            # browser_use's independent CDP connection. Switching the instant the page object
+            # exists (before it's attached) races with browser_use's own Target.attachToTarget
+            # and can sever the connection; wait_for_load_state is best-effort since we'd
+            # rather proceed late than fail the whole node over a page that's just slow.
+            new_page = pages[-1]
+            try:
+                await new_page.wait_for_load_state("domcontentloaded", timeout=3000)
+            except (PatchrightTimeoutError, PlaywrightTimeoutError):
+                logger.debug(
+                    "New tab did not reach domcontentloaded within 3s, proceeding anyway"
+                )
+            except Exception as e:
+                logger.debug(
+                    f"Error waiting for new tab to stabilize, proceeding anyway: {e}"
+                )
+
+            tabs = await self.backend_agent.browser_session.get_tabs()
+
+            for tab in tabs[::-1]:
+                if tab.target_id not in self.page_to_target_id:
+                    self.page_to_target_id.append(tab.target_id)
+            self.previous_total_pages = len(pages)
+
+            tab_id = self.page_to_target_id[-1][-4:]
+            action_model = self.backend_agent.ActionModel(
+                **{"switch": {"tab_id": tab_id}}
+            )
+            await self.backend_agent.multi_act([action_model])
+            return True, total_time
+        except Exception as e:
+            logger.error(f"Error handling new tabs: {e}", exc_info=True)
             return False, total_time
-
-        tabs = await self.backend_agent.browser_session.get_tabs()
-
-        for tab in tabs[::-1]:
-            if tab.target_id not in self.page_to_target_id:
-                self.page_to_target_id.append(tab.target_id)
-        self.previous_total_pages = len(pages)
-
-        tab_id = self.page_to_target_id[-1][-4:]
-        action_model = self.backend_agent.ActionModel(**{"switch": {"tab_id": tab_id}})
-        await self.backend_agent.multi_act([action_model])
-        return True, total_time
 
     async def close_current_tab(self):
         if self.context is None or self.backend_agent is None:
