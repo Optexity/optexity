@@ -1934,6 +1934,11 @@
                         "title": "Allow Cookies",
                         "default": false
                     },
+                    "enable_browser_alerts": {
+                        "type": "boolean",
+                        "title": "Enable Browser Alerts",
+                        "default": false
+                    },
                     "max_retries": { "type": "integer", "title": "Max Retries", "default": 0 },
                     "expected_downloads": {
                         "type": "integer",

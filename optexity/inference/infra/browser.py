@@ -31,6 +31,7 @@ class Browser:
         stealth: bool = True,
         backend: Literal["browser-use", "browserbase"] = "browser-use",
         llm_model: str | None = None,
+        enable_browser_alerts: bool = False,
     ):
 
         self.stealth = stealth
@@ -38,6 +39,7 @@ class Browser:
         # litellm model string for the download-handling agent. None falls back
         # to LLM_MODEL; run_automation passes the task's own model.
         self.llm_model = llm_model
+        self.enable_browser_alerts = enable_browser_alerts
 
         self.playwright: (
             playwright.async_api.Playwright | patchright.async_api.Playwright | None
@@ -85,6 +87,9 @@ class Browser:
 
             # TODO: remove this handling from browseruse
             async def _safe_handle_dialog(dialog):
+                logger.info(
+                    f"JS dialog: type={dialog.type!r} message={dialog.message!r}"
+                )
                 try:
                     await dialog.accept()
                 except Exception as e:
@@ -114,6 +119,23 @@ class Browser:
             #         )
             #     ),
             # )
+
+            if self.enable_browser_alerts:
+                # browser_use's PopupsWatchdog answers dialogs independently
+                # (and disagrees with the handler above for prompt-type
+                # dialogs), racing it. No public API to disable it.
+                try:
+                    from browser_use.browser.watchdogs.popups_watchdog import (
+                        PopupsWatchdog,
+                    )
+
+                    PopupsWatchdog.attach_to_session = lambda self, *a, **kw: None
+                except Exception:
+                    logger.error(
+                        "Could not neutralize browser_use PopupsWatchdog; "
+                        "dialog double-handling may occur",
+                        exc_info=True,
+                    )
 
             browser_session = BrowserSession(
                 cdp_url=self.cdp_url, keep_alive=True, auto_download_pdfs=False
