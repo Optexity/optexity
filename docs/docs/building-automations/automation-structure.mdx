@@ -14,6 +14,7 @@ Automation
 ├── os_emulation         # OS to emulate: "windows", "linux", or null
 ├── max_retries          # Total run attempts on failure (default: 1)
 ├── expected_downloads   # Number of files to download
+├── enable_browser_alerts   # Log native JS dialogs (alert/confirm/prompt) as they're auto-accepted
 ├── reuse_page_if_already_on_url   # Skip navigation when already on url (dedicated only)
 ├── parameters           # Input, secure, and generated variables
 └── nodes[]              # Sequence of actions
@@ -62,6 +63,7 @@ Automation
 | `os_emulation` | `"windows" \| "linux" \| null` | `null` | OS user-agent to emulate; `null` uses the default system OS |
 | `max_retries` | `int` | `0` | Total number of run attempts. `0` = no retry, `1` = one retry, etc. |
 | `expected_downloads` | `int` | `0` | Number of expected downloads (automation waits for completion) |
+| `enable_browser_alerts` | `bool` | `false` | Log native JS dialogs (`alert`, `confirm`, `prompt`) as they're encountered. See [Browser Alerts](#browser-alerts) |
 | `reuse_page_if_already_on_url` | `bool` | `false` | Start on the existing page instead of navigating, when a dedicated browser is already on `url`. See [Reuse Page If Already On URL](#reuse-page-if-already-on-url) |
 | `parameters` | `Parameters` | — | Input, secure, and generated variables |
 | `nodes` | `list[action_node \| for_loop_node \| if_else_node \| private_node]` | — | Ordered list of actions |
@@ -135,6 +137,20 @@ Set this to wait for file downloads to complete:
 ```
 
 The automation waits until all expected files are downloaded before completing.
+
+## Browser Alerts
+
+Native JS dialogs (`alert`, `confirm`, `prompt`) are always auto-accepted so they never block the automation. Set `enable_browser_alerts` to also log each dialog's type and message when one is triggered:
+
+```json
+{
+  "enable_browser_alerts": true
+}
+```
+
+<Tip>
+Turn this on while building or debugging an automation against a site that pops native dialogs, so you can see in the logs when and why one fired. Leave it off otherwise.
+</Tip>
 
 ## OS Emulation
 
