@@ -18,6 +18,26 @@ logger = logging.getLogger(__name__)
 _SPACE_PLACEHOLDER = "_._"
 
 
+def _sniff_image_media_type(screenshot_b64: str) -> str:
+    """Detect the real encoding of a base64 screenshot from its magic bytes.
+
+    Screenshots reach here from more than one capture path (our own
+    Playwright page.screenshot(), which defaults to PNG, vs. browser_use's
+    ScreenshotWatchdog, which explicitly captures JPEG) — declaring a fixed
+    media type regardless of the source causes providers like Anthropic to
+    reject the image outright when it doesn't match. 
+    """
+    try:
+        header = base64.b64decode(screenshot_b64[:16])
+    except Exception:
+        return "png"
+    if header.startswith(b"\xff\xd8\xff"):
+        return "jpeg"
+    if header.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    return "png"
+
+
 def _sanitize_schema_keys(obj):
     """Recursively replace spaces in dict keys with _._
 
@@ -114,11 +134,14 @@ class LiteLLMModel(LLMModel):
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
 
         if screenshot is not None:
+            media_type = _sniff_image_media_type(screenshot)
             content.insert(
                 0,
                 {
                     "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{screenshot}"},
+                    "image_url": {
+                        "url": f"data:image/{media_type};base64,{screenshot}"
+                    },
                 },
             )
         elif pdf_url is not None:

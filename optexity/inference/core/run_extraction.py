@@ -103,6 +103,7 @@ async def run_extraction_action(
             browser,
             task,
             extraction_action.unique_identifier,
+            extraction_action.allow_none,
         )
     elif extraction_action.network_call:
         await handle_network_call_extraction(
@@ -235,6 +236,7 @@ async def handle_llm_extraction(
     browser: Browser,
     task: Task,
     unique_identifier: str | None = None,
+    allow_none: bool = False,
 ):
     system_instruction = f"""
     You are an expert in extracting information from a website. You will be given an axtree of a webpage.
@@ -294,6 +296,7 @@ async def handle_llm_extraction(
 
         v2_null_retry_eligible = (
             task.version == "v2"
+            and not allow_none
             and _llm_extraction_uses_axtree_or_screenshot(llm_extraction)
             and _extraction_response_contains_null(response_dict)
         )

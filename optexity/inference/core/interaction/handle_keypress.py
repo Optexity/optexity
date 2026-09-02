@@ -12,31 +12,35 @@ async def handle_key_press(
     if page is None:
         return
 
-    if keypress_action.type == KeyPressType.ENTER:
+    key_type = keypress_action.type
+    if isinstance(key_type, str):
+        key_type = key_type.capitalize()
+
+    if key_type == KeyPressType.ENTER:
         await page.keyboard.press("Enter")
-    if keypress_action.type == KeyPressType.TAB:
+    if key_type == KeyPressType.TAB:
         await page.keyboard.press("Tab")
-    if keypress_action.type == KeyPressType.ZERO:
+    if key_type == KeyPressType.ZERO:
         await page.keyboard.press("0")
-    if keypress_action.type == KeyPressType.ONE:
+    if key_type == KeyPressType.ONE:
         await page.keyboard.press("1")
-    if keypress_action.type == KeyPressType.TWO:
+    if key_type == KeyPressType.TWO:
         await page.keyboard.press("2")
-    if keypress_action.type == KeyPressType.THREE:
+    if key_type == KeyPressType.THREE:
         await page.keyboard.press("3")
-    if keypress_action.type == KeyPressType.FOUR:
+    if key_type == KeyPressType.FOUR:
         await page.keyboard.press("4")
-    if keypress_action.type == KeyPressType.FIVE:
+    if key_type == KeyPressType.FIVE:
         await page.keyboard.press("5")
-    if keypress_action.type == KeyPressType.SIX:
+    if key_type == KeyPressType.SIX:
         await page.keyboard.press("6")
-    if keypress_action.type == KeyPressType.SEVEN:
+    if key_type == KeyPressType.SEVEN:
         await page.keyboard.press("7")
-    if keypress_action.type == KeyPressType.EIGHT:
+    if key_type == KeyPressType.EIGHT:
         await page.keyboard.press("8")
-    if keypress_action.type == KeyPressType.NINE:
+    if key_type == KeyPressType.NINE:
         await page.keyboard.press("9")
-    if keypress_action.type == KeyPressType.SLASH:
+    if key_type == KeyPressType.SLASH:
         await page.keyboard.press("/")
-    if keypress_action.type == KeyPressType.SPACE:
+    if key_type == KeyPressType.SPACE:
         await page.keyboard.press("Space")

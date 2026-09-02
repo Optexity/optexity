@@ -99,10 +99,12 @@ class Browser:
                         return
                     logger.error(f"Error handling dialog: {e}", exc_info=True)
 
-            self.context.on(
-                "dialog",
-                lambda dialog: asyncio.create_task(_safe_handle_dialog(dialog)),
-            )
+            if not self.enable_browser_alerts:
+                # When enable_browser_alerts is on, actual_browser.py's parent-context handler is the sole dialog answerer (see its _register_dialog_handler
+                self.context.on(
+                    "dialog",
+                    lambda dialog: asyncio.create_task(_safe_handle_dialog(dialog)),
+                )
 
             self.context.on("request", lambda req: self.log_request(req))
             self.context.on("response", lambda resp: self.log_response(resp))
