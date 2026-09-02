@@ -372,6 +372,9 @@ class ActualBrowser:
                 f"[parent] JS dialog: type={dialog.type!r} message={dialog.message!r}"
             )
             try:
+                # window.alert/confirm/prompt takes to return and treat a sub-~10ms response as proof the browser is silently auto-suppressing dialogs,
+                # time so the round-trip clears such checks.
+                await asyncio.sleep(0.15)
                 await dialog.accept()
             except Exception as e:
                 if "No dialog is showing" not in str(e):
