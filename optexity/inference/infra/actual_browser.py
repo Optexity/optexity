@@ -379,6 +379,7 @@ class ActualBrowser:
             except Exception as e:
                 if "No dialog is showing" not in str(e):
                     logger.error(f"Error handling dialog (parent): {e}", exc_info=True)
+
         self.context.on(
             "dialog",
             lambda dialog: asyncio.create_task(_safe_handle_dialog(dialog)),

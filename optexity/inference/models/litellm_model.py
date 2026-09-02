@@ -25,7 +25,7 @@ def _sniff_image_media_type(screenshot_b64: str) -> str:
     Playwright page.screenshot(), which defaults to PNG, vs. browser_use's
     ScreenshotWatchdog, which explicitly captures JPEG) — declaring a fixed
     media type regardless of the source causes providers like Anthropic to
-    reject the image outright when it doesn't match. 
+    reject the image outright when it doesn't match.
     """
     try:
         header = base64.b64decode(screenshot_b64[:16])
