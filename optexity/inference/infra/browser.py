@@ -99,8 +99,10 @@ class Browser:
                         return
                     logger.error(f"Error handling dialog: {e}", exc_info=True)
 
-            if not self.enable_browser_alerts:
-                # When enable_browser_alerts is on, actual_browser.py's parent-context handler is the sole dialog answerer (see its _register_dialog_handler
+            if self.enable_browser_alerts:
+                # Keep a no-op dialog listener so this CDP client doesn't auto-dismiss dialogs before the parent context handles them.
+                self.context.on("dialog", lambda dialog: None)
+            else:
                 self.context.on(
                     "dialog",
                     lambda dialog: asyncio.create_task(_safe_handle_dialog(dialog)),
