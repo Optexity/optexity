@@ -16,6 +16,9 @@ class InferenceRequest(BaseModel):
     is_dedicated: bool = (
         False  ## Opt into dedicated mode per-request. In cloud mode a dedicated_service DB row (admin policy) takes precedence over this flag.
     )
+    # Marketplace targets only: true runs the target's node graph on the browser
+    # fleet, false runs it as a browser-free methods.py function on the lite pool.
+    is_browser: bool = False
     task_callback_url: str | None = None
     task_callback_api_key: str | None = None
     # Dedicated limits used only when is_dedicated is true and no DB policy row

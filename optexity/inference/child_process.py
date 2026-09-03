@@ -1,9 +1,12 @@
 import argparse
 import asyncio
+import importlib
+import inspect
 import json
 import logging
 import os
 import pathlib
+import re
 import signal
 import subprocess
 import sys
@@ -23,14 +26,17 @@ from optexity.inference.core.logging import (
     complete_task_in_server,
     delete_local_data,
     initiate_callback,
+    save_downloads_in_server,
+    save_output_data_in_server,
     save_trajectory_in_server,
+    start_task_in_server,
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.inference.infra.browser_health import consume_browser_restart_request
 from optexity.schema.automation import Automation
 from optexity.schema.enums import ExitCodes
 from optexity.schema.inference import InferenceRequest
-from optexity.schema.memory import SystemInfo
+from optexity.schema.memory import Memory, SystemInfo
 from optexity.schema.task import Task
 from optexity.utils.http import request_with_backoff
 from optexity.utils.settings import settings
@@ -373,6 +379,119 @@ async def run_automation_in_process(
         await delete_local_data(task)
 
 
+MARKETPLACE_ENDPOINT_PREFIX = "marketplace/"
+# Guards the dynamic import below. A "." or ".." segment would walk the module
+# namespace straight out of optexity_private.portals; a leading underscore would
+# reach a private helper, which neither dispatch path should ever resolve.
+_MARKETPLACE_SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_]*$")
+
+
+def parse_marketplace_endpoint_name(endpoint_name: str) -> tuple[str, str] | None:
+    """Split ``marketplace/<portal>/<target>`` into ``(portal, target)``.
+
+    Whether the target is a browser-free function or a node graph is carried by
+    ``task.is_browser``, not spelled into the name -- the name says what to run,
+    the flag says what it needs to run on.
+
+    Returns None for anything malformed, so a bad name is reported as such
+    instead of being dispatched half-parsed. Mirrored in opcloud's
+    `shared/marketplace.py` (this package cannot import it); keep both in step.
+    """
+    if not endpoint_name.startswith(MARKETPLACE_ENDPOINT_PREFIX):
+        return None
+    parts = endpoint_name[len(MARKETPLACE_ENDPOINT_PREFIX) :].split("/")
+    if len(parts) != 2:
+        return None
+    if not all(_MARKETPLACE_SEGMENT_RE.match(part) for part in parts):
+        return None
+    portal, target = parts
+    return portal, target
+
+
+async def run_marketplace_function(
+    task: Task, unique_child_arn: str, child_process_id: int
+) -> None:
+    """Call a single `optexity_private.portals.<portal>.methods` function
+    directly, with no browser/node graph — for endpoint_name
+    "marketplace/<portal>/<function_name>" run with is_browser false.
+    Cookie-requiring functions get `processed_cookie_data` fetched from the DB
+    here, never from the caller. The dispatched function must be `async def`
+    and return `(success, message)`.
+    """
+    memory: Memory | None = None
+    try:
+        parsed = parse_marketplace_endpoint_name(task.endpoint_name)
+        if parsed is None:
+            raise ValueError(
+                f"'{task.endpoint_name}' is not a marketplace endpoint "
+                "(expected marketplace/<portal>/<function_name>)"
+            )
+        portal, function_name = parsed
+        module = importlib.import_module(f"optexity_private.portals.{portal}.methods")
+        fn = getattr(module, function_name)
+        if function_name.startswith("_") or not inspect.iscoroutinefunction(fn):
+            raise ValueError(f"'{function_name}' is not a dispatchable function")
+
+        await start_task_in_server(task)
+        memory = Memory(unique_child_arn=unique_child_arn)
+
+        params = inspect.signature(fn).parameters
+        kwargs = {}
+        if "processed_cookie_data" in params:
+            processed_cookie_data = await module.get_processed_cookie_data_in_server(
+                task
+            )
+            if not processed_cookie_data:
+                raise ValueError(
+                    f"No saved session cookies found for portal '{portal}' "
+                    f"(task {task.task_id}); cannot call '{function_name}'"
+                )
+            kwargs["processed_cookie_data"] = processed_cookie_data
+        if "task" in params:
+            kwargs["task"] = task
+        if "memory" in params:
+            kwargs["memory"] = memory
+
+        # Dispatchable functions are real async I/O (httpx, not requests) and
+        # return (success, message) rather than raising for expected failures,
+        # so this can be awaited directly without blocking the event loop
+        # this shares with /health and /kill_task for every other task.
+        success, message = await fn(**kwargs)
+        if success:
+            task.status = "success"
+            logger.info(
+                f"Marketplace function succeeded for task {task.task_id}: {message}"
+            )
+        else:
+            task.status = "failed"
+            task.error = message
+            logger.error(
+                f"Marketplace function failed for task {task.task_id}: {message}"
+            )
+    except Exception as e:
+        logger.error(
+            f"Marketplace function call failed for task {task.task_id} "
+            f"({task.endpoint_name}): {e}"
+        )
+        task.error = str(e)
+        task.status = "failed"
+
+    task.completed_at = datetime.now(timezone.utc)
+    if memory is not None:
+        await save_output_data_in_server(task, memory)
+        await save_downloads_in_server(task, memory)
+    try:
+        await complete_task_in_server(
+            task,
+            memory.token_usage if memory else None,
+            child_process_id,
+            unique_child_arn,
+        )
+        await initiate_callback(task)
+    except Exception as fail_err:
+        logger.error(f"Failed to report task {task.task_id} completion: {fail_err}")
+
+
 async def task_processor():
     """Background worker that processes tasks from the queue one at a time."""
     global task_running, last_task_start_time, current_task_timeout_minutes
@@ -386,54 +505,103 @@ async def task_processor():
                 tasks_to_kill.remove(task.task_id)
                 continue
 
-            # Fetch fresh automation from server just before running so any
-            # workflow changes after allocation are picked up. Client errors
-            # (<500) retry 3x with 3s wait; 5xx / unreachable use up to 4 min
-            # exponential backoff.
-            recording_url = settings.GET_RECORDING_ENDPOINT.format(
-                recording_id=task.recording_id
-            )
-            fetch_url = f"{settings.SERVER_URL.rstrip('/')}/{recording_url}"
-            fetch_success = False
-            response, attempt = await request_with_backoff(
-                fetch_url,
-                headers={"x-api-key": task.api_key},
-                log_label=f"automation fetch for task {task.task_id}",
-            )
-            if response is not None:
-                try:
-                    data = response.json()
-                    task.automation = Automation.model_validate(data["automation"])
-                    # Use recording/workspace callback_url only if no per-task
-                    # override exists on either field (task_callback_url takes
-                    # priority; task.callback_url may have been set via x-callback-url
-                    # header and must not be overwritten).
-                    if (
-                        task.callback_url is None
-                        and not task.task_callback_url
-                        and data.get("callback_url")
-                    ):
-                        from optexity.schema.task import CallbackUrl
+            marketplace = parse_marketplace_endpoint_name(task.endpoint_name)
 
-                        try:
-                            task.callback_url = CallbackUrl.model_validate(
-                                data["callback_url"]
-                            )
-                        except Exception as cb_err:
-                            logger.warning(
-                                f"Failed to parse callback_url for task "
-                                f"{task.task_id}: {cb_err}"
-                            )
+            if marketplace is not None and not task.is_browser:
+                task_running = True
+                last_task_start_time = datetime.now(timezone.utc)
+                current_task_timeout_minutes = task.max_timeout_in_minutes
+                await run_marketplace_function(task, unique_child_arn, child_process_id)
+                continue
+
+            automation_error: str | None = None
+            if task.endpoint_name.startswith(MARKETPLACE_ENDPOINT_PREFIX):
+                # Marketplace automations are plain .py modules shipped in
+                # optexity_private (worker image only) — built directly instead
+                # of fetching a recording-backed automation from opcloud.
+                fetch_success = False
+                try:
+                    if marketplace is None:
+                        raise ValueError("expected marketplace/<portal>/<target>")
+                    portal, automation_name = marketplace
+                    # methods.py is the single resolution point for every
+                    # marketplace target; a browser one exposes a zero-arg
+                    # function returning its Automation.
+                    module = importlib.import_module(
+                        f"optexity_private.portals.{portal}.methods"
+                    )
+                    task.automation = getattr(module, automation_name)()
                     fetch_success = True
                     logger.info(
-                        f"Fetched fresh automation for task {task.task_id} "
-                        f"(recording {task.recording_id})"
+                        f"Loaded marketplace automation '{automation_name}' "
+                        f"(portal={portal}) for task {task.task_id}"
                     )
-                except Exception as parse_err:
-                    logger.warning(
-                        f"Failed to parse automation response for task "
-                        f"{task.task_id}: {parse_err}"
+                except (
+                    ImportError,
+                    AttributeError,
+                    ValueError,
+                    # getattr resolved something that isn't a zero-arg callable.
+                    TypeError,
+                ) as marketplace_err:
+                    automation_error = (
+                        f"Failed to load marketplace automation "
+                        f"'{task.endpoint_name}': {marketplace_err}"
                     )
+                    logger.error(f"{automation_error} (task {task.task_id})")
+            else:
+                # Fetch fresh automation from server just before running so any
+                # workflow changes after allocation are picked up. Client errors
+                # (<500) retry 3x with 3s wait; 5xx / unreachable use up to 4 min
+                # exponential backoff.
+                recording_url = settings.GET_RECORDING_ENDPOINT.format(
+                    recording_id=task.recording_id
+                )
+                fetch_url = f"{settings.SERVER_URL.rstrip('/')}/{recording_url}"
+                fetch_success = False
+                response, attempt = await request_with_backoff(
+                    fetch_url,
+                    headers={"x-api-key": task.api_key},
+                    log_label=f"automation fetch for task {task.task_id}",
+                )
+                if response is not None:
+                    try:
+                        data = response.json()
+                        task.automation = Automation.model_validate(data["automation"])
+                        # Use recording/workspace callback_url only if no per-task
+                        # override exists on either field (task_callback_url takes
+                        # priority; task.callback_url may have been set via x-callback-url
+                        # header and must not be overwritten).
+                        if (
+                            task.callback_url is None
+                            and not task.task_callback_url
+                            and data.get("callback_url")
+                        ):
+                            from optexity.schema.task import CallbackUrl
+
+                            try:
+                                task.callback_url = CallbackUrl.model_validate(
+                                    data["callback_url"]
+                                )
+                            except Exception as cb_err:
+                                logger.warning(
+                                    f"Failed to parse callback_url for task "
+                                    f"{task.task_id}: {cb_err}"
+                                )
+                        fetch_success = True
+                        logger.info(
+                            f"Fetched fresh automation for task {task.task_id} "
+                            f"(recording {task.recording_id})"
+                        )
+                    except Exception as parse_err:
+                        logger.warning(
+                            f"Failed to parse automation response for task "
+                            f"{task.task_id}: {parse_err}"
+                        )
+                if not fetch_success:
+                    automation_error = (
+                        f"Failed to fetch automation after {attempt} attempts"
+                    )
+
             if not fetch_success:
                 if task.automation is not None:
                     logger.warning(
@@ -446,7 +614,7 @@ async def task_processor():
                         f"marking failed and firing callback"
                     )
                     task.status = "failed"
-                    task.error = f"Failed to fetch automation after {attempt} attempts"
+                    task.error = automation_error
                     task.completed_at = datetime.now(timezone.utc)
                     try:
                         await complete_task_in_server(
