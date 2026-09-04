@@ -90,7 +90,7 @@
                         "pages": ["/api-reference/callback", "/api-reference/stream-endpoint"]
                     },
                     {
-                        "group": "HTTP API",
+                        "group": "HTTPS API",
                         "openapi": "openapi.json",
                         "pages": [
                             "POST /api/v1/inference",
@@ -102,7 +102,10 @@
                             "POST /api/v1/add_example",
                             "POST /api/v1/update_example",
                             "POST /api/v1/validate_api_key",
-                            "PATCH /api/v1/update_recording/{recording_id}"
+                            "PATCH /api/v1/update_recording/{recording_id}",
+                            "GET /api/v1/get_workspaces",
+                            "GET /api/v1/get_recordings",
+                            "GET /api/v1/get_tasks"
                         ]
                     }
                 ]
