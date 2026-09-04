@@ -1,6 +1,7 @@
 {
     "openapi": "3.1.0",
     "info": { "title": "Dashboard Backend API", "version": "0.1.0" },
+    "servers": [{ "url": "https://api.optexity.com" }],
     "paths": {
         "/api/v1/agents/{agent_id}/runs": {
             "post": {
@@ -137,12 +138,52 @@
                 }
             }
         },
+        "/api/v1/get_workspaces": {
+            "get": {
+                "tags": ["dashboard"],
+                "summary": "Get Workspaces",
+                "operationId": "get_workspaces_api_v1_get_workspaces_get",
+                "parameters": [
+                    {
+                        "name": "x-api-key",
+                        "in": "header",
+                        "required": true,
+                        "schema": { "type": "string", "title": "X-Api-Key" }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": { "application/json": { "schema": {} } }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/get_recordings": {
             "get": {
                 "tags": ["dashboard"],
                 "summary": "Get Recordings",
                 "operationId": "get_recordings_api_v1_get_recordings_get",
                 "parameters": [
+                    {
+                        "name": "workspace_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [{ "type": "string" }, { "type": "null" }],
+                            "description": "Workspace to list recordings from. Defaults to the caller's default workspace.",
+                            "title": "Workspace Id"
+                        },
+                        "description": "Workspace to list recordings from. Defaults to the caller's default workspace."
+                    },
                     {
                         "name": "endpoint_name",
                         "in": "query",
@@ -183,6 +224,17 @@
                 "summary": "Get Tasks",
                 "operationId": "get_tasks_api_v1_get_tasks_get",
                 "parameters": [
+                    {
+                        "name": "workspace_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [{ "type": "string" }, { "type": "null" }],
+                            "description": "Workspace to list tasks from. Defaults to the caller's default workspace.",
+                            "title": "Workspace Id"
+                        },
+                        "description": "Workspace to list tasks from. Defaults to the caller's default workspace."
+                    },
                     {
                         "name": "page",
                         "in": "query",
