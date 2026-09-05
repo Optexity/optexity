@@ -21,12 +21,14 @@ class InferenceRequest(BaseModel):
     is_browser: bool = False
     task_callback_url: str | None = None
     task_callback_api_key: str | None = None
-    # Dedicated limits used only when is_dedicated is true and no DB policy row
-    # exists. max_parallelism is the service-wide cap (clamped server-side, see
-    # DEDICATED_MAX_REQUEST_PARALLELISM); per_login_parallelism is how many
-    # containers a single login may use before its tasks round-robin onto them.
-    max_parallelism: int = 1
-    per_login_parallelism: int = 1
+    # Concurrency caps, applied to every task type (dedicated, shared browser,
+    # API). max_parallelism bounds tasks running at once for (user, url);
+    # per_login_parallelism bounds tasks running at once for (user, url,
+    # unique_parameters). Precedence server-side: these values (clamped to
+    # DEDICATED_MAX_REQUEST_PARALLELISM) > dedicated_service DB row > defaults
+    # (1 / 1 for dedicated, DEFAULT_PARALLELISM otherwise). None = not supplied.
+    max_parallelism: int | None = None
+    per_login_parallelism: int | None = None
     task_callback_url: str | None = None
     task_callback_api_key: str | None = None
     # Optional queue priority: lower runs first, negatives allowed, None runs

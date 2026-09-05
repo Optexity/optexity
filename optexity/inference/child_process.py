@@ -548,10 +548,14 @@ async def task_processor():
                         f"'{task.endpoint_name}': {marketplace_err}"
                     )
                     logger.error(f"{automation_error} (task {task.task_id})")
+            elif task.automation is not None:
+                # opcloud fetched the fresh automation (and callback_url) from
+                # the DB right before allocating this task; nothing to fetch.
+                fetch_success = True
             else:
-                # Fetch fresh automation from server just before running so any
-                # workflow changes after allocation are picked up. Client errors
-                # (<500) retry 3x with 3s wait; 5xx / unreachable use up to 4 min
+                # Fallback for tasks allocated without an automation: fetch it
+                # from the server just before running. Client errors (<500)
+                # retry 3x with 3s wait; 5xx / unreachable use up to 4 min
                 # exponential backoff.
                 recording_url = settings.GET_RECORDING_ENDPOINT.format(
                     recording_id=task.recording_id
