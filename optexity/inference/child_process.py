@@ -33,12 +33,10 @@ from optexity.inference.core.logging import (
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.inference.infra.browser_health import consume_browser_restart_request
-from optexity.schema.automation import Automation
 from optexity.schema.enums import ExitCodes
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import Memory, SystemInfo
 from optexity.schema.task import Task
-from optexity.utils.http import request_with_backoff
 from optexity.utils.settings import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -548,88 +546,32 @@ async def task_processor():
                         f"'{task.endpoint_name}': {marketplace_err}"
                     )
                     logger.error(f"{automation_error} (task {task.task_id})")
-            elif task.automation is not None:
-                # opcloud fetched the fresh automation (and callback_url) from
-                # the DB right before allocating this task; nothing to fetch.
-                fetch_success = True
             else:
-                # Fallback for tasks allocated without an automation: fetch it
-                # from the server just before running. Client errors (<500)
-                # retry 3x with 3s wait; 5xx / unreachable use up to 4 min
-                # exponential backoff.
-                recording_url = settings.GET_RECORDING_ENDPOINT.format(
-                    recording_id=task.recording_id
-                )
-                fetch_url = f"{settings.SERVER_URL.rstrip('/')}/{recording_url}"
-                fetch_success = False
-                response, attempt = await request_with_backoff(
-                    fetch_url,
-                    headers={"x-api-key": task.api_key},
-                    log_label=f"automation fetch for task {task.task_id}",
-                )
-                if response is not None:
-                    try:
-                        data = response.json()
-                        task.automation = Automation.model_validate(data["automation"])
-                        # Use recording/workspace callback_url only if no per-task
-                        # override exists on either field (task_callback_url takes
-                        # priority; task.callback_url may have been set via x-callback-url
-                        # header and must not be overwritten).
-                        if (
-                            task.callback_url is None
-                            and not task.task_callback_url
-                            and data.get("callback_url")
-                        ):
-                            from optexity.schema.task import CallbackUrl
-
-                            try:
-                                task.callback_url = CallbackUrl.model_validate(
-                                    data["callback_url"]
-                                )
-                            except Exception as cb_err:
-                                logger.warning(
-                                    f"Failed to parse callback_url for task "
-                                    f"{task.task_id}: {cb_err}"
-                                )
-                        fetch_success = True
-                        logger.info(
-                            f"Fetched fresh automation for task {task.task_id} "
-                            f"(recording {task.recording_id})"
-                        )
-                    except Exception as parse_err:
-                        logger.warning(
-                            f"Failed to parse automation response for task "
-                            f"{task.task_id}: {parse_err}"
-                        )
+                # opcloud fetches the fresh automation (and callback_url) from
+                # the DB right before allocating a recording task, so it must
+                # already be on the task.
+                fetch_success = task.automation is not None
                 if not fetch_success:
-                    automation_error = (
-                        f"Failed to fetch automation after {attempt} attempts"
-                    )
+                    automation_error = "Task allocated without an automation"
 
             if not fetch_success:
-                if task.automation is not None:
-                    logger.warning(
-                        f"All automation fetch attempts failed for task {task.task_id}; "
-                        f"using in-memory fallback"
+                logger.error(
+                    f"{automation_error} (task {task.task_id}); "
+                    f"marking failed and firing callback"
+                )
+                task.status = "failed"
+                task.error = automation_error
+                task.completed_at = datetime.now(timezone.utc)
+                try:
+                    await complete_task_in_server(
+                        task, None, child_process_id, unique_child_arn
                     )
-                else:
+                    await initiate_callback(task)
+                except Exception as fail_err:
                     logger.error(
-                        f"All automation fetch attempts failed for task {task.task_id}; "
-                        f"marking failed and firing callback"
+                        f"Failed to report task {task.task_id} failure: {fail_err}"
                     )
-                    task.status = "failed"
-                    task.error = automation_error
-                    task.completed_at = datetime.now(timezone.utc)
-                    try:
-                        await complete_task_in_server(
-                            task, None, child_process_id, unique_child_arn
-                        )
-                        await initiate_callback(task)
-                    except Exception as fail_err:
-                        logger.error(
-                            f"Failed to report task {task.task_id} failure: {fail_err}"
-                        )
-                    continue
+                continue
 
             task_running = True
             last_task_start_time = datetime.now(timezone.utc)

@@ -1473,9 +1473,9 @@
         "/api/v1/recording/{recording_id}": {
             "get": {
                 "tags": ["recording"],
-                "summary": "Get Recording For Child",
-                "description": "Return automation and resolved callback_url for a recording.\n\nCalled by child workers just before running a task to get fresh automation\nand the effective callback URL (recording-level, falling back to workspace).\nRequires workspace membership — the task was already authorized at creation\ntime so no additional ownership check is needed beyond this.",
-                "operationId": "get_recording_for_child_api_v1_recording__recording_id__get",
+                "summary": "Get Recording",
+                "description": "Return the automation and resolved callback_url for a recording.\n\nThe callback URL is the recording-level one, falling back to the workspace\ndefault. Requires workspace membership.",
+                "operationId": "get_recording_api_v1_recording__recording_id__get",
                 "parameters": [
                     {
                         "name": "recording_id",
