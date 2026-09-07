@@ -196,6 +196,17 @@
                         "description": "Filter by endpoint name pattern (case-insensitive)"
                     },
                     {
+                        "name": "include_marketplace",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+                            "description": "Include marketplace-type recordings. Defaults to excluding them.",
+                            "title": "Include Marketplace"
+                        },
+                        "description": "Include marketplace-type recordings. Defaults to excluding them."
+                    },
+                    {
                         "name": "x-api-key",
                         "in": "header",
                         "required": true,
@@ -928,6 +939,53 @@
                         }
                     }
                 }
+            },
+            "post": {
+                "tags": ["task_details"],
+                "summary": "Get task status (single or batch)",
+                "description": "Returns the current status and lifecycle timestamps for one or more tasks. Pass `task_id` as a single string for the single-task shape (`{success, task}`, 404 if not found), or as an array for the batch shape (`{success, tasks, found_task_count, not_found_task_ids}`, always 200).",
+                "operationId": "task_status_multi_api_v1_task_status_post",
+                "parameters": [
+                    {
+                        "name": "x-api-key",
+                        "in": "header",
+                        "required": true,
+                        "schema": { "type": "string", "title": "X-Api-Key" }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/TaskStatusRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        { "$ref": "#/components/schemas/TaskStatusResponse" },
+                                        { "$ref": "#/components/schemas/TaskStatusBatchResponse" }
+                                    ],
+                                    "description": "TaskStatusResponse when `task_id` was a string; TaskStatusBatchResponse when it was an array.",
+                                    "title": "Response"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/get_output_data": {
@@ -1058,7 +1116,7 @@
             "post": {
                 "tags": ["task_details"],
                 "summary": "Get callback payload",
-                "description": "Returns the full task result payload in the same shape sent to callback URLs. Pass full_logs=true to also include for_loop_status.",
+                "description": "Returns the full task result payload in the same shape sent to callback URLs. Pass `task_id` as a single string for the single-task shape (`{success, data}`), or as an array for the batch shape (`{success, data: [...], found_task_count, not_found_task_ids}`). `endpoint_name` is optional — when supplied it's echoed back onto every payload as-is; when omitted it's resolved server-side per task from its recording. Pass full_logs=true to also include for_loop_status.",
                 "operationId": "get_callback_data_api_v1_get_callback_data_post",
                 "parameters": [
                     {
@@ -1084,9 +1142,7 @@
                     "required": true,
                     "content": {
                         "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Body_get_callback_data_api_v1_get_callback_data_post"
-                            }
+                            "schema": { "$ref": "#/components/schemas/GetCallbackDataRequest" }
                         }
                     }
                 },
@@ -1095,7 +1151,16 @@
                         "description": "Successful Response",
                         "content": {
                             "application/json": {
-                                "schema": { "$ref": "#/components/schemas/GetCallbackDataResponse" }
+                                "schema": {
+                                    "anyOf": [
+                                        { "$ref": "#/components/schemas/GetCallbackDataResponse" },
+                                        {
+                                            "$ref": "#/components/schemas/GetCallbackDataBatchResponse"
+                                        }
+                                    ],
+                                    "description": "GetCallbackDataResponse when `task_id` was a string; GetCallbackDataBatchResponse when it was an array.",
+                                    "title": "Response"
+                                }
                             }
                         }
                     },
@@ -2084,15 +2149,6 @@
                 "required": ["automation", "description", "endpoint_name"],
                 "title": "Body_add_example_api_v1_add_example_post"
             },
-            "Body_get_callback_data_api_v1_get_callback_data_post": {
-                "properties": {
-                    "task_id": { "type": "string", "title": "Task Id" },
-                    "endpoint_name": { "type": "string", "title": "Endpoint Name" }
-                },
-                "type": "object",
-                "required": ["task_id", "endpoint_name"],
-                "title": "Body_get_callback_data_api_v1_get_callback_data_post"
-            },
             "Body_initiate_callback_api_v1_initiate_callback_post": {
                 "properties": {
                     "task_id": { "type": "string", "title": "Task Id" },
@@ -2879,6 +2935,44 @@
                 "type": "object",
                 "required": ["variable_name", "index", "value", "status"],
                 "title": "ForLoopStatus"
+            },
+            "GetCallbackDataBatchResponse": {
+                "properties": {
+                    "success": { "type": "boolean", "title": "Success" },
+                    "data": {
+                        "items": { "$ref": "#/components/schemas/CallbackDataItem" },
+                        "type": "array",
+                        "title": "Data"
+                    },
+                    "found_task_count": { "type": "integer", "title": "Found Task Count" },
+                    "not_found_task_ids": {
+                        "items": { "type": "string" },
+                        "type": "array",
+                        "title": "Not Found Task Ids"
+                    }
+                },
+                "type": "object",
+                "required": ["success", "data", "found_task_count", "not_found_task_ids"],
+                "title": "GetCallbackDataBatchResponse"
+            },
+            "GetCallbackDataRequest": {
+                "properties": {
+                    "task_id": {
+                        "anyOf": [
+                            { "type": "string" },
+                            { "items": { "type": "string" }, "type": "array" }
+                        ],
+                        "title": "Task Id"
+                    },
+                    "endpoint_name": {
+                        "anyOf": [{ "type": "string" }, { "type": "null" }],
+                        "title": "Endpoint Name"
+                    }
+                },
+                "type": "object",
+                "required": ["task_id"],
+                "title": "GetCallbackDataRequest",
+                "description": "`task_id` accepts either a single task id or a list of them — the\nresponse shape mirrors whichever was sent. `endpoint_name` is optional:\nwhen supplied it's trusted client input echoed onto every payload\nunchanged (matching the original single-task contract); when omitted\nit's resolved server-side per task from its recording."
             },
             "GetCallbackDataResponse": {
                 "properties": {
@@ -4271,6 +4365,25 @@
                 "required": ["task_id", "started_at"],
                 "title": "TaskStartedRequest"
             },
+            "TaskStatusBatchResponse": {
+                "properties": {
+                    "success": { "type": "boolean", "title": "Success" },
+                    "tasks": {
+                        "items": { "$ref": "#/components/schemas/TaskStatusData" },
+                        "type": "array",
+                        "title": "Tasks"
+                    },
+                    "found_task_count": { "type": "integer", "title": "Found Task Count" },
+                    "not_found_task_ids": {
+                        "items": { "type": "string" },
+                        "type": "array",
+                        "title": "Not Found Task Ids"
+                    }
+                },
+                "type": "object",
+                "required": ["success", "tasks", "found_task_count", "not_found_task_ids"],
+                "title": "TaskStatusBatchResponse"
+            },
             "TaskStatusData": {
                 "properties": {
                     "task_id": { "type": "string", "title": "Task Id" },
@@ -4299,6 +4412,21 @@
                 "type": "object",
                 "required": ["task_id", "status"],
                 "title": "TaskStatusData"
+            },
+            "TaskStatusRequest": {
+                "properties": {
+                    "task_id": {
+                        "anyOf": [
+                            { "type": "string" },
+                            { "items": { "type": "string" }, "type": "array" }
+                        ],
+                        "title": "Task Id"
+                    }
+                },
+                "type": "object",
+                "required": ["task_id"],
+                "title": "TaskStatusRequest",
+                "description": "`task_id` accepts either a single task id or a list of them —\nthe response shape mirrors whichever was sent."
             },
             "TaskStatusResponse": {
                 "properties": {
