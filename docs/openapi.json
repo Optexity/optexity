@@ -943,7 +943,7 @@
             "post": {
                 "tags": ["task_details"],
                 "summary": "Get task status (single or batch)",
-                "description": "Returns the current status and lifecycle timestamps for one or more tasks. Pass `task_id` as a single string for the single-task shape (`{success, task}`, 404 if not found), or as an array for the batch shape (`{success, tasks, found_task_count, not_found_task_ids}`, always 200).",
+                "description": "Returns the current status and lifecycle timestamps for one or more tasks. Pass `task_id` as a single string for the single-task shape (`{success, task}`, 404 if not found), or as an array for the batch shape (`{success, tasks, found_task_count, not_found_task_ids}`, always 200). Batches are capped at 50 `task_id`s per request.",
                 "operationId": "task_status_multi_api_v1_task_status_post",
                 "parameters": [
                     {
@@ -1116,7 +1116,7 @@
             "post": {
                 "tags": ["task_details"],
                 "summary": "Get callback payload",
-                "description": "Returns the full task result payload in the same shape sent to callback URLs. Pass `task_id` as a single string for the single-task shape (`{success, data}`), or as an array for the batch shape (`{success, data: [...], found_task_count, not_found_task_ids}`). `endpoint_name` is optional — when supplied it's echoed back onto every payload as-is; when omitted it's resolved server-side per task from its recording. Pass full_logs=true to also include for_loop_status.",
+                "description": "Returns the full task result payload in the same shape sent to callback URLs. Pass `task_id` as a single string for the single-task shape (`{success, data}`, 404 if not found), or as an array for the batch shape (`{success, data: [...], found_task_count, not_found_task_ids}`, always 200). Batches are capped at 50 `task_id`s per request. `endpoint_name` is optional — when supplied it's echoed back onto every payload as-is; when omitted it's resolved server-side per task from its recording. Pass full_logs=true to also include for_loop_status.",
                 "operationId": "get_callback_data_api_v1_get_callback_data_post",
                 "parameters": [
                     {
@@ -2972,7 +2972,7 @@
                 "type": "object",
                 "required": ["task_id"],
                 "title": "GetCallbackDataRequest",
-                "description": "`task_id` accepts either a single task id or a list of them — the\nresponse shape mirrors whichever was sent. `endpoint_name` is optional:\nwhen supplied it's trusted client input echoed onto every payload\nunchanged (matching the original single-task contract); when omitted\nit's resolved server-side per task from its recording."
+                "description": "`task_id` accepts either a single task id or a list of them — the\nresponse shape mirrors whichever was sent. A list is capped at\n`MAX_BATCH_TASK_IDS` (50) items per request. `endpoint_name` is\noptional: when supplied it's trusted client input echoed onto every\npayload unchanged (matching the original single-task contract); when\nomitted it's resolved server-side per task from its recording."
             },
             "GetCallbackDataResponse": {
                 "properties": {
@@ -4426,7 +4426,7 @@
                 "type": "object",
                 "required": ["task_id"],
                 "title": "TaskStatusRequest",
-                "description": "`task_id` accepts either a single task id or a list of them —\nthe response shape mirrors whichever was sent."
+                "description": "`task_id` accepts either a single task id or a list of them —\nthe response shape mirrors whichever was sent. A list is capped at\n`MAX_BATCH_TASK_IDS` (50) items per request."
             },
             "TaskStatusResponse": {
                 "properties": {
