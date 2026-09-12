@@ -16,6 +16,8 @@ class Settings(LLMSettings):
     UPDATE_EXAMPLE_ENDPOINT: str = "api/v1/update_example"
     START_TASK_ENDPOINT: str = "api/v1/start_task"
     COMPLETE_TASK_ENDPOINT: str = "api/v1/complete_task"
+    # Attempts for the terminal-status callback (5xx / transport only).
+    COMPLETE_TASK_MAX_ATTEMPTS: int = 3
     SAVE_OUTPUT_DATA_ENDPOINT: str = "api/v1/save_output_data"
     REQUEST_DOWNLOAD_UPLOAD_URLS_ENDPOINT: str = "api/v1/request_download_upload_urls"
     CONFIRM_DOWNLOADS_ENDPOINT: str = "api/v1/confirm_downloads"
