@@ -88,39 +88,53 @@ async def complete_task_in_server(
     child_process_id: int,
     unique_child_arn: str | None = None,
 ) -> dict | None:
-    try:
-        task.completed_at = datetime.now(timezone.utc)
+    """Report the task's terminal status. Retries 5xx / transport failures.
 
-        url = urljoin(settings.SERVER_URL, settings.COMPLETE_TASK_ENDPOINT)
-        headers = {"x-api-key": task.api_key}
-        body = {
-            "task_id": task.task_id,
-            "child_process_id": child_process_id,
-            "unique_child_arn": unique_child_arn,
-            "completed_at": task.completed_at.isoformat(),
-            "status": task.status,
-            "error": task.error,
-            "retry_count": task.retry_count + 1,
-        }
-        if token_usage:
-            body["token_usage"] = token_usage.model_dump()
+    This callback is the only thing that writes the task's terminal row, so
+    dropping it on a transient server error leaves the task stuck in "running".
+    """
+    task.completed_at = datetime.now(timezone.utc)
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                url,
-                headers=headers,
-                json=body,
+    url = urljoin(settings.SERVER_URL, settings.COMPLETE_TASK_ENDPOINT)
+    headers = {"x-api-key": task.api_key}
+    body = {
+        "task_id": task.task_id,
+        "child_process_id": child_process_id,
+        "unique_child_arn": unique_child_arn,
+        "completed_at": task.completed_at.isoformat(),
+        "status": task.status,
+        "error": task.error,
+        "retry_count": task.retry_count + 1,
+    }
+    if token_usage:
+        body["token_usage"] = token_usage.model_dump()
+
+    attempts = settings.COMPLETE_TASK_MAX_ATTEMPTS
+    last_error = "unknown error"
+    for attempt in range(attempts):
+        if attempt:
+            await asyncio.sleep(2 ** (attempt - 1))
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, headers=headers, json=body)
+                if response.status_code < 500:
+                    # 4xx will not pass on a retry either.
+                    response.raise_for_status()
+                    return response.json()
+                last_error = f"{response.status_code} - {response.text}"
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"Failed to complete task in server: {e.response.status_code} - {e.response.text}"
             )
-
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPStatusError as e:
-        logger.error(
-            f"Failed to complete task in server: {e.response.status_code} - {e.response.text}"
+            return None
+        except Exception as e:
+            last_error = f"{type(e).__name__}: {e}"
+        logger.warning(
+            f"Failed to complete task in server (attempt {attempt + 1}/{attempts}): "
+            f"{last_error}"
         )
-
-    except Exception as e:
-        logger.error(f"Failed to complete task in server: {e}")
+    logger.error(f"Failed to complete task in server after {attempts} attempts")
+    return None
 
 
 async def save_output_data_in_server(task: Task, memory: Memory):
