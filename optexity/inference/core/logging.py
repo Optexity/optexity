@@ -177,7 +177,6 @@ async def save_downloads_in_server(task: Task, memory: Memory):
     try:
         headers = {"x-api-key": task.api_key}
 
-        files: list[tuple[str, bytes]] = []
         downloads = [
             download
             for download in task.downloads_directory.iterdir()
@@ -188,8 +187,11 @@ async def save_downloads_in_server(task: Task, memory: Memory):
             f"found {len(downloads)} download file(s): "
             f"{[(d.name, d.stat().st_size) for d in downloads]}"
         )
-        for download in downloads:
-            files.append((download.name, await asyncio.to_thread(download.read_bytes)))
+
+        # Downloads stay on disk until their own PUT: a doc-heavy task can pull
+        # tens of files, and holding them all in memory at once is what OOM-kills
+        # a lite worker. Screenshots are already decoded in memory.
+        files: list[tuple[str, Path | bytes]] = [(d.name, d) for d in downloads]
 
         for data in memory.variables.output_data:
             if data.screenshot:
@@ -226,11 +228,11 @@ async def save_downloads_in_server(task: Task, memory: Memory):
         logger.info(
             f"[save_downloads_in_server] task={task.task_id} "
             f"starting direct-to-S3 upload of {len(files)} file(s): "
-            f"{[(f, uploads_by_filename[f]['content_type'], len(c)) for f, c in files if f in uploads_by_filename]}"
+            f"{[(f, uploads_by_filename[f]['content_type']) for f, _ in files if f in uploads_by_filename]}"
         )
         uploaded_filenames = []
         async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT) as client:
-            for filename, content in files:
+            for filename, source in files:
                 upload = uploads_by_filename.get(filename)
                 if upload is None:
                     logger.warning(
@@ -239,6 +241,20 @@ async def save_downloads_in_server(task: Task, memory: Memory):
                     )
                     continue
                 put_start = time.monotonic()
+                try:
+                    # Read inside the loop so only one file is resident at a
+                    # time; the previous one is released on reassignment.
+                    content = (
+                        source
+                        if isinstance(source, bytes)
+                        else await asyncio.to_thread(source.read_bytes)
+                    )
+                except OSError as e:
+                    logger.error(
+                        f"[save_downloads_in_server] task={task.task_id} "
+                        f"could not read {filename!r}, skipping: {type(e).__name__}: {e}"
+                    )
+                    continue
                 try:
                     put_response = await client.put(
                         upload["upload_url"],
