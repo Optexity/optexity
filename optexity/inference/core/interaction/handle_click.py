@@ -59,7 +59,7 @@ async def click_element_index(
 ):
 
     try:
-        index = await get_index_from_prompt(
+        index, dom_node = await get_index_from_prompt(
             memory, click_element_action.prompt_instructions, browser, task
         )
         if index is None:
@@ -82,6 +82,7 @@ async def click_element_index(
             await LocatorExtraction.log_interacted_locator(
                 browser,
                 index,
+                dom_node,
                 f".click(button={click_element_action.button!r})",
                 memory,
             )

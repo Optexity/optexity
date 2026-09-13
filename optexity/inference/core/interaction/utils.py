@@ -312,10 +312,138 @@ class LocatorExtraction:
         return False
 
     @staticmethod
+    def _escape_css_string(value: str) -> str:
+        """Escape a value for embedding in a single-quoted CSS string literal
+        (backslash first, then the quote — same escaping order as
+        _quote_locator_value, but for the CSS syntax layer rather than the
+        outer Python string layer that wraps it)."""
+        return value.replace("\\", "\\\\").replace("'", "\\'")
+
+    @staticmethod
     def _css_attr(tag: str, attr: str, value: str) -> str:
         """Build a css attribute selector using single quotes for the inner value so it
         survives being wrapped in a double-quoted ``locator("...")`` expression."""
-        return f"{tag}[{attr}='{value}']"
+        escaped = LocatorExtraction._escape_css_string(value)
+        return f"{tag}[{attr}='{escaped}']"
+
+    @classmethod
+    def _bare_frame_selector(cls, node) -> str | None:
+        """A single durable, bare selector (no ``locator(...)``/``get_by_...()``
+        wrapper) for an ``<iframe>`` element, suitable for Playwright's
+        ``frame_locator()`` (which takes a raw selector string, not a chained
+        locator-builder call). Prefers attributes least likely to change across
+        reloads/deploys.
+
+        Deliberately never returns the CDP ``frame_id`` browser_use tags nodes
+        with internally — that id is session-ephemeral (regenerated on every
+        navigation/reload) and would be meaningless the next time this
+        automation runs. Only durable DOM attributes of the iframe element
+        itself are ever persisted.
+        """
+        attrs = getattr(node, "attributes", None) or {}
+        tag = (getattr(node, "tag_name", "") or "iframe").lower()
+        for attr in ("id", "name", "data-testid", "title", "src"):
+            val = (attrs.get(attr) or "").strip()
+            if val and not cls._looks_dynamic(val):
+                if attr == "id" and re.match(r"^[A-Za-z][\w-]*$", val):
+                    return f"#{val}"
+                return cls._css_attr(tag, attr, val)
+        xpath = (getattr(node, "xpath", "") or "").strip()
+        return f"xpath={xpath}" if xpath else None
+
+    @classmethod
+    def _frame_locator_prefix_from_tree_node(cls, node) -> str:
+        """Best-effort ``.frame_locator(...)`` chain needed to reach ``node``'s
+        containing document from the top-level page, built by walking
+        browser_use's own cross-frame ``EnhancedDOMTreeNode.parent_node`` links
+        (confirmed to cross iframe boundaries: a frame's document root's
+        ``parent_node`` is the ``<iframe>`` element itself in the outer
+        document — the same link ``EnhancedDOMTreeNode.xpath`` walks and
+        explicitly stops at). No CDP round-trips, no reaching into Playwright's
+        private ``Frame``/``Locator`` internals — the whole cross-frame tree is
+        already in memory because browser_use built it to construct its
+        selector_map in the first place.
+
+        Returns ``""`` when ``node`` isn't inside any iframe, or when a
+        boundary iframe has no durable selector available (never guesses with
+        the ephemeral ``frame_id`` — see ``_bare_frame_selector``).
+        """
+        segments: list[str] = []
+        current = getattr(node, "parent_node", None)
+        hops = 0
+        while current is not None and hops < 8:
+            hops += 1
+            if (getattr(current, "tag_name", "") or "").lower() == "iframe":
+                sel = cls._bare_frame_selector(current)
+                if sel is None:
+                    return ""
+                segments.append(sel)
+            current = getattr(current, "parent_node", None)
+        if not segments:
+            return ""
+        segments.reverse()
+        return "".join(
+            f".frame_locator({cls._quote_locator_value(s, 400)})" for s in segments
+        )
+
+    @classmethod
+    async def _verify_candidate(
+        cls, page, frame_prefix: str, loc: str, expected_bounds
+    ) -> bool:
+        """Best-effort: does ``page<frame_prefix>.<loc>`` resolve to exactly one
+        live element, and does it plausibly match the element this candidate
+        was actually built from (bounding-box proximity — a CDP
+        ``backend_node_id`` isn't comparable to anything Playwright exposes, so
+        this is the pragmatic identity check)? Never raises — a failure here
+        just means "not verified," same "logging-only, never blocks control
+        flow" posture as the rest of this class.
+        """
+        try:
+            located = eval(f"page{frame_prefix}.{loc}")
+            if await located.count() != 1:
+                return False
+            if expected_bounds is None:
+                return True
+            box = await located.bounding_box()
+            if box is None:
+                return False
+            tolerance = 5.0
+            return (
+                abs(box["x"] - expected_bounds.x) <= tolerance
+                and abs(box["y"] - expected_bounds.y) <= tolerance
+            )
+        except Exception:
+            return False
+
+    @classmethod
+    async def candidates_from_tree_node(cls, node, method: str, page) -> list[dict]:
+        """The ranked, frame-aware, uniqueness-verified candidate list for a
+        browser_use ``EnhancedDOMTreeNode`` — shared by the axtree and agentic
+        tiers, both of which resolve elements via browser_use's own DOM tree
+        (unlike the command tier, which already has a real Playwright
+        ``Locator`` and goes through ``locator_from_playwright`` instead).
+
+        Verified candidates always sort before unverified ones (each group
+        keeps its internal stability-score order), so ``candidates[0]`` is
+        verified whenever any candidate is — closing the "does NOT check
+        uniqueness" gap this class's docstring has documented since it was
+        heuristic-only.
+        """
+        frame_prefix = cls._frame_locator_prefix_from_tree_node(node)
+        bounds = getattr(getattr(node, "snapshot_node", None), "bounds", None)
+        verified: list[dict] = []
+        unverified: list[dict] = []
+        for score, kind, loc in cls._scored_candidates(node):
+            full_loc = f"{frame_prefix}.{loc}"
+            is_verified = await cls._verify_candidate(page, frame_prefix, loc, bounds)
+            entry = {
+                "locator": f"page{full_loc}{method}",
+                "kind": kind,
+                "score": score,
+                "verified": is_verified,
+            }
+            (verified if is_verified else unverified).append(entry)
+        return verified + unverified
 
     @classmethod
     def _scored_candidates(cls, element) -> list[tuple[int, str, str]]:
@@ -438,16 +566,45 @@ class LocatorExtraction:
             for score, kind, loc in cls._scored_candidates(element)
         ]
 
+    # Sentinel score for the "executed" candidate — always outranks every
+    # heuristic candidate (max 100, see _scored_candidates) since it is the one
+    # locator we know for a fact resolved to the right element, in the right
+    # frame, because it is literally what just ran.
+    _EXECUTED_SCORE = 1000
+
     @classmethod
     async def locator_from_playwright(
-        cls, locator, method: str, fallback_command: str | None = None
+        cls, locator, method: str, executed_command: str | None = None
     ) -> list[dict]:
-        """Resolve the element a command's Playwright *locator* points to and return all
-        candidate locators (best-first) for it via the heuristic, so the recorded
-        candidates are not just an echo of the command. ``method`` is the trailing call
-        (e.g. ``.click()``). Falls back to the raw command if the element can't be read.
+        """Resolve the element a command's Playwright *locator* points to and return
+        candidate locators, best-first. ``method`` is the trailing call (e.g.
+        ``.click()``).
+
+        ``executed_command`` — the command that was actually eval'd to produce
+        ``locator`` — is always surfaced as the top candidate when given. This
+        matters because the heuristic candidates below are built purely from the
+        target element's own attributes/role/text and know nothing about how that
+        element was *reached*: for an element inside an iframe, ``executed_command``
+        may be a frame-qualified expression (e.g.
+        ``frame_locator("iframe#x").locator("#foo")``) while the heuristic can only
+        ever emit a bare ``page.locator("#foo")``, which silently targets the
+        top-level document instead and would fail (or hit the wrong element) on
+        replay. The executed command has no such ambiguity, so it must win over
+        heuristic candidates rather than only being used as a last-resort fallback.
+
         Never raises.
         """
+        executed = (
+            [
+                {
+                    "locator": f"page.{executed_command}{method}",
+                    "kind": "executed",
+                    "score": cls._EXECUTED_SCORE,
+                }
+            ]
+            if executed_command
+            else []
+        )
         try:
             signals = await locator.evaluate(cls._ELEMENT_SIGNALS_JS)
             element = SimpleNamespace(
@@ -461,21 +618,13 @@ class LocatorExtraction:
             )
             candidates = cls.locator_candidates(element, method)
             if candidates:
-                return candidates
+                return executed + candidates
         except Exception as e:
             logger.debug(
-                f"locator_from_playwright failed, falling back to command: "
+                f"locator_from_playwright failed, falling back to executed command: "
                 f"{type(e).__name__}: {e}"
             )
-        if fallback_command:
-            return [
-                {
-                    "locator": f"page.{fallback_command}{method}",
-                    "kind": "command",
-                    "score": 0,
-                }
-            ]
-        return []
+        return executed
 
     @staticmethod
     def record_locator_candidates(
@@ -485,40 +634,53 @@ class LocatorExtraction:
         in the per-step task log uploaded to S3."""
         if candidates and memory is not None and memory.browser_states:
             memory.browser_states[-1].locator_candidates = candidates
+            memory.browser_states[-1].resolution_tier = "axtree"
 
     @classmethod
     async def log_interacted_locator(
-        cls, browser: Browser, index: int, method: str, memory: Memory | None = None
+        cls,
+        browser: Browser,
+        index: int,
+        dom_node,
+        method: str,
+        memory: Memory | None = None,
     ) -> None:
         """Log (and record on the trajectory) the Playwright-style locator browser-use
         actually interacted with for the LLM-predicted axtree *index*.
 
-        Runs on the index-based fallback path (after the command/locator-based action
-        failed and we acted on the LLM-predicted index via ``multi_act``). ``method`` is
-        the trailing Playwright call to make the line copy-pasteable, e.g. ``.click()``
-        or ``.fill("foo")``. When ``memory`` is given the full ``page.<locator><method>``
-        expression is recorded on the current browser state. Best-effort, never raises.
+        ``dom_node`` is the ``EnhancedDOMTreeNode`` browser_use's own
+        ``selector_map`` resolved *index* to at decision time (captured by the
+        caller, e.g. ``get_index_from_prompt``, before the action ran) — not
+        re-resolved here. Re-querying ``get_dom_element_by_index`` after the
+        click (the old behavior) raced whatever DOM mutation the click itself
+        caused, and built only bare, frame-blind candidates; using the
+        pre-action node instead fixes both, via ``candidates_from_tree_node``.
+
+        Runs on the index-based fallback path (after the command/locator-based
+        action failed and we acted on the LLM-predicted index via
+        ``multi_act``). ``method`` is the trailing Playwright call to make the
+        line copy-pasteable, e.g. ``.click()`` or ``.fill("foo")``. When
+        ``memory`` is given the full ``page.<locator><method>`` expression is
+        recorded on the current browser state. Best-effort, never raises.
         """
         try:
-            backend_agent = browser.backend_agent
-            if backend_agent is None or backend_agent.browser_session is None:
-                logger.info(
-                    f"LLM fallback locator [index {index}]: unavailable (no backend session)"
-                )
-                return
-            element = await backend_agent.browser_session.get_dom_element_by_index(
-                index
-            )
-            if element is None:
+            if dom_node is None:
                 logger.info(
                     f"LLM fallback locator [index {index}]: unavailable (index not in selector map)"
                 )
                 return
-            candidates = cls.locator_candidates(element, method)
+            page = await browser.get_current_page()
+            if page is None:
+                logger.info(
+                    f"LLM fallback locator [index {index}]: unavailable (no page)"
+                )
+                return
+            candidates = await cls.candidates_from_tree_node(dom_node, method, page)
             if candidates:
                 logger.info(
                     f"LLM fallback locator [index {index}]: {candidates[0]['locator']} "
-                    f"(+{len(candidates) - 1} more candidate(s))"
+                    f"(verified={candidates[0]['verified']}, "
+                    f"+{len(candidates) - 1} more candidate(s))"
                 )
                 cls.record_locator_candidates(memory, candidates)
         except Exception as e:
@@ -542,7 +704,16 @@ def _get_index_prediction_agent(task: "Task") -> ActionPredictionLocatorAxtree:
 
 async def get_index_from_prompt(
     memory: Memory, prompt_instructions: str, browser: Browser, task: Task
-):
+) -> tuple[int | None, Any]:
+    """Returns ``(index, dom_node)``. ``dom_node`` is the ``EnhancedDOMTreeNode``
+    browser_use's own ``selector_map`` resolves *index* to, captured from this
+    same pre-action ``browser_state_summary`` (the one that decided *index* in
+    the first place) — not re-resolved later. Callers should thread ``dom_node``
+    through to ``LocatorExtraction.log_interacted_locator`` instead of having it
+    re-query the DOM after the action runs, which both races the action's own
+    DOM mutation and loses frame context. ``dom_node`` is ``None`` whenever
+    *index* is (including the early-return/error paths).
+    """
     browser_state_summary = await browser.get_browser_state_summary()
     memory.browser_states[-1] = BrowserState(
         url=browser_state_summary.url,
@@ -556,7 +727,7 @@ async def get_index_from_prompt(
     try:
         if memory.browser_states[-1].axtree is None:
             logger.error("Axtree is None, cannot predict action")
-            return None
+            return None, None
         final_prompt, response, token_usage = _get_index_prediction_agent(
             task
         ).predict_action(
@@ -584,11 +755,13 @@ async def get_index_from_prompt(
                 command=prompt_instructions,
             )
 
-        return response.index
+        dom_node = browser_state_summary.dom_state.selector_map.get(response.index)
+        return response.index, dom_node
     except ElementNotFoundInAxtreeException as e:
         raise e
     except Exception as e:
         logger.error(f"Error in get_index_from_prompt: {e}")
+        return None, None
 
 
 def _snapshot_dir(directory: str) -> dict[str, float]:
