@@ -544,6 +544,7 @@ async def save_latest_memory_state_locally(
             "token_usage": memory.token_usage.model_dump(),
             "unique_child_arn": memory.unique_child_arn,
             "system_info": browser_state.system_info.model_dump(mode="json"),
+            "resolution_tier": browser_state.resolution_tier,
         }
 
         async with aiofiles.open(step_directory / "state.json", "w") as f:

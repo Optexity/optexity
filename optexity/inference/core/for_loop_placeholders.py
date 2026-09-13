@@ -66,6 +66,7 @@ def expand_locator_for_loop_placeholders(
     node.replace(
         f"{{locator[{index_variable_name}]}}",
         f"{locator_command}.nth({index})",
+        escape_command=False,
     )
     return _bind_index(node, index, index_variable_name)
 

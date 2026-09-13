@@ -131,7 +131,7 @@ async def input_text_index(
     input_text_action: InputTextAction, browser: Browser, memory: Memory, task: Task
 ):
     try:
-        index = await get_index_from_prompt(
+        index, dom_node = await get_index_from_prompt(
             memory,
             input_text_action.prompt_instructions,
             browser,
@@ -161,6 +161,7 @@ async def input_text_index(
             await LocatorExtraction.log_interacted_locator(
                 browser,
                 index,
+                dom_node,
                 f".fill({(input_text_action.input_text or '')!r})",
                 memory,
             )

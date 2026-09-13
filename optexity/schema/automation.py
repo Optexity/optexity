@@ -92,7 +92,12 @@ class VariableSubstitution:
     fetching secure values) and feeds them through it.
     """
 
-    def replace(self, pattern: str, replacement: str | int | float | bool | None):
+    def replace(
+        self,
+        pattern: str,
+        replacement: str | int | float | bool | None,
+        escape_command: bool = True,
+    ):
         raise NotImplementedError
 
     async def replace_variables(
@@ -242,10 +247,15 @@ class ActionNode(VariableSubstitution, BaseModel):
 
         return self
 
-    def replace(self, pattern: str, replacement: str | int | float | bool | None):
+    def replace(
+        self,
+        pattern: str,
+        replacement: str | int | float | bool | None,
+        escape_command: bool = True,
+    ):
         replacement = str(replacement)
         if self.interaction_action:
-            self.interaction_action.replace(pattern, replacement)
+            self.interaction_action.replace(pattern, replacement, escape_command)
         if self.assertion_action:
             self.assertion_action.replace(pattern, replacement)
         if self.extraction_action:
@@ -296,7 +306,12 @@ class PrivateNode(VariableSubstitution, BaseModel):
     before_sleep_time: float = 0.0
     end_sleep_time: float = 0.0
 
-    def replace(self, pattern: str, replacement: str | int | float | bool | None):
+    def replace(
+        self,
+        pattern: str,
+        replacement: str | int | float | bool | None,
+        escape_command: bool = True,
+    ):
         replacement_str = "" if replacement is None else str(replacement)
         self.inputs = _replace_in_value(self.inputs, pattern, replacement_str)
         return self
@@ -434,11 +449,22 @@ class ForLoopNode(BaseModel):
                 )
         return self
 
-    def replace(self, pattern: str, replacement: str | int | float | bool | None):
+    def replace(
+        self,
+        pattern: str,
+        replacement: str | int | float | bool | None,
+        escape_command: bool = True,
+    ):
         """Recursively replace placeholders in loop body/reset nodes.
 
         This mirrors ActionNode.replace() so ForLoopNode can be safely used anywhere
         the runtime expects a `.replace()` method (e.g. loop expansion).
+
+        ``self.locator`` is deliberately never escaped here regardless of
+        ``escape_command``: it never receives substituted *data* (it's never a
+        replace_variables() target), only the code-splice bindings in
+        for_loop_placeholders.py, which must remain unescaped to stay valid
+        Playwright/Python syntax.
         """
         replacement_str = "" if replacement is None else str(replacement)
 
@@ -447,11 +473,11 @@ class ForLoopNode(BaseModel):
 
         for node in self.nodes:
             if hasattr(node, "replace"):
-                node.replace(pattern, replacement_str)
+                node.replace(pattern, replacement_str, escape_command)
 
         for node in self.reset_nodes:
             if hasattr(node, "replace"):
-                node.replace(pattern, replacement_str)
+                node.replace(pattern, replacement_str, escape_command)
 
         return self
 
@@ -527,8 +553,20 @@ class IfElseNode(BaseModel):
         ActionNode | IfElseNodeRef | ForLoopNodeRef | AssertLocatorNodeRef | PrivateNode
     ] = []
 
-    def replace(self, pattern: str, replacement: str | int | float | bool | None):
-        """Recursively replace placeholders in condition and branches."""
+    def replace(
+        self,
+        pattern: str,
+        replacement: str | int | float | bool | None,
+        escape_command: bool = True,
+    ):
+        """Recursively replace placeholders in condition and branches.
+
+        ``self.condition`` substitution is intentionally left as-is here: it's
+        a bare Python-expression splice evaluated by evaluate_condition(), a
+        structurally different problem from the quoted-string-literal case
+        `escape_command` addresses — out of scope for this fix, see the
+        locator-command-escaping design notes.
+        """
         replacement_str = "" if replacement is None else str(replacement)
 
         if self.condition:
@@ -536,11 +574,11 @@ class IfElseNode(BaseModel):
 
         for node in self.if_nodes:
             if hasattr(node, "replace"):
-                node.replace(pattern, replacement_str)
+                node.replace(pattern, replacement_str, escape_command)
 
         for node in self.else_nodes:
             if hasattr(node, "replace"):
-                node.replace(pattern, replacement_str)
+                node.replace(pattern, replacement_str, escape_command)
 
         return self
 
@@ -623,7 +661,15 @@ class AssertLocatorNode(BaseModel):
     output_variable_name: str | None = None
     timeout: float = 5.0
 
-    def replace(self, pattern: str, replacement: str | int | float | bool | None):
+    def replace(
+        self,
+        pattern: str,
+        replacement: str | int | float | bool | None,
+        escape_command: bool = True,
+    ):
+        # self.locator is never escaped here — same reasoning as
+        # ForLoopNode.replace(): it's never a replace_variables() data target,
+        # only the code-splice bindings in for_loop_placeholders.py touch it.
         replacement_str = "" if replacement is None else str(replacement)
         if self.locator:
             self.locator = self.locator.replace(pattern, replacement_str)
