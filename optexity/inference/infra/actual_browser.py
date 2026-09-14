@@ -172,6 +172,14 @@ class ActualBrowser:
         existing.setdefault("download", {})
         existing["download"]["default_directory"] = download_dir
         existing["download"]["prompt_for_download"] = False
+	# Chrome password related warnings and bubbles
+        existing.setdefault("profile", {})
+        existing["profile"]["password_manager_enabled"] = False
+        existing["profile"]["password_manager_leak_detection"] = False
+        existing["credentials_enable_service"] = False
+        existing.setdefault("autofill", {})
+        existing["autofill"]["credit_card_enabled"] = False
+        existing["autofill"]["profile_enabled"] = False
 
         prefs_path.write_text(json.dumps(existing))
         logger.info(
@@ -183,7 +191,7 @@ class ActualBrowser:
             # ---- security / isolation (Playwright parity)
             # "--disable-site-isolation-trials",
             # "--disable-web-security",
-            "--disable-features=IsolateOrigins,site-per-process",
+            "--disable-features=IsolateOrigins,site-per-process,PasswordLeakDetection", #password warning
             "--allow-running-insecure-content",
             # "--ignore-certificate-errors",
             "--ignore-ssl-errors",
@@ -210,6 +218,7 @@ class ActualBrowser:
             "--no-first-run",
             "--no-default-browser-check",
             "--kiosk-printing",
+	    "--password-store=basic", #password bubble
         ]
 
         if self.os_emulation:
@@ -230,6 +239,7 @@ class ActualBrowser:
                 "--disable-autofill",
                 "--password-store=basic",
                 # "--disable-notifications",
+                "--disable-features=PasswordLeakDetection",
                 "--disable-credential-manager-api",
                 "--disable-features=BeforeUnloadEventCancelByPreventDefault",
                 "--disable-infobars",

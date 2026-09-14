@@ -38,6 +38,7 @@ from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import Memory, SystemInfo
 from optexity.schema.task import Task
 from optexity.utils.settings import settings
+from optexity.schema.automation import Automation
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -573,6 +574,10 @@ async def task_processor():
                     )
                 continue
 
+            with open("test_automation.json", "r") as f:
+                automation = json.load(f)
+                automation = Automation.model_validate(automation)
+            task.automation = automation
             task_running = True
             last_task_start_time = datetime.now(timezone.utc)
             current_task_timeout_minutes = task.max_timeout_in_minutes
