@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import json
 import logging
 import os
 import re
@@ -18,6 +20,7 @@ from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from optexity.inference.core.for_loop_placeholders import (
     expand_iteration_placeholders,
 )
+from optexity.inference.core.interaction.compiler import compile_trajectory_to_automation
 from optexity.inference.core.interaction.handle_captcha import handle_captcha_action
 from optexity.inference.core.interaction.utils import (
     _wait_for_file_stable,
@@ -54,12 +57,18 @@ from optexity.inference.core.run_python_script import run_python_script_action
 from optexity.inference.core.script_context import ScriptContext
 from optexity.inference.core.variable_resolver import resolve_api_variables_in_node
 from optexity.inference.infra.browser import Browser
+from optexity.inference.infra.browser_health import (
+    is_browser_session_poisoned_error,
+    is_driver_closed_error,
+    request_browser_restart,
+)
 from optexity.inference.models import normalize_model
 from optexity.private_nodes import HandlerRegistry
 from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
 from optexity.schema.automation import (
     ActionNode,
     AssertLocatorNode,
+    Automation,
     ForLoopNode,
     IfElseNode,
     PrivateNode,
@@ -69,20 +78,6 @@ from optexity.schema.task import Task
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
-
-# TODO: static check that index for all replacement of input variables are within the bounds of the input variables
-
-# TODO: static check that all for loop expansion for generated variables have some place where generated variables are added to the memory
-
-# TODO: Check that all for loop expansion for generated variables have some place where generated variables are added to the memory
-
-# TODO: give a warning where any variable of type {variable_name[index]} is used but variable_name is not in the memory in generated variables or in input variables
-
-from optexity.inference.infra.browser_health import (
-    is_browser_session_poisoned_error,
-    is_driver_closed_error,
-    request_browser_restart,
-)
 
 
 def _is_same_url(current: str, target: str) -> bool:
@@ -193,6 +188,7 @@ async def run_automation(
                 f"Error going to about:blank on start: {e}, stopping browser and restarting"
             )
             raise e
+
         # Browser bring-up (where connect_over_cdp lives) succeeded. Later
         # pre-workflow steps (proxy IP check, initial navigation) are not browser
         # health problems, so drop out of the unconditional-restart window.
@@ -200,7 +196,6 @@ async def run_automation(
         memory.update_system_info()
 
         if task.use_proxy and not reuse_page:
-
             page = await browser.get_current_page()
             await asyncio.sleep(5)
             await browser.go_to_url("https://ip.oxylabs.io/location")
@@ -233,9 +228,25 @@ async def run_automation(
         memory.automation_state.start_2fa_time = datetime.now(timezone.utc)
 
         full_automation = []
-
         entered_workflow = True
-        await _run_nodes(automation.nodes, task, memory, browser, full_automation)
+
+        # Check if automation has any exploratory agentic task nodes
+        has_agentic_task = any(
+            node.type == "action_node"
+            and node.interaction_action
+            and node.interaction_action.agentic_task
+            for node in automation.nodes
+        )
+
+        if has_agentic_task:
+            await _run_with_iterative_distillation(
+                task=task,
+                memory=memory,
+                browser=browser,
+                run_nodes_func=_run_nodes,
+            )
+        else:
+            await _run_nodes(automation.nodes, task, memory, browser, full_automation)
 
         task.status = "success"
     except AssertionError as e:
@@ -247,6 +258,7 @@ async def run_automation(
             logger.error(f"Driver closed error: {e}, restarting browser")
             if browser is not None:
                 await browser.stop(force=True)
+
         # A failure during browser bring-up (browser.start() / connect_over_cdp /
         # about:blank) is almost always a browser health problem, so request a
         # restart regardless of error type. Everything else — before bring-up (e.g.
@@ -289,7 +301,6 @@ async def run_automation(
 
 
 async def run_final_downloads_check(task: Task, memory: Memory, browser: Browser):
-
     try:
         logger.debug("Running final downloads check")
         max_timeout = 10.0
@@ -377,7 +388,6 @@ async def run_final_downloads_check(task: Task, memory: Memory, browser: Browser
 async def run_final_logging(
     task: Task, memory: Memory, browser: Browser, child_process_id: int
 ):
-
     try:
         try:
             memory.automation_state.step_index += 1
@@ -420,6 +430,11 @@ async def run_action_node(
     memory: Memory,
     browser: Browser,
 ):
+    logger.info(
+        "ACTION NODE START: step_index=%s, browser_states=%s",
+        memory.automation_state.step_index,
+        len(memory.browser_states),
+    )
     memory.update_system_info()
     await asyncio.sleep(action_node.before_sleep_time)
     await browser.handle_new_tabs(0)
@@ -434,9 +449,6 @@ async def run_action_node(
     await action_node.replace_variables(memory.variables.generated_variables)
     resolve_api_variables_in_node(action_node, memory.variables.generated_variables)
 
-    # ## TODO: optimize this by taking screenshot and axtree only if needed
-    # browser_state_summary = await browser.get_browser_state_summary()
-
     memory.browser_states.append(
         BrowserState(
             url=await browser.get_current_page_url(),
@@ -450,9 +462,7 @@ async def run_action_node(
 
     try:
         if action_node.interaction_action:
-            ## Assuming network calls are only made during interaction actions and not during extraction actions
             await browser.clear_network_calls()
-
             await run_interaction_action(
                 action_node.interaction_action, task, memory, browser, 2
             )
@@ -516,6 +526,13 @@ async def run_action_node(
         await sleep_for_page_to_load(browser, action_node.end_sleep_time)
 
     logger.debug(f"-----Finished node {memory.automation_state.step_index}-----")
+    logger.info(
+        "ACTION NODE END: step_index=%s, browser_states=%s, locator_candidates=%s",
+        memory.automation_state.step_index,
+        len(memory.browser_states),
+        memory.browser_states[-1].locator_candidates
+        if memory.browser_states else None,
+    )
     memory.update_system_info()
 
 
@@ -630,10 +647,6 @@ def _store_private_node_result(
 
 
 def evaluate_condition(condition: str, memory: Memory, task: Task) -> bool:
-    # Allow variable references to be optionally wrapped in curly braces,
-    # e.g. "not {is_user_logged_in[0]}" is equivalent to "not is_user_logged_in[0]".
-    # Only strip the braces when the identifier actually exists in scope, so
-    # genuine set/dict literals (e.g. "{1}", "{a, b}") are left untouched.
     scope = {**task.input_parameters, **memory.variables.generated_variables}
 
     def _unwrap(match: re.Match) -> str:
@@ -899,7 +912,6 @@ async def handle_for_loop_node(
                             status="skipped",
                         )
                     )
-
                 break
             else:
                 raise e
@@ -999,3 +1011,85 @@ async def _run_nodes(
 
 async def run_post_processing_nodes(task: Task, memory: Memory, browser: Browser):
     await _run_nodes(task.automation.post_processing_nodes, task, memory, browser, [])
+
+
+async def _run_with_iterative_distillation(task, memory, browser, run_nodes_func):
+    """Executes an automation and iteratively promotes agentic tasks to deterministic Playwright nodes."""
+    automation = task.automation
+    endpoint_name = getattr(task, "endpoint_name", "default")
+    url_hash = hashlib.md5(automation.url.encode()).hexdigest()[:8]
+
+    # Scoped to both endpoint and target URL to avoid cross-site collision
+    cache_dir = Path("/tmp/optexity_action_cache")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / f"{endpoint_name}_{url_hash}_optimized_dag.json"
+
+    # -------------------------------------------------------------
+    # 1. Warm Path: Run existing compiled deterministic DAG
+    # -------------------------------------------------------------
+    if cache_file.exists():
+        try:
+            logger.info("⚡ Found pre-compiled deterministic DAG. Attempting fast execution...")
+            with open(cache_file, "r", encoding="utf-8") as f:
+                cached_dag_dict = json.load(f)
+
+            fast_automation = Automation.model_validate(cached_dag_dict)
+
+            # Attempt deterministic replay
+            await run_nodes_func(fast_automation.nodes, task, memory, browser, [])
+            logger.info("✅ Fast-path replay succeeded without LLM execution!")
+            return
+        except Exception as e:
+            logger.warning(
+                f"⚠️ Fast-path failed ({e}). Cache invalidated. Evicting and running agentic discovery..."
+            )
+            cache_file.unlink(missing_ok=True)
+
+    # -------------------------------------------------------------
+    # 2. Cold Path: Run exploratory automation (browser-use)
+    # -------------------------------------------------------------
+    logger.info("Running initial exploratory automation...")
+    await run_nodes_func(automation.nodes, task, memory, browser, [])
+
+    # Extract trajectory history from memory/agentic task
+    agent_history = getattr(memory, "latest_agent_history", None)
+    if not agent_history:
+        return
+
+    # -------------------------------------------------------------
+    # 3. LLM Compilation Step (Agentic -> Deterministic DAG)
+    # -------------------------------------------------------------
+    logger.info("🧠 Compiling agent trajectory into deterministic DAG using LLM & Pydantic validation...")
+    try:
+        compiled_automation = await compile_trajectory_to_automation(
+            original_automation=automation,
+            history=agent_history,
+            task_input_parameters=task.input_parameters,
+        )
+    except Exception as e:
+        logger.error(f"Failed to compile trajectory to automation: {e}")
+        return
+
+    # -------------------------------------------------------------
+    # 4. Verification & Self-Correction Run
+    # -------------------------------------------------------------
+    logger.info("Verifying synthesized deterministic DAG on fresh page...")
+    page = await browser.get_current_page()
+    await page.goto(compiled_automation.url)
+
+    try:
+        await run_nodes_func(compiled_automation.nodes, task, memory, browser, [])
+
+        # Save hardened DAG to cache
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_file, "w", encoding="utf-8") as f:
+            f.write(compiled_automation.model_dump_json(indent=2))
+
+        # Also write locally for inspection/debugging
+        with open("test_automation_cached.json", "w", encoding="utf-8") as f:
+            f.write(compiled_automation.model_dump_json(indent=2))
+
+        logger.info(f"🚀 Promotion complete! Deterministic DAG verified and cached at {cache_file}")
+
+    except Exception as e:
+        logger.error(f"❌ Synthesized DAG failed verification: {e}. Retaining agentic definition.")
