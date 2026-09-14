@@ -1,0 +1,22 @@
+{
+  "url": "https://stockanalysis.com/",
+  "parameters": {
+    "input_parameters": {
+      "first_name": ["myname"]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "Search for NVDA. Open the first search result for NVIDIA / NVDA. Then navigate to the Financials tab. Stop when the Financials page for NVDA is visible.",
+          "max_steps": 20,
+          "backend": "browser_use"
+        }
+      },
+      "end_sleep_time": 5.0
+    }
+  ]
+}

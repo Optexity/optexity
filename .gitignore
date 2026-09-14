@@ -216,3 +216,6 @@ node_modules
 optexity/utils/optexity.code-workspace
 
 tmp
+
+# Deterministic-cache exports (Phase 1) - generated per run, not committed
+cached_run_*.json
