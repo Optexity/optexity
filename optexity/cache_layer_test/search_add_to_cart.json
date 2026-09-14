@@ -1,0 +1,26 @@
+{
+  "url": "https://practicesoftwaretesting.com",
+  "parameters": {
+    "input_parameters": {
+      "search_term": ["Pliers"],
+      "product_name": ["Slip Joint Pliers"]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "1. Type {search_term[0]} into the search box at the top of the page and submit the search.\n2. In the search results, click the product named {product_name[0]} to open its detail page.\n3. On the product detail page, click the 'Add to cart' button.\n4. Click the cart icon in the top navigation bar to open the cart page.\n5. Stop once the cart page shows the product. Do not check out and do not enter any personal details.",
+          "max_steps": 25,
+          "backend": "browser_use",
+          "use_vision": false,
+          "keep_alive": true
+        }
+      },
+      "end_sleep_time": 1.0,
+      "before_sleep_time": 0.0
+    }
+  ]
+}
