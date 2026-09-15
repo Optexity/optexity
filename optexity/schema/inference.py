@@ -34,6 +34,10 @@ class InferenceRequest(BaseModel):
     # Optional queue priority: lower runs first, negatives allowed, None runs
     # last. Only orders tasks within the same login / unique_parameters group.
     priority: int | None = None
+    # Client-supplied dedupe key, unique per (user, key). Re-POSTing with the
+    # same key returns the task the first POST created instead of a new one, so
+    # a caller that times out or retries cannot run the same automation twice.
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
 
     @model_validator(mode="after")
     def validate_use_proxy(self):
