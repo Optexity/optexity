@@ -187,6 +187,8 @@ async def save_output_data_in_server(task: Task, memory: Memory):
 
 
 async def save_downloads_in_server(task: Task, memory: Memory):
+    from optexity.inference.core.script_context import sanitize_download_filename
+
     upload_start = None
     try:
         headers = {"x-api-key": task.api_key}
@@ -203,7 +205,8 @@ async def save_downloads_in_server(task: Task, memory: Memory):
             f"{[(d.name, d.stat().st_size) for d in downloads]}"
         )
         for download in downloads:
-            files.append((download.name, await asyncio.to_thread(download.read_bytes)))
+            safe_name = sanitize_download_filename(download.name)
+            files.append((safe_name, await asyncio.to_thread(download.read_bytes)))
 
         for data in memory.variables.output_data:
             if data.screenshot:
