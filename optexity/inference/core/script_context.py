@@ -32,9 +32,10 @@ from optexity.utils.utils import resolve_download_metadata_template
 
 logger = logging.getLogger(__name__)
 
-# Filesystem-hostile characters and control chars. Mirrors the sanitization
-# rules that automation prep scripts have been reimplementing by hand.
-_UNSAFE_FILENAME_CHARS = re.compile(r'[/\\:*?"\'<>|\x00-\x1f]')
+# Filesystem-hostile characters, URL hazards for s3:// refs (# % &), and
+# control chars. Mirrors the sanitization rules that automation prep scripts
+# have been reimplementing by hand.
+_UNSAFE_FILENAME_CHARS = re.compile(r'[/\\:*?"\'<>|#%&\x00-\x1f]')
 _WHITESPACE_RUN = re.compile(r"\s+")
 _MAX_FILENAME_LENGTH = 150
 # Guard against an unbounded rename loop on a pathological directory.
@@ -46,8 +47,9 @@ def sanitize_download_filename(
 ) -> str:
     """Make a user-visible label safe to use as a filename.
 
-    Strips path separators and control characters, collapses whitespace runs,
-    drops trailing dots/spaces, and truncates while preserving the extension.
+    Strips path separators, URL hazards (``# % &``) that break ``s3://`` object
+    refs, and control characters; collapses whitespace runs; drops trailing
+    dots/spaces; and truncates while preserving the extension.
     """
     name = _UNSAFE_FILENAME_CHARS.sub("_", str(filename))
     name = _WHITESPACE_RUN.sub(" ", name).strip()
