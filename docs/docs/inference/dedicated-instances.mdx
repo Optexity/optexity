@@ -66,6 +66,7 @@ Set `"is_dedicated": false` (or omit it) for a normal, non‑dedicated run.
 | `per_login_parallelism` | `int` | `1` | no | Maximum number of containers a **single login** may use before its extra tasks round‑robin onto those containers. |
 | `unique_parameter_names` | `list[str]` | `[]` | no | Which input parameters identify a "login" / queue. **Each name must be one of the keys in `input_parameters`.** See [Controlling the queue](#controlling-the-queue). |
 | `priority` | `int \| null` | `null` | no | Queue priority. **Lower runs first; negatives allowed; omit to run last.** Only reorders tasks within the same login‑queue. See [Task priority](#task-priority). |
+| `idempotency_key` | `string \| null` | `null` | no | Dedupe key, unique per API key. A repeat request with the same key returns the **existing** `task_id` (HTTP 202, `"idempotent_replay": true`) instead of creating a second task. Use it when you retry a submit after a timeout. |
 
 <Tip>
 Defaults work great. Start with just `is_dedicated: true` and only raise the parallelism

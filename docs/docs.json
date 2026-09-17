@@ -95,6 +95,7 @@
                         "pages": [
                             "POST /api/v1/inference",
                             "GET /api/v1/task_status",
+                            "POST /api/v1/task_status",
                             "GET /api/v1/get_output_data",
                             "GET /api/v1/get_downloads",
                             "POST /api/v1/initiate_callback",
