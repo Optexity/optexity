@@ -57,6 +57,7 @@ async def handle_agentic_task(
         )
         step_directory.mkdir(parents=True, exist_ok=True)
 
+        cache_path = step_directory / "action_cache.json"
         agent = Agent(
             task=agentic_task_action.task,
             llm=llm,
@@ -65,12 +66,18 @@ async def handle_agentic_task(
             tools=tools,
             calculate_cost=True,
             save_conversation_path=step_directory,
+            cache_actions=True,
+            cache_actions_path=cache_path,
+            directly_open_url=False,
         )
         logger.debug(f"Starting browser session for agentic task {browser.cdp_url} ")
         await agent.browser_session.start()
         logger.debug(f"Finally running agentic task on browser_use {browser.cdp_url} ")
         history = await agent.run(max_steps=agentic_task_action.max_steps)
         logger.debug(f"Agentic task completed on browser_use {browser.cdp_url} ")
+
+        if agent.action_cache:
+            logger.info(f"[ActionCache] Recorded {len(agent.action_cache.actions)} actions")
 
         agent.stop()
         if agent.browser_session:

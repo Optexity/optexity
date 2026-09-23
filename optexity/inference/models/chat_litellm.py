@@ -132,7 +132,7 @@ class ChatLiteLLM(BaseChatModel):
     ) -> ChatInvokeCompletion[T]: ...
 
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: type[T] | None = None
+        self, messages: list[BaseMessage], output_format: type[T] | None = None, **kwargs
     ) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
         try:
             response = await litellm.acompletion(
