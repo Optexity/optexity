@@ -22,12 +22,54 @@ from optexity.utils.utils import save_screenshot
 
 logger = logging.getLogger(__name__)
 
+# Loggers whose records belong in the per-task optexity.log the dashboard shows.
+# optexity_private is a separate top-level package, so a handler on "optexity"
+# alone never sees portal logs.
+_TASK_LOG_LOGGER_NAMES = ("optexity", "optexity_private")
+
 UPLOAD_TIMEOUT = httpx.Timeout(
     connect=settings.UPLOAD_CONNECT_TIMEOUT_SECONDS,
     write=settings.UPLOAD_WRITE_TIMEOUT_SECONDS,
     read=settings.UPLOAD_READ_TIMEOUT_SECONDS,
     pool=settings.UPLOAD_POOL_TIMEOUT_SECONDS,
 )
+
+
+def attach_task_log_file(task: Task) -> logging.Handler:
+    """Append this task's ``logs/optexity.log``, including portal loggers.
+
+    ``run_automation`` writes that file for browser tasks. Marketplace
+    functions run in this process and never enter ``run_automation``, so
+    without this their ``ctx.log`` / ``logger`` lines stay on stdout and the
+    task-logs page stays empty.
+    """
+    task.log_file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_handler = logging.FileHandler(str(task.log_file_path))
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s.%(funcName)s: %(message)s"
+        )
+    )
+    # Root stays at WARNING. Raise the portal logger here as well as in
+    # package init so info/debug records exist for this handler to write.
+    logging.getLogger("optexity_private").setLevel(logging.DEBUG)
+    for name in _TASK_LOG_LOGGER_NAMES:
+        logging.getLogger(name).addHandler(file_handler)
+    return file_handler
+
+
+def detach_task_log_file(file_handler: logging.Handler) -> None:
+    """Flush and unhook a handler from :func:`attach_task_log_file`.
+
+    Close before the trajectory tar is built so the uploaded file includes
+    the last lines, and so the next task on this process does not keep writing
+    into a finished task's log.
+    """
+    file_handler.flush()
+    file_handler.close()
+    for name in _TASK_LOG_LOGGER_NAMES:
+        logging.getLogger(name).removeHandler(file_handler)
 
 
 def create_tar_in_memory(

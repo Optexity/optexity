@@ -145,6 +145,9 @@ async def run_automation(
 
     current_module = __name__.split(".")[0]  # top-level module/package
     logging.getLogger(current_module).addHandler(file_handler)
+    # Portal modules log under optexity_private, which does not propagate
+    # through the optexity logger. Same file, so both show up in task logs.
+    logging.getLogger("optexity_private").addHandler(file_handler)
     logging.getLogger("browser_use").setLevel(logging.INFO)
 
     logger.info(f"Task {task.task_id} started running")
@@ -286,6 +289,7 @@ async def run_automation(
     file_handler.flush()
     file_handler.close()
     logging.getLogger(current_module).removeHandler(file_handler)
+    logging.getLogger("optexity_private").removeHandler(file_handler)
 
 
 async def run_final_downloads_check(task: Task, memory: Memory, browser: Browser):

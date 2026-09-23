@@ -18,3 +18,7 @@ logging.basicConfig(
 )
 current_module = __name__.split(".")[0]  # top-level module/package
 logging.getLogger(current_module).setLevel(logging.DEBUG)
+# Portal modules log under optexity_private. The root logger stays at WARNING,
+# so without this their info/debug lines are dropped before any task-log
+# handler can write them.
+logging.getLogger("optexity_private").setLevel(logging.DEBUG)
