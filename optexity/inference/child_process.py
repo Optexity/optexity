@@ -10,6 +10,7 @@ import re
 import signal
 import subprocess
 import sys
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -23,8 +24,10 @@ from pydantic import BaseModel
 from uvicorn import run
 
 from optexity.inference.core.logging import (
+    attach_task_log_file,
     complete_task_in_server,
     delete_local_data,
+    detach_task_log_file,
     initiate_callback,
     save_downloads_in_server,
     save_output_data_in_server,
@@ -417,67 +420,92 @@ async def run_marketplace_function(
     and return `(success, message)`.
     """
     memory: Memory | None = None
+    file_handler = attach_task_log_file(task)
+    started = time.monotonic()
     try:
-        parsed = parse_marketplace_endpoint_name(task.endpoint_name)
-        if parsed is None:
-            raise ValueError(
-                f"'{task.endpoint_name}' is not a marketplace endpoint "
-                "(expected marketplace/<portal>/<function_name>)"
-            )
-        portal, function_name = parsed
-        module = importlib.import_module(f"optexity_private.portals.{portal}.methods")
-        fn = getattr(module, function_name)
-        if function_name.startswith("_") or not inspect.iscoroutinefunction(fn):
-            raise ValueError(f"'{function_name}' is not a dispatchable function")
-
-        await start_task_in_server(task)
-        memory = Memory(unique_child_arn=unique_child_arn)
-
-        params = inspect.signature(fn).parameters
-        kwargs = {}
-        if "processed_cookie_data" in params:
-            processed_cookie_data = await module.get_processed_cookie_data_in_server(
-                task
-            )
-            if not processed_cookie_data:
-                raise ValueError(
-                    f"No saved session cookies found for portal '{portal}' "
-                    f"(task {task.task_id}); cannot call '{function_name}'"
-                )
-            kwargs["processed_cookie_data"] = processed_cookie_data
-        if "task" in params:
-            kwargs["task"] = task
-        if "memory" in params:
-            kwargs["memory"] = memory
-
-        # Dispatchable functions are real async I/O (httpx, not requests) and
-        # return (success, message) rather than raising for expected failures,
-        # so this can be awaited directly without blocking the event loop
-        # this shares with /health and /kill_task for every other task.
-        success, message = await fn(**kwargs)
-        if success:
-            task.status = "success"
+        try:
             logger.info(
-                f"Marketplace function succeeded for task {task.task_id}: {message}"
+                "Marketplace function starting for task %s: %s",
+                task.task_id,
+                task.endpoint_name,
             )
-        else:
-            task.status = "failed"
-            task.error = message
-            logger.error(
-                f"Marketplace function failed for task {task.task_id}: {message}"
+            parsed = parse_marketplace_endpoint_name(task.endpoint_name)
+            if parsed is None:
+                raise ValueError(
+                    f"'{task.endpoint_name}' is not a marketplace endpoint "
+                    "(expected marketplace/<portal>/<function_name>)"
+                )
+            portal, function_name = parsed
+            module = importlib.import_module(
+                f"optexity_private.portals.{portal}.methods"
             )
-    except Exception as e:
-        logger.error(
-            f"Marketplace function call failed for task {task.task_id} "
-            f"({task.endpoint_name}): {e}"
-        )
-        task.error = str(e)
-        task.status = "failed"
+            fn = getattr(module, function_name)
+            if function_name.startswith("_") or not inspect.iscoroutinefunction(fn):
+                raise ValueError(f"'{function_name}' is not a dispatchable function")
 
-    task.completed_at = datetime.now(timezone.utc)
-    if memory is not None:
-        await save_output_data_in_server(task, memory)
-        await save_downloads_in_server(task, memory)
+            await start_task_in_server(task)
+            memory = Memory(unique_child_arn=unique_child_arn)
+
+            params = inspect.signature(fn).parameters
+            kwargs = {}
+            if "processed_cookie_data" in params:
+                processed_cookie_data = (
+                    await module.get_processed_cookie_data_in_server(task)
+                )
+                if not processed_cookie_data:
+                    raise ValueError(
+                        f"No saved session cookies found for portal '{portal}' "
+                        f"(task {task.task_id}); cannot call '{function_name}'"
+                    )
+                kwargs["processed_cookie_data"] = processed_cookie_data
+            if "task" in params:
+                kwargs["task"] = task
+            if "memory" in params:
+                kwargs["memory"] = memory
+
+            # Dispatchable functions are real async I/O (httpx, not requests) and
+            # return (success, message) rather than raising for expected failures,
+            # so this can be awaited directly without blocking the event loop
+            # this shares with /health and /kill_task for every other task.
+            success, message = await fn(**kwargs)
+            elapsed = time.monotonic() - started
+            if success:
+                task.status = "success"
+                logger.info(
+                    "Marketplace function succeeded for task %s in %.1fs: %s",
+                    task.task_id,
+                    elapsed,
+                    message,
+                )
+            else:
+                task.status = "failed"
+                task.error = message
+                logger.error(
+                    "Marketplace function failed for task %s in %.1fs: %s",
+                    task.task_id,
+                    elapsed,
+                    message,
+                )
+        except Exception as e:
+            logger.exception(
+                "Marketplace function call failed for task %s (%s) after %.1fs",
+                task.task_id,
+                task.endpoint_name,
+                time.monotonic() - started,
+            )
+            task.error = str(e)
+            task.status = "failed"
+
+        task.completed_at = datetime.now(timezone.utc)
+        if memory is not None:
+            await save_output_data_in_server(task, memory)
+            await save_downloads_in_server(task, memory)
+    finally:
+        # Close the log file before it is tarred. complete_task tears the
+        # worker down, so the trajectory has to finish uploading before that
+        # call — including when the function or an artifact upload fails.
+        detach_task_log_file(file_handler)
+        await save_trajectory_in_server(task)
     try:
         await complete_task_in_server(
             task,
