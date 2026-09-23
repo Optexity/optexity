@@ -29,8 +29,7 @@ async def handle_click_element(
     browser: Browser,
     max_timeout_seconds_per_try: float,
     max_tries: int,
-):
-
+) -> str:
     if click_element_action.command and not click_element_action.skip_command:
         last_error = await command_based_action_with_retry(
             click_element_action,
@@ -42,13 +41,16 @@ async def handle_click_element(
         )
 
         if last_error is None:
-            return
+            return "command_success"
 
     if not click_element_action.skip_prompt:
         logger.debug(
             f"Executing prompt-based action: {click_element_action.__class__.__name__}"
         )
         await click_element_index(click_element_action, browser, memory, task)
+        return "prompt_fallback"
+
+    return "failed"
 
 
 async def click_element_index(

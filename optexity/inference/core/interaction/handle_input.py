@@ -78,8 +78,7 @@ async def handle_input_text(
     browser: Browser,
     max_timeout_seconds_per_try: float,
     max_tries: int,
-):
-
+) -> str:
     if (
         input_text_action.input_text is None
         and not input_text_action.skip_prompt
@@ -96,7 +95,7 @@ async def handle_input_text(
         logger.debug(
             f"Input text is None for action: {input_text_action.__class__.__name__}"
         )
-        return
+        return "skipped"
 
     # {some english chars [0]}
     INT_INDEX_PATTERN = re.compile(r"^\{([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\}$")
@@ -105,7 +104,7 @@ async def handle_input_text(
         logger.debug(
             "Skipping input text because input variable was not present for this step"
         )
-        return
+        return "skipped"
 
     if input_text_action.command and not input_text_action.skip_command:
         last_error = await command_based_action_with_retry(
@@ -118,13 +117,16 @@ async def handle_input_text(
         )
 
         if last_error is None:
-            return
+            return "command_success"
 
     if not input_text_action.skip_prompt:
         logger.debug(
             f"Executing prompt-based action: {input_text_action.__class__.__name__}"
         )
         await input_text_index(input_text_action, browser, memory, task)
+        return "prompt_fallback"
+
+    return "failed"
 
 
 async def input_text_index(

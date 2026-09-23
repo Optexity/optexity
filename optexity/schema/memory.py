@@ -37,6 +37,9 @@ class AutomationState(BaseModel):
     step_index: int = Field(default_factory=lambda: -1)
     try_index: int = Field(default_factory=lambda: -1)
     start_2fa_time: datetime | None = Field(default=None)
+    # Per-node execution outcome: "command_success" | "prompt_fallback" | "failed" |
+    # "agentic" | "deterministic" | "skipped". Populated during replay for the loop.
+    node_outcomes: list[dict] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_start_2fa_time(self):

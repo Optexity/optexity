@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import re
@@ -270,6 +271,15 @@ async def run_automation(
         task.status = "failed"
 
     finally:
+        if memory is not None:
+            try:
+                outcomes_path = Path(task.logs_directory) / "node_outcomes.json"
+                outcomes_path.write_text(
+                    json.dumps(memory.automation_state.node_outcomes, indent=2)
+                )
+            except Exception as _e:
+                logger.warning(f"Could not save node_outcomes.json: {_e}")
+
         if task.retry_count == task.automation.max_retries or task.status == "success":
             if task and task.status == "running":
                 task.status = "failed"
@@ -452,42 +462,51 @@ async def run_action_node(
 
     logger.debug(f"-----Running node new {memory.automation_state.step_index}-----")
 
+    node_outcome: str = "unknown"
     try:
         if action_node.interaction_action:
             ## Assuming network calls are only made during interaction actions and not during extraction actions
             await browser.clear_network_calls()
 
-            await run_interaction_action(
+            node_outcome = await run_interaction_action(
                 action_node.interaction_action, task, memory, browser, 2
             )
         elif action_node.extraction_action:
             await run_extraction_action(
                 action_node.extraction_action, memory, browser, task
             )
+            node_outcome = "deterministic"
         elif action_node.python_script_action:
             await run_python_script_action(
                 action_node.python_script_action, memory, browser, task
             )
+            node_outcome = "deterministic"
         elif action_node.sleep_action:
             await run_sleep_action(action_node.sleep_action)
+            node_outcome = "deterministic"
         elif action_node.fail_state_action:
             await run_fail_state_action(
                 action_node.fail_state_action, memory, browser, task
             )
+            node_outcome = "deterministic"
         elif action_node.assertion_action:
             await run_assertion_action(
                 action_node.assertion_action, memory, browser, task
             )
+            node_outcome = "deterministic"
         elif action_node.captcha_action:
             await handle_captcha_action(action_node.captcha_action, browser, memory)
+            node_outcome = "deterministic"
         elif action_node.human_in_loop_action:
             await run_human_in_loop_action(
                 action_node.human_in_loop_action, task, memory
             )
+            node_outcome = "deterministic"
         elif action_node.dynamic_form_mapping_action:
             await run_dynamic_form_mapping_action(
                 action_node.dynamic_form_mapping_action, task, memory, browser
             )
+            node_outcome = "deterministic"
         elif action_node.misc_action:
             misc = action_node.misc_action
             if misc.set_variable:
@@ -496,11 +515,17 @@ async def run_action_node(
                 await run_llm_query_action(misc.llm_query, memory, task)
             elif misc.count_locator:
                 await run_count_locator_action(misc.count_locator, memory, browser)
+            node_outcome = "deterministic"
 
     except Exception as e:
+        node_outcome = "failed"
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
         raise e
     finally:
+        memory.automation_state.node_outcomes.append({
+            "node": memory.automation_state.step_index,
+            "outcome": node_outcome,
+        })
         await save_latest_memory_state_locally(task, memory, action_node)
         if memory.automation_state.step_index % 5 == 0:
             await save_trajectory_in_server(task)

@@ -61,18 +61,23 @@ async def run_interaction_action(
     memory: Memory,
     browser: Browser,
     retries_left: int,
-):
+) -> str:
+    """Execute an interaction action and return a node-outcome label:
+    "command_success" | "prompt_fallback" | "failed" | "skipped" |
+    "agentic" | "deterministic"
+    """
     if retries_left <= 0:
-        return
+        return "failed"
 
     logger.debug(
         f"---------Running interaction action {interaction_action.model_dump_json(exclude_none=True, exclude_defaults=True)}---------"
     )
 
+    outcome: str = "deterministic"
     try:
         memory.automation_state.start_2fa_time = datetime.now(timezone.utc)
         if interaction_action.click_element:
-            await handle_click_element(
+            outcome = await handle_click_element(
                 interaction_action.click_element,
                 task,
                 memory,
@@ -81,7 +86,7 @@ async def run_interaction_action(
                 interaction_action.max_tries,
             )
         elif interaction_action.input_text:
-            await handle_input_text(
+            outcome = await handle_input_text(
                 interaction_action.input_text,
                 task,
                 memory,
@@ -90,7 +95,7 @@ async def run_interaction_action(
                 interaction_action.max_tries,
             )
         elif interaction_action.select_option:
-            await handle_select_option(
+            outcome = await handle_select_option(
                 interaction_action.select_option,
                 task,
                 memory,
@@ -132,10 +137,12 @@ async def run_interaction_action(
                 interaction_action.download_url_as_pdf, task, memory, browser
             )
         elif interaction_action.agentic_task:
+            outcome = "agentic"
             await handle_agentic_task(
                 interaction_action.agentic_task, task, memory, browser
             )
         elif interaction_action.close_overlay_popup:
+            outcome = "agentic"
             await handle_agentic_task(
                 interaction_action.close_overlay_popup, task, memory, browser
             )
@@ -163,6 +170,7 @@ async def run_interaction_action(
         elif interaction_action.scroll:
             await handle_scroll(interaction_action.scroll, memory, browser)
     except ElementNotFoundInAxtreeException as e:
+        outcome = "prompt_fallback"
         await handle_element_not_found_in_axtree(
             e, interaction_action, task, memory, browser
         )
@@ -170,6 +178,8 @@ async def run_interaction_action(
         await handle_assert_locator_presence_error(
             e, interaction_action, task, memory, browser, retries_left
         )
+
+    return outcome
 
 
 async def handle_scroll(

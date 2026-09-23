@@ -85,8 +85,7 @@ async def handle_select_option(
     browser: Browser,
     max_timeout_seconds_per_try: float,
     max_tries: int,
-):
-
+) -> str:
     if (
         select_option_action.select_values is None
         and not select_option_action.skip_prompt
@@ -103,7 +102,7 @@ async def handle_select_option(
         logger.debug(
             f"Select values is None for action: {select_option_action.__class__.__name__}, skipping action"
         )
-        return
+        return "skipped"
 
     if select_option_action.command and not select_option_action.skip_command:
         last_error = await command_based_action_with_retry(
@@ -116,13 +115,16 @@ async def handle_select_option(
         )
 
         if last_error is None:
-            return
+            return "command_success"
 
     if not select_option_action.skip_prompt:
         logger.debug(
             f"Executing prompt-based action: {select_option_action.__class__.__name__}"
         )
         await select_option_index(select_option_action, browser, memory, task)
+        return "prompt_fallback"
+
+    return "failed"
 
 
 def _build_css_selector(node) -> str | None:

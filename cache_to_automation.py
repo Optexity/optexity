@@ -132,10 +132,10 @@ def _build_locator_command(element: dict) -> str | None:
 
     data_test = attrs.get('data-test', '')
     if data_test:
-        return f'locator("[data-test=\\"{data_test}\\"]")'
+        return f'locator("[data-test=\\"{data_test}\\"]").nth(0)'
     data_testid = attrs.get('data-testid', '')
     if data_testid:
-        return f'locator("[data-testid=\\"{data_testid}\\"]")'
+        return f'locator("[data-testid=\\"{data_testid}\\"]").nth(0)'
 
     el_id = attrs.get('id', '')
     if el_id and not _looks_dynamic(el_id):

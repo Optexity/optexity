@@ -135,12 +135,122 @@
     {
       "type": "action_node",
       "interaction_action": {
-        "agentic_task": {
-          "task": "You are on a hotel detail page on booking.com. Find the cheapest available room and click Reserve or Book now for it. Then fill in the guest details form: first name {first_name[0]}, last name {last_name[0]}, email address {email_address[0]}, phone number {phone_number[0]}. If asked for arrival time select any option. Click the final booking button (Complete booking, Confirm, or similar) to reach the payment page. Stop once you reach the payment/credit card page.",
-          "max_steps": 25,
-          "backend": "browser_use"
+        "select_option": {
+          "command": "locator('[data-testid=\"select-room-trigger\"]').nth(0)",
+          "select_values": [
+            "{number_of_rooms[0]}"
+          ],
+          "prompt_instructions": "Select the number of rooms"
         }
-      }
+      },
+      "expect_new_tab": false
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "scroll": {
+          "down": true,
+          "amount": 3
+        }
+      },
+      "expect_new_tab": false
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"button\", name=\"I'll\\u00a0reserve\")",
+          "prompt_instructions": "Click the Reserve button"
+        }
+      },
+      "expect_new_tab": false
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator('[data-testid=\"user-details-firstname\"]')",
+          "input_text": "{first_name[0]}",
+          "prompt_instructions": "Enter first name"
+        }
+      },
+      "expect_new_tab": false
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator('[data-testid=\"user-details-lastname\"]')",
+          "input_text": "{last_name[0]}",
+          "prompt_instructions": "Enter last name"
+        }
+      },
+      "expect_new_tab": false
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator('[data-testid=\"user-details-email\"]')",
+          "input_text": "{email_address[0]}",
+          "prompt_instructions": "Enter email address"
+        }
+      },
+      "expect_new_tab": false
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator('[data-testid=\"phone-number-input\"]')",
+          "input_text": "{phone_number[0]}",
+          "prompt_instructions": "Enter phone number"
+        }
+      },
+      "expect_new_tab": false
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "select_option": {
+          "command": "locator('[data-testid=\"arrival-time-dropdown\"]')",
+          "select_values": [
+            "{arrival_time_slot[0]}"
+          ],
+          "prompt_instructions": "Select estimated arrival time"
+        }
+      },
+      "expect_new_tab": false
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"button\", name=\"Next: Final details\")",
+          "prompt_instructions": "Click Next: Final details button"
+        }
+      },
+      "expect_new_tab": false
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "scroll": {
+          "down": false,
+          "amount": 3
+        }
+      },
+      "expect_new_tab": false
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"button\", name=\"Complete booking\")",
+          "prompt_instructions": "Click Complete booking button"
+        }
+      },
+      "expect_new_tab": false
     }
   ]
 }
