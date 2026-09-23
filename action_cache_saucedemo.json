@@ -1,0 +1,703 @@
+{
+  "task_description": "Log in with username=standard_user and password=secret_sauce. Then add 'Sauce Labs Backpack' and 'Sauce Labs Bike Light' to the cart. Click the cart icon. Click Checkout. Fill first name=John, last name=Doe, zip=12345. Click Continue. Click Finish.",
+  "start_url": "",
+  "start_time": 1790178498.9415848,
+  "total_actions": 13,
+  "successful_actions": 13,
+  "deterministic_actions": 12,
+  "actions": [
+    {
+      "step_number": 1,
+      "action_type": "input",
+      "action_params": {
+        "index": 15,
+        "text": "standard_user",
+        "clear": true
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div/div/div[2]/div[1]/div/div/form/div[1]/input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "Username",
+          "aria-label": "Username",
+          "data-test": "username",
+          "id": "user-name",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "text",
+          "value": "",
+          "name": "user-name",
+          "style": ""
+        },
+        "ax_name": "Username"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Typed 'standard_user'",
+      "url": "https://www.saucedemo.com/",
+      "timestamp": 1790178503.161848
+    },
+    {
+      "step_number": 1,
+      "action_type": "input",
+      "action_params": {
+        "index": 16,
+        "text": "secret_sauce",
+        "clear": true
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div/div/div[2]/div[1]/div/div/form/div[2]/input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "Password",
+          "aria-label": "Password",
+          "data-test": "password",
+          "id": "password",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "password",
+          "value": "",
+          "name": "password",
+          "style": ""
+        },
+        "ax_name": "Password"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Typed 'secret_sauce'",
+      "url": "https://www.saucedemo.com/",
+      "timestamp": 1790178503.1622021
+    },
+    {
+      "step_number": 1,
+      "action_type": "click",
+      "action_params": {
+        "index": 17,
+        "coordinate_x": null,
+        "coordinate_y": null
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div/div/div[2]/div[1]/div/div/form/input",
+        "attributes": {
+          "class": "submit-button btn_action",
+          "data-test": "login-button",
+          "id": "login-button",
+          "type": "submit",
+          "value": "Login",
+          "name": "login-button",
+          "style": ""
+        },
+        "ax_name": "Login"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked input type=submit id=login-button name=login-button",
+      "url": "https://www.saucedemo.com/",
+      "timestamp": 1790178503.1626081
+    },
+    {
+      "step_number": 2,
+      "action_type": "click",
+      "action_params": {
+        "index": 169
+      },
+      "element": {
+        "tag_name": "button",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "ax_name": "Add to cart",
+        "text_content": "Add to cart"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked button \"Add to cart\" id=add-to-cart-sauce-la name=add-to-cart-sauce-la",
+      "url": "https://www.saucedemo.com/inventory.html",
+      "timestamp": 1790178508.560395
+    },
+    {
+      "step_number": 2,
+      "action_type": "click",
+      "action_params": {
+        "index": 180
+      },
+      "element": {
+        "tag_name": "button",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[2]/div[2]/div[2]/button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-bike-light",
+          "id": "add-to-cart-sauce-labs-bike-light",
+          "name": "add-to-cart-sauce-labs-bike-light"
+        },
+        "ax_name": "Add to cart",
+        "text_content": "Add to cart"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked button \"Add to cart\" id=add-to-cart-sauce-la name=add-to-cart-sauce-la",
+      "url": "https://www.saucedemo.com/inventory.html",
+      "timestamp": 1790178508.560637
+    },
+    {
+      "step_number": 3,
+      "action_type": "click",
+      "action_params": {
+        "index": 134,
+        "coordinate_x": null,
+        "coordinate_y": null
+      },
+      "element": {
+        "tag_name": "a",
+        "xpath": "html/body/div[1]/div/div/header/div[1]/div[3]/a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, 2 items"
+        },
+        "ax_name": "Cart, 2 items",
+        "text_content": "2"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked a role=button \"2\" aria-label=Cart, 2 items",
+      "url": "https://www.saucedemo.com/inventory.html",
+      "timestamp": 1790178513.175808
+    },
+    {
+      "step_number": 4,
+      "action_type": "click",
+      "action_params": {
+        "index": 392,
+        "coordinate_x": null,
+        "coordinate_y": null
+      },
+      "element": {
+        "tag_name": "button",
+        "xpath": "html/body/div[1]/div/div/div/div/div[2]/button[2]",
+        "attributes": {
+          "class": "btn btn_action btn_medium checkout_button ",
+          "data-test": "checkout",
+          "id": "checkout",
+          "name": "checkout"
+        },
+        "ax_name": "Checkout",
+        "text_content": "Checkout"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked button \"Checkout\" id=checkout name=checkout",
+      "url": "https://www.saucedemo.com/cart.html",
+      "timestamp": 1790178516.8625941
+    },
+    {
+      "step_number": 5,
+      "action_type": "input",
+      "action_params": {
+        "index": 473,
+        "text": "John",
+        "clear": true
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div[1]/div/div/div/div/form/div[1]/div[1]/input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "First Name",
+          "aria-label": "First Name",
+          "data-test": "firstName",
+          "id": "first-name",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "text",
+          "value": "",
+          "name": "firstName"
+        },
+        "ax_name": "First Name"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Typed 'John'",
+      "url": "https://www.saucedemo.com/checkout-step-one.html",
+      "timestamp": 1790178519.274285
+    },
+    {
+      "step_number": 5,
+      "action_type": "input",
+      "action_params": {
+        "index": 474,
+        "text": "Doe",
+        "clear": true
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div[1]/div/div/div/div/form/div[1]/div[2]/input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "Last Name",
+          "aria-label": "Last Name",
+          "data-test": "lastName",
+          "id": "last-name",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "text",
+          "value": "",
+          "name": "lastName"
+        },
+        "ax_name": "Last Name"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Typed 'Doe'",
+      "url": "https://www.saucedemo.com/checkout-step-one.html",
+      "timestamp": 1790178519.2743921
+    },
+    {
+      "step_number": 5,
+      "action_type": "input",
+      "action_params": {
+        "index": 475,
+        "text": "12345",
+        "clear": true
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div[1]/div/div/div/div/form/div[1]/div[3]/input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "Zip/Postal Code",
+          "aria-label": "Zip/Postal Code",
+          "data-test": "postalCode",
+          "id": "postal-code",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "text",
+          "value": "",
+          "name": "postalCode"
+        },
+        "ax_name": "Zip/Postal Code"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Typed '12345'",
+      "url": "https://www.saucedemo.com/checkout-step-one.html",
+      "timestamp": 1790178519.274455
+    },
+    {
+      "step_number": 6,
+      "action_type": "click",
+      "action_params": {
+        "index": 482,
+        "coordinate_x": null,
+        "coordinate_y": null
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div[1]/div/div/div/div/form/div[2]/input",
+        "attributes": {
+          "class": "submit-button btn btn_primary cart_button btn_action",
+          "data-test": "continue",
+          "id": "continue",
+          "type": "submit",
+          "value": "Continue",
+          "name": "continue"
+        },
+        "ax_name": "Continue"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked input type=submit id=continue name=continue",
+      "url": "https://www.saucedemo.com/checkout-step-one.html",
+      "timestamp": 1790178523.194443
+    },
+    {
+      "step_number": 7,
+      "action_type": "click",
+      "action_params": {
+        "index": 641,
+        "coordinate_x": null,
+        "coordinate_y": null
+      },
+      "element": {
+        "tag_name": "button",
+        "xpath": "html/body/div[1]/div/div/div/div/div[2]/div[9]/button[2]",
+        "attributes": {
+          "class": "btn btn_action btn_medium cart_button",
+          "data-test": "finish",
+          "id": "finish",
+          "name": "finish"
+        },
+        "ax_name": "Finish",
+        "text_content": "Finish"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked button \"Finish\" id=finish name=finish",
+      "url": "https://www.saucedemo.com/checkout-step-two.html",
+      "timestamp": 1790178527.03181
+    },
+    {
+      "step_number": 8,
+      "action_type": "done",
+      "action_params": {
+        "text": "The order has been completed successfully! Here's a summary of what was accomplished:\n\n1. \u2705 Logged in with username=standard_user and password=secret_sauce\n2. \u2705 Added 'Sauce Labs Backpack' ($29.99) to the cart\n3. \u2705 Added 'Sauce Labs Bike Light' ($9.99) to the cart\n4. \u2705 Clicked the cart icon\n5. \u2705 Clicked Checkout\n6. \u2705 Filled in First Name=John, Last Name=Doe, Zip=12345\n7. \u2705 Clicked Continue\n8. \u2705 Clicked Finish\n\nThe checkout is complete! The page now shows \"Checkout: Complete!\" with the message: \"Thank you for your order! Your order has been dispatched, and will arrive just as fast as the pony can get there!\"",
+        "success": true,
+        "files_to_display": []
+      },
+      "element": null,
+      "result_success": true,
+      "result_error": null,
+      "result_content": "The order has been completed successfully! Here's a summary of what was accomplished:\n\n1. \u2705 Logged in with username=standard_user and password=secret_sauce\n2. \u2705 Added 'Sauce Labs Backpack' ($29.99) to the cart\n3. \u2705 Added 'Sauce Labs Bike Light' ($9.99) to the cart\n4. \u2705 Clicked the cart icon\n5. \u2705 Clicked Checkout\n6. \u2705 Filled in First Name=John, Last Name=Doe, Zip=12345\n7. \u2705 Clicked Continue\n8. \u2705 Clicked Finish\n\nThe checkout is complete! The page now shows \"Checkout: Complete!\" with the message: \"Thank you for your order! Your order has been dispatched, and will arrive just as fast as the pony can get there!\"",
+      "url": "https://www.saucedemo.com/checkout-complete.html",
+      "timestamp": 1790178530.755905
+    }
+  ],
+  "deterministic_actions_list": [
+    {
+      "step_number": 1,
+      "action_type": "input",
+      "action_params": {
+        "index": 15,
+        "text": "standard_user",
+        "clear": true
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div/div/div[2]/div[1]/div/div/form/div[1]/input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "Username",
+          "aria-label": "Username",
+          "data-test": "username",
+          "id": "user-name",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "text",
+          "value": "",
+          "name": "user-name",
+          "style": ""
+        },
+        "ax_name": "Username"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Typed 'standard_user'",
+      "url": "https://www.saucedemo.com/",
+      "timestamp": 1790178503.161848
+    },
+    {
+      "step_number": 1,
+      "action_type": "input",
+      "action_params": {
+        "index": 16,
+        "text": "secret_sauce",
+        "clear": true
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div/div/div[2]/div[1]/div/div/form/div[2]/input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "Password",
+          "aria-label": "Password",
+          "data-test": "password",
+          "id": "password",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "password",
+          "value": "",
+          "name": "password",
+          "style": ""
+        },
+        "ax_name": "Password"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Typed 'secret_sauce'",
+      "url": "https://www.saucedemo.com/",
+      "timestamp": 1790178503.1622021
+    },
+    {
+      "step_number": 1,
+      "action_type": "click",
+      "action_params": {
+        "index": 17,
+        "coordinate_x": null,
+        "coordinate_y": null
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div/div/div[2]/div[1]/div/div/form/input",
+        "attributes": {
+          "class": "submit-button btn_action",
+          "data-test": "login-button",
+          "id": "login-button",
+          "type": "submit",
+          "value": "Login",
+          "name": "login-button",
+          "style": ""
+        },
+        "ax_name": "Login"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked input type=submit id=login-button name=login-button",
+      "url": "https://www.saucedemo.com/",
+      "timestamp": 1790178503.1626081
+    },
+    {
+      "step_number": 2,
+      "action_type": "click",
+      "action_params": {
+        "index": 169
+      },
+      "element": {
+        "tag_name": "button",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "ax_name": "Add to cart",
+        "text_content": "Add to cart"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked button \"Add to cart\" id=add-to-cart-sauce-la name=add-to-cart-sauce-la",
+      "url": "https://www.saucedemo.com/inventory.html",
+      "timestamp": 1790178508.560395
+    },
+    {
+      "step_number": 2,
+      "action_type": "click",
+      "action_params": {
+        "index": 180
+      },
+      "element": {
+        "tag_name": "button",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[2]/div[2]/div[2]/button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-bike-light",
+          "id": "add-to-cart-sauce-labs-bike-light",
+          "name": "add-to-cart-sauce-labs-bike-light"
+        },
+        "ax_name": "Add to cart",
+        "text_content": "Add to cart"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked button \"Add to cart\" id=add-to-cart-sauce-la name=add-to-cart-sauce-la",
+      "url": "https://www.saucedemo.com/inventory.html",
+      "timestamp": 1790178508.560637
+    },
+    {
+      "step_number": 3,
+      "action_type": "click",
+      "action_params": {
+        "index": 134,
+        "coordinate_x": null,
+        "coordinate_y": null
+      },
+      "element": {
+        "tag_name": "a",
+        "xpath": "html/body/div[1]/div/div/header/div[1]/div[3]/a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, 2 items"
+        },
+        "ax_name": "Cart, 2 items",
+        "text_content": "2"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked a role=button \"2\" aria-label=Cart, 2 items",
+      "url": "https://www.saucedemo.com/inventory.html",
+      "timestamp": 1790178513.175808
+    },
+    {
+      "step_number": 4,
+      "action_type": "click",
+      "action_params": {
+        "index": 392,
+        "coordinate_x": null,
+        "coordinate_y": null
+      },
+      "element": {
+        "tag_name": "button",
+        "xpath": "html/body/div[1]/div/div/div/div/div[2]/button[2]",
+        "attributes": {
+          "class": "btn btn_action btn_medium checkout_button ",
+          "data-test": "checkout",
+          "id": "checkout",
+          "name": "checkout"
+        },
+        "ax_name": "Checkout",
+        "text_content": "Checkout"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked button \"Checkout\" id=checkout name=checkout",
+      "url": "https://www.saucedemo.com/cart.html",
+      "timestamp": 1790178516.8625941
+    },
+    {
+      "step_number": 5,
+      "action_type": "input",
+      "action_params": {
+        "index": 473,
+        "text": "John",
+        "clear": true
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div[1]/div/div/div/div/form/div[1]/div[1]/input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "First Name",
+          "aria-label": "First Name",
+          "data-test": "firstName",
+          "id": "first-name",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "text",
+          "value": "",
+          "name": "firstName"
+        },
+        "ax_name": "First Name"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Typed 'John'",
+      "url": "https://www.saucedemo.com/checkout-step-one.html",
+      "timestamp": 1790178519.274285
+    },
+    {
+      "step_number": 5,
+      "action_type": "input",
+      "action_params": {
+        "index": 474,
+        "text": "Doe",
+        "clear": true
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div[1]/div/div/div/div/form/div[1]/div[2]/input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "Last Name",
+          "aria-label": "Last Name",
+          "data-test": "lastName",
+          "id": "last-name",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "text",
+          "value": "",
+          "name": "lastName"
+        },
+        "ax_name": "Last Name"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Typed 'Doe'",
+      "url": "https://www.saucedemo.com/checkout-step-one.html",
+      "timestamp": 1790178519.2743921
+    },
+    {
+      "step_number": 5,
+      "action_type": "input",
+      "action_params": {
+        "index": 475,
+        "text": "12345",
+        "clear": true
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div[1]/div/div/div/div/form/div[1]/div[3]/input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "Zip/Postal Code",
+          "aria-label": "Zip/Postal Code",
+          "data-test": "postalCode",
+          "id": "postal-code",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "text",
+          "value": "",
+          "name": "postalCode"
+        },
+        "ax_name": "Zip/Postal Code"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Typed '12345'",
+      "url": "https://www.saucedemo.com/checkout-step-one.html",
+      "timestamp": 1790178519.274455
+    },
+    {
+      "step_number": 6,
+      "action_type": "click",
+      "action_params": {
+        "index": 482,
+        "coordinate_x": null,
+        "coordinate_y": null
+      },
+      "element": {
+        "tag_name": "input",
+        "xpath": "html/body/div[1]/div/div/div/div/form/div[2]/input",
+        "attributes": {
+          "class": "submit-button btn btn_primary cart_button btn_action",
+          "data-test": "continue",
+          "id": "continue",
+          "type": "submit",
+          "value": "Continue",
+          "name": "continue"
+        },
+        "ax_name": "Continue"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked input type=submit id=continue name=continue",
+      "url": "https://www.saucedemo.com/checkout-step-one.html",
+      "timestamp": 1790178523.194443
+    },
+    {
+      "step_number": 7,
+      "action_type": "click",
+      "action_params": {
+        "index": 641,
+        "coordinate_x": null,
+        "coordinate_y": null
+      },
+      "element": {
+        "tag_name": "button",
+        "xpath": "html/body/div[1]/div/div/div/div/div[2]/div[9]/button[2]",
+        "attributes": {
+          "class": "btn btn_action btn_medium cart_button",
+          "data-test": "finish",
+          "id": "finish",
+          "name": "finish"
+        },
+        "ax_name": "Finish",
+        "text_content": "Finish"
+      },
+      "result_success": true,
+      "result_error": null,
+      "result_content": "Clicked button \"Finish\" id=finish name=finish",
+      "url": "https://www.saucedemo.com/checkout-step-two.html",
+      "timestamp": 1790178527.03181
+    }
+  ]
+}
