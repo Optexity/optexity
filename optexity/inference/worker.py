@@ -21,12 +21,29 @@ def _force_exit(code: int) -> None:
     os._exit(code)
 
 
+def _apply_local_override(task: Task) -> None:
+    """Override automation from local file if OPTEXITY_LOCAL_AUTOMATION is set."""
+    import json
+    import pathlib
+    override_path = os.environ.get("OPTEXITY_LOCAL_AUTOMATION", "")
+    if override_path and pathlib.Path(override_path).exists():
+        try:
+            from optexity.schema.automation import Automation
+            with open(override_path) as f:
+                data = json.load(f)
+            task.automation = Automation.model_validate(data)
+            print(f"[WORKER OVERRIDE] Loaded automation from {override_path}", file=sys.stderr)
+        except Exception as e:
+            print(f"[WORKER OVERRIDE] Failed: {e}", file=sys.stderr)
+
+
 async def main():
     # Nodes execute in this process, so private_node handlers must be registered
     # here — registering them in the parent service would not reach the executor.
     load_plugins()
 
     task = Task.model_validate_json(sys.argv[1])
+    _apply_local_override(task)
     unique_child_arn = sys.argv[2]
     child_process_id = int(sys.argv[3])
     cdp_url = sys.argv[4]

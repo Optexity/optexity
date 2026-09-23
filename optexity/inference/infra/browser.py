@@ -352,7 +352,6 @@ class Browser:
             include_screenshot=include_screenshot,  # default True even if use_vision=False so cloud sync is useful (it's fast now anyway); pass False when only the axtree is needed
             include_recent_events=False,
             cached=False,
-            include_full_page=include_full_page,
         )
 
         return browser_state_summary

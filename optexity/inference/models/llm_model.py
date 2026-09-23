@@ -28,6 +28,56 @@ def extract_json_objects(text: str) -> list[str]:
     return json_candidates
 
 
+def _recover_partial_output(data: dict, schema: type[BaseModel]) -> BaseModel:
+    """Recover when a model embeds state fields inside action items.
+
+    Some models return:
+      {"action": [{"thinking": "...", "evaluation_previous_goal": "...", "click": {...}}]}
+    instead of:
+      {"evaluation_previous_goal": "...", "action": [{"click": {...}}]}
+
+    This function extracts string fields that belong at the top level from
+    inside the first action item, promotes them, strips them from action items,
+    and fills any remaining missing string fields with empty defaults.
+    """
+    # Collect names of string-typed fields in the schema
+    top_str_fields: set[str] = set()
+    for name, field in schema.model_fields.items():
+        ann = field.annotation
+        args = getattr(ann, "__args__", None)
+        if ann is str or (args is not None and str in args):
+            top_str_fields.add(name)
+
+    recovered: dict = {}
+    cleaned_actions: list = []
+    for item in data.get("action", []):
+        if not isinstance(item, dict):
+            cleaned_actions.append(item)
+            continue
+        clean: dict = {}
+        for k, v in item.items():
+            if k in top_str_fields and k not in data:
+                recovered[k] = v
+            elif k == "thinking" and "thinking" not in schema.model_fields:
+                # model adds free-form thinking inside action — promote or discard
+                if "thinking" in top_str_fields:
+                    recovered.setdefault("thinking", v)
+            else:
+                clean[k] = v
+        cleaned_actions.append(clean)
+
+    new_data = dict(data)
+    new_data.update(recovered)
+    new_data["action"] = cleaned_actions
+
+    # Fill any still-missing string fields with empty defaults
+    for name in top_str_fields:
+        if name not in new_data:
+            new_data[name] = ""
+
+    return schema.model_validate(new_data)
+
+
 def parse_json_from_completion(
     content: str, response_schema: type[BaseModel]
 ) -> BaseModel:
@@ -49,7 +99,16 @@ def parse_json_from_completion(
             try:
                 return response_schema.model_validate(ast.literal_eval(block))
             except Exception:
-                continue
+                pass
+        # Fallback: provider returned valid JSON but misplaced state fields.
+        # Promote string fields from inside action items and fill empty defaults.
+        try:
+            import json as _json
+            data = _json.loads(block)
+            if isinstance(data, dict):
+                return _recover_partial_output(data, response_schema)
+        except Exception:
+            continue
 
     raise ValueError("Could not parse response from completion.")
 

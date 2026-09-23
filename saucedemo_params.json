@@ -1,0 +1,9 @@
+{
+  "input_parameters": {
+    "username": ["standard_user"],
+    "password": ["secret_sauce"],
+    "first_name": ["John"],
+    "last_name": ["Doe"],
+    "postal_code": ["12345"]
+  }
+}

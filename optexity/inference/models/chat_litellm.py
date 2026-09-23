@@ -168,6 +168,10 @@ class ChatLiteLLM(BaseChatModel):
             try:
                 parsed = parse_json_from_completion(content, output_format)
             except Exception as e:
+                logger.error(
+                    f"[PARSE_FAIL] model={self.name} content_len={len(content)} "
+                    f"content_preview={repr(content[:300])}"
+                )
                 raise ModelProviderError(
                     message=f"Could not parse structured output from {self.name}: {e}",
                     model=self.name,

@@ -1,0 +1,39 @@
+{
+  "url": "https://www.booking.com",
+  "parameters": {
+    "input_parameters": {
+      "destination_city": ["Gurgaon"],
+      "check_in_date": ["Thursday, 25 September"],
+      "check_out_date": ["Sunday, 28 September"],
+      "number_of_rooms": ["1"],
+      "first_name": ["John"],
+      "last_name": ["Doe"],
+      "email_address": ["john.doe@example.com"],
+      "phone_number": ["5551234567"],
+      "arrival_time_slot": ["1"]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "close_overlay_popup": {
+          "task": "Close any popup or overlay that appears on the page. Look for X buttons, close buttons, or dismiss buttons. If there is a 'Sign in' or 'Genius' popup, close it.",
+          "max_steps": 3,
+          "backend": "browser_use"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "Search for hotels in {destination_city[0]}. First dismiss any popups by clicking X or close buttons. Then enter {destination_city[0]} in the destination search box and select it from suggestions. Set check-in to {check_in_date[0]} and check-out to {check_out_date[0]}. Set {number_of_rooms[0]} room. Click Search. Once results load, sort by lowest price first. Then click the first hotel in the sorted results.",
+          "max_steps": 30,
+          "backend": "browser_use"
+        }
+      }
+    }
+  ]
+}

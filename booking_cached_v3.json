@@ -1,0 +1,136 @@
+{
+  "url": "https://www.booking.com",
+  "parameters": {
+    "input_parameters": {
+      "destination_city": [
+        "Gurgaon"
+      ],
+      "check_in_date": [
+        "Friday, 25 September"
+      ],
+      "check_out_date": [
+        "Monday, 28 September"
+      ],
+      "number_of_rooms": [
+        "1"
+      ],
+      "first_name": [
+        "John"
+      ],
+      "last_name": [
+        "Doe"
+      ],
+      "email_address": [
+        "john.doe@example.com"
+      ],
+      "phone_number": [
+        "5551234567"
+      ],
+      "arrival_time_slot": [
+        "1"
+      ]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_label(\"Dismiss sign in information.\")",
+          "prompt_instructions": "Close the Genius popup if it appears.",
+          "optional": true
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "locator(\"#searchbox-horizontal-destination-input\")",
+          "prompt_instructions": "Click 'Enter destination'."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator(\"#searchbox-horizontal-destination-input\")",
+          "prompt_instructions": "Enter the Enter destination '{destination_city[0]}' into the field.",
+          "input_text": "{destination_city[0]}"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"option\", name=\"{destination_city[0]} Haryana, India\")",
+          "prompt_instructions": "Click '{destination_city[0]} Haryana, India'."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"gridcell\", name=\"{check_in_date[0]} 2026\")",
+          "prompt_instructions": "Click '{check_in_date[0]} 2026'."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"gridcell\", name=\"{check_out_date[0]} 2026\")",
+          "prompt_instructions": "Click '{check_out_date[0]} 2026'."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"button\", name=\"Search\")",
+          "prompt_instructions": "Click 'Search'."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "scroll": {
+          "down": true
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "scroll": {
+          "down": false
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "go_to_url": {
+          "url": "https://www.booking.com/searchresults.en-gb.html?ss={destination_city[0]}&checkin=2026-09-25&checkout=2026-09-28&group_adults=2&no_rooms=1&group_children=0&order=price"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "locator(\"[data-testid=\\\"title-link\\\"]\")",
+          "prompt_instructions": "Click the first hotel in the sorted results."
+        }
+      },
+      "expect_new_tab": true
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "url": "https://www.roboform.com/filling-test-all-fields",
+  "parameters": {
+    "input_parameters": {},
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator(\"[name='01___title']\").first",
+          "prompt_instructions": "Enter 01___title value in the field",
+          "input_text": "Mr."
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator(\"[name='02frstname']\").first",
+          "prompt_instructions": "Enter 02frstname value in the field",
+          "input_text": "my"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator(\"[name='04lastname']\").first",
+          "prompt_instructions": "Enter 04lastname value in the field",
+          "input_text": "name"
+        }
+      }
+    }
+  ]
+}

@@ -590,16 +590,20 @@ async def task_processor():
                 if not fetch_success:
                     automation_error = "Task allocated without an automation"
 
-            if os.environ.get("OPTEXITY_LOCAL_AUTOMATION"):
-                override_path = pathlib.Path(os.environ["OPTEXITY_LOCAL_AUTOMATION"])
-                if override_path.exists():
-                    from optexity.schema.automation import Automation
-                    with open(override_path, "r") as f:
-                        automation = json.load(f)
-                        automation = Automation.model_validate(automation)
-                    task.automation = automation
-                    fetch_success = True
-                    logger.info(f"Loaded local automation override from {override_path}")
+            override_env = os.environ.get("OPTEXITY_LOCAL_AUTOMATION", "test_automation.json")
+            if override_env:
+                try:
+                    override_path = pathlib.Path(override_env)
+                    if override_path.exists():
+                        from optexity.schema.automation import Automation
+                        with open(override_path, "r") as f:
+                            override_data = json.load(f)
+                            automation_obj = Automation.model_validate(override_data)
+                        task.automation = automation_obj
+                        fetch_success = True
+                        logger.info(f"[LOCAL OVERRIDE] Loaded automation from {override_path}")
+                except Exception as override_err:
+                    logger.error(f"[LOCAL OVERRIDE] Failed to load {override_env}: {override_err}")
 
             if not fetch_success:
                 logger.error(

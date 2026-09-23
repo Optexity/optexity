@@ -216,3 +216,6 @@ node_modules
 optexity/utils/optexity.code-workspace
 
 tmp
+# Handover and local test files
+HANDOVER.md
+agentic_booking.json

@@ -71,12 +71,28 @@ def _fuzzy_match(param_val: str, text: str) -> bool:
 def _substitute_value(text: str, reverse_map: dict[str, str]) -> str:
     """Replace literal values with variable references.
 
-    Tries exact match first, then fuzzy matching (substring/token overlap).
+    Tries exact match first, then substring replacement (keeping surrounding
+    text), then token-overlap full replacement as a last resort.
     """
     if text in reverse_map:
         return reverse_map[text]
+    result = text
     for literal, var_ref in reverse_map.items():
-        if _fuzzy_match(literal, text):
+        if len(literal) >= 3 and literal in result:
+            result = result.replace(literal, var_ref)
+        elif len(text) >= 3 and text in literal:
+            # text is a sub-string of literal (e.g. "Sep 25" inside a full date)
+            return var_ref
+    if result != text:
+        return result
+    # Last resort: token overlap — only when text is a simple standalone phrase
+    for literal, var_ref in reverse_map.items():
+        param_tokens = _tokenize(literal)
+        if len(param_tokens) < 2:
+            continue
+        text_tokens = _tokenize(text)
+        overlap = param_tokens & text_tokens
+        if len(overlap) / len(param_tokens) >= 0.6:
             return var_ref
     return text
 
@@ -114,9 +130,12 @@ def _build_locator_command(element: dict) -> str | None:
     attrs = element.get('attributes', {})
     tag = element.get('tag_name', '')
 
-    data_test = attrs.get('data-test', '') or attrs.get('data-testid', '')
+    data_test = attrs.get('data-test', '')
     if data_test:
         return f'locator("[data-test=\\"{data_test}\\"]")'
+    data_testid = attrs.get('data-testid', '')
+    if data_testid:
+        return f'locator("[data-testid=\\"{data_testid}\\"]")'
 
     el_id = attrs.get('id', '')
     if el_id and not _looks_dynamic(el_id):
@@ -134,8 +153,11 @@ def _build_locator_command(element: dict) -> str | None:
     role = attrs.get('role', '')
     if ax_name and role:
         return f'get_by_role("{role}", name="{_escape(ax_name)}")'
-    if ax_name and tag in ('button', 'a', 'input', 'select', 'textarea'):
-        return f'get_by_text("{_escape(ax_name)}")'
+    _IMPLICIT_ROLES = {'button': 'button', 'a': 'link', 'select': 'combobox', 'textarea': 'textbox'}
+    if ax_name and tag in _IMPLICIT_ROLES:
+        return f'get_by_role("{_IMPLICIT_ROLES[tag]}", name="{_escape(ax_name)}")'
+    if ax_name and tag == 'input':
+        return f'get_by_role("textbox", name="{_escape(ax_name)}")'
 
     aria_label = attrs.get('aria-label', '')
     if aria_label:
@@ -195,7 +217,9 @@ def _action_to_node(cached_action: dict, reverse_map: dict[str, str]) -> dict | 
     action_type = cached_action.get('action_type', '')
     params = cached_action.get('action_params', {})
     element = cached_action.get('element')
-    locator_cmd = _build_locator_command(element) if element else None
+    _raw_locator = _build_locator_command(element) if element else None
+    # Substitute parameter values in locator (e.g. date strings, city names)
+    locator_cmd = _substitute_value(_raw_locator, reverse_map) if _raw_locator else None
     new_tab = _opens_new_tab(element)
 
     if action_type in ('input_text', 'input'):
