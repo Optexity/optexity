@@ -590,17 +590,16 @@ async def task_processor():
                 if not fetch_success:
                     automation_error = "Task allocated without an automation"
 
-            # Local override: load automation from test_automation.json
-            # Uncomment below to override dashboard automation with local file
-            # from optexity.schema.automation import Automation
-            # test_automation_path = pathlib.Path("test_automation.json")
-            # if test_automation_path.exists():
-            #     with open(test_automation_path, "r") as f:
-            #         automation = json.load(f)
-            #         automation = Automation.model_validate(automation)
-            #     task.automation = automation
-            #     fetch_success = True
-            #     logger.info(f"Loaded local test automation from {test_automation_path}")
+            if os.environ.get("OPTEXITY_LOCAL_AUTOMATION"):
+                override_path = pathlib.Path(os.environ["OPTEXITY_LOCAL_AUTOMATION"])
+                if override_path.exists():
+                    from optexity.schema.automation import Automation
+                    with open(override_path, "r") as f:
+                        automation = json.load(f)
+                        automation = Automation.model_validate(automation)
+                    task.automation = automation
+                    fetch_success = True
+                    logger.info(f"Loaded local automation override from {override_path}")
 
             if not fetch_success:
                 logger.error(
