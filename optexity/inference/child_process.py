@@ -506,6 +506,9 @@ async def run_marketplace_function(
         # call — including when the function or an artifact upload fails.
         detach_task_log_file(file_handler)
         await save_trajectory_in_server(task)
+        # The lite worker is long-lived, so without this every task's
+        # downloads and logs stay on its disk after they have been uploaded.
+        await delete_local_data(task)
     try:
         await complete_task_in_server(
             task,
