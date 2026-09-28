@@ -20,7 +20,7 @@ class InferenceRequest(BaseModel):
     # fleet, false runs it as a browser-free methods.py function on the lite pool.
     is_browser: bool = False
     # Marketplace download targets only: skip documents over 20 pages.
-    is_skip_large_docs: bool = True
+    is_skip_large_docs: bool = False
     task_callback_url: str | None = None
     task_callback_api_key: str | None = None
     # Concurrency caps, applied to every task type (dedicated, shared browser,

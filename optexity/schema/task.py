@@ -135,7 +135,7 @@ class Task(BaseModel):
     # dispatch read the same value.
     is_browser: bool = False
     # Marketplace download targets only: skip documents over 20 pages.
-    is_skip_large_docs: bool = True
+    is_skip_large_docs: bool = False
     # Dedicated limits carried with the task when is_dedicated is set via the
     # request (no DB policy row). Ignored for non-dedicated tasks and when a
     # dedicated_service DB row governs the service.
