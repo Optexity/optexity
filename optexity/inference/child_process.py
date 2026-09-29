@@ -803,6 +803,25 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
     async def allocate_task(tasks: list[Task] = Body(...)):
         """Bulk allocate tasks onto this child's local priority queue."""
         try:
+            system_info = SystemInfo()
+            if system_info.total_system_memory > 0:
+                pct_used = (
+                    system_info.total_system_memory_used
+                    / system_info.total_system_memory
+                )
+                if pct_used > settings.ALLOCATE_MEMORY_REFUSE_THRESHOLD:
+                    msg = (
+                        f"memory pressure: {pct_used:.0%} used "
+                        f"({system_info.total_system_memory_used:.0f}/"
+                        f"{system_info.total_system_memory:.0f} MiB) "
+                        f"exceeds {settings.ALLOCATE_MEMORY_REFUSE_THRESHOLD:.0%}"
+                    )
+                    logger.warning("Refusing allocate_task: %s", msg)
+                    return JSONResponse(
+                        content={"success": False, "message": msg},
+                        status_code=503,
+                    )
+
             for task in tasks:
                 _enqueue_task(task)
             return JSONResponse(

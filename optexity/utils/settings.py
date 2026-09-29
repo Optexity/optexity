@@ -54,6 +54,10 @@ class Settings(LLMSettings):
 
     DOWNLOAD_TIMEOUT_SECONDS: float = 200.0
 
+    # Refuse /allocate_task (503) when cgroup used/total exceeds this so opcloud
+    # retires the worker and requeues the task elsewhere.
+    ALLOCATE_MEMORY_REFUSE_THRESHOLD: float = 0.75
+
     UPLOAD_CONNECT_TIMEOUT_SECONDS: float = 30.0
     UPLOAD_WRITE_TIMEOUT_SECONDS: float = 300.0
     UPLOAD_READ_TIMEOUT_SECONDS: float = 600.0
