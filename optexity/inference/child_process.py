@@ -507,13 +507,16 @@ async def run_marketplace_function(
         detach_task_log_file(file_handler)
         await save_trajectory_in_server(task)
     try:
-        await complete_task_in_server(
+        completed = await complete_task_in_server(
             task,
             memory.token_usage if memory else None,
             child_process_id,
             unique_child_arn,
         )
-        await initiate_callback(task)
+        # opcloud parks a dead session for one cookie refresh and reruns this
+        # task. The caller is not told about that intermediate failure.
+        if not (isinstance(completed, dict) and completed.get("suppress_callback")):
+            await initiate_callback(task)
     except Exception as fail_err:
         logger.error(f"Failed to report task {task.task_id} completion: {fail_err}")
 
