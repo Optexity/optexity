@@ -134,6 +134,9 @@ class Task(BaseModel):
     # from InferenceRequest so both opcloud's pool routing and child_process.py's
     # dispatch read the same value.
     is_browser: bool = False
+    # Marketplace download targets only: when set, skip documents with more
+    # pages than this. Unset (None) sends every document, whatever its size.
+    page_limit: int | None = None
     # Dedicated limits carried with the task when is_dedicated is set via the
     # request (no DB policy row). Ignored for non-dedicated tasks and when a
     # dedicated_service DB row governs the service.

@@ -19,6 +19,9 @@ class InferenceRequest(BaseModel):
     # Marketplace targets only: true runs the target's node graph on the browser
     # fleet, false runs it as a browser-free methods.py function on the lite pool.
     is_browser: bool = False
+    # Marketplace download targets only: when set, skip documents with more
+    # pages than this. Unset (None) sends every document, whatever its size.
+    page_limit: int | None = None
     task_callback_url: str | None = None
     task_callback_api_key: str | None = None
     # Concurrency caps, applied to every task type (dedicated, shared browser,
