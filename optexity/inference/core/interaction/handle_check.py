@@ -54,7 +54,7 @@ async def check_element_index(
     task: Task,
 ):
     try:
-        index = await get_index_from_prompt(
+        index, dom_node = await get_index_from_prompt(
             memory, check_action.prompt_instructions, browser, task
         )
         if index is None:
@@ -73,7 +73,7 @@ async def check_element_index(
         )
         await browser.backend_agent.multi_act([action_model])
         await LocatorExtraction.log_interacted_locator(
-            browser, index, ".check()", memory
+            browser, index, dom_node, ".check()", memory
         )
     except ElementNotFoundInAxtreeException as e:
         raise e
@@ -118,7 +118,7 @@ async def uncheck_element_index(
     task: Task,
 ):
     try:
-        index = await get_index_from_prompt(
+        index, dom_node = await get_index_from_prompt(
             memory, uncheck_action.prompt_instructions, browser, task
         )
         if index is None:
@@ -137,7 +137,7 @@ async def uncheck_element_index(
         )
         await browser.backend_agent.multi_act([action_model])
         await LocatorExtraction.log_interacted_locator(
-            browser, index, ".uncheck()", memory
+            browser, index, dom_node, ".uncheck()", memory
         )
     except ElementNotFoundInAxtreeException as e:
         raise e

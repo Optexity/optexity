@@ -57,7 +57,7 @@ async def hover_element_index(
 ):
 
     try:
-        index = await get_index_from_prompt(
+        index, dom_node = await get_index_from_prompt(
             memory, hover_element_action.prompt_instructions, browser, task
         )
         if index is None:
@@ -79,7 +79,7 @@ async def hover_element_index(
                 )
                 results = await browser.backend_agent.multi_act([action_model])
                 await LocatorExtraction.log_interacted_locator(
-                    browser, index, ".hover()", memory
+                    browser, index, dom_node, ".hover()", memory
                 )
                 if results and results[0].error:
                     raise RuntimeError(

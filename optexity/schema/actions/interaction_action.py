@@ -9,6 +9,26 @@ from optexity.schema.actions.keyboard_keys import KEY_NAMES
 from optexity.schema.actions.prompts import overlay_popup_prompt
 
 
+def escape_for_command_string(value: str) -> str:
+    """Escape backslashes and double quotes so `value` is safe to splice as
+    *data* into a double-quoted Python string literal inside a
+    ``page.<command>`` expression that will later be eval()'d (see
+    Browser.get_locator_from_command). Same escaping order as
+    LocatorExtraction._quote_locator_value (backslash first, then double
+    quote), but a plain escape — no quote-wrapping, whitespace-collapsing, or
+    length-truncation, since those are specific to that function's own
+    candidate-generation use case and would corrupt generic template data
+    (e.g. multi-line extracted text).
+
+    Do NOT use this for a replacement that is itself meant to be spliced in as
+    Playwright/Python *code* rather than data — e.g. the locator-for-loop
+    ``.nth(<N>)`` expansion in for_loop_placeholders.py, which passes
+    ``escape_command=False`` down to BaseAction.replace() for exactly this
+    reason.
+    """
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 class Locator(BaseModel):
     regex_options: list[str] | None = None
     locator_class: str
@@ -82,7 +102,7 @@ class BaseAction(BaseModel):
 
         return self
 
-    def replace(self, pattern: str, replacement: str):
+    def replace(self, pattern: str, replacement: str, escape_command: bool = True):
         if self.prompt_instructions:
             self.prompt_instructions = self.prompt_instructions.replace(
                 pattern, replacement
@@ -90,7 +110,12 @@ class BaseAction(BaseModel):
         if self.xpath:
             self.xpath = self.xpath.replace(pattern, replacement)
         if self.command:
-            self.command = self.command.replace(pattern, replacement).strip('"')
+            command_replacement = (
+                escape_for_command_string(replacement)
+                if escape_command
+                else replacement
+            )
+            self.command = self.command.replace(pattern, command_replacement).strip('"')
         if self.keyword:
             self.keyword = self.keyword.replace(pattern, replacement)
         if self.coordinates:
@@ -128,8 +153,8 @@ class SelectOptionAction(BaseAction):
 
         return self
 
-    def replace(self, pattern: str, replacement: str):
-        super().replace(pattern, replacement)
+    def replace(self, pattern: str, replacement: str, escape_command: bool = True):
+        super().replace(pattern, replacement, escape_command)
         if self.select_values:
             self.select_values = [
                 value.replace(pattern, replacement).strip('"')
@@ -175,8 +200,8 @@ class ClickElementAction(BaseAction):
 
         return self
 
-    def replace(self, pattern: str, replacement: str):
-        super().replace(pattern, replacement)
+    def replace(self, pattern: str, replacement: str, escape_command: bool = True):
+        super().replace(pattern, replacement, escape_command)
         if self.download_filename:
             self.download_filename = self.download_filename.replace(
                 pattern, replacement
@@ -198,8 +223,8 @@ class InputTextAction(BaseAction):
             raise ValueError("command is required when press_enter is True")
         return self
 
-    def replace(self, pattern: str, replacement: str):
-        super().replace(pattern, replacement)
+    def replace(self, pattern: str, replacement: str, escape_command: bool = True):
+        super().replace(pattern, replacement, escape_command)
         if self.input_text:
             self.input_text = self.input_text.replace(pattern, replacement).strip('"')
 
@@ -252,7 +277,7 @@ class UploadFileAction(BaseAction):
         # "{upload_file_url[0]}") have been substituted with the real URL.
         return self
 
-    def replace(self, pattern: str, replacement: str):
+    def replace(self, pattern: str, replacement: str, escape_command: bool = True):
         if self.file_path:
             self.file_path = self.file_path.replace(pattern, replacement).strip('"')
         if self.file_url:
@@ -345,8 +370,8 @@ class KeyPressAction(BaseAction):
             ), f"Invalid keys: {self.type}"
         return self
 
-    def replace(self, pattern: str, replacement: str):
-        super().replace(pattern, replacement)
+    def replace(self, pattern: str, replacement: str, escape_command: bool = True):
+        super().replace(pattern, replacement, escape_command)
         if self.type:
             if isinstance(self.type, str):
                 self.type = self.type.replace(pattern, replacement).strip('"')
@@ -441,19 +466,19 @@ class InteractionAction(BaseModel):
 
         return self
 
-    def replace(self, pattern: str, replacement: str):
+    def replace(self, pattern: str, replacement: str, escape_command: bool = True):
         if self.click_element:
-            self.click_element.replace(pattern, replacement)
+            self.click_element.replace(pattern, replacement, escape_command)
         if self.input_text:
-            self.input_text.replace(pattern, replacement)
+            self.input_text.replace(pattern, replacement, escape_command)
         if self.select_option:
-            self.select_option.replace(pattern, replacement)
+            self.select_option.replace(pattern, replacement, escape_command)
         if self.check:
-            self.check.replace(pattern, replacement)
+            self.check.replace(pattern, replacement, escape_command)
         if self.uncheck:
-            self.uncheck.replace(pattern, replacement)
+            self.uncheck.replace(pattern, replacement, escape_command)
         if self.hover:
-            self.hover.replace(pattern, replacement)
+            self.hover.replace(pattern, replacement, escape_command)
         if self.download_url_as_pdf:
             self.download_url_as_pdf.replace(pattern, replacement)
         if self.close_tabs_until:
@@ -465,10 +490,10 @@ class InteractionAction(BaseModel):
         if self.go_to_url:
             self.go_to_url.replace(pattern, replacement)
         if self.upload_file:
-            self.upload_file.replace(pattern, replacement)
+            self.upload_file.replace(pattern, replacement, escape_command)
         if self.scroll:
             self.scroll.replace(pattern, replacement)
         if self.key_press:
-            self.key_press.replace(pattern, replacement)
+            self.key_press.replace(pattern, replacement, escape_command)
 
         return self

@@ -145,8 +145,11 @@ async def command_based_action_with_retry(
                         f"{type(e).__name__}: {e}"
                     )
 
-                # Resolve the element this command targets and collect all candidate
-                # locators for it via the heuristic (not just an echo of the command).
+                # Record the executed command plus the heuristic's ranked alternatives
+                # for this element. The executed command is always ranked first — it's
+                # the only one guaranteed correct for elements resolved through a
+                # frame, which the heuristic candidates below can't represent; see
+                # LocatorExtraction.locator_from_playwright.
                 # Pure logging: guarded so a failure here can never skip the action below.
                 locator_candidates = None
                 try:
@@ -170,6 +173,7 @@ async def command_based_action_with_retry(
                     title=await browser.get_current_page_title(),
                     axtree=axtree,
                     locator_candidates=locator_candidates,
+                    resolution_tier="command",
                 )
 
                 if isinstance(action, ClickElementAction):
@@ -218,6 +222,17 @@ async def command_based_action_with_retry(
             # retry or downgrade to a string error; fail the task with the fixed
             # message.
             raise
+        except SyntaxError as e:
+            # A malformed command (e.g. an unescaped quote from bad template
+            # substitution) is deterministic — every remaining try will fail
+            # identically. Log distinctly and stop, instead of burning the
+            # full retry budget/sleeps on something that can't self-heal.
+            last_error = f"error: {e}"
+            logger.error(
+                f"Malformed command for {action.__class__.__name__} "
+                f"(command={action.command!r}): {type(e).__name__}: {e}"
+            )
+            break
         except Exception as e:
             last_error = f"error: {e}"
             await asyncio.sleep(max_timeout_seconds_per_try)
