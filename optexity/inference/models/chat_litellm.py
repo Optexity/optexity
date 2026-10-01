@@ -131,8 +131,9 @@ class ChatLiteLLM(BaseChatModel):
         self, messages: list[BaseMessage], output_format: type[T]
     ) -> ChatInvokeCompletion[T]: ...
 
+ # browser-use >=0.11 passes session_id to ainvoke; accept and ignore
     async def ainvoke(
-        self, messages: list[BaseMessage], output_format: type[T] | None = None
+        self, messages: list[BaseMessage], output_format: type[T] | None = None, **kwargs
     ) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
         try:
             response = await litellm.acompletion(
