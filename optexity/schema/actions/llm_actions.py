@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class LLMAction(BaseModel):
-    # Any litellm model string; unset falls through to the task's model, then
-    # to settings.LLM_MODEL. llm_provider is deprecated but still honored.
+    # OpenRouter model ID; unset falls through to the task's model, then to the
+    # configured default. llm_provider is deprecated.
     llm_provider: str | None = None
     llm_model_name: str | None = None

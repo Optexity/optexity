@@ -4,7 +4,7 @@ from browser_use import Agent, BrowserSession, Tools
 
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import normalize_model
-from optexity.inference.models.chat_litellm import build_agent_llm
+from optexity.inference.models.chat_openrouter import build_agent_llm
 from optexity.schema.actions.interaction_action import (
     AgenticTask,
     CloseOverlayPopupAction,
@@ -64,6 +64,7 @@ async def handle_agentic_task(
             use_vision=agentic_task_action.use_vision,
             tools=tools,
             calculate_cost=True,
+            llm_timeout=llm.call_timeout,
             save_conversation_path=step_directory,
         )
         logger.debug(f"Starting browser session for agentic task {browser.cdp_url} ")

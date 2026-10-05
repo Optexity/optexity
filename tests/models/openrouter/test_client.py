@@ -206,3 +206,26 @@ def test_async_path_falls_back_too(monkeypatch):
     r = asyncio.run(make_client(fake).acomplete(MSG, schema=Answer))
     assert fake.models == [LITE0, LITE0, LITE1]
     assert r.parsed.answer == "a"
+
+
+def test_provider_rejection_moves_to_next_model_without_retry():
+    rejected = httpx.Response(
+        400,
+        json={
+            "error": {
+                "code": 400,
+                "message": "Provider returned error",
+                "metadata": {"raw": "The compiled grammar is too large"},
+            }
+        },
+    )
+    fake = FakeOpenRouter(rejected, completion(model=LITE1))
+    r = make_client(fake).complete(MSG)
+    assert fake.models == [LITE0, LITE1] and r.model_used == LITE1
+
+
+def test_invalid_model_id_is_still_fatal():
+    fake = FakeOpenRouter(error(400, "gemini/x is not a valid model ID"))
+    with pytest.raises(LLMBadRequest):
+        make_client(fake).complete(MSG, model="gemini/x")
+    assert len(fake.requests) == 1

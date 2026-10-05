@@ -47,7 +47,12 @@ logger = logging.getLogger(__name__)
 _DEFAULT = object()  # reasoning not given: use the tier's default
 _FATAL = (LLMAuthError, LLMOutOfCredits, LLMBadRequest, LLMConfigError)
 _TRANSIENT = (LLMRateLimited, LLMUnavailable, LLMTimeout)
-_CONTEXT_ERROR = re.compile(r"context|too long|maximum.*tokens|token limit", re.I)
+# 400s that another model could still serve: the upstream provider rejected the
+# request ("Provider returned error", e.g. a schema it can't compile) or the
+# context is too long. OpenRouter's own 400s (bad model ID, bad params) stay fatal.
+_MODEL_SPECIFIC = re.compile(
+    r"^Provider returned error|context|too long|maximum.*tokens|token limit", re.I
+)
 
 # _run yields ("send", request kwargs, timeout) or ("sleep", seconds).
 _Step = tuple
@@ -75,6 +80,7 @@ class OpenRouterClient:
         *,
         model: str | Tier | None = None,
         schema: type[BaseModel] | None = None,
+        schema_override: dict | None = None,
         needs: set[str] | frozenset[str] = frozenset(),
         reasoning: Any = _DEFAULT,
         max_tokens: int | None = None,
@@ -88,9 +94,10 @@ class OpenRouterClient:
 
         ``model`` is an OpenRouter model ID, a ``Tier``, or ``None`` for the
         configured default; see ``resolve_chain``. ``schema`` requests structured
-        output and fills ``LLMResult.parsed``. ``timeout`` overrides the tier's
-        per-attempt timeout. ``feature`` and ``session_id`` tag the request for
-        usage reporting.
+        output and fills ``LLMResult.parsed``; ``schema_override`` sends that JSON
+        schema as-is (non-strict) instead of the one generated from ``schema``.
+        ``timeout`` overrides the tier's per-attempt timeout. ``feature`` and
+        ``session_id`` tag the request for usage reporting.
         """
         if self._sync is None:
             self._sync = openai.OpenAI(
@@ -100,7 +107,7 @@ class OpenRouterClient:
                 http_client=self._http_client,
             )
         run = self._run(
-            messages, model, schema, needs, reasoning, max_tokens,
+            messages, model, schema, schema_override, needs, reasoning, max_tokens,
             temperature, timeout, feature, session_id, extra_body,
         )  # fmt: skip
         step = next(run)
@@ -127,6 +134,7 @@ class OpenRouterClient:
         *,
         model: str | Tier | None = None,
         schema: type[BaseModel] | None = None,
+        schema_override: dict | None = None,
         needs: set[str] | frozenset[str] = frozenset(),
         reasoning: Any = _DEFAULT,
         max_tokens: int | None = None,
@@ -145,7 +153,7 @@ class OpenRouterClient:
                 http_client=self._async_http_client,
             )
         run = self._run(
-            messages, model, schema, needs, reasoning, max_tokens,
+            messages, model, schema, schema_override, needs, reasoning, max_tokens,
             temperature, timeout, feature, session_id, extra_body,
         )  # fmt: skip
         step = next(run)
@@ -171,6 +179,7 @@ class OpenRouterClient:
         messages: list[dict[str, Any]],
         model: str | Tier | None,
         schema: type[BaseModel] | None,
+        schema_override: dict | None,
         needs: set[str] | frozenset[str],
         reasoning: Any,
         max_tokens: int | None,
@@ -187,13 +196,17 @@ class OpenRouterClient:
         response_format, aliases = None, {}
         if schema is not None:
             all_needs.add("json_schema")
-            strict, aliases = to_strict_schema(schema)
+            if schema_override is not None:
+                json_schema, strict = schema_override, False
+            else:
+                json_schema, aliases = to_strict_schema(schema)
+                strict = True
             response_format = {
                 "type": "json_schema",
                 "json_schema": {
                     "name": re.sub(r"[^a-zA-Z0-9_-]", "_", schema.__name__)[:64],
-                    "strict": True,
-                    "schema": strict,
+                    "strict": strict,
+                    "schema": json_schema,
                 },
             }
         chain = resolve_chain(
@@ -377,7 +390,7 @@ def _by_status(status: int | None, message: str, model: str) -> LLMError:
         return LLMAuthError(message, model=model, status_code=status)
     if status == 402:
         return LLMOutOfCredits(message, model=model, status_code=status)
-    if status in (403, 404, 413) or (status == 400 and _CONTEXT_ERROR.search(message)):
+    if status in (403, 404, 413) or (status == 400 and _MODEL_SPECIFIC.search(message)):
         return LLMModelRejected(message, model=model, status_code=status)
     if status == 408:
         return LLMTimeout(message, model=model, status_code=status)

@@ -143,10 +143,9 @@ class Task(BaseModel):
     max_parallelism: int = 1
     per_login_parallelism: int = 1
     company_id: CompanyID
-    # Any litellm model string, e.g. "gemini/gemini-3.5-flash-lite" or
-    # "anthropic/claude-sonnet-4-6". Unset falls through to settings.LLM_MODEL.
-    # llm_provider is deprecated — prefer a "provider/model" llm_model_name — but
-    # is still honored so existing workflow JSON keeps working.
+    # OpenRouter model ID, e.g. "google/gemini-3.6-flash". Unset uses the
+    # configured default (LLM_MODEL, else the lite tier). llm_provider is
+    # deprecated — prefer a full ID in llm_model_name.
     llm_provider: str | None = None
     llm_model_name: str | None = None
     # Optional queue priority: lower runs first, negatives allowed, None runs
