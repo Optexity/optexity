@@ -38,6 +38,9 @@ dependencies = [
     # optexity-browser-use pins openai<2.0.0. Bumping that fork's pin to
     # <3.0.0 would let this move to the latest litellm.
     "litellm>=1.80,<1.81",
+    # OpenRouter adapter (inference/models/openrouter). <2 because
+    # optexity-browser-use pins openai<2.0.0.
+    "openai>=1.100,<2",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +48,7 @@ dev = [
     "black",
     "isort",
     "pre-commit",
+    "pytest",
 ]
 
 [project.scripts]

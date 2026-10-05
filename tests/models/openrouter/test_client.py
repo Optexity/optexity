@@ -1,0 +1,208 @@
+import asyncio
+
+import httpx
+import pytest
+from pydantic import BaseModel
+
+from optexity.inference.models.openrouter import (
+    LLMAllModelsFailed,
+    LLMBadRequest,
+    LLMConfig,
+    LLMConfigError,
+    LLMOutOfCredits,
+    OpenRouterClient,
+    Tier,
+    user_message,
+)
+
+from .fakes import FakeOpenRouter, completion, error, make_client
+
+MSG = [user_message("hello")]
+LITE0, LITE1, LITE2 = (
+    "google/gemini-3.5-flash-lite",
+    "anthropic/claude-haiku-4.5",
+    "openai/gpt-5.6-luna",
+)
+
+
+class Answer(BaseModel):
+    answer: str
+
+
+def test_tags_reasoning_and_usage_are_sent(no_sleep):
+    fake = FakeOpenRouter(completion())
+    client = make_client(fake, service="optexity-worker", environment="prod")
+    client.complete(MSG, feature="llm_extraction", session_id="task-1")
+    body = fake.requests[0]
+    assert body["model"] == LITE0
+    assert body["user"] == "optexity-worker"
+    assert body["session_id"] == "task-1"
+    assert body["trace"] == {
+        "service": "optexity-worker",
+        "feature": "llm_extraction",
+        "environment": "prod",
+    }
+    assert body["usage"] == {"include": True}
+    assert body["reasoning"] == {"effort": "medium", "exclude": True}
+    assert "provider" not in body and "plugins" not in body
+
+
+def test_pro_tier_sends_no_reasoning():
+    fake = FakeOpenRouter(completion(model="google/gemini-2.5-pro"))
+    make_client(fake).complete(MSG, model=Tier.PRO)
+    assert "reasoning" not in fake.requests[0]
+
+
+def test_untagged_when_service_not_configured():
+    fake = FakeOpenRouter(completion())
+    make_client(fake).complete(MSG)
+    assert "user" not in fake.requests[0] and "trace" not in fake.requests[0]
+
+
+def test_schema_sends_strict_json_schema_and_require_parameters():
+    fake = FakeOpenRouter(completion('{"answer": "42"}'))
+    result = make_client(fake).complete(MSG, schema=Answer)
+    body = fake.requests[0]
+    assert body["response_format"]["type"] == "json_schema"
+    assert body["response_format"]["json_schema"]["strict"] is True
+    assert body["provider"] == {"require_parameters": True}
+    assert result.parsed == Answer(answer="42")
+
+
+def test_pdf_pins_native_file_parser():
+    fake = FakeOpenRouter(completion())
+    make_client(fake).complete([user_message("read", pdfs=[b"%PDF-1.4"])])
+    assert fake.requests[0]["plugins"] == [
+        {"id": "file-parser", "pdf": {"engine": "native"}}
+    ]
+
+
+def test_result_has_usage_cost_and_model():
+    fake = FakeOpenRouter(completion(model=LITE0))
+    r = make_client(fake).complete(MSG)
+    assert (r.text, r.model_used, r.provider, r.generation_id) == (
+        "ok",
+        LITE0,
+        "Google",
+        "gen-test",
+    )
+    assert (r.usage.prompt_tokens, r.usage.completion_tokens, r.usage.cost) == (
+        10,
+        5,
+        0.001,
+    )
+    assert (r.usage.reasoning_tokens, r.usage.cached_tokens) == (2, 1)
+    assert r.fallback_count == 0
+
+
+def test_transient_error_retries_once_then_next_model(no_sleep):
+    fake = FakeOpenRouter(error(503), error(503), completion(model=LITE1))
+    r = make_client(fake).complete(MSG)
+    assert fake.models == [LITE0, LITE0, LITE1]
+    assert r.model_used == LITE1 and r.fallback_count == 1
+    assert [a.outcome for a in r.attempts] == ["LLMUnavailable", "LLMUnavailable", "ok"]
+    assert len(no_sleep) == 1
+
+
+def test_retry_after_header_is_honoured_and_capped(no_sleep):
+    fake = FakeOpenRouter(error(429, headers={"retry-after": "3"}), completion())
+    make_client(fake).complete(MSG)
+    assert no_sleep == [3.0]
+    fake = FakeOpenRouter(error(429, headers={"retry-after": "120"}), completion())
+    make_client(fake).complete(MSG)
+    assert no_sleep[-1] == 10.0
+
+
+def test_timeout_counts_as_transient(no_sleep):
+    def timeout(request, body):
+        raise httpx.ReadTimeout("slow", request=request)
+
+    fake = FakeOpenRouter(timeout, timeout, completion(model=LITE1))
+    r = make_client(fake).complete(MSG)
+    assert fake.models == [LITE0, LITE0, LITE1]
+    assert r.attempts[0].outcome == "LLMTimeout"
+
+
+def test_out_of_credits_stops_immediately():
+    fake = FakeOpenRouter(error(402, "Insufficient credits"))
+    with pytest.raises(LLMOutOfCredits):
+        make_client(fake).complete(MSG)
+    assert fake.models == [LITE0]
+
+
+def test_bad_request_stops_immediately():
+    fake = FakeOpenRouter(error(400, "invalid parameter"))
+    with pytest.raises(LLMBadRequest):
+        make_client(fake).complete(MSG)
+    assert len(fake.requests) == 1
+
+
+def test_context_length_error_moves_to_next_model_without_retry():
+    fake = FakeOpenRouter(error(400, "maximum context length exceeded"), completion())
+    make_client(fake).complete(MSG)
+    assert fake.models == [LITE0, LITE1]
+
+
+def test_invalid_output_retries_twice_then_next_model():
+    fake = FakeOpenRouter(
+        completion("nope"),
+        completion("still nope"),
+        completion("no json"),
+        completion('{"answer": "ok"}', model=LITE1),
+    )
+    r = make_client(fake).complete(MSG, schema=Answer)
+    assert fake.models == [LITE0, LITE0, LITE0, LITE1]
+    assert r.parsed.answer == "ok"
+    # every billed attempt is counted
+    assert r.usage.cost == pytest.approx(0.004)
+
+
+def test_http_200_with_error_body_is_treated_as_failure(no_sleep):
+    bad = httpx.Response(
+        200,
+        json={
+            "id": "x",
+            "object": "chat.completion",
+            "created": 0,
+            "model": LITE0,
+            "choices": [],
+            "error": {"code": 502, "message": "upstream died"},
+        },
+    )
+    fake = FakeOpenRouter(bad, bad, completion(model=LITE1))
+    r = make_client(fake).complete(MSG)
+    assert r.model_used == LITE1
+
+
+def test_all_models_failing_raises_with_every_error(no_sleep):
+    fake = FakeOpenRouter(*[error(503)] * 6)
+    with pytest.raises(LLMAllModelsFailed) as exc:
+        make_client(fake).complete(MSG)
+    assert fake.models == [LITE0, LITE0, LITE1, LITE1, LITE2, LITE2]
+    assert len(exc.value.errors) == 6 and exc.value.retryable
+
+
+def test_tier_call_never_uses_env_fallback(no_sleep):
+    fake = FakeOpenRouter(*[error(503)] * 6)
+    client = make_client(fake, env_fallback="openai/gpt-5-mini")
+    with pytest.raises(LLMAllModelsFailed):
+        client.complete(MSG, model=Tier.PRO)
+    assert "openai/gpt-5-mini" not in fake.models
+
+
+def test_missing_api_key_is_a_config_error():
+    with pytest.raises(LLMConfigError):
+        OpenRouterClient(LLMConfig(api_key=None))
+
+
+def test_async_path_falls_back_too(monkeypatch):
+    async def no_wait(_):
+        return None
+
+    monkeypatch.setattr(asyncio, "sleep", no_wait)
+    fake = FakeOpenRouter(
+        error(503), error(503), completion('{"answer": "a"}', model=LITE1)
+    )
+    r = asyncio.run(make_client(fake).acomplete(MSG, schema=Answer))
+    assert fake.models == [LITE0, LITE0, LITE1]
+    assert r.parsed.answer == "a"
