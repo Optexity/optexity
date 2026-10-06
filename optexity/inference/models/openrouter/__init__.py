@@ -30,11 +30,12 @@ from .core import (
     Usage,
     WebSearch,
     normalize_model_id,
+    parse_model_list,
     resolve_chain,
 )
 from .messages import image_part, pdf_part, user_message
 
-__version__ = "0.4.3"
+__version__ = "0.4.4"
 
 __all__ = [
     "DEFAULT_TIERS",
@@ -62,6 +63,7 @@ __all__ = [
     "Usage",
     "WebSearch",
     "image_part",
+    "parse_model_list",
     "pdf_part",
     "resolve_chain",
     "user_message",

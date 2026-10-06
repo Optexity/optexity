@@ -250,6 +250,11 @@ class LLMConfig:
         return cls(tiers=tiers, **kwargs)
 
 
+def parse_model_list(value: str | None) -> list[str]:
+    """Comma-separated model IDs (e.g. an LLM_TIER_PRO setting) -> list."""
+    return [m.strip() for m in (value or "").split(",") if m.strip()]
+
+
 @dataclass(frozen=True)
 class ChainEntry:
     model: str

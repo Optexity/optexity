@@ -9,7 +9,14 @@ from optexity.schema.token_usage import TokenUsage
 from optexity.utils.llm_settings import llm_settings
 from optexity.utils.utils import is_local_path, is_url
 
-from .openrouter import LLMConfig, OpenRouterClient, Tier, Usage, user_message
+from .openrouter import (
+    LLMConfig,
+    OpenRouterClient,
+    Tier,
+    Usage,
+    parse_model_list,
+    user_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +31,9 @@ def get_config() -> LLMConfig:
         s = llm_settings
         _config = LLMConfig.with_tier_overrides(
             {
-                Tier.LITE: _split(s.LLM_TIER_LITE),
-                Tier.STANDARD: _split(s.LLM_TIER_STANDARD),
-                Tier.PRO: _split(s.LLM_TIER_PRO),
+                Tier.LITE: parse_model_list(s.LLM_TIER_LITE),
+                Tier.STANDARD: parse_model_list(s.LLM_TIER_STANDARD),
+                Tier.PRO: parse_model_list(s.LLM_TIER_PRO),
             },
             api_key=s.OPENROUTER_API_KEY,
             service=s.LLM_SERVICE_NAME,
@@ -44,10 +51,6 @@ def get_client() -> OpenRouterClient:
     if _client is None:
         _client = OpenRouterClient(get_config())
     return _client
-
-
-def _split(models: str | None) -> list[str]:
-    return [m.strip() for m in (models or "").split(",") if m.strip()]
 
 
 def _load_pdf(pdf_url: str | Path) -> bytes:
