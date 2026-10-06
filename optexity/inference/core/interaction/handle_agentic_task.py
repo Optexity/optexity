@@ -5,6 +5,7 @@ from browser_use import Agent, BrowserSession, Tools
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import normalize_model
 from optexity.inference.models.chat_openrouter import build_agent_llm
+from optexity.inference.models.llm_model import to_token_usage
 from optexity.schema.actions.interaction_action import (
     AgenticTask,
     CloseOverlayPopupAction,
@@ -57,28 +58,36 @@ async def handle_agentic_task(
         )
         step_directory.mkdir(parents=True, exist_ok=True)
 
-        agent = Agent(
-            task=agentic_task_action.task,
-            llm=llm,
-            browser_session=browser_session,
-            use_vision=agentic_task_action.use_vision,
-            tools=tools,
-            calculate_cost=True,
-            llm_timeout=llm.call_timeout,
-            save_conversation_path=step_directory,
-        )
-        logger.debug(f"Starting browser session for agentic task {browser.cdp_url} ")
-        await agent.browser_session.start()
-        logger.debug(f"Finally running agentic task on browser_use {browser.cdp_url} ")
-        history = await agent.run(max_steps=agentic_task_action.max_steps)
-        logger.debug(f"Agentic task completed on browser_use {browser.cdp_url} ")
+        try:
+            agent = Agent(
+                task=agentic_task_action.task,
+                llm=llm,
+                browser_session=browser_session,
+                use_vision=agentic_task_action.use_vision,
+                tools=tools,
+                calculate_cost=True,
+                llm_timeout=llm.call_timeout,
+                save_conversation_path=step_directory,
+            )
+            logger.debug(
+                f"Starting browser session for agentic task {browser.cdp_url} "
+            )
+            await agent.browser_session.start()
+            logger.debug(
+                f"Finally running agentic task on browser_use {browser.cdp_url} "
+            )
+            history = await agent.run(max_steps=agentic_task_action.max_steps)
+            logger.debug(f"Agentic task completed on browser_use {browser.cdp_url} ")
 
-        agent.stop()
-        if agent.browser_session:
-            await agent.browser_session.stop()
-            await agent.browser_session.reset()
+            agent.stop()
+            if agent.browser_session:
+                await agent.browser_session.stop()
+                await agent.browser_session.reset()
 
-        return history
+            return history
+        finally:
+            # browser-use doesn't add its LLM calls to the task's usage, so do it here.
+            memory.token_usage += to_token_usage(llm.usage)
 
     elif agentic_task_action.backend == "browserbase":
         raise NotImplementedError("Browserbase is not supported yet")

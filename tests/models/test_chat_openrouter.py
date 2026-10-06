@@ -82,3 +82,12 @@ def test_call_timeout_covers_every_retry_and_fallback(monkeypatch):
         45 * 2 + 10
     )
     assert build_agent_llm(Tier.PRO).call_timeout == 3 * (180 * 2 + 10)
+
+
+def test_usage_accumulates_across_calls(fake):
+    fake(completion('{"action": "click"}'), completion('{"action": "type"}'))
+    llm = build_agent_llm()
+    invoke(llm, Step)
+    invoke(llm, Step)
+    assert (llm.usage.prompt_tokens, llm.usage.completion_tokens) == (20, 10)
+    assert llm.usage.cost == pytest.approx(0.002)

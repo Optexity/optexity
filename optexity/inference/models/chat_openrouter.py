@@ -5,7 +5,7 @@ OpenRouter speaks the OpenAI wire format, so browser-use's own
 ``OpenAIMessageSerializer`` does the message conversion.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypeVar, overload
 
 from browser_use.llm.base import BaseChatModel
@@ -26,6 +26,7 @@ from .openrouter import (
     LLMOutOfCredits,
     LLMRateLimited,
     Tier,
+    Usage,
     resolve_chain,
 )
 
@@ -46,6 +47,8 @@ class ChatOpenRouter(BaseChatModel):
     target: str | Tier | None = None
     temperature: float | None = None
     max_output_tokens: int | None = None
+    # Token usage and cost of every successful call made through this instance.
+    usage: Usage = field(default_factory=Usage)
 
     @property
     def model(self) -> str:
@@ -112,6 +115,7 @@ class ChatOpenRouter(BaseChatModel):
             # browser-use treats ModelProviderError as a retryable step failure.
             raise ModelProviderError(message=str(e), model=self.name) from e
 
+        self.usage += result.usage
         usage = ChatInvokeUsage(
             prompt_tokens=result.usage.prompt_tokens,
             prompt_cached_tokens=result.usage.cached_tokens or None,
