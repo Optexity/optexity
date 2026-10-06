@@ -65,3 +65,32 @@ def make_client(fake: FakeOpenRouter, **config) -> OpenRouterClient:
         http_client=httpx.Client(transport=httpx.MockTransport(fake)),
         async_http_client=httpx.AsyncClient(transport=httpx.MockTransport(fake)),
     )
+
+
+def sse(chunks: list[dict]) -> httpx.Response:
+    """A streamed (server-sent events) chat completion."""
+    body = "".join(f"data: {json.dumps(c)}\n\n" for c in chunks) + "data: [DONE]\n\n"
+    return httpx.Response(
+        200, headers={"content-type": "text/event-stream"}, content=body.encode()
+    )
+
+
+def chunk(
+    delta: dict | None = None,
+    finish_reason=None,
+    model="google/gemini-2.5-pro",
+    **extra,
+):
+    choices = (
+        []
+        if delta is None
+        else [{"index": 0, "delta": delta, "finish_reason": finish_reason}]
+    )
+    return {
+        "id": "gen-stream",
+        "object": "chat.completion.chunk",
+        "created": 0,
+        "model": model,
+        "choices": choices,
+        **extra,
+    }

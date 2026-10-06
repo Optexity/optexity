@@ -15,6 +15,7 @@ import random
 import re
 import time
 from collections.abc import Generator
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -85,6 +86,7 @@ class OpenRouterClient:
         schema_override: dict | None = None,
         tools: list[dict] | None = None,
         tool_choice: str | dict | None = None,
+        stream: bool = False,
         needs: set[str] | frozenset[str] = frozenset(),
         reasoning: Any = _DEFAULT,
         max_tokens: int | None = None,
@@ -101,9 +103,11 @@ class OpenRouterClient:
         output and fills ``LLMResult.parsed``; ``schema_override`` sends that JSON
         schema as-is (non-strict) instead of the one generated from ``schema``.
         ``tools`` (OpenAI function definitions) and ``tool_choice`` enable tool
-        calling; calls come back in ``LLMResult.tool_calls``. ``timeout``
-        overrides the tier's per-attempt timeout. ``feature`` and ``session_id``
-        tag the request for usage reporting.
+        calling; calls come back in ``LLMResult.tool_calls``. ``stream`` streams
+        the response and returns the same ``LLMResult``; the timeout then limits
+        the gap between chunks instead of the whole response, so long outputs
+        aren't cut off. ``timeout`` overrides the tier's per-attempt timeout.
+        ``feature`` and ``session_id`` tag the request for usage reporting.
         """
         if self._sync is None:
             self._sync = openai.OpenAI(
@@ -113,7 +117,7 @@ class OpenRouterClient:
                 http_client=self._http_client,
             )
         run = self._run(
-            messages, model, schema, schema_override, tools, tool_choice, needs, reasoning, max_tokens,
+            messages, model, schema, schema_override, tools, tool_choice, stream, needs, reasoning, max_tokens,
             temperature, timeout, feature, session_id, extra_body,
         )  # fmt: skip
         step = next(run)
@@ -127,7 +131,12 @@ class OpenRouterClient:
                     resp = self._sync.chat.completions.create(
                         **step[1], timeout=step[2]
                     )
-                except openai.OpenAIError as exc:
+                    if step[1].get("stream"):
+                        acc = _StreamAccumulator()
+                        for chunk in resp:
+                            acc.add(chunk)
+                        resp = acc.result()
+                except (openai.OpenAIError, httpx.HTTPError) as exc:
                     step = run.throw(exc)
                 else:
                     step = run.send(resp)
@@ -143,6 +152,7 @@ class OpenRouterClient:
         schema_override: dict | None = None,
         tools: list[dict] | None = None,
         tool_choice: str | dict | None = None,
+        stream: bool = False,
         needs: set[str] | frozenset[str] = frozenset(),
         reasoning: Any = _DEFAULT,
         max_tokens: int | None = None,
@@ -161,7 +171,7 @@ class OpenRouterClient:
                 http_client=self._async_http_client,
             )
         run = self._run(
-            messages, model, schema, schema_override, tools, tool_choice, needs, reasoning, max_tokens,
+            messages, model, schema, schema_override, tools, tool_choice, stream, needs, reasoning, max_tokens,
             temperature, timeout, feature, session_id, extra_body,
         )  # fmt: skip
         step = next(run)
@@ -175,7 +185,12 @@ class OpenRouterClient:
                     resp = await self._async.chat.completions.create(
                         **step[1], timeout=step[2]
                     )
-                except openai.OpenAIError as exc:
+                    if step[1].get("stream"):
+                        acc = _StreamAccumulator()
+                        async for chunk in resp:
+                            acc.add(chunk)
+                        resp = acc.result()
+                except (openai.OpenAIError, httpx.HTTPError) as exc:
                     step = run.throw(exc)
                 else:
                     step = run.send(resp)
@@ -190,6 +205,7 @@ class OpenRouterClient:
         schema_override: dict | None,
         tools: list[dict] | None,
         tool_choice: str | dict | None,
+        stream: bool,
         needs: set[str] | frozenset[str],
         reasoning: Any,
         max_tokens: int | None,
@@ -247,6 +263,8 @@ class OpenRouterClient:
                 request["extra_body"]["reasoning"] = {"effort": effort, "exclude": True}
             if response_format is not None:
                 request["response_format"] = response_format
+            if stream:
+                request["stream"] = True
             if tools:
                 request["tools"] = tools
                 if tool_choice is not None:
@@ -264,7 +282,7 @@ class OpenRouterClient:
                 try:
                     try:
                         resp = yield ("send", request, attempt_timeout)
-                    except openai.OpenAIError as exc:
+                    except (openai.OpenAIError, httpx.HTTPError) as exc:
                         raise _classify(exc, entry.model, attempt_timeout) from exc
                     usage += _usage(resp)
                     result = _read(resp, entry, schema, aliases)
@@ -341,6 +359,60 @@ class OpenRouterClient:
     def _backoff(self, err: LLMError) -> float:
         wait = err.retry_after or 1.0 + random.random()
         return min(self.config.max_backoff_seconds, wait)
+
+
+class _StreamAccumulator:
+    """Builds a response shaped like a non-streamed one from stream chunks."""
+
+    def __init__(self) -> None:
+        self.id = self.model = self.provider = self.error = self.usage = None
+        self.finish_reason: str | None = None
+        self.text: list[str] = []
+        self.tool_calls: dict[int, dict[str, str]] = {}
+
+    def add(self, chunk: Any) -> None:
+        self.id = self.id or getattr(chunk, "id", None)
+        self.model = getattr(chunk, "model", None) or self.model
+        self.provider = getattr(chunk, "provider", None) or self.provider
+        self.error = getattr(chunk, "error", None) or self.error
+        self.usage = getattr(chunk, "usage", None) or self.usage
+        for choice in getattr(chunk, "choices", None) or []:
+            delta = choice.delta
+            if delta is not None:
+                if delta.content:
+                    self.text.append(delta.content)
+                for call in delta.tool_calls or []:
+                    slot = self.tool_calls.setdefault(
+                        call.index, {"id": "", "name": "", "arguments": ""}
+                    )
+                    slot["id"] = call.id or slot["id"]
+                    if call.function is not None:
+                        slot["name"] = call.function.name or slot["name"]
+                        slot["arguments"] += call.function.arguments or ""
+            self.finish_reason = choice.finish_reason or self.finish_reason
+
+    def result(self) -> SimpleNamespace:
+        tool_calls = [
+            SimpleNamespace(
+                id=c["id"],
+                function=SimpleNamespace(name=c["name"], arguments=c["arguments"]),
+            )
+            for _, c in sorted(self.tool_calls.items())
+        ]
+        message = SimpleNamespace(content="".join(self.text), tool_calls=tool_calls)
+        choices = []
+        if self.text or tool_calls or self.finish_reason:
+            choices = [
+                SimpleNamespace(message=message, finish_reason=self.finish_reason)
+            ]
+        return SimpleNamespace(
+            id=self.id,
+            model=self.model,
+            provider=self.provider,
+            error=self.error,
+            usage=self.usage,
+            choices=choices,
+        )
 
 
 def _attempt(
@@ -465,10 +537,13 @@ def _error_message(body: Any, fallback: str) -> str:
     return f"{msg} ({str(raw)[:200]})" if raw else msg
 
 
-def _classify(exc: openai.OpenAIError, model: str, timeout: float) -> LLMError:
-    if isinstance(exc, openai.APITimeoutError):
+def _classify(
+    exc: openai.OpenAIError | httpx.HTTPError, model: str, timeout: float
+) -> LLMError:
+    # Errors while reading a stream come from httpx directly.
+    if isinstance(exc, (openai.APITimeoutError, httpx.TimeoutException)):
         return LLMTimeout(f"{model} timed out after {timeout:.0f}s", model=model)
-    if isinstance(exc, openai.APIConnectionError):
+    if isinstance(exc, (openai.APIConnectionError, httpx.HTTPError)):
         return LLMUnavailable(f"Connection error to OpenRouter: {exc}", model=model)
     if isinstance(exc, openai.APIStatusError):
         err = _by_status(exc.status_code, _error_message(exc.body, str(exc)), model)
@@ -476,6 +551,9 @@ def _classify(exc: openai.OpenAIError, model: str, timeout: float) -> LLMError:
         if retry_after.replace(".", "", 1).isdigit():
             err.retry_after = float(retry_after)
         return err
+    if isinstance(exc, openai.APIError) and isinstance(exc.body, dict):
+        # e.g. an error sent in the middle of a stream
+        return _from_error_body(exc.body.get("error", exc.body), model)
     return LLMUnavailable(f"Unexpected OpenAI SDK error: {exc}", model=model)
 
 

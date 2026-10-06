@@ -321,3 +321,118 @@ def test_text_reply_has_no_tool_calls_and_plain_message():
     r = make_client(fake).complete(MSG, tools=TOOLS)
     assert r.tool_calls == []
     assert r.message == {"role": "assistant", "content": "done"}
+
+
+def test_stream_collects_text_usage_and_finish_reason():
+    from .fakes import chunk, sse
+
+    fake = FakeOpenRouter(
+        sse(
+            [
+                chunk({"role": "assistant", "content": "Hel"}),
+                chunk({"content": "lo"}),
+                chunk({}, finish_reason="stop"),
+                chunk(
+                    None,
+                    usage={
+                        "prompt_tokens": 7,
+                        "completion_tokens": 3,
+                        "total_tokens": 10,
+                        "cost": 0.0005,
+                    },
+                ),
+            ]
+        )
+    )
+    r = make_client(fake).complete(MSG, model=Tier.PRO, stream=True)
+    assert fake.requests[0]["stream"] is True
+    assert (r.text, r.finish_reason, r.model_used) == (
+        "Hello",
+        "stop",
+        "google/gemini-2.5-pro",
+    )
+    assert (r.usage.prompt_tokens, r.usage.completion_tokens, r.usage.cost) == (
+        7,
+        3,
+        0.0005,
+    )
+
+
+def test_stream_collects_tool_call_pieces():
+    from .fakes import chunk, sse
+
+    fake = FakeOpenRouter(
+        sse(
+            [
+                chunk(
+                    {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {
+                                    "name": "read_doc_file",
+                                    "arguments": '{"pa',
+                                },
+                            }
+                        ]
+                    }
+                ),
+                chunk(
+                    {
+                        "tool_calls": [
+                            {"index": 0, "function": {"arguments": 'th": "a.md"}'}}
+                        ]
+                    }
+                ),
+                chunk({}, finish_reason="tool_calls"),
+            ]
+        )
+    )
+    r = make_client(fake).complete(MSG, tools=TOOLS, stream=True)
+    (call,) = r.tool_calls
+    assert (call.id, call.name, call.arguments) == (
+        "call_1",
+        "read_doc_file",
+        {"path": "a.md"},
+    )
+
+
+def test_error_in_the_middle_of_a_stream_moves_on(no_sleep):
+    from .fakes import chunk, sse
+
+    broken = sse(
+        [
+            chunk({"content": "partial"}),
+            chunk(
+                {},
+                finish_reason="error",
+                error={"code": 502, "message": "upstream died"},
+            ),
+        ]
+    )
+    recovered = sse(
+        [
+            chunk({"content": "ok"}, model="anthropic/claude-opus-4.7"),
+            chunk({}, finish_reason="stop"),
+        ]
+    )
+    fake = FakeOpenRouter(broken, broken, recovered)
+    r = make_client(fake).complete(MSG, model=Tier.PRO, stream=True)
+    assert fake.models == [
+        "google/gemini-2.5-pro",
+        "google/gemini-2.5-pro",
+        "anthropic/claude-opus-4.7",
+    ]
+    assert r.text == "ok"
+
+
+def test_async_stream():
+    from .fakes import chunk, sse
+
+    fake = FakeOpenRouter(
+        sse([chunk({"content": "async ok"}), chunk({}, finish_reason="stop")])
+    )
+    r = asyncio.run(make_client(fake).acomplete(MSG, stream=True))
+    assert r.text == "async ok"
