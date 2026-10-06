@@ -87,6 +87,7 @@ async def _solve_grid(
         response_schema=CaptchaBoxes,
         screenshot=screenshot_b64,
         system_instruction="You are a captcha solver.",
+        feature="captcha",
     )
     memory.token_usage += token_usage
 
@@ -176,6 +177,7 @@ async def _solve_and_click(
                 response_schema=CaptchaRefreshCheck,
                 screenshot=post_click_screenshot_b64,
                 system_instruction="You are a captcha checker.",
+                feature="captcha",
             )
         )
         memory.token_usage += token_usage

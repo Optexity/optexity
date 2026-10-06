@@ -86,7 +86,7 @@ def test_feature_and_session_tags_reach_openrouter(fake):
         "q", Answer, feature="captcha", session_id="task-1"
     )
     body = f.requests[0]
-    assert body["user"] == "optexity-worker"
+    assert body["user"] == "optexity-worker:captcha"
     assert body["session_id"] == "task-1"
     assert body["trace"]["feature"] == "captcha"
 

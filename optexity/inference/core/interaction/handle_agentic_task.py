@@ -21,6 +21,7 @@ async def handle_agentic_task(
     task: Task,
     memory: Memory,
     browser: Browser,
+    feature: str = "agentic_task",
 ):
 
     if agentic_task_action.backend == "browser_use":
@@ -48,7 +49,9 @@ async def handle_agentic_task(
             )
         else:
             tools = Tools()
-        llm = build_agent_llm(normalize_model(task.llm_provider, task.llm_model_name))
+        llm = build_agent_llm(
+            normalize_model(task.llm_provider, task.llm_model_name), feature
+        )
         browser_session = BrowserSession(
             cdp_url=browser.cdp_url, keep_alive=agentic_task_action.keep_alive
         )

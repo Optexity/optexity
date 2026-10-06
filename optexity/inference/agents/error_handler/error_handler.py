@@ -41,6 +41,7 @@ class ErrorHandlerAgent:
             response_schema=ErrorHandlerOutput,
             screenshot=screenshot,
             system_instruction=system_prompt,
+            feature="llm_fallback",
         )
 
         return final_prompt, response, token_usage

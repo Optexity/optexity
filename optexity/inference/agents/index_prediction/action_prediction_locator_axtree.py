@@ -69,6 +69,7 @@ class ActionPredictionLocatorAxtree:
             response_schema=response_schema,
             screenshot=screenshot,
             system_instruction=system_instruction,
+            feature="llm_fallback",
         )
 
         return final_prompt, response, token_usage

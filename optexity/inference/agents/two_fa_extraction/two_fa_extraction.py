@@ -46,5 +46,6 @@ class TwoFAExtraction:
             prompt=final_prompt,
             response_schema=TwoFAExtractionOutput,
             system_instruction=system_prompt,
+            feature="two_fa",
         )
         return final_prompt, response, token_usage

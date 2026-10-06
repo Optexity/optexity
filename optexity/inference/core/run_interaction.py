@@ -397,7 +397,13 @@ async def handle_assert_locator_presence_error(
         elif response.error_type == "overlay_popup_blocking":
             logger.debug(f"Overlay popup blocking, closing overlay popup and retrying")
             close_overlay_popup_action = CloseOverlayPopupAction()
-            await handle_agentic_task(close_overlay_popup_action, task, memory, browser)
+            await handle_agentic_task(
+                close_overlay_popup_action,
+                task,
+                memory,
+                browser,
+                feature="agentic_fallback",
+            )
             await run_interaction_action(
                 interaction_action, task, memory, browser, retries_left - 1
             )

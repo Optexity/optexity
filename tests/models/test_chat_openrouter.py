@@ -88,3 +88,9 @@ def test_usage_accumulates_across_calls(fake):
     invoke(llm, Step)
     assert (llm.usage.prompt_tokens, llm.usage.completion_tokens) == (20, 10)
     assert llm.usage.cost == pytest.approx(0.002)
+
+
+def test_agentic_fallback_is_tagged_separately(fake):
+    f = fake(completion("done"))
+    invoke(build_agent_llm(feature="agentic_fallback"))
+    assert f.requests[0]["trace"]["feature"] == "agentic_fallback"

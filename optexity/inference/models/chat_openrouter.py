@@ -47,6 +47,8 @@ class ChatOpenRouter(BaseChatModel):
     target: str | Tier | None = None
     temperature: float | None = None
     max_output_tokens: int | None = None
+    # Usage-reporting tag sent with every call.
+    feature: str = "agentic_task"
     # Token usage and cost of every successful call made through this instance.
     usage: Usage = field(default_factory=Usage)
 
@@ -103,7 +105,7 @@ class ChatOpenRouter(BaseChatModel):
                 ),
                 max_tokens=self.max_output_tokens,
                 temperature=self.temperature,
-                feature="agentic_task",
+                feature=self.feature,
             )
         except LLMAllModelsFailed as e:
             if all(isinstance(err, LLMRateLimited) for err in e.errors):
@@ -130,7 +132,9 @@ class ChatOpenRouter(BaseChatModel):
         )
 
 
-def build_agent_llm(model: str | Tier | None = None) -> ChatOpenRouter:
+def build_agent_llm(
+    model: str | Tier | None = None, feature: str = "agentic_task"
+) -> ChatOpenRouter:
     """The chat model for the browser-use agentic paths. Callers pass the task's
     own model so an agentic step runs on the same model as the rest of the task."""
-    return ChatOpenRouter(target=model)
+    return ChatOpenRouter(target=model, feature=feature)
