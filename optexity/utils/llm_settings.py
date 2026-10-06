@@ -38,7 +38,7 @@ class LLMSettings(BaseSettings):
 
     # Tags sent with every request so usage can be split by service in the
     # OpenRouter dashboard.
-    LLM_SERVICE_NAME: str | None = None
+    LLM_SERVICE_NAME: str = "optexity-worker"
     LLM_ENVIRONMENT: str | None = None
 
     class Config:
