@@ -54,24 +54,15 @@ def user_message(
     return {"role": "user", "content": content}
 
 
-def inspect_messages(messages: list[dict[str, Any]]) -> tuple[set[str], int]:
-    """(capabilities the messages need, rough token estimate of their text)."""
-    needs: set[str] = set()
-    chars = 0
+def has_pdf(messages: list[dict[str, Any]]) -> bool:
+    """True if any message carries a PDF file part."""
     for msg in messages:
         content = msg.get("content")
-        if isinstance(content, str):
-            chars += len(content)
-            continue
-        for part in content or []:
-            kind = part.get("type")
-            if kind == "image_url":
-                needs.add("vision")
-            elif kind == "file":
-                needs.add("pdf")
-            elif kind == "text":
-                chars += len(part.get("text", ""))
-    return needs, chars // 4
+        if isinstance(content, list) and any(
+            part.get("type") == "file" for part in content
+        ):
+            return True
+    return False
 
 
 def to_strict_schema(model: type[BaseModel]) -> tuple[dict, dict[str, str]]:

@@ -45,7 +45,7 @@ from .core import (
     WebSearch,
     resolve_chain,
 )
-from .messages import inspect_messages, parse_structured, to_strict_schema
+from .messages import has_pdf, parse_structured, to_strict_schema
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,6 @@ class OpenRouterClient:
         tool_choice: str | dict | None = None,
         stream: bool = False,
         web_search: WebSearch | None = None,
-        needs: set[str] | frozenset[str] = frozenset(),
         reasoning: Any = _DEFAULT,
         max_tokens: int | None = None,
         temperature: float | None = None,
@@ -122,7 +121,7 @@ class OpenRouterClient:
                 http_client=self._http_client,
             )
         run = self._run(
-            messages, model, schema, schema_override, tools, tool_choice, stream, web_search, needs, reasoning, max_tokens,
+            messages, model, schema, schema_override, tools, tool_choice, stream, web_search, reasoning, max_tokens,
             temperature, timeout, feature, session_id, extra_body,
         )  # fmt: skip
         step = next(run)
@@ -159,7 +158,6 @@ class OpenRouterClient:
         tool_choice: str | dict | None = None,
         stream: bool = False,
         web_search: WebSearch | None = None,
-        needs: set[str] | frozenset[str] = frozenset(),
         reasoning: Any = _DEFAULT,
         max_tokens: int | None = None,
         temperature: float | None = None,
@@ -177,7 +175,7 @@ class OpenRouterClient:
                 http_client=self._async_http_client,
             )
         run = self._run(
-            messages, model, schema, schema_override, tools, tool_choice, stream, web_search, needs, reasoning, max_tokens,
+            messages, model, schema, schema_override, tools, tool_choice, stream, web_search, reasoning, max_tokens,
             temperature, timeout, feature, session_id, extra_body,
         )  # fmt: skip
         step = next(run)
@@ -213,7 +211,6 @@ class OpenRouterClient:
         tool_choice: str | dict | None,
         stream: bool,
         web_search: WebSearch | None,
-        needs: set[str] | frozenset[str],
         reasoning: Any,
         max_tokens: int | None,
         temperature: float | None,
@@ -224,11 +221,8 @@ class OpenRouterClient:
     ) -> Generator[_Step, Any, LLMResult]:
         # Retry/fallback logic shared by complete() and acomplete(): it yields what
         # to do next, and the caller performs the request or sleep.
-        msg_needs, est_tokens = inspect_messages(messages)
-        all_needs = set(needs) | msg_needs
         response_format, aliases = None, {}
         if schema is not None:
-            all_needs.add("json_schema")
             if schema_override is not None:
                 json_schema, strict = schema_override, False
             else:
@@ -242,16 +236,9 @@ class OpenRouterClient:
                     "schema": json_schema,
                 },
             }
-        if tools:
-            all_needs.add("tools")
-        chain = resolve_chain(
-            self.config,
-            model,
-            needs=frozenset(all_needs),
-            est_tokens=est_tokens,
-        )
+        chain = resolve_chain(self.config, model)
         body = self._body(
-            feature, session_id, schema is not None or bool(tools), all_needs
+            feature, session_id, schema is not None or bool(tools), has_pdf(messages)
         )
         if web_search is not None:
             body.setdefault("plugins", []).append(web_search.plugin())
@@ -338,7 +325,7 @@ class OpenRouterClient:
         feature: str | None,
         session_id: str | None,
         strict_routing: bool,
-        needs: set[str],
+        pdf: bool,
     ) -> dict[str, Any]:
         cfg = self.config
         body: dict[str, Any] = {"usage": {"include": True}}
@@ -360,7 +347,7 @@ class OpenRouterClient:
         if strict_routing:
             # Don't route to an endpoint that would ignore the schema or tools.
             body["provider"] = {"require_parameters": True}
-        if "pdf" in needs:
+        if pdf:
             # Use the model's native PDF input, not OpenRouter's paid OCR fallback.
             body["plugins"] = [{"id": "file-parser", "pdf": {"engine": "native"}}]
         return body

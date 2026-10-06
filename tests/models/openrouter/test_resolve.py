@@ -2,7 +2,6 @@ import pytest
 
 from optexity.inference.models.openrouter import (
     LLMConfig,
-    LLMConfigError,
     Tier,
     resolve_chain,
 )
@@ -82,16 +81,6 @@ def test_tier_override_replaces_list():
     assert chain(cfg, model=Tier.LITE) == LITE
 
 
-def test_context_too_large_skips_small_fallback():
-    # Haiku 4.5 has a 200k context window.
-    assert chain(model=Tier.LITE, est_tokens=300_000) == [LITE[0], LITE[2]]
-
-
-def test_user_chosen_model_is_never_filtered():
-    cfg = LLMConfig(api_key="k", default_model="anthropic/claude-haiku-4.5")
-    assert chain(cfg, est_tokens=300_000)[0] == "anthropic/claude-haiku-4.5"
-
-
 def test_reasoning_and_timeout_per_tier():
     lite = resolve_chain(LLMConfig(api_key="k"))[0]
     pro = resolve_chain(LLMConfig(api_key="k"), model=Tier.PRO)[0]
@@ -122,14 +111,6 @@ def test_env_values_accept_openrouter_prefix_too():
 
 def test_plain_string_is_never_treated_as_a_tier():
     assert chain(model="pro") == ["pro"]  # sent as a model ID; OpenRouter rejects it
-
-
-def test_no_model_left_after_filtering_is_a_config_error():
-    cfg = LLMConfig.with_tier_overrides(
-        {Tier.LITE: ["anthropic/claude-haiku-4.5"]}, api_key="k"
-    )
-    with pytest.raises(LLMConfigError):
-        chain(cfg, model=Tier.LITE, est_tokens=300_000)
 
 
 def test_every_model_in_a_tier_gets_the_tier_timeout():

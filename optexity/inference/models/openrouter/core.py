@@ -163,27 +163,6 @@ class Tier(str, Enum):
     PRO = "pro"
 
 
-@dataclass(frozen=True)
-class ModelSpec:
-    context_window: int
-    vision: bool = True
-    pdf: bool = True
-    json_schema: bool = True
-    tools: bool = True
-
-
-MODEL_SPECS: dict[str, ModelSpec] = {
-    "google/gemini-3.5-flash-lite": ModelSpec(1_048_576),
-    "anthropic/claude-haiku-4.5": ModelSpec(200_000),
-    "openai/gpt-5.6-luna": ModelSpec(1_050_000),
-    "google/gemini-3.6-flash": ModelSpec(1_048_576),
-    "anthropic/claude-sonnet-4.6": ModelSpec(1_000_000),
-    "openai/gpt-5.6-terra": ModelSpec(1_050_000),
-    "google/gemini-2.5-pro": ModelSpec(1_048_576),
-    "anthropic/claude-opus-4.7": ModelSpec(1_000_000),
-    "openai/gpt-5.6-sol": ModelSpec(1_050_000),
-}
-
 DEFAULT_TIERS: dict[Tier, tuple[str, ...]] = {
     Tier.LITE: (
         "google/gemini-3.5-flash-lite",
@@ -291,9 +270,6 @@ def _rest_of_tier(config: LLMConfig, model: str) -> list[str]:
 def resolve_chain(
     config: LLMConfig,
     model: str | Tier | None = None,
-    *,
-    needs: frozenset[str] = frozenset(),
-    est_tokens: int = 0,
 ) -> list[ChainEntry]:
     """Models to try for one call, in order.
 
@@ -303,11 +279,10 @@ def resolve_chain(
     - ``None``: ``default_model`` (else the lite primary), then ``env_fallback``
       if set, else the lite tier.
 
-    Fallbacks that can't handle ``needs`` or ``est_tokens`` are skipped; an
-    explicitly chosen model never is.
+    A model that can't serve a request (unsupported parameters, context too
+    long) is skipped at call time from OpenRouter's error.
     """
     fallback = normalize_model_id(config.env_fallback) if config.env_fallback else None
-    chosen: str | None = None
 
     if isinstance(model, Tier):
         entries = [_entry(config, m, model) for m in config.tiers[model]]
@@ -327,20 +302,8 @@ def resolve_chain(
 
     chain: list[ChainEntry] = []
     for e in entries:
-        if any(c.model == e.model for c in chain):
-            continue
-        spec = MODEL_SPECS.get(e.model)
-        if e.model != chosen and spec and not _supports(spec, needs, est_tokens):
-            continue
-        chain.append(e)
+        if not any(c.model == e.model for c in chain):
+            chain.append(e)
     if not chain:
-        raise LLMConfigError(
-            f"No model left after filtering (needs={sorted(needs)}, ~{est_tokens} tokens)"
-        )
+        raise LLMConfigError("No models configured for this call")
     return chain
-
-
-def _supports(spec: ModelSpec, needs: frozenset[str], est_tokens: int) -> bool:
-    if est_tokens and spec.context_window < est_tokens:
-        return False
-    return all(getattr(spec, need, True) for need in needs)

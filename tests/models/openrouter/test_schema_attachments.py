@@ -11,7 +11,7 @@ from optexity.inference.models.openrouter import (
     user_message,
 )
 from optexity.inference.models.openrouter.messages import (
-    inspect_messages,
+    has_pdf,
     parse_structured,
     to_strict_schema,
 )
@@ -82,8 +82,8 @@ def test_pdf_part_and_message_inspection():
     msg = user_message("read this", images=[PNG], pdfs=[b"%PDF-1.4 x"])
     kinds = [p["type"] for p in msg["content"]]
     assert kinds == ["image_url", "file", "text"]
-    needs, _ = inspect_messages([msg])
-    assert needs == {"vision", "pdf"}
+    assert has_pdf([msg])
+    assert not has_pdf([user_message("text only", images=[PNG])])
     with pytest.raises(LLMBadRequest):
         pdf_part(b"not a pdf")
 
