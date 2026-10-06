@@ -378,6 +378,7 @@ class _StreamAccumulator:
         self.finish_reason: str | None = None
         self.text: list[str] = []
         self.tool_calls: dict[int, dict[str, str]] = {}
+        self.reasoning_details: list[dict] = []
 
     def add(self, chunk: Any) -> None:
         self.id = self.id or getattr(chunk, "id", None)
@@ -390,6 +391,8 @@ class _StreamAccumulator:
             if delta is not None:
                 if delta.content:
                     self.text.append(delta.content)
+                for item in getattr(delta, "reasoning_details", None) or []:
+                    self._add_reasoning(item)
                 for call in delta.tool_calls or []:
                     slot = self.tool_calls.setdefault(
                         call.index, {"id": "", "name": "", "arguments": ""}
@@ -400,6 +403,27 @@ class _StreamAccumulator:
                         slot["arguments"] += call.function.arguments or ""
             self.finish_reason = choice.finish_reason or self.finish_reason
 
+    def _add_reasoning(self, item: Any) -> None:
+        # Pieces of one reasoning block share an index: join their text/data so
+        # the block is sent back on the next turn exactly as the model produced it.
+        item = dict(item) if isinstance(item, dict) else item.model_dump()
+        last = self.reasoning_details[-1] if self.reasoning_details else None
+        same_block = (
+            last is not None
+            and item.get("index") is not None
+            and last.get("index") == item.get("index")
+            and last.get("type") == item.get("type")
+        )
+        if not same_block:
+            self.reasoning_details.append(item)
+            return
+        for key in ("text", "summary", "data"):
+            if item.get(key):
+                last[key] = (last.get(key) or "") + item[key]
+        for key in ("signature", "id", "format"):
+            if item.get(key):
+                last[key] = item[key]
+
     def result(self) -> SimpleNamespace:
         tool_calls = [
             SimpleNamespace(
@@ -408,7 +432,11 @@ class _StreamAccumulator:
             )
             for _, c in sorted(self.tool_calls.items())
         ]
-        message = SimpleNamespace(content="".join(self.text), tool_calls=tool_calls)
+        message = SimpleNamespace(
+            content="".join(self.text),
+            tool_calls=tool_calls,
+            reasoning_details=self.reasoning_details or None,
+        )
         choices = []
         if self.text or tool_calls or self.finish_reason:
             choices = [

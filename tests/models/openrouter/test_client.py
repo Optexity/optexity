@@ -479,3 +479,73 @@ def test_web_search_plugin_and_citations():
             url="https://python.org", title="Python", content="Python 3.14 released"
         )
     ]
+
+
+def test_stream_rebuilds_reasoning_details_for_the_next_turn():
+    from .fakes import chunk, sse
+
+    fake = FakeOpenRouter(
+        sse(
+            [
+                chunk(
+                    {
+                        "reasoning_details": [
+                            {
+                                "type": "reasoning.text",
+                                "index": 0,
+                                "text": "Need the ",
+                                "format": "x",
+                            }
+                        ]
+                    }
+                ),
+                chunk(
+                    {
+                        "reasoning_details": [
+                            {
+                                "type": "reasoning.text",
+                                "index": 0,
+                                "text": "docs.",
+                                "signature": "sig",
+                            }
+                        ]
+                    }
+                ),
+                chunk(
+                    {
+                        "reasoning_details": [
+                            {"type": "reasoning.encrypted", "index": 1, "data": "enc"}
+                        ]
+                    }
+                ),
+                chunk(
+                    {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {
+                                    "name": "read_doc_file",
+                                    "arguments": "{}",
+                                },
+                            }
+                        ]
+                    }
+                ),
+                chunk({}, finish_reason="tool_calls"),
+            ]
+        )
+    )
+    r = make_client(fake).complete(MSG, tools=TOOLS, stream=True)
+    assert r.message["reasoning_details"] == [
+        {
+            "type": "reasoning.text",
+            "index": 0,
+            "text": "Need the docs.",
+            "format": "x",
+            "signature": "sig",
+        },
+        {"type": "reasoning.encrypted", "index": 1, "data": "enc"},
+    ]
+    assert r.tool_calls[0].name == "read_doc_file"

@@ -81,7 +81,7 @@ def test_call_timeout_covers_every_retry_and_fallback(monkeypatch):
     assert build_agent_llm().call_timeout == (45 * 2 + 10) + (120 * 2 + 10) + (
         45 * 2 + 10
     )
-    assert build_agent_llm(Tier.PRO).call_timeout == 3 * (180 * 2 + 10)
+    assert build_agent_llm(Tier.PRO).call_timeout == 3 * (300 * 2 + 10)
 
 
 def test_usage_accumulates_across_calls(fake):

@@ -96,7 +96,7 @@ def test_reasoning_and_timeout_per_tier():
     lite = resolve_chain(LLMConfig(api_key="k"))[0]
     pro = resolve_chain(LLMConfig(api_key="k"), model=Tier.PRO)[0]
     assert (lite.reasoning, lite.timeout) == ("medium", 45.0)
-    assert (pro.reasoning, pro.timeout) == (None, 180.0)
+    assert (pro.reasoning, pro.timeout) == (None, 300.0)
 
 
 @pytest.mark.parametrize(
@@ -142,4 +142,4 @@ def test_anthropic_models_get_a_minimum_timeout():
     pinned = resolve_chain(LLMConfig(api_key="k"), "anthropic/claude-3-haiku")[0]
     assert pinned.timeout == 120.0
     pro = resolve_chain(LLMConfig(api_key="k"), Tier.PRO)
-    assert [e.timeout for e in pro] == [180.0, 180.0, 180.0]
+    assert [e.timeout for e in pro] == [300.0, 300.0, 300.0]

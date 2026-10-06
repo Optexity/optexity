@@ -213,7 +213,7 @@ DEFAULT_REASONING: dict[Tier, str | None] = {
 DEFAULT_TIMEOUTS: dict[Tier, float] = {
     Tier.LITE: 45.0,
     Tier.STANDARD: 90.0,
-    Tier.PRO: 180.0,
+    Tier.PRO: 300.0,
 }
 _UNTIERED_TIMEOUT = DEFAULT_TIMEOUTS[Tier.STANDARD]
 
