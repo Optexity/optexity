@@ -95,7 +95,7 @@ def test_user_chosen_model_is_never_filtered():
 def test_reasoning_and_timeout_per_tier():
     lite = resolve_chain(LLMConfig(api_key="k"))[0]
     pro = resolve_chain(LLMConfig(api_key="k"), model=Tier.PRO)[0]
-    assert (lite.reasoning, lite.timeout) == ("medium", 60.0)
+    assert (lite.reasoning, lite.timeout) == ("medium", 120.0)
     assert (pro.reasoning, pro.timeout) == (None, 300.0)
 
 
@@ -132,14 +132,10 @@ def test_no_model_left_after_filtering_is_a_config_error():
         chain(cfg, model=Tier.LITE, est_tokens=300_000)
 
 
-def test_anthropic_models_get_a_minimum_timeout():
+def test_every_model_in_a_tier_gets_the_tier_timeout():
     timeouts = {e.model: e.timeout for e in resolve_chain(LLMConfig(api_key="k"))}
-    assert timeouts == {
-        "google/gemini-3.5-flash-lite": 60.0,
-        "anthropic/claude-haiku-4.5": 120.0,
-        "openai/gpt-5.6-luna": 60.0,
-    }
-    # Not in any tier: the standard timeout (180s) is already above the minimum.
+    assert set(timeouts.values()) == {120.0}
+    # Not in any tier: the standard timeout.
     pinned = resolve_chain(LLMConfig(api_key="k"), "anthropic/claude-3-haiku")[0]
     assert pinned.timeout == 180.0
     pro = resolve_chain(LLMConfig(api_key="k"), Tier.PRO)

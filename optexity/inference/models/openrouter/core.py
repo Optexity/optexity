@@ -211,15 +211,11 @@ DEFAULT_REASONING: dict[Tier, str | None] = {
 
 # Per attempt, in seconds. A timeout is retried / falls back like any temporary error.
 DEFAULT_TIMEOUTS: dict[Tier, float] = {
-    Tier.LITE: 60.0,
+    Tier.LITE: 120.0,
     Tier.STANDARD: 180.0,
     Tier.PRO: 300.0,
 }
 _UNTIERED_TIMEOUT = DEFAULT_TIMEOUTS[Tier.STANDARD]
-
-# Anthropic's first request with a new JSON schema can take over a minute while
-# the schema is compiled, so Anthropic models never get less than this.
-_MIN_TIMEOUT_BY_VENDOR = {"anthropic/": 120.0}
 
 
 @dataclass(frozen=True)
@@ -276,9 +272,6 @@ def _entry(config: LLMConfig, model: str, tier: Tier | None = None) -> ChainEntr
     tier = tier or tier_of(config, model)
     reasoning = DEFAULT_REASONING[tier] if tier else None
     timeout = DEFAULT_TIMEOUTS[tier] if tier else _UNTIERED_TIMEOUT
-    for vendor, minimum in _MIN_TIMEOUT_BY_VENDOR.items():
-        if model.startswith(vendor):
-            timeout = max(timeout, minimum)
     return ChainEntry(model, reasoning, timeout)
 
 
