@@ -8,7 +8,7 @@ from playwright.async_api import Page
 from pydantic import BaseModel
 
 from optexity.inference.infra.browser import Browser
-from optexity.inference.models import get_llm_model_with_fallback
+from optexity.inference.models import Tier, get_llm_model
 from optexity.schema.actions.captcha_action import CaptchaAction
 from optexity.schema.memory import Memory
 
@@ -87,6 +87,7 @@ async def _solve_grid(
         response_schema=CaptchaBoxes,
         screenshot=screenshot_b64,
         system_instruction="You are a captcha solver.",
+        feature="captcha",
     )
     memory.token_usage += token_usage
 
@@ -153,12 +154,12 @@ async def _solve_and_click(
     config: dict,
     memory: Memory,
     attempt: int,
-    llm_model_name: str = "gemini/gemini-2.5-pro",
+    llm_model_name: str | None = None,
 ):
     """Screenshot → LLM → click boxes → check for image refresh → repeat if refreshed → press verify."""
 
     max_retries = int(config.get("max_captcha_retries", 3))
-    llm_model = get_llm_model_with_fallback(None, llm_model_name, True)
+    llm_model = get_llm_model(llm_model_name or Tier.PRO, True)
 
     refresh_count = 0
     while refresh_count <= max_retries:
@@ -176,6 +177,7 @@ async def _solve_and_click(
                 response_schema=CaptchaRefreshCheck,
                 screenshot=post_click_screenshot_b64,
                 system_instruction="You are a captcha checker.",
+                feature="captcha",
             )
         )
         memory.token_usage += token_usage

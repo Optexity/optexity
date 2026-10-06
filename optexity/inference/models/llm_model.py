@@ -1,95 +1,92 @@
-import ast
 import logging
-import re
-import time
 from pathlib import Path
 from typing import Optional
 
-import litellm
+import httpx
 from pydantic import BaseModel
 
 from optexity.schema.token_usage import TokenUsage
+from optexity.utils.llm_settings import llm_settings
+from optexity.utils.utils import is_local_path, is_url
+
+from .openrouter import (
+    LLMConfig,
+    OpenRouterClient,
+    Tier,
+    Usage,
+    parse_model_list,
+    user_message,
+)
 
 logger = logging.getLogger(__name__)
 
-
-def extract_json_objects(text: str) -> list[str]:
-    stack = []  # Stack to track `{` positions
-    json_candidates = []  # Potential JSON substrings
-
-    # Iterate through the text to find balanced { }
-    for i, char in enumerate(text):
-        if char == "{":
-            stack.append(i)  # Store index of '{'
-        elif char == "}" and stack:
-            start = stack.pop()  # Get the last unmatched '{'
-            json_candidates.append(text[start : i + 1])  # Extract substring
-
-    return json_candidates
+_config: LLMConfig | None = None
+_client: OpenRouterClient | None = None
 
 
-def parse_json_from_completion(
-    content: str, response_schema: type[BaseModel]
-) -> BaseModel:
-    """Recover a schema instance from a completion that isn't clean JSON.
+def get_config() -> LLMConfig:
+    """OpenRouter client config, built from `llm_settings` on first use."""
+    global _config
+    if _config is None:
+        s = llm_settings
+        _config = LLMConfig.with_tier_overrides(
+            {
+                Tier.LITE: parse_model_list(s.LLM_TIER_LITE),
+                Tier.STANDARD: parse_model_list(s.LLM_TIER_STANDARD),
+                Tier.PRO: parse_model_list(s.LLM_TIER_PRO),
+            },
+            api_key=s.OPENROUTER_API_KEY,
+            service=s.LLM_SERVICE_NAME,
+            environment=s.LLM_ENVIRONMENT,
+            default_model=s.LLM_MODEL,
+            env_fallback=s.LLM_MODEL_FALLBACK,
+        )
+    return _config
 
-    Covers providers that wrap JSON in markdown fences or prose, and those that
-    drop `response_format` altogether.
-    """
-    patterns = [r"```json\n(.*?)\n```"]
-    json_blocks = []
-    for pattern in patterns:
-        json_blocks += re.findall(pattern, content, re.DOTALL)
-    json_blocks += extract_json_objects(content)
-    for block in json_blocks:
-        block = block.strip()
-        try:
-            return response_schema.model_validate_json(block)
-        except Exception:
-            try:
-                return response_schema.model_validate(ast.literal_eval(block))
-            except Exception:
-                continue
 
-    raise ValueError("Could not parse response from completion.")
+def get_client() -> OpenRouterClient:
+    """The shared OpenRouter client. Raises LLMConfigError on first use if
+    OPENROUTER_API_KEY isn't set."""
+    global _client
+    if _client is None:
+        _client = OpenRouterClient(get_config())
+    return _client
+
+
+def _load_pdf(pdf_url: str | Path) -> bytes:
+    if is_local_path(pdf_url):
+        return Path(str(pdf_url)).read_bytes()
+    if is_url(pdf_url):
+        response = httpx.get(str(pdf_url), timeout=60, follow_redirects=True)
+        response.raise_for_status()
+        return response.content
+    raise ValueError(f"Invalid pdf_url: {pdf_url}")
+
+
+def to_token_usage(usage: Usage) -> TokenUsage:
+    # Reasoning tokens are already inside completion_tokens, so they are reported
+    # but not added to the total again. OpenRouter returns one total cost.
+    total = usage.prompt_tokens + usage.completion_tokens
+    return TokenUsage(
+        input_tokens=usage.prompt_tokens,
+        output_tokens=usage.completion_tokens,
+        thoughts_tokens=usage.reasoning_tokens,
+        total_tokens=total,
+        calculated_total_tokens=total + usage.reasoning_tokens,
+        total_cost=usage.cost,
+    )
 
 
 class LLMModel:
-    def __init__(self, model_name: str, use_structured_output: bool):
+    """An LLM call target: an OpenRouter model ID, a `Tier`, or None for the
+    configured default (`LLM_MODEL`, else the lite tier)."""
 
+    def __init__(
+        self, model_name: str | Tier | None, use_structured_output: bool = True
+    ):
         self.model_name = model_name
+        # Kept for existing callers; responses are always requested as structured output.
         self.use_structured_output = use_structured_output
-
-    def _get_model_response(
-        self, prompt: str, system_instruction: Optional[str] = None
-    ) -> tuple[str, TokenUsage]:
-        raise NotImplementedError("This method should be implemented by subclasses.")
-
-    def _get_model_response_with_structured_output(
-        self,
-        prompt: str,
-        response_schema: type[BaseModel],
-        screenshot: Optional[str] = None,
-        pdf_url: Optional[str | Path] = None,
-        system_instruction: Optional[str] = None,
-    ) -> tuple[BaseModel, TokenUsage]:
-        raise NotImplementedError("This method should be implemented by subclasses.")
-
-    def get_model_response(
-        self, prompt: str, system_instruction: Optional[str] = None
-    ) -> tuple[str, TokenUsage]:
-
-        max_retries = 3
-        for i in range(max_retries):
-            try:
-                return self._get_model_response(prompt, system_instruction)
-            except Exception as e:
-                logger.error(f"LLM Error during inference: {e}")
-                if i < max_retries - 1:
-                    logger.info(f"Retrying... {i + 1}/{max_retries}")
-                    time.sleep(5)
-                continue
-        raise Exception("Max retries exceeded for LLM")
 
     def get_model_response_with_structured_output(
         self,
@@ -98,96 +95,27 @@ class LLMModel:
         screenshot: Optional[str] = None,
         pdf_url: Optional[str | Path] = None,
         system_instruction: Optional[str] = None,
+        feature: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> tuple[BaseModel, TokenUsage]:
-
-        total_token_usage = TokenUsage()
-        max_retries = 3
-        last_exception = ""
-        for i in range(max_retries):
-            try:
-                # raise Exception("Test error")
-                parsed_response, token_usage = (
-                    self._get_model_response_with_structured_output(
-                        prompt=prompt,
-                        response_schema=response_schema,
-                        screenshot=screenshot,
-                        pdf_url=pdf_url,
-                        system_instruction=system_instruction,
-                    )
-                )
-                total_token_usage += token_usage
-                if parsed_response is not None:
-                    return parsed_response, total_token_usage
-            except Exception as e:
-                logger.error(f"LLM with structured output Error during inference: {e}")
-                if i < max_retries - 1:
-                    logger.info(f"Retrying... {i + 1}/{max_retries}")
-                    time.sleep(5)
-                last_exception = str(e)
-
-        raise Exception(
-            "Max retries exceeded for LLM with structured output"
-            + "\n"
-            + last_exception
-        )
-
-    def extract_json_objects(self, text):
-        return extract_json_objects(text)
-
-    def parse_from_completion(
-        self, content: str, response_schema: type[BaseModel]
-    ) -> BaseModel:
-        return parse_json_from_completion(content, response_schema)
-
-    def get_token_usage(
-        self,
-        input_tokens: int | None = None,
-        output_tokens: int | None = None,
-        tool_use_tokens: int | None = None,
-        thoughts_tokens: int | None = None,
-        total_tokens: Optional[int] = None,
-    ) -> TokenUsage:
-        if input_tokens is None:
-            input_tokens = 0
-        if output_tokens is None:
-            output_tokens = 0
-        if tool_use_tokens is None:
-            tool_use_tokens = 0
-        if thoughts_tokens is None:
-            thoughts_tokens = 0
-        if total_tokens is None:
-            total_tokens = 0
-
-        # litellm already counts reasoning/thinking inside completion_tokens, so
-        # thoughts and tool-use are reported as tokens but never priced separately —
-        # doing so would double-bill them.
-        tool_use_cost = thoughts_cost = 0.0
-        try:
-            input_cost, output_cost = litellm.cost_per_token(
-                model=self.model_name,
-                prompt_tokens=input_tokens,
-                completion_tokens=output_tokens,
+        """Ask the model for ``response_schema``; retries and fallback happen in
+        the OpenRouter client. ``screenshot`` is a base64 PNG/JPEG; ``pdf_url`` a
+        local path or URL. Returns the parsed object and its token usage."""
+        messages = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append(
+            user_message(
+                prompt,
+                images=[screenshot] if screenshot else (),
+                pdfs=[_load_pdf(pdf_url)] if pdf_url else (),
             )
-        except Exception as e:
-            logger.warning(
-                f"Model {self.model_name} has no litellm pricing data ({e}). "
-                f"Cost will be reported as 0."
-            )
-            input_cost = output_cost = 0.0
-        calculated_total_tokens = (
-            input_tokens + output_tokens + tool_use_tokens + thoughts_tokens
         )
-        total_cost = input_cost + output_cost + tool_use_cost + thoughts_cost
-        return TokenUsage(
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            tool_use_tokens=tool_use_tokens,
-            thoughts_tokens=thoughts_tokens,
-            total_tokens=total_tokens,
-            calculated_total_tokens=calculated_total_tokens,
-            input_cost=input_cost,
-            output_cost=output_cost,
-            tool_use_cost=tool_use_cost,
-            thoughts_cost=thoughts_cost,
-            total_cost=total_cost,
+        result = get_client().complete(
+            messages,
+            model=self.model_name,
+            schema=response_schema,
+            feature=feature,
+            session_id=session_id,
         )
+        return result.parsed, to_token_usage(result.usage)

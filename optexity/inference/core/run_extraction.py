@@ -284,6 +284,7 @@ async def handle_llm_extraction(
             response_schema=llm_extraction.build_model(),
             screenshot=screenshot,
             system_instruction=system_instruction,
+            feature="extraction",
         )
         response_dict = response.model_dump()
         memory.token_usage += token_usage
@@ -339,7 +340,13 @@ async def handle_llm_extraction(
             logger.debug(
                 "LLM extraction null fields; classifier overlay_popup_blocking — closing overlay then retry"
             )
-            await handle_agentic_task(CloseOverlayPopupAction(), task, memory, browser)
+            await handle_agentic_task(
+                CloseOverlayPopupAction(),
+                task,
+                memory,
+                browser,
+                feature="agentic_fallback",
+            )
         else:
             logger.debug(
                 "LLM extraction null fields; classifier could_retry_now — immediate retry"
@@ -606,6 +613,7 @@ async def handle_pdf_extraction(
         response_schema=pdf_extraction.build_model(),
         pdf_url=pdf_file,
         system_instruction=system_instruction,
+        feature="extraction",
     )
     response_dict = response.model_dump()
     output_data = OutputData(

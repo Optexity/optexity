@@ -283,4 +283,6 @@ async def run_axtree_fallback_agent(
         f"Running agentic fallback for goal '{goal}' on {current_url} "
         f"(max_steps={FALLBACK_MAX_STEPS})"
     )
-    return await handle_agentic_task(fallback_action, task, memory, browser)
+    return await handle_agentic_task(
+        fallback_action, task, memory, browser, feature="agentic_fallback"
+    )

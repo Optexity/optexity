@@ -5,10 +5,10 @@ class CaptchaAction(BaseModel):
     locator: str
     secondary_locator: str | None = None
     wait_time: float = 2.0  # Seconds to wait after trigger click for captcha to appear
-    # Captcha grids need a stronger model than the task default, so this one
-    # keeps an explicit default rather than falling through to settings.LLM_MODEL.
+    # OpenRouter model ID. Unset uses the pro tier: captcha grids need a stronger
+    # vision model than the task default.
     llm_provider: str | None = None
-    llm_model_name: str = "gemini/gemini-2.5-pro"
+    llm_model_name: str | None = None
 
     config: dict = Field(
         default_factory=lambda: {

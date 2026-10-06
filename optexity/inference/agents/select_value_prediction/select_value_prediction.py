@@ -34,6 +34,7 @@ class SelectValuePredictionAgent:
             prompt=final_prompt,
             response_schema=SelectValuePredictionOutput,
             system_instruction=system_prompt,
+            feature="llm_fallback",
         )
 
         return final_prompt, response, token_usage

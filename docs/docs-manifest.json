@@ -486,7 +486,7 @@
             "id": "docs-action-types-llm-query-action",
             "path": "docs/action-types/llm-query-action.mdx",
             "title": "LLM Query Action",
-            "summary": "Documents misc_action.llm_query — a direct LLM query that operates on in-memory data without browser context. Covers output_format, prompt_instructions, output_variable_names, provider/model selection, and how it differs from extraction_action.llm.",
+            "summary": "Documents misc_action.llm_query — a direct LLM query that operates on in-memory data without browser context. Covers output_format, prompt_instructions, output_variable_names, OpenRouter model selection, and how it differs from extraction_action.llm.",
             "gist": "Send a prompt to an LLM and store structured output — no browser round-trip. Used to transform or classify data already extracted.",
             "keywords": [
                 "llm_query",
@@ -500,7 +500,7 @@
                 "transform",
                 "llm_provider",
                 "llm_model_name",
-                "litellm"
+                "openrouter"
             ],
             "document_type": "guide",
             "tags": ["action-types", "llm", "misc-action", "structured-output", "classification"],
@@ -1118,14 +1118,11 @@
             "id": "docs-advanced-model-configuration",
             "path": "docs/advanced/model-configuration.mdx",
             "title": "Model Configuration",
-            "summary": "Explains how to choose the LLM that powers an automation. Every LLM call routes through LiteLLM, so any supported provider works. Covers the LLM_MODEL, LLM_MODEL_API_KEY, LLM_MODEL_FALLBACK and LLM_MODEL_FALLBACK_API_KEY environment variables, the provider/model string format, the action -> task -> LLM_MODEL resolution order, per-task and per-action llm_model_name overrides, cross-provider fallbacks, the gemini/gemini-2.5-pro captcha default, LiteLLM-based cost tracking, and migrating off the deprecated llm_provider field.",
-            "gist": "Pick the LLM via LLM_MODEL (LiteLLM strings), override per task or per action with llm_model_name, and configure a cross-provider fallback.",
+            "summary": "Explains how to choose the LLM that powers an automation. Every LLM call goes through OpenRouter with one OPENROUTER_API_KEY. Covers the OPENROUTER_API_KEY, LLM_MODEL and LLM_MODEL_FALLBACK environment variables, OpenRouter vendor/model IDs, older model strings that keep working, setting a model per action with llm_model_name, the google/gemini-2.5-pro captcha default, automatic fallbacks, per-task cost tracking, and migrating from LiteLLM, provider API keys and llm_provider.",
+            "gist": "Set OPENROUTER_API_KEY, pick the default model with LLM_MODEL (OpenRouter IDs), set a backup with LLM_MODEL_FALLBACK, and override per action with llm_model_name.",
             "keywords": [
                 "LLM_MODEL",
-                "LLM_MODEL_API_KEY",
                 "LLM_MODEL_FALLBACK",
-                "LLM_MODEL_FALLBACK_API_KEY",
-                "litellm",
                 "llm_model_name",
                 "llm_provider",
                 "model",
@@ -1134,7 +1131,11 @@
                 "anthropic",
                 "openai",
                 "cost",
-                "token usage"
+                "token usage",
+                "OPENROUTER_API_KEY",
+                "openrouter",
+                "litellm migration",
+                "model id"
             ],
             "document_type": "guide",
             "tags": ["advanced", "llm", "configuration", "models", "cost"],
@@ -1158,13 +1159,13 @@
                 ]
             },
             "entities": {
-                "systems": ["LiteLLM", "Google Gemini", "Anthropic", "OpenAI", "AWS Bedrock"],
+                "systems": ["Anthropic", "OpenAI", "OpenRouter", "Google"],
                 "apis": [],
                 "data_models": ["Task", "LLMAction", "CaptchaAction"]
             },
             "reading_priority": 3,
-            "when_to_use": "Select when the query is about which LLM an automation uses, switching provider or model, setting LLM_MODEL or an API key, configuring a fallback model, LLM cost or token pricing, or migrating from llm_provider to a prefixed llm_model_name.",
-            "embedding_hint": "LLM model configuration litellm LLM_MODEL fallback api key provider gemini anthropic openai cost"
+            "when_to_use": "Select when the query is about which LLM an automation uses, OPENROUTER_API_KEY, switching or setting a model, LLM_MODEL or LLM_MODEL_FALLBACK, fallbacks, LLM cost or token usage, old model strings like gemini/gemini-2.5-pro, or migrating from LiteLLM or llm_provider.",
+            "embedding_hint": "LLM model configuration openrouter api key LLM_MODEL LLM_MODEL_FALLBACK fallback llm_model_name per action model ids captcha cost migration litellm"
         },
         {
             "id": "docs-advanced-timing-retries",
@@ -1613,13 +1614,13 @@
             "id": "docs-building-automations-local-setup",
             "path": "docs/building-automations/local-setup.mdx",
             "title": "Local Setup",
-            "summary": "Step-by-step guide for setting up the Optexity development environment locally. Covers creating an account at dashboard.optexity.com, obtaining an API key, installing the Chrome Recorder Extension, prerequisites (Python 3.11+, Git), creating a conda/venv environment, installing Optexity via PyPI or source, setting required environment variables (OPTEXITY_API_KEY, GOOGLE_API_KEY, DEPLOYMENT), and pointing Optexity at a non-default LLM with LLM_MODEL.",
+            "summary": "Step-by-step guide for setting up the Optexity development environment locally. Covers creating an account at dashboard.optexity.com, obtaining an API key, installing the Chrome Recorder Extension, prerequisites (Python 3.11+, Git), creating a conda/venv environment, installing Optexity via PyPI or source, setting required environment variables (OPTEXITY_API_KEY, OPENROUTER_API_KEY, DEPLOYMENT), and pointing Optexity at a non-default LLM with LLM_MODEL.",
             "gist": "Local dev setup: account, API key, recorder extension, Python 3.11 env, pip install, env vars.",
             "keywords": [
                 "local setup",
                 "installation",
                 "OPTEXITY_API_KEY",
-                "GOOGLE_API_KEY",
+                "OPENROUTER_API_KEY",
                 "LLM_MODEL",
                 "conda",
                 "pip install optexity",
