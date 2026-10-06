@@ -1,10 +1,14 @@
 """Errors, result types, model tiers, client config and fallback-chain resolution."""
 
+import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class LLMError(Exception):
@@ -241,11 +245,72 @@ class ChainEntry:
     timeout: float
 
 
+# Old model strings the rules below can't convert -> OpenRouter ID.
+LEGACY_MODEL_ALIASES: dict[str, str] = {}
+
+# LiteLLM routes whose model part is converted by name.
+_LEGACY_ROUTES = ("gemini/", "vertex_ai/", "bedrock/")
+_logged_conversions: set[str] = set()
+
+
 def normalize_model_id(model: str) -> str:
-    """Strips whitespace and an optional "openrouter/" prefix. Unknown IDs are
-    rejected by OpenRouter itself (LLMBadRequest)."""
-    model = model.strip()
-    return model.removeprefix("openrouter/")
+    """The OpenRouter ID for a model string.
+
+    Accepts OpenRouter IDs (optionally prefixed "openrouter/") and older
+    LiteLLM-style strings saved in workflows and env files:
+    "gemini/gemini-2.5-pro" and bare "gemini-2.5-pro" -> "google/gemini-2.5-pro",
+    "claude-opus-4-6" -> "anthropic/claude-opus-4.6",
+    "bedrock/anthropic.claude-sonnet-4-20250514-v1:0" -> "anthropic/claude-sonnet-4".
+    Anything else is passed through; OpenRouter rejects unknown IDs
+    (LLMBadRequest).
+    """
+    original = model.strip()
+    converted = LEGACY_MODEL_ALIASES.get(original) or _convert_legacy(
+        original.removeprefix("openrouter/")
+    )
+    if (
+        converted != original.removeprefix("openrouter/")
+        and original not in _logged_conversions
+    ):
+        _logged_conversions.add(original)
+        logger.warning(
+            "Converted model %r to OpenRouter ID %r; update the saved value.",
+            original,
+            converted,
+        )
+    return converted
+
+
+def _convert_legacy(model: str) -> str:
+    if model.startswith(_LEGACY_ROUTES) or "/" not in model:
+        name = model.split("/", 1)[1] if "/" in model else model
+        name = re.sub(r"^anthropic\.", "", name)  # bedrock: anthropic.claude-...
+        name = re.sub(r"-v\d+(:\d+)?$", "", name)  # bedrock: ...-v1:0
+        vendor = _vendor_of(name)
+        if vendor is None:
+            return model
+        model = f"{vendor}/{name}"
+    vendor, name = model.split("/", 1)
+    if vendor == "anthropic":
+        name = _anthropic_name(name)
+    return f"{vendor}/{name}"
+
+
+def _vendor_of(name: str) -> str | None:
+    if name.startswith("gemini"):
+        return "google"
+    if name.startswith("claude"):
+        return "anthropic"
+    if re.match(r"^(gpt-|chatgpt-|o\d)", name):
+        return "openai"
+    return None
+
+
+def _anthropic_name(name: str) -> str:
+    # Anthropic's own IDs use dashes and dates; OpenRouter's use dots, no date.
+    name = re.sub(r"(@\d{8}|-\d{8})$", "", name)
+    name = re.sub(r"^(claude-(?:opus|sonnet|haiku)-\d+)-(\d+)$", r"\1.\2", name)
+    return re.sub(r"^claude-(\d+)-(\d+)-(opus|sonnet|haiku)$", r"claude-\1.\2-\3", name)
 
 
 def tier_of(config: LLMConfig, model: str) -> Tier | None:

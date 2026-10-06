@@ -7,6 +7,7 @@ result = client.complete([user_message("hi")], tier=Tier.PRO)
 from .client import OpenRouterClient
 from .core import (
     DEFAULT_TIERS,
+    LEGACY_MODEL_ALIASES,
     Attempt,
     ChainEntry,
     Citation,
@@ -33,7 +34,7 @@ from .core import (
 )
 from .messages import image_part, pdf_part, user_message
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     "DEFAULT_TIERS",
@@ -52,6 +53,7 @@ __all__ = [
     "LLMRateLimited",
     "LLMResult",
     "LLMTimeout",
+    "LEGACY_MODEL_ALIASES",
     "LLMUnavailable",
     "OpenRouterClient",
     "Tier",

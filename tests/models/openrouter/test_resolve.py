@@ -3,6 +3,7 @@ import pytest
 from optexity.inference.models.openrouter import (
     LLMConfig,
     Tier,
+    normalize_model_id,
     resolve_chain,
 )
 
@@ -121,3 +122,48 @@ def test_every_model_in_a_tier_gets_the_tier_timeout():
     assert pinned.timeout == 180.0
     pro = resolve_chain(LLMConfig(api_key="k"), Tier.PRO)
     assert [e.timeout for e in pro] == [300.0, 300.0, 300.0]
+
+
+@pytest.mark.parametrize(
+    "old, new",
+    [
+        # values found in saved workflows
+        ("gemini/gemini-2.5-pro", "google/gemini-2.5-pro"),
+        ("gemini/gemini-2.5-flash", "google/gemini-2.5-flash"),
+        ("gemini-2.5-pro", "google/gemini-2.5-pro"),
+        ("anthropic/claude-opus-4-6", "anthropic/claude-opus-4.6"),
+        ("openai/gpt-4.1", "openai/gpt-4.1"),
+        ("openai/gpt-4o-mini", "openai/gpt-4o-mini"),
+        # other LiteLLM / provider-native forms
+        ("claude-haiku-4-5-20251001", "anthropic/claude-haiku-4.5"),
+        ("claude-3-5-sonnet-20241022", "anthropic/claude-3.5-sonnet"),
+        ("vertex_ai/claude-sonnet-4-5@20250929", "anthropic/claude-sonnet-4.5"),
+        ("vertex_ai/gemini-2.5-pro", "google/gemini-2.5-pro"),
+        (
+            "bedrock/anthropic.claude-sonnet-4-20250514-v1:0",
+            "anthropic/claude-sonnet-4",
+        ),
+        ("gpt-4o", "openai/gpt-4o"),
+        ("o3-mini", "openai/o3-mini"),
+        # already OpenRouter IDs, or unknown: unchanged
+        ("openrouter/google/gemini-2.5-pro", "google/gemini-2.5-pro"),
+        ("anthropic/claude-sonnet-4.6", "anthropic/claude-sonnet-4.6"),
+        ("mistralai/mistral-large", "mistralai/mistral-large"),
+        ("some-unknown-model", "some-unknown-model"),
+    ],
+)
+def test_legacy_model_ids_are_converted(old, new):
+    assert normalize_model_id(old) == new
+
+
+def test_alias_map_wins_over_rules(monkeypatch):
+    from optexity.inference.models.openrouter import core
+
+    monkeypatch.setitem(
+        core.LEGACY_MODEL_ALIASES, "old-custom", "google/gemini-3.6-flash"
+    )
+    assert normalize_model_id("old-custom") == "google/gemini-3.6-flash"
+
+
+def test_legacy_pin_falls_back_like_its_new_id():
+    assert chain(model="gemini/gemini-2.5-pro") == PRO
