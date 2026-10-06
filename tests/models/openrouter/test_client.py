@@ -35,7 +35,7 @@ def test_tags_reasoning_and_usage_are_sent(no_sleep):
     client.complete(MSG, feature="llm_extraction", session_id="task-1")
     body = fake.requests[0]
     assert body["model"] == LITE0
-    assert body["user"] == "optexity-worker"
+    assert body["user"] == "optexity-worker:llm_extraction"
     assert body["session_id"] == "task-1"
     assert body["trace"] == {
         "service": "optexity-worker",
@@ -549,3 +549,9 @@ def test_stream_rebuilds_reasoning_details_for_the_next_turn():
         {"type": "reasoning.encrypted", "index": 1, "data": "enc"},
     ]
     assert r.tool_calls[0].name == "read_doc_file"
+
+
+def test_user_is_the_service_alone_without_a_feature(no_sleep):
+    fake = FakeOpenRouter(completion())
+    make_client(fake, service="optexity-worker").complete(MSG)
+    assert fake.requests[0]["user"] == "optexity-worker"

@@ -330,7 +330,8 @@ class OpenRouterClient:
         cfg = self.config
         body: dict[str, Any] = {"usage": {"include": True}}
         if cfg.service:
-            body["user"] = cfg.service
+            # The dashboard groups spend by `user`, so the feature goes in it too.
+            body["user"] = f"{cfg.service}:{feature}" if feature else cfg.service
         if session_id:
             body["session_id"] = session_id
         trace = {
