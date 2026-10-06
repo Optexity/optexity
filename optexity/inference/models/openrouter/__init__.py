@@ -10,6 +10,7 @@ from .core import (
     MODEL_SPECS,
     Attempt,
     ChainEntry,
+    Citation,
     LLMAllModelsFailed,
     LLMAuthError,
     LLMBadRequest,
@@ -27,18 +28,20 @@ from .core import (
     Tier,
     ToolCall,
     Usage,
+    WebSearch,
     normalize_model_id,
     resolve_chain,
 )
 from .messages import image_part, pdf_part, user_message
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "DEFAULT_TIERS",
     "MODEL_SPECS",
     "Attempt",
     "ChainEntry",
+    "Citation",
     "LLMAllModelsFailed",
     "LLMAuthError",
     "LLMBadRequest",
@@ -57,6 +60,7 @@ __all__ = [
     "Tier",
     "ToolCall",
     "Usage",
+    "WebSearch",
     "image_part",
     "pdf_part",
     "resolve_chain",

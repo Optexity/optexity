@@ -101,6 +101,34 @@ class Attempt:
 
 
 @dataclass
+class WebSearch:
+    """OpenRouter web search for a request. ``engine`` None lets OpenRouter pick
+    (the model's native search where available)."""
+
+    max_results: int = 5
+    include_domains: list[str] | None = None
+    exclude_domains: list[str] | None = None
+    engine: str | None = None
+
+    def plugin(self) -> dict:
+        plugin: dict = {"id": "web", "max_results": self.max_results}
+        if self.include_domains:
+            plugin["include_domains"] = self.include_domains
+        if self.exclude_domains:
+            plugin["exclude_domains"] = self.exclude_domains
+        if self.engine:
+            plugin["engine"] = self.engine
+        return plugin
+
+
+@dataclass
+class Citation:
+    url: str
+    title: str | None = None
+    content: str | None = None
+
+
+@dataclass
 class ToolCall:
     id: str
     name: str
@@ -122,6 +150,7 @@ class LLMResult:
     attempts: list[Attempt] = field(default_factory=list)
     latency_ms: int = 0
     tool_calls: list[ToolCall] = field(default_factory=list)
+    citations: list[Citation] = field(default_factory=list)  # from web search
     # The assistant message as it should be appended to the conversation for the
     # next turn (tool calls and reasoning details included).
     message: dict | None = None

@@ -25,6 +25,7 @@ from pydantic import BaseModel
 from .core import (
     Attempt,
     ChainEntry,
+    Citation,
     LLMAllModelsFailed,
     LLMAuthError,
     LLMBadRequest,
@@ -41,6 +42,7 @@ from .core import (
     Tier,
     ToolCall,
     Usage,
+    WebSearch,
     resolve_chain,
 )
 from .messages import inspect_messages, parse_structured, to_strict_schema
@@ -87,6 +89,7 @@ class OpenRouterClient:
         tools: list[dict] | None = None,
         tool_choice: str | dict | None = None,
         stream: bool = False,
+        web_search: WebSearch | None = None,
         needs: set[str] | frozenset[str] = frozenset(),
         reasoning: Any = _DEFAULT,
         max_tokens: int | None = None,
@@ -106,7 +109,9 @@ class OpenRouterClient:
         calling; calls come back in ``LLMResult.tool_calls``. ``stream`` streams
         the response and returns the same ``LLMResult``; the timeout then limits
         the gap between chunks instead of the whole response, so long outputs
-        aren't cut off. ``timeout`` overrides the tier's per-attempt timeout.
+        aren't cut off. ``web_search`` lets the model search the web; sources
+        come back in ``LLMResult.citations``. ``timeout`` overrides the tier's
+        per-attempt timeout.
         ``feature`` and ``session_id`` tag the request for usage reporting.
         """
         if self._sync is None:
@@ -117,7 +122,7 @@ class OpenRouterClient:
                 http_client=self._http_client,
             )
         run = self._run(
-            messages, model, schema, schema_override, tools, tool_choice, stream, needs, reasoning, max_tokens,
+            messages, model, schema, schema_override, tools, tool_choice, stream, web_search, needs, reasoning, max_tokens,
             temperature, timeout, feature, session_id, extra_body,
         )  # fmt: skip
         step = next(run)
@@ -153,6 +158,7 @@ class OpenRouterClient:
         tools: list[dict] | None = None,
         tool_choice: str | dict | None = None,
         stream: bool = False,
+        web_search: WebSearch | None = None,
         needs: set[str] | frozenset[str] = frozenset(),
         reasoning: Any = _DEFAULT,
         max_tokens: int | None = None,
@@ -171,7 +177,7 @@ class OpenRouterClient:
                 http_client=self._async_http_client,
             )
         run = self._run(
-            messages, model, schema, schema_override, tools, tool_choice, stream, needs, reasoning, max_tokens,
+            messages, model, schema, schema_override, tools, tool_choice, stream, web_search, needs, reasoning, max_tokens,
             temperature, timeout, feature, session_id, extra_body,
         )  # fmt: skip
         step = next(run)
@@ -206,6 +212,7 @@ class OpenRouterClient:
         tools: list[dict] | None,
         tool_choice: str | dict | None,
         stream: bool,
+        web_search: WebSearch | None,
         needs: set[str] | frozenset[str],
         reasoning: Any,
         max_tokens: int | None,
@@ -246,6 +253,8 @@ class OpenRouterClient:
         body = self._body(
             feature, session_id, schema is not None or bool(tools), all_needs
         )
+        if web_search is not None:
+            body.setdefault("plugins", []).append(web_search.plugin())
         body.update(extra_body or {})
 
         started = time.monotonic()
@@ -469,6 +478,7 @@ def _read(
         text=text,
         parsed=parsed,
         tool_calls=tool_calls,
+        citations=_citations(choice.message),
         message=_assistant_message(choice.message, text, tool_calls),
         model_used=getattr(resp, "model", None) or entry.model,
         finish_reason=finish,
@@ -490,6 +500,21 @@ def _tool_calls(message: Any, model: str) -> list[ToolCall]:
             ) from e
         calls.append(ToolCall(call.id, call.function.name, arguments))
     return calls
+
+
+def _citations(message: Any) -> list[Citation]:
+    citations = []
+    for annotation in getattr(message, "annotations", None) or []:
+        cite = getattr(annotation, "url_citation", None)
+        if getattr(annotation, "type", None) == "url_citation" and cite is not None:
+            citations.append(
+                Citation(
+                    url=cite.url,
+                    title=getattr(cite, "title", None),
+                    content=getattr(cite, "content", None),
+                )
+            )
+    return citations
 
 
 def _assistant_message(

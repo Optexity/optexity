@@ -436,3 +436,46 @@ def test_async_stream():
     )
     r = asyncio.run(make_client(fake).acomplete(MSG, stream=True))
     assert r.text == "async ok"
+
+
+def test_web_search_plugin_and_citations():
+    from optexity.inference.models.openrouter import Citation, WebSearch
+
+    fake = FakeOpenRouter(
+        completion(
+            choices=[
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": "Python 3.14 is out.",
+                        "annotations": [
+                            {
+                                "type": "url_citation",
+                                "url_citation": {
+                                    "url": "https://python.org",
+                                    "title": "Python",
+                                    "content": "Python 3.14 released",
+                                    "start_index": 0,
+                                    "end_index": 10,
+                                },
+                            }
+                        ],
+                    },
+                }
+            ]
+        )
+    )
+    r = make_client(fake).complete(
+        [user_message("latest python?", pdfs=[b"%PDF-1.4"])],
+        web_search=WebSearch(max_results=3, include_domains=["python.org"]),
+    )
+    plugins = fake.requests[0]["plugins"]
+    assert {"id": "web", "max_results": 3, "include_domains": ["python.org"]} in plugins
+    assert any(p["id"] == "file-parser" for p in plugins)  # PDF plugin kept too
+    assert r.citations == [
+        Citation(
+            url="https://python.org", title="Python", content="Python 3.14 released"
+        )
+    ]
