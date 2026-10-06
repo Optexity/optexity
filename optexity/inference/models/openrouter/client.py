@@ -9,6 +9,7 @@ For each model in the chain:
 """
 
 import asyncio
+import json
 import logging
 import random
 import re
@@ -37,6 +38,7 @@ from .core import (
     LLMTimeout,
     LLMUnavailable,
     Tier,
+    ToolCall,
     Usage,
     resolve_chain,
 )
@@ -81,6 +83,8 @@ class OpenRouterClient:
         model: str | Tier | None = None,
         schema: type[BaseModel] | None = None,
         schema_override: dict | None = None,
+        tools: list[dict] | None = None,
+        tool_choice: str | dict | None = None,
         needs: set[str] | frozenset[str] = frozenset(),
         reasoning: Any = _DEFAULT,
         max_tokens: int | None = None,
@@ -96,8 +100,10 @@ class OpenRouterClient:
         configured default; see ``resolve_chain``. ``schema`` requests structured
         output and fills ``LLMResult.parsed``; ``schema_override`` sends that JSON
         schema as-is (non-strict) instead of the one generated from ``schema``.
-        ``timeout`` overrides the tier's per-attempt timeout. ``feature`` and
-        ``session_id`` tag the request for usage reporting.
+        ``tools`` (OpenAI function definitions) and ``tool_choice`` enable tool
+        calling; calls come back in ``LLMResult.tool_calls``. ``timeout``
+        overrides the tier's per-attempt timeout. ``feature`` and ``session_id``
+        tag the request for usage reporting.
         """
         if self._sync is None:
             self._sync = openai.OpenAI(
@@ -107,7 +113,7 @@ class OpenRouterClient:
                 http_client=self._http_client,
             )
         run = self._run(
-            messages, model, schema, schema_override, needs, reasoning, max_tokens,
+            messages, model, schema, schema_override, tools, tool_choice, needs, reasoning, max_tokens,
             temperature, timeout, feature, session_id, extra_body,
         )  # fmt: skip
         step = next(run)
@@ -135,6 +141,8 @@ class OpenRouterClient:
         model: str | Tier | None = None,
         schema: type[BaseModel] | None = None,
         schema_override: dict | None = None,
+        tools: list[dict] | None = None,
+        tool_choice: str | dict | None = None,
         needs: set[str] | frozenset[str] = frozenset(),
         reasoning: Any = _DEFAULT,
         max_tokens: int | None = None,
@@ -153,7 +161,7 @@ class OpenRouterClient:
                 http_client=self._async_http_client,
             )
         run = self._run(
-            messages, model, schema, schema_override, needs, reasoning, max_tokens,
+            messages, model, schema, schema_override, tools, tool_choice, needs, reasoning, max_tokens,
             temperature, timeout, feature, session_id, extra_body,
         )  # fmt: skip
         step = next(run)
@@ -180,6 +188,8 @@ class OpenRouterClient:
         model: str | Tier | None,
         schema: type[BaseModel] | None,
         schema_override: dict | None,
+        tools: list[dict] | None,
+        tool_choice: str | dict | None,
         needs: set[str] | frozenset[str],
         reasoning: Any,
         max_tokens: int | None,
@@ -209,13 +219,17 @@ class OpenRouterClient:
                     "schema": json_schema,
                 },
             }
+        if tools:
+            all_needs.add("tools")
         chain = resolve_chain(
             self.config,
             model,
             needs=frozenset(all_needs),
             est_tokens=est_tokens,
         )
-        body = self._body(feature, session_id, schema is not None, all_needs)
+        body = self._body(
+            feature, session_id, schema is not None or bool(tools), all_needs
+        )
         body.update(extra_body or {})
 
         started = time.monotonic()
@@ -233,6 +247,10 @@ class OpenRouterClient:
                 request["extra_body"]["reasoning"] = {"effort": effort, "exclude": True}
             if response_format is not None:
                 request["response_format"] = response_format
+            if tools:
+                request["tools"] = tools
+                if tool_choice is not None:
+                    request["tool_choice"] = tool_choice
             if max_tokens is not None:
                 request["max_tokens"] = max_tokens
             if temperature is not None:
@@ -292,7 +310,7 @@ class OpenRouterClient:
         self,
         feature: str | None,
         session_id: str | None,
-        structured: bool,
+        strict_routing: bool,
         needs: set[str],
     ) -> dict[str, Any]:
         cfg = self.config
@@ -312,8 +330,8 @@ class OpenRouterClient:
         }
         if trace:
             body["trace"] = trace
-        if structured:
-            # Don't route to an endpoint that would ignore the schema.
+        if strict_routing:
+            # Don't route to an endpoint that would ignore the schema or tools.
             body["provider"] = {"require_parameters": True}
         if "pdf" in needs:
             # Use the model's native PDF input, not OpenRouter's paid OCR fallback.
@@ -374,15 +392,52 @@ def _read(
                 model=entry.model,
             )
         parsed = parse_structured(text, schema, aliases, model_id=entry.model)
+    tool_calls = _tool_calls(choice.message, entry.model)
     return LLMResult(
         text=text,
         parsed=parsed,
+        tool_calls=tool_calls,
+        message=_assistant_message(choice.message, text, tool_calls),
         model_used=getattr(resp, "model", None) or entry.model,
         finish_reason=finish,
         generation_id=getattr(resp, "id", None),
         provider=getattr(resp, "provider", None),
         raw=resp,
     )
+
+
+def _tool_calls(message: Any, model: str) -> list[ToolCall]:
+    calls = []
+    for call in getattr(message, "tool_calls", None) or []:
+        try:
+            arguments = json.loads(call.function.arguments or "{}")
+        except json.JSONDecodeError as e:
+            raise LLMInvalidOutput(
+                f"{model} sent invalid JSON arguments for tool {call.function.name}",
+                model=model,
+            ) from e
+        calls.append(ToolCall(call.id, call.function.name, arguments))
+    return calls
+
+
+def _assistant_message(
+    message: Any, text: str, tool_calls: list[ToolCall]
+) -> dict[str, Any]:
+    out: dict[str, Any] = {"role": "assistant", "content": text or None}
+    if tool_calls:
+        out["tool_calls"] = [
+            {
+                "id": c.id,
+                "type": "function",
+                "function": {"name": c.name, "arguments": json.dumps(c.arguments)},
+            }
+            for c in tool_calls
+        ]
+    # Gemini and Claude need their reasoning sent back on the next tool turn.
+    reasoning_details = getattr(message, "reasoning_details", None)
+    if reasoning_details:
+        out["reasoning_details"] = reasoning_details
+    return out
 
 
 def _by_status(status: int | None, message: str, model: str) -> LLMError:

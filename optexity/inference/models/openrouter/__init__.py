@@ -25,13 +25,14 @@ from .core import (
     LLMUnavailable,
     ModelSpec,
     Tier,
+    ToolCall,
     Usage,
     normalize_model_id,
     resolve_chain,
 )
 from .messages import image_part, pdf_part, user_message
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
 __all__ = [
     "DEFAULT_TIERS",
@@ -54,6 +55,7 @@ __all__ = [
     "ModelSpec",
     "OpenRouterClient",
     "Tier",
+    "ToolCall",
     "Usage",
     "image_part",
     "pdf_part",

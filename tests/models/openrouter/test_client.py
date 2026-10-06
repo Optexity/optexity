@@ -229,3 +229,95 @@ def test_invalid_model_id_is_still_fatal():
     with pytest.raises(LLMBadRequest):
         make_client(fake).complete(MSG, model="gemini/x")
     assert len(fake.requests) == 1
+
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "read_doc_file",
+            "description": "Read a doc file",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": ["string", "null"]}},
+            },
+        },
+    }
+]
+
+
+def tool_call_reply(arguments='{"path": "a.md"}', model=LITE0, **message_extra):
+    return completion(
+        content="",
+        model=model,
+        finish_reason="tool_calls",
+        choices=[
+            {
+                "index": 0,
+                "finish_reason": "tool_calls",
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "read_doc_file",
+                                "arguments": arguments,
+                            },
+                        }
+                    ],
+                    **message_extra,
+                },
+            }
+        ],
+    )
+
+
+def test_tools_are_sent_with_strict_routing():
+    fake = FakeOpenRouter(completion())
+    make_client(fake).complete(MSG, tools=TOOLS, tool_choice="auto")
+    body = fake.requests[0]
+    assert body["tools"] == TOOLS and body["tool_choice"] == "auto"
+    assert body["provider"] == {"require_parameters": True}
+
+
+def test_tool_calls_are_parsed_and_message_is_ready_for_history():
+    fake = FakeOpenRouter(
+        tool_call_reply(
+            reasoning_details=[{"type": "reasoning.encrypted", "data": "x"}]
+        )
+    )
+    r = make_client(fake).complete(MSG, tools=TOOLS)
+    (call,) = r.tool_calls
+    assert (call.id, call.name, call.arguments) == (
+        "call_1",
+        "read_doc_file",
+        {"path": "a.md"},
+    )
+    assert r.finish_reason == "tool_calls"
+    assert r.message["role"] == "assistant"
+    assert r.message["tool_calls"][0]["function"]["name"] == "read_doc_file"
+    assert r.message["reasoning_details"] == [
+        {"type": "reasoning.encrypted", "data": "x"}
+    ]
+
+
+def test_invalid_tool_arguments_retry_then_next_model():
+    fake = FakeOpenRouter(
+        tool_call_reply("{not json"),
+        tool_call_reply("{not json"),
+        tool_call_reply("{not json"),
+        tool_call_reply(model=LITE1),
+    )
+    r = make_client(fake).complete(MSG, tools=TOOLS)
+    assert fake.models == [LITE0, LITE0, LITE0, LITE1]
+    assert r.tool_calls[0].arguments == {"path": "a.md"}
+
+
+def test_text_reply_has_no_tool_calls_and_plain_message():
+    fake = FakeOpenRouter(completion("done"))
+    r = make_client(fake).complete(MSG, tools=TOOLS)
+    assert r.tool_calls == []
+    assert r.message == {"role": "assistant", "content": "done"}

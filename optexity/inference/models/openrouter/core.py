@@ -101,6 +101,13 @@ class Attempt:
 
 
 @dataclass
+class ToolCall:
+    id: str
+    name: str
+    arguments: dict
+
+
+@dataclass
 class LLMResult:
     text: str
     model_used: str
@@ -114,6 +121,10 @@ class LLMResult:
     fallback_count: int = 0
     attempts: list[Attempt] = field(default_factory=list)
     latency_ms: int = 0
+    tool_calls: list[ToolCall] = field(default_factory=list)
+    # The assistant message as it should be appended to the conversation for the
+    # next turn (tool calls and reasoning details included).
+    message: dict | None = None
     raw: Any = None
 
 
@@ -129,6 +140,7 @@ class ModelSpec:
     vision: bool = True
     pdf: bool = True
     json_schema: bool = True
+    tools: bool = True
 
 
 MODEL_SPECS: dict[str, ModelSpec] = {
