@@ -34,7 +34,7 @@ from .core import (
 )
 from .messages import image_part, pdf_part, user_message
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 
 __all__ = [
     "DEFAULT_TIERS",

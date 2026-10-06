@@ -76,10 +76,10 @@ def test_out_of_credits_escapes_so_the_agent_stops(fake):
 
 def test_call_timeout_covers_every_retry_and_fallback(monkeypatch):
     monkeypatch.setattr(llm_model, "_config", None)
-    # lite: gemini 45s, haiku 120s (Anthropic minimum), gpt 45s; 2 attempts each
+    # lite: gemini 60s, haiku 120s (Anthropic minimum), gpt 60s; 2 attempts each
     # plus up to 10s backoff per model.
-    assert build_agent_llm().call_timeout == (45 * 2 + 10) + (120 * 2 + 10) + (
-        45 * 2 + 10
+    assert build_agent_llm().call_timeout == (60 * 2 + 10) + (120 * 2 + 10) + (
+        60 * 2 + 10
     )
     assert build_agent_llm(Tier.PRO).call_timeout == 3 * (300 * 2 + 10)
 

@@ -211,8 +211,8 @@ DEFAULT_REASONING: dict[Tier, str | None] = {
 
 # Per attempt, in seconds. A timeout is retried / falls back like any temporary error.
 DEFAULT_TIMEOUTS: dict[Tier, float] = {
-    Tier.LITE: 45.0,
-    Tier.STANDARD: 90.0,
+    Tier.LITE: 60.0,
+    Tier.STANDARD: 180.0,
     Tier.PRO: 300.0,
 }
 _UNTIERED_TIMEOUT = DEFAULT_TIMEOUTS[Tier.STANDARD]
