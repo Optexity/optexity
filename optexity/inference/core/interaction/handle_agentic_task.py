@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from browser_use import Agent, BrowserSession, Tools
 
@@ -21,6 +22,25 @@ async def handle_agentic_task(
     memory: Memory,
     browser: Browser,
 ):
+    """Returns ``(history, interacted_nodes)``. ``interacted_nodes`` maps
+    ``(step_number, action_index) -> EnhancedDOMTreeNode`` for every action the
+    agent took that resolved to a live selector-map entry, captured *live* via
+    ``register_new_step_callback`` — i.e. from the same pre-action
+    ``browser_state_summary`` that decided each action, before browser_use
+    collapses it into the lossy ``DOMInteractedElement`` (which drops
+    ``parent_node`, making frame-chain reconstruction impossible from
+    ``history`` alone). Callers that don't need locator evidence (the
+    ``CloseOverlayPopupAction`` call sites) can simply discard the second
+    value.
+    """
+    interacted_nodes: dict[tuple[int, int], Any] = {}
+
+    def _capture_interacted_nodes(browser_state_summary, model_output, step_number):
+        selector_map = browser_state_summary.dom_state.selector_map
+        for action_index, action in enumerate(model_output.action):
+            index = action.get_index()
+            if index is not None and index in selector_map:
+                interacted_nodes[(step_number, action_index)] = selector_map[index]
 
     if agentic_task_action.backend == "browser_use":
 
@@ -65,6 +85,7 @@ async def handle_agentic_task(
             tools=tools,
             calculate_cost=True,
             save_conversation_path=step_directory,
+            register_new_step_callback=_capture_interacted_nodes,
         )
         logger.debug(f"Starting browser session for agentic task {browser.cdp_url} ")
         await agent.browser_session.start()
@@ -77,9 +98,9 @@ async def handle_agentic_task(
             await agent.browser_session.stop()
             await agent.browser_session.reset()
 
-        return history
+        return history, interacted_nodes
 
     elif agentic_task_action.backend == "browserbase":
         raise NotImplementedError("Browserbase is not supported yet")
 
-    return None
+    return None, interacted_nodes
