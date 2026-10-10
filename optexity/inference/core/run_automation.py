@@ -418,6 +418,32 @@ async def run_final_logging(
         logger.error(f"Error running final logging: {e}")
 
 
+def _start_repair_watcher(action_node: ActionNode, browser: Browser):
+    """Start the self-healing watcher for one step, if it applies.
+
+    Returns `(watcher, old_command)`, or `(None, None)` when self-healing is off,
+    we are not using a local workflow file, or the step has no command to repair.
+    Never raises: self-healing must not be able to break a normal run.
+    """
+    try:
+        if not (settings.WRITE_BACK and settings.DEPLOYMENT == "dev"):
+            return None, None
+        if not os.path.isfile(settings.TEST_AUTOMATION_FILE):
+            return None, None
+
+        from optexity.memory.writeback import RepairWatcher, command_of_action_node
+
+        old_command = command_of_action_node(action_node)
+        if old_command is None:
+            return None, None
+        watcher = RepairWatcher(browser)
+        watcher.start()
+        return watcher, old_command
+    except Exception as e:
+        logger.debug(f"Self-healing watcher not started: {type(e).__name__}: {e}")
+        return None, None
+
+
 async def run_action_node(
     action_node: ActionNode,
     task: Task,
@@ -452,6 +478,10 @@ async def run_action_node(
 
     logger.debug(f"-----Running node new {memory.automation_state.step_index}-----")
 
+    # Self-healing (off by default): watch this step so that, if its command breaks
+    # and the LLM fallback fixes it, the repaired command is saved to the local file.
+    repair_watcher, old_command = _start_repair_watcher(action_node, browser)
+
     try:
         if action_node.interaction_action:
             ## Assuming network calls are only made during interaction actions and not during extraction actions
@@ -460,6 +490,12 @@ async def run_action_node(
             await run_interaction_action(
                 action_node.interaction_action, task, memory, browser, 2
             )
+            if repair_watcher is not None:
+                repair_watcher.finish(
+                    settings.TEST_AUTOMATION_FILE,
+                    memory.automation_state.step_index,
+                    old_command,
+                )
         elif action_node.extraction_action:
             await run_extraction_action(
                 action_node.extraction_action, memory, browser, task
@@ -501,6 +537,8 @@ async def run_action_node(
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
         raise e
     finally:
+        if repair_watcher is not None:
+            repair_watcher.stop()
         await save_latest_memory_state_locally(task, memory, action_node)
         if memory.automation_state.step_index % 5 == 0:
             await save_trajectory_in_server(task)

@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "goal": "fill the full name as myname, address line one as xyz and line 2 as abc, city as SF",
+  "start_url": "https://www.roboform.com/filling-test-all-fields",
+  "notes": [
+    {
+      "step": 1,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "scroll",
+      "params": {
+        "down": true
+      },
+      "next_goal": "Scroll down to find the form fields",
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "url_after": "https://www.roboform.com/filling-test-all-fields",
+      "success": true
+    },
+    {
+      "step": 2,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "input",
+      "params": {
+        "index": 8,
+        "text": "myname"
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "name": "01___title"
+        },
+        "role": "textbox",
+        "name": "Title"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"input[name='01___title']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill full name with myname",
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "success": true
+    },
+    {
+      "step": 3,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "input",
+      "params": {
+        "index": 9,
+        "text": "myname"
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "name": "02frstname"
+        },
+        "role": "textbox",
+        "name": "Full Name"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"input[name='02frstname']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill full name with myname in the Full Name box",
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "success": true,
+      "evaluation": "Typed into the Title box instead of Full Name. Verdict: Failure"
+    },
+    {
+      "step": 4,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "input",
+      "params": {
+        "index": 12,
+        "text": "xyz"
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "name": "10address1",
+          "placeholder": "Address 1"
+        },
+        "role": "textbox",
+        "name": "Address 1"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"input[name='10address1']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_placeholder(\"Address 1\")",
+          "kind": "placeholder",
+          "score": 64,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill address line 1 with xyz",
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "success": true
+    },
+    {
+      "step": 5,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 99
+      },
+      "element": {
+        "tag": "div",
+        "attributes": {},
+        "role": "generic",
+        "name": ""
+      },
+      "locators": [],
+      "next_goal": "Click Address 2 box",
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "success": false,
+      "error": "Element index 99 not available"
+    },
+    {
+      "step": 6,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "input",
+      "params": {
+        "index": 13,
+        "text": "abc"
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "name": "11address2"
+        },
+        "role": "textbox",
+        "name": "Address 2"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"input[name='11address2']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill address line 2 with abc",
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "success": true
+    },
+    {
+      "step": 7,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "input",
+      "params": {
+        "index": 15,
+        "text": "SF"
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "name": "13city"
+        },
+        "role": "textbox",
+        "name": "City"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"input[name='13city']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill city with SF",
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "success": true
+    },
+    {
+      "step": 8,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "done",
+      "params": {
+        "text": "Form filled",
+        "success": true
+      },
+      "next_goal": "Finish",
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "success": true
+    }
+  ]
+}

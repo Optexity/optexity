@@ -524,6 +524,62 @@ async def run_marketplace_function(
         logger.error(f"Failed to report task {task.task_id} completion: {fail_err}")
 
 
+def _apply_local_test_automation(task: Task) -> None:
+    """Swap the workflow the cloud sent for a local JSON file (dev testing only).
+
+    What it does:
+        If we run in "dev" mode and a local file (default `test_automation.json`,
+        or whatever OPTEXITY_TEST_AUTOMATION points at) exists, read it and put it
+        on the task as its workflow.
+
+    Why it exists:
+        The real workflows live in Optexity's database and we cannot edit them
+        here. With this, we can write any workflow in a local file, call any
+        endpoint name, and the local file is what actually runs.
+
+    Inputs:
+        A task is only valid if its inputs have exactly the same names as the
+        workflow's inputs. The cloud workflow and the local file may name them
+        differently, so after the swap we rebuild the task's inputs from the
+        local file: a value sent in the request wins if the name matches,
+        otherwise the local file's own default value is used.
+
+    Safety:
+        - Does nothing in "prod".
+        - Does nothing if the file does not exist.
+        - If the file is not valid workflow JSON we log the problem and keep the
+          original workflow instead of crashing the worker.
+    """
+    if settings.DEPLOYMENT != "dev":
+        return
+
+    path = pathlib.Path(settings.TEST_AUTOMATION_FILE)
+    if not path.is_file():
+        return
+
+    # Local import: keeps the schema import out of module start-up.
+    from optexity.schema.automation import Automation
+
+    try:
+        with open(path, "r") as f:
+            task.automation = Automation.model_validate(json.load(f))
+        local_params = task.automation.parameters
+        task.input_parameters = {
+            name: task.input_parameters.get(name, default)
+            for name, default in local_params.input_parameters.items()
+        }
+        task.secure_parameters = {
+            name: task.secure_parameters.get(name, default)
+            for name, default in local_params.secure_parameters.items()
+        }
+        logger.info(f"Using local test automation '{path}' for task {task.task_id}")
+    except Exception as e:
+        logger.error(
+            f"Could not load local test automation '{path}': {e}. "
+            f"Keeping the workflow from the server."
+        )
+
+
 async def task_processor():
     """Background worker that processes tasks from the queue one at a time."""
     global task_running, last_task_start_time, current_task_timeout_minutes
@@ -584,6 +640,8 @@ async def task_processor():
                 # opcloud fetches the fresh automation (and callback_url) from
                 # the DB right before allocating a recording task, so it must
                 # already be on the task.
+                # Dev-only: let a local JSON file replace that workflow.
+                _apply_local_test_automation(task)
                 fetch_success = task.automation is not None
                 if not fetch_success:
                     automation_error = "Task allocated without an automation"

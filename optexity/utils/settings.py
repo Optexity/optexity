@@ -63,6 +63,37 @@ class Settings(LLMSettings):
     UPLOAD_READ_TIMEOUT_SECONDS: float = 600.0
     UPLOAD_POOL_TIMEOUT_SECONDS: float = 30.0
 
+    # ---- Memory layer (agentic-task caching) -------------------------------
+    # Local workflow file that replaces the workflow the cloud sends back.
+    # Only used when DEPLOYMENT == "dev" and the file exists. Lets us test any
+    # workflow JSON through any endpoint name. Env var: OPTEXITY_TEST_AUTOMATION.
+    TEST_AUTOMATION_FILE: str = Field(
+        default="test_automation.json",
+        validation_alias=AliasChoices("OPTEXITY_TEST_AUTOMATION", "TEST_AUTOMATION_FILE"),
+    )
+    # Switch for recording what browser-use does during an `agentic_task`.
+    # Off by default so normal runs behave exactly as before.
+    # Env var: OPTEXITY_RECORD_ACTIONS=1
+    RECORD_ACTIONS: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("OPTEXITY_RECORD_ACTIONS", "RECORD_ACTIONS"),
+    )
+    # Folder where the recorded notes and the compiled workflow are written.
+    # Env var: OPTEXITY_CACHE_DIR
+    MEMORY_CACHE_DIR: str = Field(
+        default="cache",
+        validation_alias=AliasChoices("OPTEXITY_CACHE_DIR", "MEMORY_CACHE_DIR"),
+    )
+
+    # Self-healing: when a cached step's command breaks and the LLM fallback
+    # fixes it, save the repaired command back into the local workflow file.
+    # Only works in dev mode with a local test automation file.
+    # Env var: OPTEXITY_WRITE_BACK
+    WRITE_BACK: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("OPTEXITY_WRITE_BACK", "WRITE_BACK"),
+    )
+
     @model_validator(mode="after")
     def validate_local_callback_url(self):
         if self.DEPLOYMENT == "prod" and self.LOCAL_CALLBACK_URL is not None:

@@ -1,0 +1,19 @@
+{
+  "url": "https://stockanalysis.com",
+  "parameters": {
+    "input_parameters": {},
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "Type AAPL into the site search box, click the Apple Inc. result so the AAPL stock page opens, then click the 'Financials' tab. Stop when the Financials page is shown.",
+          "max_steps": 12,
+          "backend": "browser_use"
+        }
+      }
+    }
+  ]
+}

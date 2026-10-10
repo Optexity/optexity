@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "goal": "fill the full name as myname, address line one as xyz and line 2 as abc, city as SF",
+  "start_url": "https://www.roboform.com/filling-test-all-fields",
+  "created_at": "2026-10-10T05:30:33.312267Z",
+  "notes": [
+    {
+      "step": 1,
+      "position": 0,
+      "actions_in_step": 4,
+      "action": "input",
+      "params": {
+        "index": 78,
+        "text": "myname",
+        "clear": true
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "type": "text",
+          "size": "20",
+          "name": "04fullname",
+          "value": "",
+          "style": ""
+        },
+        "role": "textbox",
+        "name": null,
+        "text": null,
+        "xpath": "html/body/div[2]/form/div/div[1]/div[5]/div[2]/input"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[5]/div[2]/input\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill the requested form fields and complete the task.",
+      "evaluation": null,
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "url_after": "https://www.roboform.com/filling-test-all-fields",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 1,
+      "position": 1,
+      "actions_in_step": 4,
+      "action": "input",
+      "params": {
+        "index": 81,
+        "text": "xyz",
+        "clear": true
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "type": "text",
+          "size": "20",
+          "name": "10address1",
+          "value": "",
+          "style": ""
+        },
+        "role": "textbox",
+        "name": null,
+        "text": null,
+        "xpath": "html/body/div[2]/form/div/div[1]/div[8]/div[2]/input"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[8]/div[2]/input\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill the requested form fields and complete the task.",
+      "evaluation": null,
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "url_after": "https://www.roboform.com/filling-test-all-fields",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 1,
+      "position": 2,
+      "actions_in_step": 4,
+      "action": "input",
+      "params": {
+        "index": 82,
+        "text": "abc",
+        "clear": true
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "type": "text",
+          "size": "20",
+          "name": "11address2",
+          "value": "",
+          "style": ""
+        },
+        "role": "textbox",
+        "name": null,
+        "text": null,
+        "xpath": "html/body/div[2]/form/div/div[1]/div[9]/div[2]/input"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[9]/div[2]/input\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill the requested form fields and complete the task.",
+      "evaluation": null,
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "url_after": "https://www.roboform.com/filling-test-all-fields",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 1,
+      "position": 3,
+      "actions_in_step": 4,
+      "action": "input",
+      "params": {
+        "index": 83,
+        "text": "SF",
+        "clear": true
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "type": "text",
+          "size": "20",
+          "name": "13adr_city",
+          "value": "",
+          "style": ""
+        },
+        "role": "textbox",
+        "name": null,
+        "text": null,
+        "xpath": "html/body/div[2]/form/div/div[1]/div[10]/div[2]/input"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"xpath=html/body/div[2]/form/div/div[1]/div[10]/div[2]/input\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill the requested form fields and complete the task.",
+      "evaluation": null,
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "url_after": "https://www.roboform.com/filling-test-all-fields",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 2,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "done",
+      "params": {
+        "text": "Successfully filled out the form fields: Full Name ('myname'), Address Line 1 ('xyz'), Address Line 2 ('abc'), and City ('SF').",
+        "success": true,
+        "files_to_display": []
+      },
+      "element": null,
+      "locators": [],
+      "next_goal": "Complete the task.",
+      "evaluation": "Successfully filled all requested form fields.",
+      "url_before": "https://www.roboform.com/filling-test-all-fields",
+      "url_after": "https://www.roboform.com/filling-test-all-fields",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "url": "https://stockanalysis.com/",
+  "automation_description": "Compiled from agentic task: Type AAPL into the site search box, click the Apple Inc. result so the AAPL stock page opens, then click the 'Financials' tab. Stop when the Financials page is shown.",
+  "parameters": {
+    "input_parameters": {},
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "input_text": {
+          "command": "locator(\"#search-header\")",
+          "prompt_instructions": "Type AAPL into the site search box (element 36).",
+          "input_text": "AAPL"
+        }
+      },
+      "end_sleep_time": 0.2
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "locator(\"a.sres.flex.active-search-result\", has_text=\"AAPL Apple Inc. Stock\")",
+          "prompt_instructions": "Click the Apple Inc. search result (index 2494) to open the AAPL stock page."
+        }
+      },
+      "end_sleep_time": 1.0
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "Click the Apple Inc. search result (index 2494) to open the AAPL stock page.",
+          "max_steps": 5,
+          "backend": "browser_use"
+        }
+      }
+    },
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "click_element": {
+          "command": "get_by_role(\"link\", name=\"Financials\")",
+          "prompt_instructions": "Click the 'Financials' tab (index 5440) to view AAPL financials."
+        }
+      },
+      "end_sleep_time": 1.0
+    }
+  ]
+}

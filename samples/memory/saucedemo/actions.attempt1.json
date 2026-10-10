@@ -1,0 +1,2172 @@
+{
+  "version": 1,
+  "goal": "Log in with username standard_user and password secret_sauce. Add the item 'Sauce Labs Backpack' to the cart, open the cart, click Checkout, fill first name John, last name Doe and postal code 12345, click Continue, then click Finish. Stop when the 'Thank you for your order' message is shown.",
+  "start_url": "https://www.saucedemo.com/",
+  "created_at": "2026-10-10T05:33:04.449538Z",
+  "notes": [
+    {
+      "step": 1,
+      "position": 0,
+      "actions_in_step": 3,
+      "action": "input",
+      "params": {
+        "index": 20,
+        "text": "standard_user",
+        "clear": true
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "Username",
+          "aria-label": "Username",
+          "data-test": "username",
+          "id": "user-name",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "text",
+          "value": "",
+          "name": "user-name",
+          "style": ""
+        },
+        "role": "textbox",
+        "name": "Username",
+        "text": "Username",
+        "xpath": "html/body/div/div/div[2]/div[1]/div/div/form/div[1]/input"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"input[data-test='username']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#user-name\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"input[name='user-name']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Username\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"textbox\", name=\"Username\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_placeholder(\"Username\")",
+          "kind": "placeholder",
+          "score": 64,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"input.input_error.form_input\", has_text=\"Username\")",
+          "kind": "css+text",
+          "score": 62,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"textbox\", name=\"Username\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div/div/div[2]/div[1]/div/div/form/div[1]/input\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill username, password, and click login.",
+      "evaluation": "Agent initialized and ready at the login page. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/",
+      "url_after": "https://www.saucedemo.com/",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 1,
+      "position": 1,
+      "actions_in_step": 3,
+      "action": "input",
+      "params": {
+        "index": 21,
+        "text": "",
+        "clear": true
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "class": "input_error form_input",
+          "placeholder": "Password",
+          "aria-label": "Password",
+          "data-test": "password",
+          "id": "password",
+          "autocorrect": "off",
+          "autocapitalize": "none",
+          "type": "password",
+          "value": "",
+          "name": "password",
+          "style": ""
+        },
+        "role": "textbox",
+        "name": "Password",
+        "text": "Password",
+        "xpath": "html/body/div/div/div[2]/div[1]/div/div/form/div[2]/input"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"input[data-test='password']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#password\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"input[name='password']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Password\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"textbox\", name=\"Password\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_placeholder(\"Password\")",
+          "kind": "placeholder",
+          "score": 64,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"input.input_error.form_input\", has_text=\"Password\")",
+          "kind": "css+text",
+          "score": 62,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"textbox\", name=\"Password\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div/div/div[2]/div[1]/div/div/form/div[2]/input\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill username, password, and click login.",
+      "evaluation": "Agent initialized and ready at the login page. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/",
+      "url_after": "https://www.saucedemo.com/",
+      "success": true,
+      "error": null,
+      "sensitive": true
+    },
+    {
+      "step": 1,
+      "position": 2,
+      "actions_in_step": 3,
+      "action": "click",
+      "params": {
+        "index": 22
+      },
+      "element": {
+        "tag": "input",
+        "attributes": {
+          "class": "submit-button btn_action",
+          "data-test": "login-button",
+          "id": "login-button",
+          "type": "submit",
+          "value": "Login",
+          "name": "login-button",
+          "style": ""
+        },
+        "role": "button",
+        "name": "Login",
+        "text": "Login",
+        "xpath": "html/body/div/div/div[2]/div[1]/div/div/form/input"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"input[data-test='login-button']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#login-button\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"input[name='login-button']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Login\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"input.submit-button.btn_action\", has_text=\"Login\")",
+          "kind": "css+text",
+          "score": 62,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Login\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div/div/div[2]/div[1]/div/div/form/input\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Fill username, password, and click login.",
+      "evaluation": "Agent initialized and ready at the login page. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 2,
+      "position": 0,
+      "actions_in_step": 2,
+      "action": "click",
+      "params": {
+        "index": 172
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "role": "button",
+        "name": "Add to cart",
+        "text": "Add to cart",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#add-to-cart-sauce-labs-backpack\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"button.btn.btn_primary.btn_small\", has_text=\"Add to cart\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Add Sauce Labs Backpack to the cart and open the cart.",
+      "evaluation": "Successfully logged in and reached the inventory page. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 2,
+      "position": 1,
+      "actions_in_step": 2,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, empty"
+        },
+        "role": "button",
+        "name": "Cart, empty",
+        "text": "Cart, empty",
+        "xpath": "html/body/div[1]/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, empty\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, empty\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Add Sauce Labs Backpack to the cart and open the cart.",
+      "evaluation": "Successfully logged in and reached the inventory page. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 3,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, empty"
+        },
+        "role": "button",
+        "name": "Cart, empty",
+        "text": "Cart, empty",
+        "xpath": "html/body/div[1]/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, empty\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, empty\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the shopping cart link to open the cart.",
+      "evaluation": "Added the item to cart, but need to ensure cart is open. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 4,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, empty"
+        },
+        "role": "button",
+        "name": "Cart, empty",
+        "text": "Cart, empty",
+        "xpath": "html/body/div[1]/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, empty\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, empty\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the shopping cart link to open the cart page.",
+      "evaluation": "Tried to open the cart, but we are still on the inventory page. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 5,
+      "position": 0,
+      "actions_in_step": 2,
+      "action": "click",
+      "params": {
+        "index": 172
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "role": "button",
+        "name": "Add to cart",
+        "text": "Add to cart",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#add-to-cart-sauce-labs-backpack\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"button.btn.btn_primary.btn_small\", has_text=\"Add to cart\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click 'Add to cart' for Sauce Labs Backpack and then open the cart.",
+      "evaluation": "Failed to open the cart page because the cart was empty or the click didn't register. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 5,
+      "position": 1,
+      "actions_in_step": 2,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, empty"
+        },
+        "role": "button",
+        "name": "Cart, empty",
+        "text": "Cart, empty",
+        "xpath": "html/body/div[1]/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, empty\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, empty\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click 'Add to cart' for Sauce Labs Backpack and then open the cart.",
+      "evaluation": "Failed to open the cart page because the cart was empty or the click didn't register. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 6,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 172
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "role": "button",
+        "name": "Add to cart",
+        "text": "Add to cart",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#add-to-cart-sauce-labs-backpack\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"button.btn.btn_primary.btn_small\", has_text=\"Add to cart\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click 'Add to cart' for Sauce Labs Backpack ([172]).",
+      "evaluation": "Failed to add item to cart properly or open cart in previous step. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 7,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, empty"
+        },
+        "role": "button",
+        "name": "Cart, empty",
+        "text": "Cart, empty",
+        "xpath": "html/body/div[1]/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, empty\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, empty\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the shopping cart link to open the cart page.",
+      "evaluation": "Successfully clicked 'Add to cart' for Sauce Labs Backpack. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 8,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "navigate",
+      "params": {
+        "url": "https://www.saucedemo.com/cart.html",
+        "new_tab": false
+      },
+      "element": null,
+      "locators": [],
+      "next_goal": "Navigate to the cart page using its URL.",
+      "evaluation": "Successfully clicked 'Add to cart' for Sauce Labs Backpack. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 9,
+      "position": 0,
+      "actions_in_step": 2,
+      "action": "click",
+      "params": {
+        "index": 172
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "role": "button",
+        "name": "Add to cart",
+        "text": "Add to cart",
+        "xpath": "html/body/div/div/div/div/div/div/div/div[1]/div[2]/div[2]/button"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#add-to-cart-sauce-labs-backpack\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"button.btn.btn_primary.btn_small\", has_text=\"Add to cart\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div/div/div/div/div/div/div/div[1]/div[2]/div[2]/button\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click 'Add to cart' for Sauce Labs Backpack [172] and then click the cart icon [137].",
+      "evaluation": "Navigating to cart URL redirected or didn't persist, we are on inventory page. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 9,
+      "position": 1,
+      "actions_in_step": 2,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, empty"
+        },
+        "role": "button",
+        "name": "Cart, empty",
+        "text": "Cart, empty",
+        "xpath": "html/body/div/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, empty\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, empty\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click 'Add to cart' for Sauce Labs Backpack [172] and then click the cart icon [137].",
+      "evaluation": "Navigating to cart URL redirected or didn't persist, we are on inventory page. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 10,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, empty"
+        },
+        "role": "button",
+        "name": "Cart, empty",
+        "text": "Cart, empty",
+        "xpath": "html/body/div[1]/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, empty\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, empty\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the shopping cart link [137] to open the cart page.",
+      "evaluation": "Clicked 'Add to cart' for Sauce Labs Backpack, but the cart link still showed empty or we didn't successfully navigate. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 11,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 172
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "role": "button",
+        "name": "Add to cart",
+        "text": "Add to cart",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#add-to-cart-sauce-labs-backpack\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"button.btn.btn_primary.btn_small\", has_text=\"Add to cart\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click 'Add to cart' for Sauce Labs Backpack (index 172).",
+      "evaluation": "Failed to open the cart because the cart was empty. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 12,
+      "position": 0,
+      "actions_in_step": 2,
+      "action": "click",
+      "params": {
+        "index": 172
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "role": "button",
+        "name": "Add to cart",
+        "text": "Add to cart",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#add-to-cart-sauce-labs-backpack\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"button.btn.btn_primary.btn_small\", has_text=\"Add to cart\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the cart icon to open the cart page.",
+      "evaluation": "Clicked 'Add to cart' for Sauce Labs Backpack. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 12,
+      "position": 1,
+      "actions_in_step": 2,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, empty"
+        },
+        "role": "button",
+        "name": "Cart, empty",
+        "text": "Cart, empty",
+        "xpath": "html/body/div[1]/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, empty\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, empty\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the cart icon to open the cart page.",
+      "evaluation": "Clicked 'Add to cart' for Sauce Labs Backpack. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 13,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 172
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "role": "button",
+        "name": "Add to cart",
+        "text": "Add to cart",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#add-to-cart-sauce-labs-backpack\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"button.btn.btn_primary.btn_small\", has_text=\"Add to cart\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click 'Add to cart' for Sauce Labs Backpack (index 172) and verify it registers.",
+      "evaluation": "Attempted to add to cart and open cart, but the cart remained empty and the item was not added. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 14,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 172
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "role": "button",
+        "name": "Add to cart",
+        "text": "Add to cart",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#add-to-cart-sauce-labs-backpack\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"button.btn.btn_primary.btn_small\", has_text=\"Add to cart\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click 'Add to cart' for Sauce Labs Backpack (index 172).",
+      "evaluation": "Clicked 'Add to cart' for Sauce Labs Backpack, but need to ensure it registers and stays in the cart. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 15,
+      "position": 0,
+      "actions_in_step": 2,
+      "action": "click",
+      "params": {
+        "index": 172
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_primary btn_small btn_inventory ",
+          "data-test": "add-to-cart-sauce-labs-backpack",
+          "id": "add-to-cart-sauce-labs-backpack",
+          "name": "add-to-cart-sauce-labs-backpack"
+        },
+        "role": "button",
+        "name": "Add to cart",
+        "text": "Add to cart",
+        "xpath": "html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#add-to-cart-sauce-labs-backpack\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='add-to-cart-sauce-labs-backpack']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"button.btn.btn_primary.btn_small\", has_text=\"Add to cart\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Add to cart\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 6,
+          "unique": false
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/div/div/div/div/div[1]/div[2]/div[2]/button\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click 'Add to cart' and open the cart.",
+      "evaluation": "Clicked 'Add to cart' for Sauce Labs Backpack. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 15,
+      "position": 1,
+      "actions_in_step": 2,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, empty"
+        },
+        "role": "button",
+        "name": "Cart, empty",
+        "text": "Cart, empty",
+        "xpath": "html/body/div[1]/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, empty\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, empty\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, empty\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click 'Add to cart' and open the cart.",
+      "evaluation": "Clicked 'Add to cart' for Sauce Labs Backpack. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 16,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "evaluate",
+      "params": {
+        "code": "(function(){ try { document.querySelector('#add-to-cart-sauce-labs-backpack').click(); return 'Success: clicked add to cart'; } catch(e){ return 'Error: ' + e.message; } })()"
+      },
+      "element": null,
+      "locators": [],
+      "next_goal": "Click the 'Add to cart' button for Sauce Labs Backpack using JavaScript evaluation.",
+      "evaluation": "Clicked 'Add to cart' for Sauce Labs Backpack, but the cart remained empty. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 17,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, 1 items"
+        },
+        "role": "button",
+        "name": "Cart, 1 items",
+        "text": "Cart, 1 items",
+        "xpath": "html/body/div/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, 1 items\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, 1 items\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, 1 items\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, 1 items\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the shopping cart link [137] to open the cart page.",
+      "evaluation": "Successfully added Sauce Labs Backpack to the cart using evaluate. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 18,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "navigate",
+      "params": {
+        "url": "https://www.saucedemo.com/cart.html",
+        "new_tab": false
+      },
+      "element": null,
+      "locators": [],
+      "next_goal": "Navigate to the cart page.",
+      "evaluation": "Successfully added Sauce Labs Backpack to the cart and confirmed the cart has 1 item. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 19,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 137
+      },
+      "element": {
+        "tag": "a",
+        "attributes": {
+          "class": "shopping_cart_link",
+          "data-test": "shopping-cart-link",
+          "role": "button",
+          "aria-label": "Cart, 1 items"
+        },
+        "role": "button",
+        "name": "Cart, 1 items",
+        "text": "Cart, 1 items",
+        "xpath": "html/body/div/div/div/header/div[1]/div[3]/a"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"a[data-test='shopping-cart-link']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_label(\"Cart, 1 items\")",
+          "kind": "aria-label",
+          "score": 76,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, 1 items\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"a.shopping_cart_link\", has_text=\"Cart, 1 items\")",
+          "kind": "css+text",
+          "score": 59,
+          "match_count": 0,
+          "unique": false
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Cart, 1 items\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div/div/div/header/div[1]/div[3]/a\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the shopping cart link [137] to open the cart page.",
+      "evaluation": "Navigating to cart URL kept us on the inventory page. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/inventory.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 20,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "evaluate",
+      "params": {
+        "code": "(function(){try{const el = document.querySelector('#shopping_cart_container a, .shopping_cart_link'); if(el){el.click(); return 'clicked cart';} return 'cart link not found';}catch(e){return 'Error: '+e.message}})()"
+      },
+      "element": null,
+      "locators": [],
+      "next_goal": "Click the shopping_cart_container or shopping cart link via JavaScript evaluate to open the cart.",
+      "evaluation": "Clicked the shopping cart link, but it didn't open the cart page. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/inventory.html",
+      "url_after": "https://www.saucedemo.com/cart.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 21,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 473
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_action btn_medium checkout_button ",
+          "data-test": "checkout",
+          "id": "checkout",
+          "name": "checkout"
+        },
+        "role": "button",
+        "name": "Checkout",
+        "text": "Checkout",
+        "xpath": "html/body/div/div/div/div/div/div[2]/button[2]"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='checkout']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#checkout\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='checkout']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Checkout\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button.btn.btn_action.btn_medium\", has_text=\"Checkout\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Checkout\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div/div/div/div/div/div[2]/button[2]\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the Checkout button.",
+      "evaluation": "Successfully opened the cart page. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/cart.html",
+      "url_after": "https://www.saucedemo.com/cart.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 22,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 473
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_action btn_medium checkout_button ",
+          "data-test": "checkout",
+          "id": "checkout",
+          "name": "checkout"
+        },
+        "role": "button",
+        "name": "Checkout",
+        "text": "Checkout",
+        "xpath": "html/body/div[1]/div/div/div/div/div[2]/button[2]"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='checkout']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#checkout\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='checkout']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Checkout\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button.btn.btn_action.btn_medium\", has_text=\"Checkout\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Checkout\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/div/div/div[2]/button[2]\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the Checkout button [473].",
+      "evaluation": "Successfully opened the cart page and now ready to click Checkout. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/cart.html",
+      "url_after": "https://www.saucedemo.com/cart.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 23,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "click",
+      "params": {
+        "index": 473
+      },
+      "element": {
+        "tag": "button",
+        "attributes": {
+          "class": "btn btn_action btn_medium checkout_button ",
+          "data-test": "checkout",
+          "id": "checkout",
+          "name": "checkout"
+        },
+        "role": "button",
+        "name": "Checkout",
+        "text": "Checkout",
+        "xpath": "html/body/div[1]/div/div/div/div/div[2]/button[2]"
+      },
+      "locators": [
+        {
+          "locator": "locator(\"button[data-test='checkout']\")",
+          "kind": "test-id",
+          "score": 98,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"#checkout\")",
+          "kind": "id",
+          "score": 92,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button[name='checkout']\")",
+          "kind": "name",
+          "score": 84,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Checkout\")",
+          "kind": "role+name",
+          "score": 72,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"button.btn.btn_action.btn_medium\", has_text=\"Checkout\")",
+          "kind": "css+text",
+          "score": 65,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "get_by_role(\"button\", name=\"Checkout\")",
+          "kind": "role+text",
+          "score": 40,
+          "match_count": 1,
+          "unique": true
+        },
+        {
+          "locator": "locator(\"xpath=html/body/div[1]/div/div/div/div/div[2]/button[2]\")",
+          "kind": "xpath",
+          "score": 10,
+          "match_count": 1,
+          "unique": true
+        }
+      ],
+      "next_goal": "Click the Checkout button [473].",
+      "evaluation": "Clicked Checkout, but the page didn't transition. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/cart.html",
+      "url_after": "https://www.saucedemo.com/cart.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 24,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "evaluate",
+      "params": {
+        "code": "(function(){try{document.querySelector('#checkout').click();return 'clicked checkout'}catch(e){return 'error: '+e.message}})()"
+      },
+      "element": null,
+      "locators": [],
+      "next_goal": "Click the Checkout button using JavaScript evaluate.",
+      "evaluation": "Clicked Checkout, but the page didn't transition. Verdict: Failure",
+      "url_before": "https://www.saucedemo.com/cart.html",
+      "url_after": "https://www.saucedemo.com/checkout-step-one.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    },
+    {
+      "step": 25,
+      "position": 0,
+      "actions_in_step": 1,
+      "action": "done",
+      "params": {
+        "text": "Reached the checkout information page (checkout-step-one.html) after successfully logging in, adding 'Sauce Labs Backpack' to the cart, opening the cart, and clicking checkout. Reached the maximum step limit before filling in the customer details and finishing the order.",
+        "success": false,
+        "files_to_display": null
+      },
+      "element": null,
+      "locators": [],
+      "next_goal": "Finish the task and return status.",
+      "evaluation": "Reached checkout-step-one.html successfully. Verdict: Success",
+      "url_before": "https://www.saucedemo.com/checkout-step-one.html",
+      "url_after": "https://www.saucedemo.com/checkout-step-one.html",
+      "success": true,
+      "error": null,
+      "sensitive": false
+    }
+  ]
+}

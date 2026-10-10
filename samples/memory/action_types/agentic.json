@@ -1,0 +1,19 @@
+{
+  "url": "https://the-internet.herokuapp.com/dropdown",
+  "parameters": {
+    "input_parameters": {},
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "On this page choose 'Option 2' in the dropdown. Then go to https://the-internet.herokuapp.com/checkboxes and make sure checkbox 1 is checked and checkbox 2 is unchecked. Then go to https://the-internet.herokuapp.com/download and click the first download link. Stop after clicking it.",
+          "max_steps": 20,
+          "backend": "browser_use"
+        }
+      }
+    }
+  ]
+}
