@@ -1,4 +1,5 @@
 import logging
+import os
 
 from browser_use import Agent, BrowserSession, Tools
 
@@ -71,6 +72,14 @@ async def handle_agentic_task(
         logger.debug(f"Finally running agentic task on browser_use {browser.cdp_url} ")
         history = await agent.run(max_steps=agentic_task_action.max_steps)
         logger.debug(f"Agentic task completed on browser_use {browser.cdp_url} ")
+
+        if os.environ.get("OPTEXITY_CACHE_EXPORT") == "1":
+            from browser_use.cache.action_export import export_agent_history
+
+            try:
+                export_agent_history(history)
+            except Exception as export_err:
+                logger.error(f"Failed to export agent history for caching: {export_err}")
 
         agent.stop()
         if agent.browser_session:
