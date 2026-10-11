@@ -1,0 +1,29 @@
+{
+  "url": "https://practicesoftwaretesting.com",
+  "parameters": {
+    "input_parameters": {
+      "product_one": [
+        "Slip Joint Pliers"
+      ],
+      "product_two": [
+        "Claw Hammer"
+      ],
+      "product_three": [
+        "Phillips Screwdriver"
+      ]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "Add three products to the cart, one at a time. For each product: search for it by name in the search box, click the matching product in the results to open its detail page, click 'Add to cart', then return to the home page to search for the next one.\n\nThe three products, in order:\n1. {product_one[0]}\n2. {product_two[0]}\n3. {product_three[0]}\n\nWork through them in that order and add as many as you can. Do not check out and do not enter any personal details.",
+          "max_steps": 10
+        }
+      },
+      "end_sleep_time": 1
+    }
+  ]
+}

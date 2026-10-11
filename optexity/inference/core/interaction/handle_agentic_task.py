@@ -70,6 +70,14 @@ async def handle_agentic_task(
         await agent.browser_session.start()
         logger.debug(f"Finally running agentic task on browser_use {browser.cdp_url} ")
         history = await agent.run(max_steps=agentic_task_action.max_steps)
+        usage = history.usage
+        if usage:
+            logger.info(
+                f"Agentic task total tokens: {usage.total_tokens} "
+                f"({usage.total_prompt_tokens} in / "
+                f"{usage.total_completion_tokens} out, "
+                f"cached {usage.total_prompt_cached_tokens})"
+            )
         logger.debug(f"Agentic task completed on browser_use {browser.cdp_url} ")
 
         agent.stop()

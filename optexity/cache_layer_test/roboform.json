@@ -1,0 +1,56 @@
+{
+  "url": "https://www.roboform.com/filling-test-all-fields",
+  "parameters": {
+    "input_parameters": {
+      "user_title": [
+        "Mr"
+      ],
+      "first_name": [
+        "John"
+      ],
+      "last_name": [
+        "Doe"
+      ],
+      "full_name": [
+        "John Doe"
+      ],
+      "company_name": [
+        "Acme Corp"
+      ],
+      "job_position": [
+        "Engineer"
+      ],
+      "username": [
+        "johndoe123"
+      ],
+      "card_issuer": [
+        "Axis"
+      ],
+      "birth_place": [
+        "Gurugram"
+      ],
+      "customer_service_code": [
+        "91"
+      ],
+      "card_type": [
+        "Discover"
+      ]
+    },
+    "generated_parameters": {}
+  },
+  "nodes": [
+    {
+      "type": "action_node",
+      "interaction_action": {
+        "agentic_task": {
+          "task": "1. Fill the Title field with {user_title[0]}.\n2. Fill the First Name field with {first_name[0]}.\n3. Fill the Last Name field with {last_name[0]}.\n4. Fill the Full Name field with {full_name[0]}.\n5. Fill the Company field with {company_name[0]}.\n6. Fill the Job Position field with {job_position[0]}.\n7. Fill the Username field with {username[0]}.\n8. Fill the Card Issuer field with {card_issuer[0]}.\n9. Fill the Birth Place field with {birth_place[0]}.\n10. Fill the Customer Service Code field with {customer_service_code[0]}.\n11. Set the Credit Card Type dropdown to {card_type[0]}.",
+          "max_steps": 25,
+          "use_vision": false,
+          "keep_alive": true
+        }
+      },
+      "end_sleep_time": 1.0,
+      "before_sleep_time": 0.0
+    }
+  ]
+}
