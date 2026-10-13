@@ -64,6 +64,7 @@ from optexity.schema.automation import (
     IfElseNode,
     PrivateNode,
 )
+from optexity.schema.enums import ExitCodes
 from optexity.schema.memory import BrowserState, ForLoopStatus, Memory, OutputData
 from optexity.schema.task import Task
 from optexity.utils.settings import settings
@@ -106,6 +107,35 @@ def _is_same_url(current: str, target: str) -> bool:
     )
 
 
+class BrowserUnresponsiveError(Exception):
+    """The page did not answer a locator query within a hard timeout.
+
+    Playwright's own timeouts do not fire when a dialog is left open or the
+    CDP target stops responding, so this is raised from ``asyncio.wait_for``
+    rather than from an expect timeout.
+    """
+
+
+# A wedged page ignores Playwright's assertion timeout and sits until the
+# task-level kill. This probe uses the same locator path as assert nodes, with
+# a deadline this process enforces itself.
+LOCATOR_PROBE_TIMEOUT_SECONDS = 10.0
+
+
+async def _require_page_answers_locator(browser: Browser) -> None:
+    page = await browser.get_current_page()
+    if page is None:
+        raise BrowserUnresponsiveError("No page available before the first node")
+    try:
+        await asyncio.wait_for(
+            page.locator("body").count(), timeout=LOCATOR_PROBE_TIMEOUT_SECONDS
+        )
+    except Exception as e:
+        raise BrowserUnresponsiveError(
+            f"Locator probe failed before the first node: {type(e).__name__}: {e}"
+        ) from e
+
+
 async def _can_reuse_page(browser: Browser, target_url: str) -> bool:
     """Whether the reused browser is already usable on `target_url`.
 
@@ -138,7 +168,7 @@ async def run_automation(
     child_process_id: int,
     cdp_url: str,
     max_tries: int = 1,
-):
+) -> ExitCodes | None:
     assert task.automation is not None, f"Task {task.task_id} has no automation"
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
@@ -155,6 +185,7 @@ async def run_automation(
     browser = None
     in_browser_setup = False
     entered_workflow = False
+    browser_unresponsive = False
 
     try:
         if task.retry_count == 0:
@@ -237,10 +268,23 @@ async def run_automation(
 
         full_automation = []
 
+        await _require_page_answers_locator(browser)
+        logger.debug("Page answered locator probe before the first node")
+
         entered_workflow = True
         await _run_nodes(automation.nodes, task, memory, browser, full_automation)
 
         task.status = "success"
+    except BrowserUnresponsiveError as e:
+        # Leave the task running. The worker exits with BROWSER_UNRESPONSIVE
+        # and the parent restarts Chrome and reruns before any node executes.
+        browser_unresponsive = True
+        request_browser_restart(child_process_id, str(e))
+        logger.warning(
+            "Page unresponsive before the first node for task %s: %s",
+            task.task_id,
+            e,
+        )
     except AssertionError as e:
         logger.error(f"Assertion error: {e}")
         task.error = str(e)
@@ -270,7 +314,9 @@ async def run_automation(
         task.status = "failed"
 
     finally:
-        if task.retry_count == task.automation.max_retries or task.status == "success":
+        if not browser_unresponsive and (
+            task.retry_count == task.automation.max_retries or task.status == "success"
+        ):
             if task and task.status == "running":
                 task.status = "failed"
                 task.error = "Task could not catch browser exception"
@@ -281,15 +327,26 @@ async def run_automation(
                 await run_final_logging(task, memory, browser, child_process_id)
         if browser is not None:
             try:
-                await asyncio.wait_for(browser.stop(), timeout=30)
+                await asyncio.wait_for(
+                    browser.stop(), timeout=5 if browser_unresponsive else 30
+                )
             except Exception as e:
                 logger.error(f"Error/timeout stopping browser after automation: {e}")
 
-    logger.info(f"Task {task.task_id} completed with status {task.status}")
     file_handler.flush()
     file_handler.close()
     logging.getLogger(current_module).removeHandler(file_handler)
     logging.getLogger("optexity_private").removeHandler(file_handler)
+
+    if browser_unresponsive:
+        logger.warning(
+            "Task %s deferred: browser unresponsive before the first node",
+            task.task_id,
+        )
+        return ExitCodes.BROWSER_UNRESPONSIVE
+
+    logger.info(f"Task {task.task_id} completed with status {task.status}")
+    return None
 
 
 async def run_final_downloads_check(task: Task, memory: Memory, browser: Browser):

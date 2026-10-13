@@ -238,10 +238,14 @@ async def run_automation_in_process(
     worker_path = pathlib.Path(__file__).parent / "worker.py"
     total_attempts = max(1, int(task.automation.max_retries) + 1)
     returncode: int | None = None
+    # One extra rerun when the page is wedged before the first node. This does
+    # not consume automation.max_retries; a second failure falls through to the
+    # normal retry / completion path.
+    browser_recoveries = 0
 
     async def _run_attempt(attempt_index: int) -> int | None:
         global _global_actual_browser
-        nonlocal returncode
+        nonlocal returncode, browser_recoveries
 
         attempts_left = total_attempts - attempt_index
         task.retry_count = attempt_index
@@ -323,7 +327,32 @@ async def run_automation_in_process(
         if returncode == ExitCodes.SUCCESS.value:
             return returncode
 
+        if (
+            returncode == ExitCodes.BROWSER_UNRESPONSIVE.value
+            and browser_recoveries < 1
+        ):
+            browser_recoveries += 1
+            reason = consume_browser_restart_request(child_process_id) or (
+                "page unresponsive before the first node"
+            )
+            logger.warning(
+                "Page unresponsive before the first node for task %s; "
+                "restarting browser and rerunning: %s",
+                task.task_id,
+                reason[:500],
+            )
+            await restart_global_actual_browser(reason)
+            return await _run_attempt(attempt_index)
+
         if attempts_left <= 1:
+            if returncode == ExitCodes.BROWSER_UNRESPONSIVE.value:
+                task.status = "failed"
+                task.error = "Browser page did not respond before the workflow started"
+                task.completed_at = datetime.now(timezone.utc)
+                await complete_task_in_server(
+                    task, None, child_process_id, unique_child_arn
+                )
+                await initiate_callback(task)
             return returncode
 
         # Backoff before retrying.

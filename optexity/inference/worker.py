@@ -33,7 +33,7 @@ async def main():
     max_tries = int(sys.argv[5]) if len(sys.argv) > 5 else 1
 
     try:
-        await run_automation(
+        outcome = await run_automation(
             task,
             unique_child_arn,
             child_process_id,
@@ -43,6 +43,8 @@ async def main():
     except Exception:
         _force_exit(ExitCodes.WORKER_CRASHED.value)
 
+    if outcome == ExitCodes.BROWSER_UNRESPONSIVE:
+        _force_exit(ExitCodes.BROWSER_UNRESPONSIVE.value)
     if task.status == "success":
         _force_exit(ExitCodes.SUCCESS.value)
     if task.status == "killed":
