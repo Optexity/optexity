@@ -332,6 +332,7 @@ async def click_locator(
             task,
             click_element_action.download_filename,
             click_element_action.download_metadata,
+            click_element_action.download_timeout_seconds,
         )
     else:
         await _actual_click()
@@ -449,6 +450,7 @@ async def select_option_locator(
             task,
             select_option_action.download_filename,
             select_option_action.download_metadata,
+            select_option_action.download_timeout_seconds,
         )
     else:
         await _actual_select_option()

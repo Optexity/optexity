@@ -63,6 +63,7 @@ Use `command` for deterministic element finding (fast, no LLM tokens). The AI us
 | `expect_download` | `bool` | `False` | Click triggers file download |
 | `download_filename` | `str \| None` | Auto-generated | Filename for download |
 | `download_metadata` | `dict \| None` | `None` | Freeform JSON stored with the download |
+| `download_timeout_seconds` | `float \| None` | Global default (200s) | How long to wait for the file after the click |
 
 ### Examples
 
@@ -169,6 +170,7 @@ If `input_text` references an empty variable, the action is skipped automaticall
 | `expect_download` | `bool` | `False` | Selection triggers download |
 | `download_filename` | `str \| None` | Auto-generated | Filename for download |
 | `download_metadata` | `dict \| None` | `None` | Freeform JSON stored with the download |
+| `download_timeout_seconds` | `float \| None` | Global default (200s) | How long to wait for the file after the selection |
 
 <Tip>
 Optexity supports fuzzy matching for select values—"United States" will match "UNITED STATES OF AMERICA".

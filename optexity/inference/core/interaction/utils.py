@@ -631,6 +631,7 @@ async def handle_download(
     task: Task,
     download_filename: str,
     download_metadata: dict[str, Any] | None = None,
+    download_timeout_seconds: float | None = None,
 ):
     download_path: Path = task.downloads_directory / download_filename
 
@@ -756,7 +757,11 @@ async def handle_download(
         # download = await download_info.value
         # logger.info(f"Suggested filename: {download.suggested_filename}")
 
-        timeout = settings.DOWNLOAD_TIMEOUT_SECONDS
+        timeout = (
+            download_timeout_seconds
+            if download_timeout_seconds is not None
+            else settings.DOWNLOAD_TIMEOUT_SECONDS
+        )
         poll_interval = 2.0
         elapsed = 0.0
         new_file: str | None = None

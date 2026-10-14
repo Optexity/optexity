@@ -906,6 +906,7 @@
                 "for_loop",
                 "locator loop",
                 "download_filename",
+                "download_timeout_seconds",
                 "/tmp/optexity",
                 "file handling",
                 "save_download",

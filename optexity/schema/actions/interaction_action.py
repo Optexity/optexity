@@ -119,6 +119,9 @@ class SelectOptionAction(BaseAction):
     expect_download: bool = False
     download_filename: str | None = None
     download_metadata: dict[str, Any] | None = None
+    # Seconds to wait for a file after the action when expect_download=True.
+    # None falls back to settings.DOWNLOAD_TIMEOUT_SECONDS.
+    download_timeout_seconds: float | None = None
 
     @model_validator(mode="after")
     def set_download_filename(self):
@@ -148,6 +151,9 @@ class ClickElementAction(BaseAction):
     expect_download: bool = False
     download_filename: str | None = None
     download_metadata: dict[str, Any] | None = None
+    # Seconds to wait for a file after the action when expect_download=True.
+    # None falls back to settings.DOWNLOAD_TIMEOUT_SECONDS.
+    download_timeout_seconds: float | None = None
     button: Literal["left", "right", "middle"] = "left"
     mouse_click: bool = False
     mouse_click_deviation: dict[str, float | int] | None = None
