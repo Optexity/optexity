@@ -244,6 +244,7 @@ async def select_option_index(
                     task,
                     select_option_action.download_filename,
                     select_option_action.download_metadata,
+                    select_option_action.download_timeout_seconds,
                 )
             else:
                 await _actual_select_option()

@@ -2489,6 +2489,11 @@
                         ],
                         "title": "Download Metadata"
                     },
+                    "download_timeout_seconds": {
+                        "anyOf": [{ "type": "number" }, { "type": "null" }],
+                        "title": "Download Timeout Seconds",
+                        "description": "Seconds to wait for a file after the action when expect_download is true. Defaults to the global DOWNLOAD_TIMEOUT_SECONDS setting (200s) when omitted."
+                    },
                     "button": {
                         "type": "string",
                         "enum": ["left", "right", "middle"],
@@ -4177,6 +4182,11 @@
                             { "type": "null" }
                         ],
                         "title": "Download Metadata"
+                    },
+                    "download_timeout_seconds": {
+                        "anyOf": [{ "type": "number" }, { "type": "null" }],
+                        "title": "Download Timeout Seconds",
+                        "description": "Seconds to wait for a file after the action when expect_download is true. Defaults to the global DOWNLOAD_TIMEOUT_SECONDS setting (200s) when omitted."
                     }
                 },
                 "type": "object",

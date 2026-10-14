@@ -35,6 +35,7 @@ Optexity can download files from websites and upload files to forms.
 | `expect_download` | `bool` | `False` | Action triggers download |
 | `download_filename` | `str \| None` | Auto-generated UUID | Filename for download |
 | `download_metadata` | `dict \| None` | `None` | Freeform JSON stored with the download |
+| `download_timeout_seconds` | `float \| None` | Global default (200s) | How long to wait for the file after the action |
 
 ---
 
@@ -230,7 +231,7 @@ Downloaded files are stored in the task's downloads directory:
 
 ## Waiting for Downloads
 
-Optexity automatically waits for downloads when `expect_download=true`. For large files, increase timing:
+Optexity automatically waits for downloads when `expect_download=true`. The default wait is 200 seconds (`DOWNLOAD_TIMEOUT_SECONDS`). Override it per node with `download_timeout_seconds` for slow or large files:
 
 ```json
 {
@@ -238,12 +239,14 @@ Optexity automatically waits for downloads when `expect_download=true`. For larg
   "interaction_action": {
     "click_element": {
       "command": "get_by_text(\"Download Large File\")",
-      "expect_download": true
+      "expect_download": true,
+      "download_timeout_seconds": 600
     }
-  },
-  "end_sleep_time": 10.0
+  }
 }
 ```
+
+You can still add `end_sleep_time` on the node for extra post-action delay after the download completes.
 
 ---
 

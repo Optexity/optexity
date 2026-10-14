@@ -99,6 +99,7 @@ async def click_element_index(
                     task,
                     click_element_action.download_filename,
                     click_element_action.download_metadata,
+                    click_element_action.download_timeout_seconds,
                 )
             else:
                 await _actual_click_element()
