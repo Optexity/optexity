@@ -126,7 +126,7 @@ async def upload_file_index(
 ):
 
     try:
-        index = await get_index_from_prompt(
+        index, dom_node = await get_index_from_prompt(
             memory, upload_file_action.prompt_instructions, browser, task
         )
         if index is None:
@@ -145,6 +145,7 @@ async def upload_file_index(
         await LocatorExtraction.log_interacted_locator(
             browser,
             index,
+            dom_node,
             f".set_input_files({upload_file_action.file_path!r})",
             memory,
         )

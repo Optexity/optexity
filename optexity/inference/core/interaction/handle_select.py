@@ -125,39 +125,55 @@ async def handle_select_option(
         await select_option_index(select_option_action, browser, memory, task)
 
 
-def _build_css_selector(node) -> str | None:
-    """Build a CSS selector from the node's attributes to locate it in the live DOM."""
-    tag = node.node_name.lower() if node.node_name else "select"
-    attrs = node.attributes or {}
-
-    for attr in ("id", "name", "data-testid", "aria-label"):
-        val = attrs.get(attr)
-        if val:
-            return f'{tag}[{attr}="{val}"]'
-
-    return None
-
-
 async def _playwright_select_option(
     browser: Browser, node, matched_values: list[str]
-) -> bool:
-    """Select an option via Playwright, searching across all frames (pierces shadow DOM and iframes)."""
-    css_selector = _build_css_selector(node)
-    if css_selector is None:
-        return False
+) -> tuple[bool, list[dict]]:
+    """Select an option via Playwright. Tries the shared, ranked, frame-aware,
+    uniqueness-verified candidate list (``LocatorExtraction.candidates_from_tree_node``
+    — the same heuristic every other tier uses) in order, best-first, instead of
+    the single unranked, unescaped CSS guess this used to hand-roll (which had
+    the same quote-escaping bug fixed elsewhere in ``LocatorExtraction._css_attr``,
+    reintroduced independently here because this code didn't know that fix
+    existed). Falls back to a brute-force scan of every frame with the top
+    candidate's bare selector only if none of the ranked candidates resolve —
+    a last resort, not the primary mechanism.
 
+    Returns ``(success, candidates)`` so the caller can log whichever candidate
+    actually worked, instead of logging the failed primary index guess.
+    """
     page = await browser.get_current_page()
-
-    for frame in page.frames:
+    method_str = f".select_option({matched_values[0]!r})"
+    candidates = await LocatorExtraction.candidates_from_tree_node(
+        node, method_str, page
+    )
+    for candidate in candidates:
         try:
-            locator = frame.locator(css_selector)
-            if await locator.count() > 0:
-                await locator.first.select_option(value=matched_values[0])
-                return True
+            located = eval(candidate["locator"].removesuffix(method_str))
+            if await located.count() == 1:
+                await located.select_option(value=matched_values[0])
+                return True, candidates
         except Exception:
             continue
 
-    return False
+    # Last-resort brute force: the frame-chain candidates above all failed to
+    # resolve (e.g. a frame boundary selector went stale) — scan every frame
+    # directly with whatever bare selector scored highest. Reuses
+    # `_bare_frame_selector` off-label (it's named/tuned for iframe boundary
+    # elements, but its id/name/data-testid/title priority is exactly the
+    # "single best raw selector" this brute-force scan also needs — a `src`
+    # match just never fires for a non-iframe node like a `<select>`).
+    fallback_selector = LocatorExtraction._bare_frame_selector(node) or None
+    if fallback_selector:
+        for frame in page.frames:
+            try:
+                locator = frame.locator(fallback_selector)
+                if await locator.count() > 0:
+                    await locator.first.select_option(value=matched_values[0])
+                    return True, candidates
+            except Exception:
+                continue
+
+    return False, candidates
 
 
 async def select_option_index(
@@ -169,7 +185,11 @@ async def select_option_index(
     ## TODO either perfect text match or agenic select value prediction
     try:
 
-        index = await get_index_from_prompt(
+        # Second value (the EnhancedDOMTreeNode) is unused here — this handler
+        # already fetches `node` separately below via `get_element_by_index`
+        # (to read the <select>'s options), which serves the same "pre-action"
+        # purpose the other handlers use `get_index_from_prompt`'s node for.
+        index, _ = await get_index_from_prompt(
             memory, select_option_action.prompt_instructions, browser, task
         )
         if index is None:
@@ -217,14 +237,11 @@ async def select_option_index(
                 }
             )
             results = await browser.backend_agent.multi_act([action_model])
-            await LocatorExtraction.log_interacted_locator(
-                browser, index, f".select_option({matched_values[0]!r})", memory
-            )
             if results and results[0].error:
                 logger.debug(
                     f"Falling back to playwright select_option: {results[0].error}"
                 )
-                playwright_success = await _playwright_select_option(
+                playwright_success, candidates = await _playwright_select_option(
                     browser, node, matched_values
                 )
                 logger.debug(
@@ -234,6 +251,19 @@ async def select_option_index(
                     raise RuntimeError(
                         f"select_dropdown failed and playwright fallback miss: {results[0].error}"
                     )
+                # Record the candidate that actually worked via the fallback,
+                # not the primary index guess that just failed — logging that
+                # unconditionally (the old behavior) attributed a locator to a
+                # path that never ran.
+                LocatorExtraction.record_locator_candidates(memory, candidates)
+            else:
+                await LocatorExtraction.log_interacted_locator(
+                    browser,
+                    index,
+                    node,
+                    f".select_option({matched_values[0]!r})",
+                    memory,
+                )
 
         try:
             if select_option_action.expect_download:
