@@ -191,6 +191,9 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
 
     if _global_actual_browser is None:
         logger.info("Starting new actual browser")
+        from optexity.utils.proxy_config import pick_random_proxy
+
+        proxy_choice = pick_random_proxy(settings) if task.use_proxy else None
         _global_actual_browser = ActualBrowser(
             channel=task.automation.browser_channel,
             unique_child_arn=unique_child_arn,
@@ -199,12 +202,14 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             is_dedicated=task.is_dedicated,
             use_proxy=task.use_proxy,
             proxy_session_id=task.proxy_session_id(
-                settings.PROXY_PROVIDER if task.use_proxy else None
+                proxy_choice.provider if proxy_choice is not None else None
             ),
             os_emulation=task.automation.os_emulation,
             allow_cookies=task.automation.allow_cookies,
             enable_browser_alerts=task.automation.enable_browser_alerts,
         )
+        if proxy_choice is not None:
+            _global_actual_browser._proxy_choice = proxy_choice
         try:
             await _global_actual_browser.start()
         except Exception:
@@ -888,7 +893,9 @@ def get_app_with_endpoints(is_aws: bool, child_id: int, port: int = -1):
                 task_data = response_data["task"]
 
                 task = Task.model_validate_json(task_data)
-                if task.use_proxy and settings.PROXY_URL is None:
+                if task.use_proxy and not (
+                    settings.PROXY_URL and settings.PROXY_URL.strip()
+                ):
                     raise ValueError(
                         "PROXY_URL is not set and is required when use_proxy is True"
                     )
