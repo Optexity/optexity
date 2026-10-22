@@ -48,7 +48,9 @@ class Settings(LLMSettings):
     PROXY_USERNAME: str | None = None
     PROXY_PASSWORD: str | None = None
     PROXY_COUNTRY: str | None = None
-    PROXY_PROVIDER: Literal["oxylabs", "brightdata", "other"] | None = None
+    # Single provider or comma-separated list aligned with PROXY_URL
+    # (e.g. "oxylabs,brightdata,other"). Parsed by ``proxy_config``.
+    PROXY_PROVIDER: str | None = None
 
     BROWSER_USE_API_KEY: str | None = None
 
@@ -68,9 +70,11 @@ class Settings(LLMSettings):
         if self.DEPLOYMENT == "prod" and self.LOCAL_CALLBACK_URL is not None:
             raise ValueError("LOCAL_CALLBACK_URL is not allowed in prod mode")
 
-        if self.PROXY_PROVIDER == "oxylabs":
-            if self.PROXY_COUNTRY is None:
-                self.PROXY_COUNTRY = "US"
+        providers = [
+            p.strip() for p in (self.PROXY_PROVIDER or "").split(",") if p.strip()
+        ]
+        if "oxylabs" in providers and self.PROXY_COUNTRY is None:
+            self.PROXY_COUNTRY = "US"
         return self
 
     # Config (env_file / extra) is inherited from LLMSettings.

@@ -98,6 +98,9 @@ class ActualBrowser:
         self.proxy_session_id = proxy_session_id
         self.os_emulation = os_emulation
         self.enable_browser_alerts = enable_browser_alerts
+        # Picked once from comma-separated PROXY_* so the browser session
+        # stays on one residential endpoint for its lifetime.
+        self._proxy_choice = None
         self.playwright = None
         self.context = None
         self.proc = None
@@ -580,26 +583,32 @@ class ActualBrowser:
     def get_proxy_playwright(self) -> ProxySettings | None:
 
         if self.use_proxy:
-            if settings.PROXY_URL is None:
+            from optexity.utils.proxy_config import pick_random_proxy
+
+            if self._proxy_choice is None:
+                self._proxy_choice = pick_random_proxy(settings)
+            choice = self._proxy_choice
+            if choice is None:
                 raise ValueError("PROXY_URL is not set")
-            proxy = {"server": settings.PROXY_URL}
-            if settings.PROXY_USERNAME is not None:
-                if settings.PROXY_PROVIDER == "oxylabs":
-                    assert settings.PROXY_USERNAME, "PROXY_USERNAME is not set"
-                    assert settings.PROXY_PASSWORD, "PROXY_PASSWORD is not set"
+            proxy = {"server": choice.url}
+            if choice.username is not None:
+                if choice.provider == "oxylabs":
+                    assert choice.username, "PROXY_USERNAME is not set"
+                    assert choice.password, "PROXY_PASSWORD is not set"
 
                     proxy["username"] = (
-                        f"customer-{settings.PROXY_USERNAME}-cc-{settings.PROXY_COUNTRY}-sessid-{self.proxy_session_id}-sesstime-10"
+                        f"customer-{choice.username}-cc-{choice.country}"
+                        f"-sessid-{self.proxy_session_id}-sesstime-10"
                     )
-                elif settings.PROXY_PROVIDER == "brightdata":
+                elif choice.provider == "brightdata":
 
                     proxy["username"] = (
-                        f"{settings.PROXY_USERNAME}-session-{self.proxy_session_id}"
+                        f"{choice.username}-session-{self.proxy_session_id}"
                     )
 
                 else:
-                    proxy["username"] = settings.PROXY_USERNAME
+                    proxy["username"] = choice.username
 
-            if settings.PROXY_PASSWORD is not None:
-                proxy["password"] = settings.PROXY_PASSWORD
+            if choice.password is not None:
+                proxy["password"] = choice.password
             return ProxySettings(**proxy)
