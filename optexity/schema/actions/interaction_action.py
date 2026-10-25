@@ -243,6 +243,26 @@ class ScrollAction(BaseModel):
         return self
 
 
+class DownloadFileAction(BaseModel):
+    """Download ``file_url`` to a file that stays on disk for a later node.
+
+    The absolute path is stored as ``{output_variable_name[0]}`` and is also
+    handed to a following ``agentic_task`` as an allowed upload path.
+    """
+
+    file_url: str
+    output_variable_name: str = "downloaded_file_path"
+
+    def replace(self, pattern: str, replacement: str):
+        if self.file_url:
+            self.file_url = self.file_url.replace(pattern, replacement).strip('"')
+        if self.output_variable_name:
+            self.output_variable_name = self.output_variable_name.replace(
+                pattern, replacement
+            ).strip('"')
+        return self
+
+
 class UploadFileAction(BaseAction):
     file_path: str | None = None
     file_url: str | None = None
@@ -396,6 +416,7 @@ class InteractionAction(BaseModel):
     uncheck: UncheckAction | None = None
     hover: HoverAction | None = None
     download_url_as_pdf: DownloadUrlAsPdfAction | None = None
+    download_file: DownloadFileAction | None = None
     scroll: ScrollAction | None = None
     upload_file: UploadFileAction | None = None
     go_to_url: GoToUrlAction | None = None
@@ -419,6 +440,7 @@ class InteractionAction(BaseModel):
             "uncheck": self.uncheck,
             "hover": self.hover,
             "download_url_as_pdf": self.download_url_as_pdf,
+            "download_file": self.download_file,
             "scroll": self.scroll,
             "upload_file": self.upload_file,
             "go_to_url": self.go_to_url,
@@ -435,7 +457,7 @@ class InteractionAction(BaseModel):
 
         if len(non_null) != 1:
             raise ValueError(
-                "Exactly one of click_element, input_text, select_option, check, uncheck, hover, download_url_as_pdf, scroll, upload_file, go_to_url, go_back, switch_tab, close_current_tab, close_all_but_last_tab, close_tabs_until, key_press, or agentic_task must be provided"
+                "Exactly one of click_element, input_text, select_option, check, uncheck, hover, download_url_as_pdf, download_file, scroll, upload_file, go_to_url, go_back, switch_tab, close_current_tab, close_all_but_last_tab, close_tabs_until, key_press, or agentic_task must be provided"
             )
 
         if not self.max_tries and (
@@ -462,6 +484,8 @@ class InteractionAction(BaseModel):
             self.hover.replace(pattern, replacement)
         if self.download_url_as_pdf:
             self.download_url_as_pdf.replace(pattern, replacement)
+        if self.download_file:
+            self.download_file.replace(pattern, replacement)
         if self.close_tabs_until:
             self.close_tabs_until.replace(pattern, replacement)
         if self.agentic_task:

@@ -43,6 +43,12 @@ Use `agentic_task` when AI should autonomously accomplish a goal:
 | `use_vision` | `bool` | `False` | Include screenshots for agent |
 | `keep_alive` | `bool` | `True` | Keep browser session after task |
 
+### Uploading a downloaded file
+
+A `download_file` node earlier in the same run saves a URL under `/tmp` and passes that path to this agent as an allowed upload file. Reference it in `task` with the generated variable, which defaults to `{downloaded_file_path[0]}`. See [Downloads & Files](/docs/advanced/downloads-files) for the action schema.
+
+Tell the agent to use its `upload_file` action on the page's file input. Clicking a control that opens the operating-system file dialog does not attach the file.
+
 ### max_steps Guidelines
 
 | Task Complexity | Suggested max_steps |

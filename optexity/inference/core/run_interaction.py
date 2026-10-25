@@ -23,7 +23,10 @@ from optexity.inference.core.interaction.handle_hover import handle_hover_elemen
 from optexity.inference.core.interaction.handle_input import handle_input_text
 from optexity.inference.core.interaction.handle_keypress import handle_key_press
 from optexity.inference.core.interaction.handle_select import handle_select_option
-from optexity.inference.core.interaction.handle_upload import handle_upload_file
+from optexity.inference.core.interaction.handle_upload import (
+    handle_download_file,
+    handle_upload_file,
+)
 from optexity.inference.infra.browser import Browser
 from optexity.inference.infra.browser_health import fetch_browser_state_for_classifier
 from optexity.inference.models import get_llm_model_with_fallback
@@ -130,6 +133,10 @@ async def run_interaction_action(
         elif interaction_action.download_url_as_pdf:
             await handle_download_url_as_pdf(
                 interaction_action.download_url_as_pdf, task, memory, browser
+            )
+        elif interaction_action.download_file:
+            await handle_download_file(
+                interaction_action.download_file, memory, browser
             )
         elif interaction_action.agentic_task:
             await handle_agentic_task(
