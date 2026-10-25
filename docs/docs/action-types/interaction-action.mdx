@@ -18,6 +18,7 @@ Interaction actions represent user interactions with the browser: clicking butto
 | `go_back` | Go back in history |
 | `close_tabs_until` | Close tabs until condition met |
 | `download_url_as_pdf` | Save page as PDF |
+| `download_file` | Download a URL to disk for a later upload |
 | `key_press` | Press keyboard keys |
 | `agentic_task` | AI agent for complex tasks |
 | `close_overlay_popup` | Dismiss popups/modals |
@@ -301,6 +302,29 @@ Capture the current page or a specific URL as PDF:
   }
 }
 ```
+
+### Download File
+
+Download an `http(s)` URL and leave the file on disk. A later `agentic_task` in the same run can upload it. This is separate from `download_url_as_pdf`, which saves into the task downloads directory and does not pass the path to the agent.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `file_url` | `str` | Required | Public `http://` or `https://` URL. Supports `{variable[index]}`. 120s timeout. The automation fails if the download errors or returns a non-2xx status. |
+| `output_variable_name` | `str` | `downloaded_file_path` | Generated variable that holds the absolute path. Read it as `{output_variable_name[0]}`. |
+
+The file is written under `/tmp` as `optexity_download_<random>.<ext>` and is not deleted when the node finishes. The extension comes from the URL path, `Content-Disposition`, or `Content-Type`, in that order. The same path is added to the next `agentic_task`'s allowed upload files.
+
+```json
+{
+  "interaction_action": {
+    "download_file": {
+      "file_url": "{file_url[0]}"
+    }
+  }
+}
+```
+
+The default variable is `{downloaded_file_path[0]}`. Set `output_variable_name` to use a different name; the `[0]` stays, because the value is stored as a one-item list.
 
 ---
 

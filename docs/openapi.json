@@ -2631,6 +2631,20 @@
                 "type": "object",
                 "title": "DownloadUrlAsPdfAction"
             },
+            "DownloadFileAction": {
+                "properties": {
+                    "file_url": { "type": "string", "title": "File Url" },
+                    "output_variable_name": {
+                        "type": "string",
+                        "title": "Output Variable Name",
+                        "default": "downloaded_file_path"
+                    }
+                },
+                "type": "object",
+                "required": ["file_url"],
+                "title": "DownloadFileAction",
+                "description": "Download file_url to a file that stays on disk for a later node. The absolute path is stored as {output_variable_name[0]} and is handed to a following agentic_task as an allowed upload path."
+            },
             "EmailTwoFAAction": {
                 "properties": {
                     "type": { "type": "string", "const": "email_two_fa_action", "title": "Type" },
@@ -3369,6 +3383,12 @@
                     "download_url_as_pdf": {
                         "anyOf": [
                             { "$ref": "#/components/schemas/DownloadUrlAsPdfAction" },
+                            { "type": "null" }
+                        ]
+                    },
+                    "download_file": {
+                        "anyOf": [
+                            { "$ref": "#/components/schemas/DownloadFileAction" },
                             { "type": "null" }
                         ]
                     },

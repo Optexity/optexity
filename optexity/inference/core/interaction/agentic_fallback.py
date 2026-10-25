@@ -48,6 +48,7 @@ def _summarize_action_node(node: ActionNode) -> str | None:
             "scroll",
             "go_to_url",
             "download_url_as_pdf",
+            "download_file",
             "go_back",
         ]:
             sub = getattr(ia, name, None)
@@ -56,6 +57,7 @@ def _summarize_action_node(node: ActionNode) -> str | None:
                     getattr(sub, "prompt_instructions", "")
                     or getattr(sub, "command", "")
                     or getattr(sub, "url", "")
+                    or getattr(sub, "file_url", "")
                     or ""
                 )
                 label = name.replace("_", " ")

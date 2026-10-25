@@ -1,7 +1,11 @@
 import logging
+import os
 
 from browser_use import Agent, BrowserSession, Tools
 
+from optexity.inference.core.interaction.handle_upload import (
+    PERSISTED_UPLOAD_FILES_KEY,
+)
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import normalize_model
 from optexity.inference.models.chat_litellm import build_agent_llm
@@ -57,6 +61,14 @@ async def handle_agentic_task(
         )
         step_directory.mkdir(parents=True, exist_ok=True)
 
+        persisted = [
+            path
+            for path in memory.state.get(PERSISTED_UPLOAD_FILES_KEY, [])
+            if isinstance(path, str) and os.path.isfile(path)
+        ]
+        if persisted:
+            logger.info(f"Agentic task can upload: {persisted}")
+
         agent = Agent(
             task=agentic_task_action.task,
             llm=llm,
@@ -65,6 +77,7 @@ async def handle_agentic_task(
             tools=tools,
             calculate_cost=True,
             save_conversation_path=step_directory,
+            available_file_paths=persisted,
         )
         logger.debug(f"Starting browser session for agentic task {browser.cdp_url} ")
         await agent.browser_session.start()

@@ -200,7 +200,7 @@
             "id": "docs-action-types-agentic-tasks",
             "path": "docs/action-types/agentic-tasks.mdx",
             "title": "Agentic Tasks",
-            "summary": "Explains the AgenticTask action type, which uses an AI agent for complex browser interactions that static actions cannot handle. Covers the schema properties (task, max_steps, backend, use_vision, keep_alive), max_steps guidelines by task complexity, writing effective task descriptions, vision mode, the CloseOverlayPopup action, variable substitution in tasks, and combining agentic with static actions.",
+            "summary": "Explains the AgenticTask action type, which uses an AI agent for complex browser interactions that static actions cannot handle. Covers the schema properties (task, max_steps, backend, use_vision, keep_alive), max_steps guidelines by task complexity, writing effective task descriptions, vision mode, the CloseOverlayPopup action, variable substitution in tasks, uploading a file saved by a prior download_file node via {downloaded_file_path[0]}, and combining agentic with static actions.",
             "gist": "AI-driven browser agent action for tasks too complex for static actions; covers schema, max_steps, task phrasing, vision mode.",
             "keywords": [
                 "agentic",
@@ -211,7 +211,9 @@
                 "keep_alive",
                 "CloseOverlayPopup",
                 "browser agent",
-                "task description"
+                "task description",
+                "download_file",
+                "downloaded_file_path"
             ],
             "document_type": "guide",
             "tags": ["action-types", "agent", "AI", "vision", "automation"],
@@ -361,7 +363,7 @@
             "id": "docs-action-types-interaction-action",
             "path": "docs/action-types/interaction-action.mdx",
             "title": "Interaction Actions",
-            "summary": "Reference for all browser interaction action types: click_element, input_text, select_option, check, upload_file, go_to_url, go_back, close_tabs_until, download_url_as_pdf, key_press, agentic_task, and close_overlay_popup. Documents common element-targeting properties (command, xpath, prompt_instructions, max_tries, max_timeout_seconds_per_try, assert_locator_presence) and per-action specifics including double-click, fill vs type mode, fuzzy matching for selects, and retry configuration.",
+            "summary": "Reference for all browser interaction action types: click_element, input_text, select_option, check, upload_file, go_to_url, go_back, close_tabs_until, download_url_as_pdf, download_file, key_press, agentic_task, and close_overlay_popup. Documents common element-targeting properties (command, xpath, prompt_instructions, max_tries, max_timeout_seconds_per_try, assert_locator_presence) and per-action specifics including double-click, fill vs type mode, fuzzy matching for selects, and retry configuration. download_file saves an http(s) URL under /tmp and exposes the path as {downloaded_file_path[0]} for a later agentic_task.",
             "gist": "All browser interaction types (click, type, select, upload, navigate, download) with full property schemas.",
             "keywords": [
                 "interaction",
@@ -374,6 +376,8 @@
                 "go_back",
                 "key_press",
                 "download_url_as_pdf",
+                "download_file",
+                "downloaded_file_path",
                 "prompt_instructions",
                 "command",
                 "xpath",
@@ -409,12 +413,13 @@
                     "click_element",
                     "input_text",
                     "select_option",
-                    "upload_file"
+                    "upload_file",
+                    "download_file"
                 ]
             },
             "reading_priority": 2,
-            "when_to_use": "Select when the query is about clicking elements, typing text, selecting dropdowns, navigating pages, uploading files, or any browser interaction action schema.",
-            "embedding_hint": "click input text select option upload navigate browser interaction Playwright"
+            "when_to_use": "Select when the query is about clicking elements, typing text, selecting dropdowns, navigating pages, uploading files, downloading a URL to disk for a later agentic upload, or any browser interaction action schema.",
+            "embedding_hint": "click input text select option upload navigate browser interaction Playwright download_file downloaded_file_path"
         },
         {
             "id": "docs-action-types-python-script-action",
@@ -893,8 +898,8 @@
             "id": "docs-advanced-downloads-files",
             "path": "docs/advanced/downloads-files.mdx",
             "title": "Downloads and File Handling",
-            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, attaching freeform download_metadata, saving pages as PDF (download_url_as_pdf), saving a file directly from a Python script with ctx.save_download() (content or path, plus metadata, without a Blob/anchor + click workaround), iterating multiple downloads with for_loop_node (over a variable list, or over a locator's matched rows using the loop index for unique filenames), and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, failure behavior when an expected download or download_url_as_pdf produces no file (the task fails with a clear error), and best practices.",
-            "gist": "File download and upload patterns: click-to-download, metadata, PDF save, multi-file loops, upload with file_path.",
+            "summary": "Covers all file handling patterns in Optexity automations: downloading files via click (expect_download), selecting with expect_download, attaching freeform download_metadata, saving pages as PDF (download_url_as_pdf), download_file (save an http(s) URL under /tmp/optexity_download_* and expose {downloaded_file_path[0]} to a later agentic_task as an allowed upload path), saving a file directly from a Python script with ctx.save_download() (content or path, plus metadata, without a Blob/anchor + click workaround), iterating multiple downloads with for_loop_node (over a variable list, or over a locator's matched rows using the loop index for unique filenames), and uploading files with file_path. Documents storage location (/tmp/optexity/{task_id}/downloads/), download timing considerations, failure behavior when an expected download or download_url_as_pdf produces no file (the task fails with a clear error), and best practices.",
+            "gist": "File download and upload patterns: click-to-download, metadata, PDF save, download_file for a later agentic upload, multi-file loops, upload with file_path.",
             "keywords": [
                 "download",
                 "upload",
@@ -902,6 +907,8 @@
                 "download_metadata",
                 "file_path",
                 "download_url_as_pdf",
+                "download_file",
+                "downloaded_file_path",
                 "PDF",
                 "for_loop",
                 "locator loop",
@@ -944,8 +951,8 @@
                 "data_models": ["download_metadata"]
             },
             "reading_priority": 3,
-            "when_to_use": "Select when the query is about downloading files, uploading files, saving pages as PDF, attaching download metadata, handling multiple file downloads, the file storage path during task execution, or why a task fails when an expected download produces no file.",
-            "embedding_hint": "download upload file PDF expect_download download_metadata download_url_as_pdf /tmp/optexity for_loop download failure task failed no file"
+            "when_to_use": "Select when the query is about downloading files, uploading files, saving pages as PDF, download_file for a later agentic upload, attaching download metadata, handling multiple file downloads, the file storage path during task execution, or why a task fails when an expected download produces no file.",
+            "embedding_hint": "download upload file PDF expect_download download_metadata download_url_as_pdf download_file downloaded_file_path /tmp/optexity for_loop download failure task failed no file"
         },
         {
             "id": "docs-advanced-locators",

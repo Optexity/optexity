@@ -15,13 +15,18 @@ from optexity.inference.core.interaction.utils import (
     update_screenshot_with_highlight,
 )
 from optexity.inference.infra.browser import Browser
-from optexity.schema.actions.interaction_action import UploadFileAction
+from optexity.schema.actions.interaction_action import (
+    DownloadFileAction,
+    UploadFileAction,
+)
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
 
 logger = logging.getLogger(__name__)
 
 _DOWNLOAD_TIMEOUT_MS = 120_000
+# Paths saved by download_file and passed to a later agentic_task.
+PERSISTED_UPLOAD_FILES_KEY = "persisted_upload_files"
 
 
 def _derive_suffix(
@@ -50,7 +55,9 @@ def _derive_suffix(
     return ""
 
 
-async def _download_to_temp_file(url: str, browser: Browser) -> str:
+async def _download_to_temp_file(
+    url: str, browser: Browser, *, prefix: str = "optexity_upload_"
+) -> str:
     logger.debug(f"Downloading upload file from {url}")
     try:
         resp = await browser.context.request.get(url, timeout=_DOWNLOAD_TIMEOUT_MS)
@@ -119,6 +126,30 @@ async def handle_upload_file(
                 os.unlink(tmp_path)
             except OSError as e:
                 logger.warning(f"Failed to remove temp upload file {tmp_path}: {e}")
+
+
+async def handle_download_file(
+    download_file_action: DownloadFileAction,
+    memory: Memory,
+    browser: Browser,
+):
+    """Download ``file_url`` and leave the file in place for a later node."""
+    if not download_file_action.file_url.startswith(("http://", "https://")):
+        raise ValueError(
+            "DownloadFileAction.file_url must be an http:// or https:// URL"
+        )
+
+    tmp_path = await _download_to_temp_file(
+        download_file_action.file_url, browser, prefix="optexity_download_"
+    )
+    name = download_file_action.output_variable_name
+    memory.variables.generated_variables[name] = [tmp_path]
+    persisted = memory.state.setdefault(PERSISTED_UPLOAD_FILES_KEY, [])
+    persisted.append(tmp_path)
+    logger.info(
+        f"Persisted download to {tmp_path} as {{{name}[0]}} "
+        f"({os.path.getsize(tmp_path)} bytes)"
+    )
 
 
 async def upload_file_index(

@@ -12,6 +12,7 @@ Optexity can download files from websites and upload files to forms.
 | Click download link | `click_element` with `expect_download=true` |
 | Select export option | `select_option` with `expect_download=true` |
 | Save page as PDF | `download_url_as_pdf` |
+| Download a URL for a later upload | `download_file` |
 | Save bytes from a script | `ctx.save_download()` in a `python_script` |
 
 ---
@@ -124,6 +125,47 @@ Capture current page or specific URL as PDF:
   }
 }
 ```
+
+---
+
+## Download a File for Upload
+
+Use `download_file` when a later `agentic_task` needs to upload a file from a URL. The file stays on disk, its path is stored in a generated variable, and that path is passed to the agent as an allowed upload file.
+
+`download_url_as_pdf` does not do this. It saves into the task downloads directory and does not expose the path to the agent.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `file_url` | `str` | Required | Public `http://` or `https://` URL. Supports `{variable[index]}`. 120s timeout. The automation fails on a network error or a non-2xx response. |
+| `output_variable_name` | `str` | `downloaded_file_path` | Name of the generated variable. The path is `{output_variable_name[0]}`. |
+
+The file is `/tmp/optexity_download_<random>.<ext>`. It is not deleted when the node finishes. The extension comes from the URL path, `Content-Disposition`, or `Content-Type`, in that order.
+
+```json
+{
+  "type": "action_node",
+  "interaction_action": {
+    "download_file": {
+      "file_url": "{file_url[0]}"
+    }
+  }
+}
+```
+
+```json
+{
+  "type": "action_node",
+  "interaction_action": {
+    "agentic_task": {
+      "task": "Upload the local file {downloaded_file_path[0]} using the upload_file action on the file input. Do not click a button that opens the system file dialog.",
+      "max_steps": 15,
+      "backend": "browser_use"
+    }
+  }
+}
+```
+
+Set `output_variable_name` to change the variable name. The index stays `[0]`.
 
 ---
 
