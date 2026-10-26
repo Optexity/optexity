@@ -57,6 +57,7 @@ def parse_json_from_completion(
 
     raise ValueError("Could not parse response from completion.")
 
+
 _SPACE_PLACEHOLDER = "_._"
 
 

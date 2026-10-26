@@ -41,7 +41,10 @@ def _closed(schema: dict) -> dict | None:
             nodes.extend(node)
         elif isinstance(node, dict):
             if node.get("type") == "object":
-                if node.get("additionalProperties") not in (None, False) or "properties" not in node:
+                if (
+                    node.get("additionalProperties") not in (None, False)
+                    or "properties" not in node
+                ):
                     return None
                 node["additionalProperties"] = False
             nodes.extend(node.values())
@@ -52,15 +55,31 @@ def _block(p: dict) -> dict:
     if p["type"] == "text":
         return {"type": "text", "text": p["text"]}
     if p["type"] in ("image_url", "file"):
-        url = p["image_url"]["url"] if p["type"] == "image_url" else p["file"]["file_data"]
+        url = (
+            p["image_url"]["url"]
+            if p["type"] == "image_url"
+            else p["file"]["file_data"]
+        )
         mime, data = decode_data_url(url)
         kind = "document" if mime == "application/pdf" else "image"
-        return {"type": kind, "source": {"type": "base64", "media_type": mime, "data": base64.b64encode(data).decode()}}
+        return {
+            "type": kind,
+            "source": {
+                "type": "base64",
+                "media_type": mime,
+                "data": base64.b64encode(data).decode(),
+            },
+        }
     return {"type": "text", "text": p.get("refusal", "")}
 
 
 def _payload(req: Request, model: str) -> dict:
-    system = [p["text"] for m in req.messages if m["role"] == "system" for p in parts(m["content"])]
+    system = [
+        p["text"]
+        for m in req.messages
+        if m["role"] == "system"
+        for p in parts(m["content"])
+    ]
     messages = [
         {"role": m["role"], "content": [_block(p) for p in parts(m["content"])]}
         for m in req.messages
@@ -72,16 +91,24 @@ def _payload(req: Request, model: str) -> dict:
         "max_tokens": req.max_tokens or _DEFAULT_MAX_TOKENS,
         "timeout": req.timeout,
         # Billing labels go in this header for partner models (base64 JSON).
-        "extra_headers": {"X-Vertex-AI-Labels": base64.b64encode(json.dumps(req.labels).encode()).decode()},
+        "extra_headers": {
+            "X-Vertex-AI-Labels": base64.b64encode(
+                json.dumps(req.labels).encode()
+            ).decode()
+        },
     }
     # temperature and seed are rejected by Claude 5.5 models, so they are not sent.
     if req.schema is not None:
         closed = _closed(req.schema)
         if closed is not None:
-            kwargs["extra_body"] = {"output_format": {"type": "json_schema", "schema": closed}}
+            kwargs["extra_body"] = {
+                "output_format": {"type": "json_schema", "schema": closed}
+            }
             kwargs["extra_headers"] |= _STRUCTURED_BETA
         else:
-            system.append(f"Respond only with JSON matching this JSON schema:\n{json.dumps(req.schema)}")
+            system.append(
+                f"Respond only with JSON matching this JSON schema:\n{json.dumps(req.schema)}"
+            )
     if system:
         kwargs["system"] = "\n\n".join(system)
     return kwargs
@@ -113,7 +140,14 @@ async def acall(req: Request, model: str) -> Reply:
 
 def classify(exc: Exception, model: str) -> LLMError:
     if isinstance(exc, anthropic.APIStatusError):
-        return LLMError(f"{model}: {exc.status_code} {exc.message}", kind_for_status(exc.status_code), model, exc.status_code)
-    if isinstance(exc, (anthropic.APITimeoutError, anthropic.APIConnectionError, TimeoutError)):
+        return LLMError(
+            f"{model}: {exc.status_code} {exc.message}",
+            kind_for_status(exc.status_code),
+            model,
+            exc.status_code,
+        )
+    if isinstance(
+        exc, (anthropic.APITimeoutError, anthropic.APIConnectionError, TimeoutError)
+    ):
         return LLMError(f"{model}: {type(exc).__name__}", "transient", model)
     return LLMError(f"{model}: {type(exc).__name__}: {exc}", "fatal", model)

@@ -50,7 +50,13 @@ def _label(value: str) -> str:
 
 
 def _usage(model: str, reply: Reply) -> TokenUsage:
-    input_cost, output_cost = cost(model, reply.prompt_tokens, reply.cached_tokens, reply.cache_write_tokens, reply.output_tokens)
+    input_cost, output_cost = cost(
+        model,
+        reply.prompt_tokens,
+        reply.cached_tokens,
+        reply.cache_write_tokens,
+        reply.output_tokens,
+    )
     total = reply.prompt_tokens + reply.output_tokens
     return TokenUsage(
         input_tokens=reply.prompt_tokens,
@@ -120,16 +126,35 @@ def _run(
                 try:
                     parsed = parse(reply.text) if parse else None
                 except Exception as exc:
-                    raise LLMError(f"{step.model} output did not match the schema ({type(exc).__name__})", "invalid_output", step.model) from exc
+                    raise LLMError(
+                        f"{step.model} output did not match the schema ({type(exc).__name__})",
+                        "invalid_output",
+                        step.model,
+                    ) from exc
             except LLMError as err:
                 errors.append(err)
                 if err.kind == "rate_limit":
                     _cooldown_until[step.model] = time.monotonic() + _COOLDOWN_S
-                retry = (err.kind == "transient" and transient_left > 0) or (err.kind == "invalid_output" and invalid_left > 0)
+                retry = (err.kind == "transient" and transient_left > 0) or (
+                    err.kind == "invalid_output" and invalid_left > 0
+                )
                 final = err.kind == "fatal" or (not retry and index == len(chain) - 1)
                 usage = _usage(step.model, reply) if reply else TokenUsage()
                 total += usage
-                _log(call_id, attempt, step, chain, requested, feature, started, usage, reply.cached_tokens if reply else 0, err, final, errors)
+                _log(
+                    call_id,
+                    attempt,
+                    step,
+                    chain,
+                    requested,
+                    feature,
+                    started,
+                    usage,
+                    reply.cached_tokens if reply else 0,
+                    err,
+                    final,
+                    errors,
+                )
                 if err.kind == "fatal":
                     raise err
                 if retry:
@@ -143,42 +168,79 @@ def _run(
 
             usage = _usage(step.model, reply)
             total += usage
-            _log(call_id, attempt, step, chain, requested, feature, started, usage, reply.cached_tokens, None, True, errors)
+            _log(
+                call_id,
+                attempt,
+                step,
+                chain,
+                requested,
+                feature,
+                started,
+                usage,
+                reply.cached_tokens,
+                None,
+                True,
+                errors,
+            )
             return LLMResult(reply.text, parsed, step.model, total, reply.finish_reason)
 
     first = errors[0]
     kind = "rate_limit" if all(e.kind == "rate_limit" for e in errors) else first.kind
     summary = "; ".join(f"{e.model}: {e.kind}" for e in errors)
-    raise LLMError(f"All models failed ({summary}). First error: {first}", kind, first.model, first.status)
+    raise LLMError(
+        f"All models failed ({summary}). First error: {first}",
+        kind,
+        first.model,
+        first.status,
+    )
 
 
-def _log(call_id, attempt, step, chain, requested, feature, started, usage, cached, err, final, errors) -> None:
+def _log(
+    call_id,
+    attempt,
+    step,
+    chain,
+    requested,
+    feature,
+    started,
+    usage,
+    cached,
+    err,
+    final,
+    errors,
+) -> None:
     fallback = step.model != chain[0].model
-    emit({
-        "service": llm_settings.LLM_SERVICE_NAME,
-        "feature": feature,
-        "environment": llm_settings.LLM_ENVIRONMENT,
-        "location": LOCATION,
-        "task_id": TASK_ID.get(),
-        "call_id": call_id,
-        "requested": requested,
-        "tier": step.tier.value if step.tier else None,
-        "model_used": step.model,
-        "provider": "claude" if step.model.startswith("claude") else "gemini",
-        "attempt": attempt,
-        "final": final,
-        "fallback": fallback,
-        "fallback_reason": next((e.kind for e in errors if e.model == chain[0].model), None) if fallback else None,
-        "status": "error" if err else "ok",
-        "error_class": err.kind if err else None,
-        "error_status": err.status if err else None,
-        "latency_ms": int((time.monotonic() - started) * 1000),
-        "input_tokens": usage.input_tokens,
-        "output_tokens": usage.output_tokens,
-        "cached_tokens": cached,
-        "total_tokens": usage.total_tokens,
-        "cost_usd": round(usage.total_cost, 8),
-    })
+    emit(
+        {
+            "service": llm_settings.LLM_SERVICE_NAME,
+            "feature": feature,
+            "environment": llm_settings.LLM_ENVIRONMENT,
+            "location": LOCATION,
+            "task_id": TASK_ID.get(),
+            "call_id": call_id,
+            "requested": requested,
+            "tier": step.tier.value if step.tier else None,
+            "model_used": step.model,
+            "provider": "claude" if step.model.startswith("claude") else "gemini",
+            "attempt": attempt,
+            "final": final,
+            "fallback": fallback,
+            "fallback_reason": (
+                next((e.kind for e in errors if e.model == chain[0].model), None)
+                if fallback
+                else None
+            ),
+            "status": "error" if err else "ok",
+            "error_class": err.kind if err else None,
+            "error_status": err.status if err else None,
+            "latency_ms": int((time.monotonic() - started) * 1000),
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "cached_tokens": cached,
+            "total_tokens": usage.total_tokens,
+            "cost_usd": round(usage.total_cost, 8),
+        }
+    )
 
 
 def complete(

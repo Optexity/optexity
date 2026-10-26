@@ -11,7 +11,13 @@ Kind = Literal["rate_limit", "transient", "invalid_output", "rejected", "fatal"]
 
 
 class LLMError(Exception):
-    def __init__(self, message: str, kind: Kind, model: str | None = None, status: int | None = None):
+    def __init__(
+        self,
+        message: str,
+        kind: Kind,
+        model: str | None = None,
+        status: int | None = None,
+    ):
         super().__init__(message)
         self.kind = kind
         self.model = model
@@ -57,12 +63,18 @@ class Reply:
 def decode_data_url(url: str) -> tuple[str, bytes]:
     """'data:image/png;base64,....' -> ('image/png', bytes)."""
     if not url.startswith("data:") or ";base64," not in url:
-        raise LLMError("Only base64 data URLs are supported for images and files", "fatal")
+        raise LLMError(
+            "Only base64 data URLs are supported for images and files", "fatal"
+        )
     header, data = url[5:].split(";base64,", 1)
     return header, base64.b64decode(data)
 
 
 def parts(content: str | list[dict] | None) -> list[dict]:
     """Message content as a list of parts, without empty text parts (both APIs reject them)."""
-    items = [{"type": "text", "text": content}] if isinstance(content, str) else content or []
+    items = (
+        [{"type": "text", "text": content}]
+        if isinstance(content, str)
+        else content or []
+    )
     return [p for p in items if p.get("type") != "text" or p.get("text")]

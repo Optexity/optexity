@@ -41,7 +41,11 @@ def _fetch() -> None:
     global _prices
     try:
         data = httpx.get(_URL, timeout=10).json()
-        _prices = {k: v for k, v in data.items() if isinstance(v, dict) and "input_cost_per_token" in v}
+        _prices = {
+            k: v
+            for k, v in data.items()
+            if isinstance(v, dict) and "input_cost_per_token" in v
+        }
     except Exception as e:
         logger.warning("Could not fetch LLM prices (%s); using built-in prices.", e)
 
@@ -72,7 +76,9 @@ def _per_token(model: str) -> tuple[float, float, float, float] | None:
     return None
 
 
-def cost(model: str, prompt: int, cached: int, cache_write: int, output: int) -> tuple[float, float]:
+def cost(
+    model: str, prompt: int, cached: int, cache_write: int, output: int
+) -> tuple[float, float]:
     """(input cost, output cost) in USD. `prompt` counts every input token,
     including cached and cache-write ones. shortcut: ignores >200k-token price
     tiers, add them if long prompts become common."""

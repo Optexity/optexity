@@ -26,7 +26,9 @@ def _attach_cloud_handler() -> None:
 
     # Background transport: entries are batched and sent off the calling thread.
     handler = CloudLoggingHandler(
-        Client(project=PROJECT), name="llm-calls", resource=Resource(type="global", labels={})
+        Client(project=PROJECT),
+        name="llm-calls",
+        resource=Resource(type="global", labels={}),
     )
     # The fields travel as json_fields; a fixed message stops the JSON line being stored twice.
     handler.setFormatter(logging.Formatter("llm_call", validate=False))
@@ -38,7 +40,9 @@ def emit(entry: dict) -> None:
     try:
         _attach_cloud_handler()
     except Exception as e:  # logging must never break an LLM call
-        _logger.warning("Cloud Logging unavailable (%s); LLM logs go to stdout only.", e)
+        _logger.warning(
+            "Cloud Logging unavailable (%s); LLM logs go to stdout only.", e
+        )
         llm_settings.LLM_CLOUD_LOGGING = False
     _logger.info(json.dumps(entry), extra={"json_fields": entry})
 

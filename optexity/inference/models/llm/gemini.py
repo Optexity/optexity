@@ -7,8 +7,17 @@ from google.genai import errors, types
 from .config import LOCATION, PROJECT
 from .types import LLMError, Reply, Request, decode_data_url, kind_for_status, parts
 
-_client: genai.Client | None = None  # kept referenced: an unreferenced client gets closed
-_BLOCKED = {"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION", "IMAGE_SAFETY"}
+_client: genai.Client | None = (
+    None  # kept referenced: an unreferenced client gets closed
+)
+_BLOCKED = {
+    "SAFETY",
+    "PROHIBITED_CONTENT",
+    "BLOCKLIST",
+    "SPII",
+    "RECITATION",
+    "IMAGE_SAFETY",
+}
 
 
 def _get_client() -> genai.Client:
@@ -31,9 +40,17 @@ def _part(p: dict) -> types.Part:
 
 
 def _payload(req: Request, model: str) -> dict:
-    system = [p["text"] for m in req.messages if m["role"] == "system" for p in parts(m["content"])]
+    system = [
+        p["text"]
+        for m in req.messages
+        if m["role"] == "system"
+        for p in parts(m["content"])
+    ]
     contents = [
-        types.Content(role="model" if m["role"] == "assistant" else "user", parts=[_part(p) for p in parts(m["content"])])
+        types.Content(
+            role="model" if m["role"] == "assistant" else "user",
+            parts=[_part(p) for p in parts(m["content"])],
+        )
         for m in req.messages
         if m["role"] != "system" and parts(m["content"])
     ]
@@ -56,12 +73,22 @@ def _payload(req: Request, model: str) -> dict:
 def _read(resp: types.GenerateContentResponse, model: str) -> Reply:
     feedback = resp.prompt_feedback
     if feedback is not None and feedback.block_reason:
-        raise LLMError(f"{model} blocked the prompt: {feedback.block_reason}", "rejected", model)
+        raise LLMError(
+            f"{model} blocked the prompt: {feedback.block_reason}", "rejected", model
+        )
     candidate = resp.candidates[0] if resp.candidates else None
-    finish = candidate.finish_reason.name if candidate and candidate.finish_reason else None
+    finish = (
+        candidate.finish_reason.name if candidate and candidate.finish_reason else None
+    )
     if candidate is None or finish in _BLOCKED:
-        raise LLMError(f"{model} returned no answer (finish_reason={finish})", "rejected", model)
-    text = "".join(p.text for p in (candidate.content.parts if candidate.content else []) or [] if p.text and not p.thought)
+        raise LLMError(
+            f"{model} returned no answer (finish_reason={finish})", "rejected", model
+        )
+    text = "".join(
+        p.text
+        for p in (candidate.content.parts if candidate.content else []) or []
+        if p.text and not p.thought
+    )
     u = resp.usage_metadata
     thoughts = (u.thoughts_token_count or 0) if u else 0
     return Reply(
@@ -79,12 +106,19 @@ def call(req: Request, model: str) -> Reply:
 
 
 async def acall(req: Request, model: str) -> Reply:
-    return _read(await _get_client().aio.models.generate_content(**_payload(req, model)), model)
+    return _read(
+        await _get_client().aio.models.generate_content(**_payload(req, model)), model
+    )
 
 
 def classify(exc: Exception, model: str) -> LLMError:
     if isinstance(exc, errors.APIError):
-        return LLMError(f"{model}: {exc.code} {exc.message}", kind_for_status(exc.code), model, exc.code)
+        return LLMError(
+            f"{model}: {exc.code} {exc.message}",
+            kind_for_status(exc.code),
+            model,
+            exc.code,
+        )
     if isinstance(exc, (httpx.TimeoutException, httpx.TransportError, TimeoutError)):
         return LLMError(f"{model}: {type(exc).__name__}", "transient", model)
     return LLMError(f"{model}: {type(exc).__name__}: {exc}", "fatal", model)

@@ -32,7 +32,11 @@ DEFAULT_TIER = Tier.LITE
 CATCH_ALL_TIER = Tier.STANDARD
 
 # Gemini thinking level per tier; None leaves the model's default.
-REASONING: dict[Tier, str | None] = {Tier.LITE: "medium", Tier.STANDARD: "medium", Tier.PRO: None}
+REASONING: dict[Tier, str | None] = {
+    Tier.LITE: "medium",
+    Tier.STANDARD: "medium",
+    Tier.PRO: None,
+}
 # Per attempt, in seconds.
 TIMEOUTS: dict[Tier, float] = {Tier.LITE: 120, Tier.STANDARD: 180, Tier.PRO: 300}
 
@@ -69,7 +73,11 @@ def tier_models(tier: Tier) -> list[str]:
 def tier_of(model: str) -> Tier | None:
     """The tier a model belongs to in any location (gemini-4-argon is pro on global too)."""
     for tier in Tier:
-        lists = [tier_models(tier), TIERS[tier], *(loc.get(tier, []) for loc in LOCATION_TIERS.values())]
+        lists = [
+            tier_models(tier),
+            TIERS[tier],
+            *(loc.get(tier, []) for loc in LOCATION_TIERS.values()),
+        ]
         if any(model in models for models in lists):
             return tier
     return None
@@ -91,11 +99,18 @@ def normalize(name: str) -> str | Tier | None:
     if model.startswith("claude"):
         model = model.replace(".", "-")
     if model in RETIRED:
-        logger.warning("Model %r is not available on Vertex; using %s instead. Update the saved value.", name, RETIRED[model])
+        logger.warning(
+            "Model %r is not available on Vertex; using %s instead. Update the saved value.",
+            name,
+            RETIRED[model],
+        )
         return RETIRED[model]
     if model.startswith(("gemini", "claude")):
         return model
-    logger.warning("Model %r is not available on Vertex; using the default models. Update the saved value.", name)
+    logger.warning(
+        "Model %r is not available on Vertex; using the default models. Update the saved value.",
+        name,
+    )
     return None
 
 
@@ -112,7 +127,11 @@ def resolve_chain(model: str | Tier | None) -> list[Step]:
     - None: LLM_MODEL if set (handled like a model ID), else the default tier's
       first model, then LLM_MODEL_FALLBACK if set, else the rest of the default tier.
     """
-    fallback = normalize(llm_settings.LLM_MODEL_FALLBACK) if llm_settings.LLM_MODEL_FALLBACK else None
+    fallback = (
+        normalize(llm_settings.LLM_MODEL_FALLBACK)
+        if llm_settings.LLM_MODEL_FALLBACK
+        else None
+    )
     rest = _expand(fallback) if fallback else None
 
     if isinstance(model, Tier):
@@ -127,7 +146,14 @@ def resolve_chain(model: str | Tier | None) -> list[Step]:
             names = [models[0], *rest] if rest else models
         else:
             tier = tier_of(target) or CATCH_ALL_TIER
-            names = [target, *(rest if rest is not None else [m for m in tier_models(tier) if m != target])]
+            names = [
+                target,
+                *(
+                    rest
+                    if rest is not None
+                    else [m for m in tier_models(tier) if m != target]
+                ),
+            ]
 
     chain: list[Step] = []
     for name in names:
