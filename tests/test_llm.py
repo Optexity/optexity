@@ -1,5 +1,7 @@
 """LLM layer: model resolution, retries/fallback (fake providers), schemas, cost."""
 
+import os
+
 import pytest
 
 from optexity.inference.models.llm import (
@@ -287,3 +289,15 @@ def test_claude_request_shape():
     req.schema = {"type": "object", "additionalProperties": {"type": "string"}}
     kw = _payload(req, "claude-sonnet-5-5")
     assert "extra_body" not in kw and "JSON schema" in kw["system"]
+
+
+def test_credentials_json_written_to_a_private_file(monkeypatch):
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+    monkeypatch.setattr(
+        llm_settings, "GOOGLE_CREDENTIALS_JSON", '{"type": "service_account"}'
+    )
+    config.credentials_file_from_env()
+    path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
+    assert open(path).read() == '{"type": "service_account"}'
+    assert os.stat(path).st_mode & 0o777 == 0o600
+    os.remove(path)

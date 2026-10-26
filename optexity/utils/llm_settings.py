@@ -38,6 +38,9 @@ class LLMSettings(BaseSettings):
 
     GOOGLE_CLOUD_PROJECT: str | None = None
     GOOGLE_CLOUD_LOCATION: str = "global"
+    # Service-account key as JSON text, for runtimes that can't mount a key file
+    # (ECS). Ignored when GOOGLE_APPLICATION_CREDENTIALS is set.
+    GOOGLE_CREDENTIALS_JSON: str | None = None
 
     # Usage tags on every request (billing labels and the per-call log entry).
     LLM_SERVICE_NAME: str = "optexity"

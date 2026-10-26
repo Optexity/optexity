@@ -17,6 +17,7 @@ Every LLM call in Optexity runs on [Google Vertex AI](https://cloud.google.com/v
 | -------- | ---- | ------- | ----------- |
 | `GOOGLE_CLOUD_PROJECT` | `str` | — | Google Cloud project for every LLM call |
 | `GOOGLE_CLOUD_LOCATION` | `str` | `global` | Vertex AI location, e.g. `global` or `us` |
+| `GOOGLE_CREDENTIALS_JSON` | `str \| None` | `None` | Service-account key as JSON text, for runtimes that can't mount a key file (used when `GOOGLE_APPLICATION_CREDENTIALS` isn't set) |
 | `LLM_MODEL` | `str \| None` | `None` | Model for calls that don't choose one (default: the `lite` tier) |
 | `LLM_MODEL_FALLBACK` | `str \| None` | `None` | Backup model for `LLM_MODEL` and `llm_model_name` overrides |
 | `LLM_TIER_LITE` / `LLM_TIER_STANDARD` / `LLM_TIER_PRO` | `str \| None` | `None` | Comma-separated models that replace a tier |

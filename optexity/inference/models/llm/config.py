@@ -2,7 +2,9 @@
 
 import functools
 import logging
+import os
 import re
+import tempfile
 from dataclasses import dataclass
 from enum import Enum
 
@@ -55,6 +57,23 @@ RETIRED: dict[str, str | Tier] = {
 
 LOCATION = llm_settings.GOOGLE_CLOUD_LOCATION
 PROJECT = llm_settings.GOOGLE_CLOUD_PROJECT
+
+
+def credentials_file_from_env() -> None:
+    """Google's libraries read the service-account key from the file named by
+    GOOGLE_APPLICATION_CREDENTIALS; write GOOGLE_CREDENTIALS_JSON to such a file."""
+    if llm_settings.GOOGLE_CREDENTIALS_JSON and not os.environ.get(
+        "GOOGLE_APPLICATION_CREDENTIALS"
+    ):
+        fd, path = tempfile.mkstemp(
+            prefix="gcp-credentials-", suffix=".json"
+        )  # mode 0600
+        with os.fdopen(fd, "w") as f:
+            f.write(llm_settings.GOOGLE_CREDENTIALS_JSON)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = path
+
+
+credentials_file_from_env()
 
 
 @dataclass(frozen=True)
