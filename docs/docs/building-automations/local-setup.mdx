@@ -69,19 +69,22 @@ optexity install-browsers
 
 ```bash
 OPTEXITY_API_KEY=YOUR_OPTEXITY_API_KEY  # API key used for authenticated requests
-GOOGLE_API_KEY=YOUR_GOOGLE_API_KEY      # API key used for Google Gemini
+GOOGLE_CLOUD_PROJECT=YOUR_GCP_PROJECT_ID   # Google Cloud project used for every LLM call
 DEPLOYMENT=dev                          # or "prod" in production
 ```
 
-You can get your free Google Gemini API key from the [Google AI Studio Console](https://aistudio.google.com).
+Optexity runs Gemini and Claude on Google Vertex AI. In your Google Cloud project, enable the Vertex AI API and enable the Claude models in Model Garden, then sign in with Application Default Credentials:
+
+```bash
+gcloud auth application-default login
+```
 
 ### Using a Different LLM
 
-Optexity defaults to `gemini/gemini-3.5-flash-lite`, but runs on any model [LiteLLM](https://docs.litellm.ai/docs/providers) supports. Set `LLM_MODEL` with its own key:
+Optexity defaults to the `lite` tier (`gemini-3.5-flash-lite`, falling back to `claude-haiku-5-5`). Set `LLM_MODEL` to use another Vertex model:
 
 ```bash
-LLM_MODEL=anthropic/claude-sonnet-4-6
-LLM_MODEL_API_KEY=YOUR_ANTHROPIC_API_KEY
+LLM_MODEL=gemini-3.6-flash
 ```
 
 See [Model Configuration](/docs/advanced/model-configuration) for fallbacks, per-task overrides, and the full list of settings.

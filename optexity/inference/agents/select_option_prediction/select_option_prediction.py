@@ -39,6 +39,7 @@ class SelectOptionPredictionAgent:
         """
 
         response, token_usage = self.model.get_model_response_with_structured_output(
+            feature="select_option_prediction",
             prompt=final_prompt,
             response_schema=SelectOptionPredictionOutput,
             screenshot=screenshot,

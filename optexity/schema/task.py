@@ -143,10 +143,10 @@ class Task(BaseModel):
     max_parallelism: int = 1
     per_login_parallelism: int = 1
     company_id: CompanyID
-    # Any litellm model string, e.g. "gemini/gemini-3.5-flash-lite" or
-    # "anthropic/claude-sonnet-4-6". Unset falls through to settings.LLM_MODEL.
-    # llm_provider is deprecated — prefer a "provider/model" llm_model_name — but
-    # is still honored so existing workflow JSON keeps working.
+    # A Vertex model ID, e.g. "gemini-3.6-flash" or "claude-sonnet-5-5" (older
+    # "gemini/..." strings still work). Unset falls through to settings.LLM_MODEL.
+    # llm_provider is deprecated but still honored so existing workflow JSON
+    # keeps working.
     llm_provider: str | None = None
     llm_model_name: str | None = None
     # Optional queue priority: lower runs first, negatives allowed, None runs

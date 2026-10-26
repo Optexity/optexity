@@ -280,6 +280,7 @@ async def handle_llm_extraction(
     """
 
         response, token_usage = llm_model.get_model_response_with_structured_output(
+            feature="llm_extraction",
             prompt=prompt,
             response_schema=llm_extraction.build_model(),
             screenshot=screenshot,
@@ -602,6 +603,7 @@ async def handle_pdf_extraction(
 
     system_instruction = "Extract the information from the PDF file and return it in the format specified by the instructions."
     response, token_usage = llm_model.get_model_response_with_structured_output(
+        feature="pdf_extraction",
         prompt=pdf_extraction.extraction_instructions,
         response_schema=pdf_extraction.build_model(),
         pdf_url=pdf_file,

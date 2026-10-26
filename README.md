@@ -78,29 +78,29 @@ optexity install-browsers
 
 ```bash
 OPTEXITY_API_KEY=YOUR_OPTEXITY_API_KEY           # API key used for authenticated requests
-GOOGLE_API_KEY=YOUR_GOOGLE_API_KEY      # API key used for Google Gemini
+GOOGLE_CLOUD_PROJECT=YOUR_GCP_PROJECT_ID   # Google Cloud project used for every LLM call
 DEPLOYMENT=dev                          # or "prod" in production
 ```
 
-You can get your free Google Gemini API key from the [Google AI Studio Console](https://aistudio.google.com).
+Optexity runs Gemini and Claude on [Google Vertex AI](https://cloud.google.com/vertex-ai).
+In your Google Cloud project, enable the Vertex AI API and enable the Claude models in
+Model Garden (they are the fallbacks). Then sign in with Application Default Credentials:
+
+```bash
+gcloud auth application-default login
+```
+
+On a server, set `GOOGLE_APPLICATION_CREDENTIALS` to a service-account key file instead.
 
 ### Choosing the LLM
 
-Optexity runs on [LiteLLM](https://docs.litellm.ai/docs/providers), so any provider it
-supports works. Set a primary model and, optionally, a fallback used when the primary
-fails — the two can be on different providers, each with its own key:
+Every call uses a model tier (`lite`, `standard`, `pro`) with automatic fallback from Gemini
+to Claude. To pick models yourself:
 
 ```bash
-LLM_MODEL=anthropic/claude-sonnet-4-6
-LLM_MODEL_API_KEY=YOUR_ANTHROPIC_API_KEY
-
-LLM_MODEL_FALLBACK=openai/gpt-4.1-mini
-LLM_MODEL_FALLBACK_API_KEY=YOUR_OPENAI_API_KEY
+LLM_MODEL=gemini-3.6-flash              # model for calls that don't choose one
+LLM_MODEL_FALLBACK=claude-sonnet-5-5    # optional backup model
 ```
-
-`LLM_MODEL` defaults to `gemini/gemini-3.5-flash-lite`. Either key may be omitted, in which
-case the provider's own environment variable is used (`GOOGLE_API_KEY` /
-`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, ...).
 
 ## Recording Your First Automation
 

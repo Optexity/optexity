@@ -55,6 +55,7 @@ from optexity.inference.core.script_context import ScriptContext
 from optexity.inference.core.variable_resolver import resolve_api_variables_in_node
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import normalize_model
+from optexity.inference.models.llm import TASK_ID
 from optexity.private_nodes import HandlerRegistry
 from optexity.schema.actions.interaction_action import DownloadUrlAsPdfAction
 from optexity.schema.automation import (
@@ -170,6 +171,7 @@ async def run_automation(
     max_tries: int = 1,
 ) -> ExitCodes | None:
     assert task.automation is not None, f"Task {task.task_id} has no automation"
+    TASK_ID.set(task.task_id)
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
 

@@ -27,7 +27,7 @@ This action does **not** send the live browser session. Your endpoint receives J
 | `include_live_stream_url` | `bool` | `false` | Attach a dashboard URL to the live browser stream |
 | `max_wait_time` | `float` | `60` | Seconds to wait for the HTTP response. Must be `> 0` and `<= 120`. Supported range is about 30–60s (ALB and most proxies idle-timeout around 60s) |
 | `output_variable_name` | `str` | `"form_values"` | Generated variable that stores the returned mapping |
-| `llm_model_name` | `str \| None` | `None` | LiteLLM model string. Falls back to the task model |
+| `llm_model_name` | `str \| None` | `None` | Vertex model ID. Falls back to the task model |
 | `llm_provider` | `str \| None` | `None` | Deprecated — prefix the provider in `llm_model_name` instead |
 
 Default `before_sleep_time` is `3.0` seconds and default `end_sleep_time` is `0.0`, matching extraction actions.

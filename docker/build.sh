@@ -28,7 +28,9 @@
 #     -p 9000:9000 \
 #     --shm-size=2g \
 #     -e USE_PLAYWRIGHT_BROWSER="False" \
-#     -e GOOGLE_API_KEY="<set-me>" \
+#     -e GOOGLE_CLOUD_PROJECT="<set-me>" \
+#     -e GOOGLE_APPLICATION_CREDENTIALS=/creds.json \
+#     -v "$HOME/.config/gcloud/application_default_credentials.json:/creds.json:ro" \
 #     -e API_KEY="<set-me>" \
 #     -e DEPLOYMENT=dev \
 #     ghcr.io/optexity/opinference-dev:vnc-linux-arm64

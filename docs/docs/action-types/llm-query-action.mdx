@@ -18,7 +18,7 @@ description: Run a direct LLM query without browser context
 | `output_format` | `dict` | Required | Expected output structure as a type-annotated dict |
 | `prompt_instructions` | `str` | Required | The full prompt to send to the LLM |
 | `output_variable_names` | `list[str] \| None` | `None` | Promote response fields to `generated_variables` |
-| `llm_model_name` | `str \| None` | `None` | LiteLLM model string, e.g. `"gemini/gemini-2.5-pro"`. Falls back to the task model, then `LLM_MODEL` |
+| `llm_model_name` | `str \| None` | `None` | Vertex model ID, e.g. `"gemini-4-argon"`. Falls back to the task model, then `LLM_MODEL` |
 | `llm_provider` | `str \| None` | `None` | Deprecated — prefix the provider in `llm_model_name` instead |
 
 ## JSON Example
@@ -100,15 +100,14 @@ Every key in `output_variable_names` must appear in `output_format`. Validation 
 
 ## Choosing a Model
 
-Set `llm_model_name` to any LiteLLM model string:
+Set `llm_model_name` to a Vertex model ID:
 
 | Model | Notes |
 |-------|-------|
-| `gemini/gemini-3.5-flash-lite` | Default; cost-effective |
-| `gemini/gemini-2.5-flash` | Previous default |
-| `gemini/gemini-2.5-pro` | Harder reasoning over extracted data |
-| `anthropic/claude-sonnet-4-6` | Strong reasoning |
-| `openai/gpt-4.1-mini` | OpenAI models |
+| `gemini-3.5-flash-lite` | Default; cost-effective |
+| `gemini-3.6-flash` | Stronger, still fast |
+| `gemini-4-argon` | Harder reasoning over extracted data |
+| `claude-sonnet-5-5` | Strong reasoning |
 
 Omit `llm_model_name` to use the task model, which itself falls back to the `LLM_MODEL` environment variable. See [Model Configuration](/docs/advanced/model-configuration).
 
