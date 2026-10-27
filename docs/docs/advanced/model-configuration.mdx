@@ -23,6 +23,7 @@ Every LLM call in Optexity runs on [Google Vertex AI](https://cloud.google.com/v
 | `LLM_TIER_LITE` / `LLM_TIER_STANDARD` / `LLM_TIER_PRO` | `str \| None` | `None` | Comma-separated models that replace a tier |
 | `LLM_SERVICE_NAME`, `LLM_ENVIRONMENT` | `str` | `optexity`, `dev` | Tags on every call, for cost and usage reports |
 | `LLM_CLOUD_LOGGING` | `bool` | `false` | Also send one log entry per LLM call to Google Cloud Logging |
+| `LLM_LOG_CONTENT` | `bool` | `false` | Add the prompt and response text to each entry; images and files appear as placeholders, and text over ~180k characters loses its middle |
 
 ## Tiers
 

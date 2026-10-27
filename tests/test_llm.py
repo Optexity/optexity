@@ -209,6 +209,54 @@ def test_all_rate_limited_reports_rate_limit(fake):
     assert e.value.kind == "rate_limit"
 
 
+def test_log_entries_with_and_without_content(fake, monkeypatch, caplog):
+    image = "data:image/png;base64," + "A" * 4096
+    messages = [
+        {"role": "system", "content": "Be brief."},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "x" * 200_000},
+                {"type": "image_url", "image_url": {"url": image}},
+            ],
+        },
+    ]
+
+    def run():
+        fake(
+            {
+                "gemini-3.5-flash-lite": [ok("not json")] * 3,
+                "claude-haiku-5-5": [LLMError("429 quota", "rate_limit")],
+            }
+        )
+        router._cooldown_until.clear()
+        caplog.clear()
+        with (
+            caplog.at_level("INFO", logger="optexity.llm_calls"),
+            pytest.raises(LLMError),
+        ):
+            complete(messages, feature="t", parse=int)
+        return caplog.records
+
+    monkeypatch.setattr(llm_settings, "LLM_LOG_CONTENT", False)
+    first, *_, last = run()
+    assert first.levelname == "WARNING" and last.levelname == "ERROR"
+    assert last.getMessage().startswith(
+        "✗ optexity/t claude-haiku-5-5 attempt 4 rate_limit"
+    )
+    assert last.json_fields["error"] == "429 quota"
+    assert "prompt" not in first.json_fields
+
+    monkeypatch.setattr(llm_settings, "LLM_LOG_CONTENT", True)
+    first, *_, last = run()
+    prompt = first.json_fields["prompt"]
+    assert prompt.startswith("[system]\nBe brief.\n\n[user]\nxxx")
+    assert prompt.endswith("\n[image/png 3KB]") and "characters cut" in prompt
+    assert len(prompt) < 121_000
+    assert first.json_fields["response"] == "not json"  # what the model sent back
+    assert last.json_fields["response"] is None  # no reply on a rate limit
+
+
 # --- provider details and cost ----------------------------------------------
 
 

@@ -47,6 +47,8 @@ class LLMSettings(BaseSettings):
     LLM_ENVIRONMENT: str = "dev"
     # Also send the per-call log entries to Google Cloud Logging.
     LLM_CLOUD_LOGGING: bool = False
+    # Add prompt and response text to those entries (images and files as placeholders).
+    LLM_LOG_CONTENT: bool = False
 
     class Config:
         env_file = env_path if env_path else None

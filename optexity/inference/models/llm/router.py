@@ -20,7 +20,7 @@ from optexity.utils.llm_settings import llm_settings
 
 from . import claude, gemini
 from .config import LOCATION, REASONING, TIMEOUTS, Step, Tier, resolve_chain
-from .log import emit
+from .log import content_fields, emit
 from .prices import cost
 from .types import LLMError, Reply, Request
 
@@ -150,10 +150,11 @@ def _run(
                     feature,
                     started,
                     usage,
-                    reply.cached_tokens if reply else 0,
+                    reply,
                     err,
                     final,
                     errors,
+                    messages,
                 )
                 if err.kind == "fatal":
                     raise err
@@ -177,10 +178,11 @@ def _run(
                 feature,
                 started,
                 usage,
-                reply.cached_tokens,
+                reply,
                 None,
                 True,
                 errors,
+                messages,
             )
             return LLMResult(reply.text, parsed, step.model, total, reply.finish_reason)
 
@@ -204,43 +206,46 @@ def _log(
     feature,
     started,
     usage,
-    cached,
+    reply,
     err,
     final,
     errors,
+    messages,
 ) -> None:
     fallback = step.model != chain[0].model
-    emit(
-        {
-            "service": llm_settings.LLM_SERVICE_NAME,
-            "feature": feature,
-            "environment": llm_settings.LLM_ENVIRONMENT,
-            "location": LOCATION,
-            "task_id": TASK_ID.get(),
-            "call_id": call_id,
-            "requested": requested,
-            "tier": step.tier.value if step.tier else None,
-            "model_used": step.model,
-            "provider": "claude" if step.model.startswith("claude") else "gemini",
-            "attempt": attempt,
-            "final": final,
-            "fallback": fallback,
-            "fallback_reason": (
-                next((e.kind for e in errors if e.model == chain[0].model), None)
-                if fallback
-                else None
-            ),
-            "status": "error" if err else "ok",
-            "error_class": err.kind if err else None,
-            "error_status": err.status if err else None,
-            "latency_ms": int((time.monotonic() - started) * 1000),
-            "input_tokens": usage.input_tokens,
-            "output_tokens": usage.output_tokens,
-            "cached_tokens": cached,
-            "total_tokens": usage.total_tokens,
-            "cost_usd": round(usage.total_cost, 8),
-        }
-    )
+    entry = {
+        "service": llm_settings.LLM_SERVICE_NAME,
+        "feature": feature,
+        "environment": llm_settings.LLM_ENVIRONMENT,
+        "location": LOCATION,
+        "task_id": TASK_ID.get(),
+        "call_id": call_id,
+        "requested": requested,
+        "tier": step.tier.value if step.tier else None,
+        "model_used": step.model,
+        "provider": "claude" if step.model.startswith("claude") else "gemini",
+        "attempt": attempt,
+        "final": final,
+        "fallback": fallback,
+        "fallback_reason": (
+            next((e.kind for e in errors if e.model == chain[0].model), None)
+            if fallback
+            else None
+        ),
+        "status": "error" if err else "ok",
+        "error_class": err.kind if err else None,
+        "error_status": err.status if err else None,
+        "error": str(err)[:2000] if err else None,
+        "latency_ms": int((time.monotonic() - started) * 1000),
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "cached_tokens": reply.cached_tokens if reply else 0,
+        "total_tokens": usage.total_tokens,
+        "cost_usd": round(usage.total_cost, 8),
+    }
+    if llm_settings.LLM_LOG_CONTENT:
+        entry.update(content_fields(messages, reply.text if reply else None))
+    emit(entry)
 
 
 def complete(

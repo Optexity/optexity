@@ -2,7 +2,8 @@
 
 Always written to the `optexity.llm_calls` logger; with LLM_CLOUD_LOGGING=true
 also sent to Google Cloud Logging (log name `llm-calls`), where log-based metrics
-and the LLM dashboard read it. Never contains prompt or response text.
+and the LLM dashboard read it. Prompt and response text only with
+LLM_LOG_CONTENT=true.
 """
 
 import json
@@ -30,8 +31,6 @@ def _attach_cloud_handler() -> None:
         name="llm-calls",
         resource=Resource(type="global", labels={}),
     )
-    # The fields travel as json_fields; a fixed message stops the JSON line being stored twice.
-    handler.setFormatter(logging.Formatter("llm_call", validate=False))
     _logger.addHandler(handler)
     _cloud_handler = handler
 
@@ -44,7 +43,57 @@ def emit(entry: dict) -> None:
             "Cloud Logging unavailable (%s); LLM logs go to stdout only.", e
         )
         llm_settings.LLM_CLOUD_LOGGING = False
-    _logger.info(json.dumps(entry), extra={"json_fields": entry})
+    ok = entry["status"] == "ok"
+    level = logging.INFO if ok else logging.ERROR if entry["final"] else logging.WARNING
+    attempt = f" attempt {entry['attempt']}" if entry["attempt"] > 1 else ""
+    outcome = f"${entry['cost_usd']:.4f}" if ok else entry["error_class"]
+    summary = (
+        f"{'✓' if ok else '✗'} {entry['service']}/{entry['feature']} "
+        f"{entry['model_used']}{attempt} {outcome} {entry['latency_ms'] / 1000:.1f}s"
+    )
+    # In Cloud Logging the fields travel as json_fields; stdout carries them as JSON.
+    message = summary if _cloud_handler else f"{summary} {json.dumps(entry)}"
+    _logger.log(level, message, extra={"json_fields": entry})
+
+
+# Together under Cloud Logging's 256 KB entry limit.
+_PROMPT_CHARS = 120_000
+_RESPONSE_CHARS = 60_000
+
+
+def _clip(text: str, limit: int) -> str:
+    """Keeps the start (instructions) and the end (latest turn), cuts the middle."""
+    if len(text) <= limit:
+        return text
+    head = limit // 4
+    cut = len(text) - limit
+    return f"{text[:head]}\n[... {cut:,} characters cut ...]\n{text[head - limit:]}"
+
+
+def _content(content) -> str:
+    if isinstance(content, str):
+        return content
+    out = []
+    for part in content or []:
+        if part.get("type") == "text":
+            out.append(part.get("text", ""))
+            continue
+        # Images and files are never logged, only their type and size.
+        source = part.get("image_url") or part.get("file") or {}
+        url = source.get("url") or source.get("file_data") or ""
+        mime = url[5:].split(";", 1)[0] if url.startswith("data:") else part.get("type")
+        out.append(f"[{mime} {len(url) * 3 // 4096}KB]")
+    return "\n".join(out)
+
+
+def content_fields(messages: list[dict], reply_text: str | None) -> dict:
+    prompt = "\n\n".join(
+        f"[{m.get('role')}]\n{_content(m.get('content'))}" for m in messages
+    )
+    return {
+        "prompt": _clip(prompt, _PROMPT_CHARS),
+        "response": None if reply_text is None else _clip(reply_text, _RESPONSE_CHARS),
+    }
 
 
 def flush_llm_logs() -> None:
