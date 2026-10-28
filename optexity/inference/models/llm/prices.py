@@ -10,15 +10,12 @@ import time
 
 import httpx
 
-from .config import LOCATION
+from . import config
 
 logger = logging.getLogger(__name__)
 
 _URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 _REFRESH_S = 24 * 3600
-# Google and Anthropic charge 10% more on non-global endpoints.
-_UPLIFT = 1.0 if LOCATION == "global" else 1.1
-
 # USD per 1M tokens, global list price: input, output, cached input, cache write.
 # Used until (or if) the price file can't be fetched.
 _FALLBACK: dict[str, tuple[float, float, float, float]] = {
@@ -88,5 +85,7 @@ def cost(
         return 0.0, 0.0
     p_in, p_out, p_cached, p_write = p
     fresh = max(prompt - cached - cache_write, 0)
-    input_cost = (fresh * p_in + cached * p_cached + cache_write * p_write) * _UPLIFT
-    return input_cost, output * p_out * _UPLIFT
+    # Google and Anthropic charge 10% more on non-global endpoints.
+    uplift = 1.0 if config.LOCATION == "global" else 1.1
+    input_cost = (fresh * p_in + cached * p_cached + cache_write * p_write) * uplift
+    return input_cost, output * p_out * uplift

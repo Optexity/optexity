@@ -37,7 +37,7 @@ class LLMSettings(BaseSettings):
     LLM_TIER_PRO: str | None = None
 
     GOOGLE_CLOUD_PROJECT: str | None = None
-    GOOGLE_CLOUD_LOCATION: str = "global"
+    GOOGLE_CLOUD_LOCATION: str = "us"
     # Service-account key as JSON text, for runtimes that can't mount a key file
     # (ECS). Ignored when GOOGLE_APPLICATION_CREDENTIALS is set.
     GOOGLE_CREDENTIALS_JSON: str | None = None

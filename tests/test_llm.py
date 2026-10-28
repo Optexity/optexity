@@ -125,6 +125,24 @@ def test_location_and_env_tier_overrides(monkeypatch):
     ]
 
 
+def test_models_a_location_does_not_serve_are_skipped(monkeypatch):
+    # gemini-3.1-pro-preview is served on global only.
+    monkeypatch.setattr(config, "LOCATION", "us")
+    assert models(config.resolve_chain("gemini-3.1-pro-preview")) == [
+        "gemini-4-argon",
+        "claude-opus-5-5",
+    ]
+    monkeypatch.setattr(
+        llm_settings, "LLM_TIER_PRO", "gemini-3.1-pro-preview, claude-opus-5-5"
+    )
+    assert models(config.resolve_chain(Tier.PRO)) == ["claude-opus-5-5"]
+    monkeypatch.setattr(config, "LOCATION", "global")
+    assert (
+        models(config.resolve_chain("gemini-3.1-pro-preview"))[0]
+        == "gemini-3.1-pro-preview"
+    )
+
+
 # --- retries and fallback ---------------------------------------------------
 
 
@@ -297,7 +315,7 @@ def test_cost_uses_cached_price_and_regional_uplift(monkeypatch):
         output=100_000,
     )
     assert inp == pytest.approx(1.05) and out == pytest.approx(1.0)
-    monkeypatch.setattr(prices, "_UPLIFT", 1.1)
+    monkeypatch.setattr(config, "LOCATION", "us")
     assert prices.cost("claude-sonnet-5-5", 1_000_000, 0, 0, 0)[0] == pytest.approx(2.2)
     assert prices.cost("unknown-model", 100, 0, 0, 100) == (0.0, 0.0)
 

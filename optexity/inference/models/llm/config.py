@@ -29,6 +29,11 @@ TIERS: dict[Tier, list[str]] = {
 LOCATION_TIERS: dict[str, dict[Tier, list[str]]] = {
     "us": {Tier.PRO: ["gemini-4-argon", "claude-opus-5-5"]},
 }
+# Models a location doesn't serve: skipped in every chain there, so a saved
+# model name falls straight through to the rest of its tier instead of a 404.
+LOCATION_UNAVAILABLE: dict[str, set[str]] = {
+    "us": {"gemini-3.1-pro-preview"},
+}
 DEFAULT_TIER = Tier.LITE
 # Fallback for a pinned model that belongs to no tier (when LLM_MODEL_FALLBACK isn't set).
 CATCH_ALL_TIER = Tier.STANDARD
@@ -174,8 +179,9 @@ def resolve_chain(model: str | Tier | None) -> list[Step]:
                 ),
             ]
 
+    unavailable = LOCATION_UNAVAILABLE.get(LOCATION, set())
     chain: list[Step] = []
     for name in names:
-        if name not in (s.model for s in chain):
+        if name not in unavailable and name not in (s.model for s in chain):
             chain.append(Step(name, tier_of(name) or tier))
     return chain
