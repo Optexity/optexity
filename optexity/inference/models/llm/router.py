@@ -89,6 +89,13 @@ def _run(
     sends back the provider's Reply or throws its exception."""
     chain = _available(resolve_chain(model))
     requested = model.value if isinstance(model, Tier) else (model or "default")
+    if not chain:
+        # Only an env override can do this: LLM_TIER_* listing models this location doesn't serve.
+        raise LLMError(
+            f"No models available for {requested!r}: every model in its chain is "
+            "unavailable in this location (check LLM_TIER_* and GOOGLE_CLOUD_LOCATION)",
+            "fatal",
+        )
     call_id = uuid.uuid4().hex[:16]
     total = TokenUsage()
     errors: list[LLMError] = []

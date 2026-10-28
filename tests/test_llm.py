@@ -143,6 +143,14 @@ def test_models_a_location_does_not_serve_are_skipped(monkeypatch):
     )
 
 
+def test_a_chain_left_empty_by_the_location_is_a_clear_error(monkeypatch):
+    monkeypatch.setattr(config, "LOCATION", "us")
+    monkeypatch.setattr(llm_settings, "LLM_TIER_PRO", "gemini-3.1-pro-preview")
+    with pytest.raises(LLMError) as e:
+        complete([], model=Tier.PRO)
+    assert e.value.kind == "fatal" and "No models available" in str(e.value)
+
+
 # --- retries and fallback ---------------------------------------------------
 
 
