@@ -37,6 +37,7 @@ class ErrorHandlerAgent:
         """
 
         response, token_usage = self.model.get_model_response_with_structured_output(
+            feature="error_handler",
             prompt=final_prompt,
             response_schema=ErrorHandlerOutput,
             screenshot=screenshot,

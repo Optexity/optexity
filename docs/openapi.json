@@ -2336,9 +2336,8 @@
                         "title": "Llm Provider"
                     },
                     "llm_model_name": {
-                        "type": "string",
-                        "title": "Llm Model Name",
-                        "default": "gemini/gemini-2.5-pro"
+                        "anyOf": [{ "type": "string" }, { "type": "null" }],
+                        "title": "Llm Model Name"
                     },
                     "config": { "additionalProperties": true, "type": "object", "title": "Config" }
                 },

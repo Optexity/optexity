@@ -116,6 +116,7 @@ async def run_llm_query_action(
 
     try:
         response, token_usage = llm_model.get_model_response_with_structured_output(
+            feature="llm_query",
             prompt=llm_query_action.prompt_instructions,
             response_schema=llm_query_action.build_model(),
             system_instruction=system_instruction,

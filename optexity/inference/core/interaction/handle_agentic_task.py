@@ -8,7 +8,7 @@ from optexity.inference.core.interaction.handle_upload import (
 )
 from optexity.inference.infra.browser import Browser
 from optexity.inference.models import normalize_model
-from optexity.inference.models.chat_litellm import build_agent_llm
+from optexity.inference.models.chat_llm import build_agent_llm
 from optexity.schema.actions.interaction_action import (
     AgenticTask,
     CloseOverlayPopupAction,

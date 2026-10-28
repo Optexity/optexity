@@ -16,7 +16,7 @@ from patchright._impl._errors import TimeoutError as PatchrightTimeoutError
 from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import Download, Locator, Page, Request, Response
 
-from optexity.inference.models.chat_litellm import build_agent_llm
+from optexity.inference.models.chat_llm import build_agent_llm
 from optexity.schema.memory import Memory, NetworkRequest, NetworkResponse
 from optexity.utils.settings import settings
 
@@ -36,8 +36,8 @@ class Browser:
 
         self.stealth = stealth
         self.backend = backend
-        # litellm model string for the download-handling agent. None falls back
-        # to LLM_MODEL; run_automation passes the task's own model.
+        # Model for the download-handling agent. None uses the configured
+        # default; run_automation passes the task's own model.
         self.llm_model = llm_model
         self.enable_browser_alerts = enable_browser_alerts
 
@@ -147,7 +147,7 @@ class Browser:
 
             self.backend_agent = Agent(
                 task="",
-                llm=build_agent_llm(self.llm_model),
+                llm=build_agent_llm(self.llm_model, feature="download_handling"),
                 browser_session=browser_session,
                 use_vision=False,
             )

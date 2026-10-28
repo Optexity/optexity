@@ -1126,21 +1126,24 @@
             "id": "docs-advanced-model-configuration",
             "path": "docs/advanced/model-configuration.mdx",
             "title": "Model Configuration",
-            "summary": "Explains how to choose the LLM that powers an automation. Every LLM call routes through LiteLLM, so any supported provider works. Covers the LLM_MODEL, LLM_MODEL_API_KEY, LLM_MODEL_FALLBACK and LLM_MODEL_FALLBACK_API_KEY environment variables, the provider/model string format, the action -> task -> LLM_MODEL resolution order, per-task and per-action llm_model_name overrides, cross-provider fallbacks, the gemini/gemini-2.5-pro captcha default, LiteLLM-based cost tracking, and migrating off the deprecated llm_provider field.",
-            "gist": "Pick the LLM via LLM_MODEL (LiteLLM strings), override per task or per action with llm_model_name, and configure a cross-provider fallback.",
+            "summary": "Explains how to choose the LLM that powers an automation. Every LLM call runs on Google Vertex AI (Gemini first, Claude as fallback) with Application Default Credentials. Covers Vertex setup, the GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION, LLM_MODEL, LLM_MODEL_FALLBACK and LLM_TIER_* environment variables, the lite / standard / pro tiers, Vertex model IDs and how older saved model strings are converted, the action -> task -> LLM_MODEL resolution order, per-task and per-action llm_model_name overrides, fallbacks, the pro-tier captcha default, cost estimates and billing labels, and migrating off LiteLLM and API keys.",
+            "gist": "Pick models with tiers, LLM_MODEL or per-task / per-action llm_model_name; calls run on Vertex AI with Gemini-to-Claude fallback.",
             "keywords": [
                 "LLM_MODEL",
-                "LLM_MODEL_API_KEY",
                 "LLM_MODEL_FALLBACK",
-                "LLM_MODEL_FALLBACK_API_KEY",
-                "litellm",
+                "LLM_TIER_LITE",
+                "LLM_TIER_STANDARD",
+                "LLM_TIER_PRO",
+                "GOOGLE_CLOUD_PROJECT",
+                "GOOGLE_CLOUD_LOCATION",
+                "vertex ai",
+                "tier",
                 "llm_model_name",
                 "llm_provider",
                 "model",
                 "fallback",
                 "gemini",
-                "anthropic",
-                "openai",
+                "claude",
                 "cost",
                 "token usage"
             ],
@@ -1171,8 +1174,8 @@
                 "data_models": ["Task", "LLMAction", "CaptchaAction"]
             },
             "reading_priority": 3,
-            "when_to_use": "Select when the query is about which LLM an automation uses, switching provider or model, setting LLM_MODEL or an API key, configuring a fallback model, LLM cost or token pricing, or migrating from llm_provider to a prefixed llm_model_name.",
-            "embedding_hint": "LLM model configuration litellm LLM_MODEL fallback api key provider gemini anthropic openai cost"
+            "when_to_use": "Select when the query is about which LLM an automation uses, switching provider or model, setting LLM_MODEL, tiers or Vertex AI credentials, configuring a fallback model, LLM cost or token pricing, or migrating from LiteLLM / API keys to Vertex AI.",
+            "embedding_hint": "LLM model configuration vertex ai gemini claude tiers LLM_MODEL fallback GOOGLE_CLOUD_PROJECT application default credentials cost"
         },
         {
             "id": "docs-advanced-timing-retries",

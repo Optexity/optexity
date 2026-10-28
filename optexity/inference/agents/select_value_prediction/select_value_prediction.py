@@ -31,6 +31,7 @@ class SelectValuePredictionAgent:
         """
 
         response, token_usage = self.model.get_model_response_with_structured_output(
+            feature="select_value_prediction",
             prompt=final_prompt,
             response_schema=SelectValuePredictionOutput,
             system_instruction=system_prompt,

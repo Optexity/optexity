@@ -36,6 +36,7 @@ class InputTextPredictionAgent:
         """
 
         response, token_usage = self.model.get_model_response_with_structured_output(
+            feature="input_text_prediction",
             prompt=final_prompt,
             response_schema=InputTextPredictionOutput,
             screenshot=screenshot,

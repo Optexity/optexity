@@ -43,6 +43,7 @@ class TwoFAExtraction:
         """
 
         response, token_usage = self.model.get_model_response_with_structured_output(
+            feature="two_fa_extraction",
             prompt=final_prompt,
             response_schema=TwoFAExtractionOutput,
             system_instruction=system_prompt,
