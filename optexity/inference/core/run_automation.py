@@ -511,6 +511,7 @@ async def run_action_node(
 
     logger.debug(f"-----Running node new {memory.automation_state.step_index}-----")
 
+    browser.include_full_page = action_node.include_full_page
     try:
         if action_node.interaction_action:
             ## Assuming network calls are only made during interaction actions and not during extraction actions
@@ -560,6 +561,7 @@ async def run_action_node(
         logger.error(f"Error running node {memory.automation_state.step_index}: {e}")
         raise e
     finally:
+        browser.include_full_page = False
         await save_latest_memory_state_locally(task, memory, action_node)
         if memory.automation_state.step_index % 5 == 0:
             await save_trajectory_in_server(task)
@@ -630,6 +632,7 @@ async def run_private_node(
         f"({private_node.handler})-----"
     )
 
+    browser.include_full_page = private_node.include_full_page
     try:
         spec = HandlerRegistry.get(private_node.handler)
         inputs = (
@@ -643,6 +646,7 @@ async def run_private_node(
         logger.error(f"Error running private node {private_node.handler}: {e}")
         raise
     finally:
+        browser.include_full_page = False
         await save_private_node_state_locally(task, memory, private_node)
         if memory.automation_state.step_index % 5 == 0:
             await save_trajectory_in_server(task)

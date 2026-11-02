@@ -43,6 +43,7 @@ Each action node contains exactly one of:
 | `end_sleep_time` | `float` | `1.0` (extractions: `0.0`) | Seconds to wait after action |
 | `expect_new_tab` | `bool` | `False` | Action opens a new tab |
 | `max_new_tab_wait_time` | `float` | `0.0` (if expect_new_tab: `10.0`) | Max wait for new tab |
+| `include_full_page` | `bool` | `False` | Include elements outside the viewport in this node's accessibility tree. Index prediction, extraction, and other axtree reads use the full page when this is `true` |
 
 ### Default Timing by Action Type
 

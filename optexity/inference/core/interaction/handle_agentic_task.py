@@ -69,6 +69,15 @@ async def handle_agentic_task(
         if persisted:
             logger.info(f"Agentic task can upload: {persisted}")
 
+        if browser.include_full_page:
+            _capture_state = browser_session.get_browser_state_summary
+
+            async def _capture_full_page_state(*args, **kwargs):
+                kwargs["include_full_page"] = True
+                return await _capture_state(*args, **kwargs)
+
+            browser_session.get_browser_state_summary = _capture_full_page_state
+
         agent = Agent(
             task=agentic_task_action.task,
             llm=llm,

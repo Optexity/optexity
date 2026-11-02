@@ -182,6 +182,10 @@ class ActionNode(VariableSubstitution, BaseModel):
     expect_new_tab: bool = False
     max_new_tab_wait_time: float = 0.0
     localized_axtree_string: str | None = None
+    # Off-viewport elements are dropped from the axtree by default. Turn this on
+    # so index prediction, extraction, and other axtree reads for this node see
+    # the full page.
+    include_full_page: bool = False
 
     @model_validator(mode="after")
     def validate_one_node(self):
@@ -295,6 +299,9 @@ class PrivateNode(VariableSubstitution, BaseModel):
     output_variable_names: list[str] | None = None
     before_sleep_time: float = 0.0
     end_sleep_time: float = 0.0
+    # Same meaning as ActionNode.include_full_page: plugin handlers that read
+    # the axtree through the shared browser see the full page when this is set.
+    include_full_page: bool = False
 
     def replace(self, pattern: str, replacement: str | int | float | bool | None):
         replacement_str = "" if replacement is None else str(replacement)
