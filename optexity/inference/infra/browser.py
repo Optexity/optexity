@@ -63,6 +63,9 @@ class Browser:
         self.network_calls: list[NetworkResponse | NetworkRequest] = []
         self.temp_downloads_dir = f"/tmp/temp_downloads"
         self._download_cdp_session = None
+        # Set for the duration of a node whose include_full_page is true.
+        # get_browser_state_summary ORs this with its explicit argument.
+        self.include_full_page = False
 
     async def start(self):
         logger.debug("Starting browser")
@@ -347,6 +350,10 @@ class Browser:
     ) -> BrowserStateSummary:
         if self.backend_agent is None:
             raise ValueError("Backend agent is not set")
+
+        # A node-level include_full_page stays on for every capture during that
+        # node, including callers that pass the default False.
+        include_full_page = include_full_page or self.include_full_page
 
         browser_state_summary = await self.backend_agent.browser_session.get_browser_state_summary(
             include_screenshot=include_screenshot,  # default True even if use_vision=False so cloud sync is useful (it's fast now anyway); pass False when only the axtree is needed

@@ -1761,6 +1761,12 @@
                     "localized_axtree_string": {
                         "anyOf": [{ "type": "string" }, { "type": "null" }],
                         "title": "Localized Axtree String"
+                    },
+                    "include_full_page": {
+                        "type": "boolean",
+                        "title": "Include Full Page",
+                        "description": "When true, accessibility-tree captures for this node include elements outside the viewport.",
+                        "default": false
                     }
                 },
                 "type": "object",
@@ -3957,6 +3963,12 @@
                         "type": "number",
                         "title": "End Sleep Time",
                         "default": 0.0
+                    },
+                    "include_full_page": {
+                        "type": "boolean",
+                        "title": "Include Full Page",
+                        "description": "When true, accessibility-tree captures for this node include elements outside the viewport.",
+                        "default": false
                     }
                 },
                 "type": "object",
