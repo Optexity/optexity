@@ -36,6 +36,7 @@ from optexity.inference.core.logging import (
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.inference.infra.browser_health import consume_browser_restart_request
+from optexity.inference.worker import WORKER_ERROR_FILE_ENV
 from optexity.schema.enums import ExitCodes
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import Memory, SystemInfo
@@ -220,6 +221,14 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             raise
 
 
+def _read_crash_error(path: pathlib.Path, returncode: int) -> str:
+    try:
+        text = path.read_text().strip()
+    except OSError:
+        text = ""
+    return text or f"Worker crashed with exit code {returncode}"
+
+
 async def run_automation_in_process(
     task: Task, unique_child_arn: str, child_process_id: int
 ):
@@ -269,6 +278,9 @@ async def run_automation_in_process(
             f"Starting worker attempt {attempt_index + 1}/{total_attempts} (attempts_left={attempts_left})"
         )
 
+        crash_error_file = task.task_directory / "worker_error.txt"
+        crash_error_file.unlink(missing_ok=True)
+
         proc = await asyncio.create_subprocess_exec(
             sys.executable,
             worker_path,
@@ -282,6 +294,7 @@ async def run_automation_in_process(
                 **os.environ,
                 "CHILD_FASTAPI_PORT": str(_child_fastapi_port),
                 "CHILD_PROCESS_ID": str(child_process_id),
+                WORKER_ERROR_FILE_ENV: str(crash_error_file),
             },
         )
         running_task_processes[task.task_id] = proc
@@ -350,9 +363,15 @@ async def run_automation_in_process(
             return await _run_attempt(attempt_index)
 
         if attempts_left <= 1:
+            crash_error = None
             if returncode == ExitCodes.BROWSER_UNRESPONSIVE.value:
+                crash_error = "Browser page did not respond before the workflow started"
+            elif returncode in (1, ExitCodes.WORKER_CRASHED.value):
+                # The worker died without reporting, so nothing else will.
+                crash_error = _read_crash_error(crash_error_file, returncode)
+            if crash_error is not None:
                 task.status = "failed"
-                task.error = "Browser page did not respond before the workflow started"
+                task.error = crash_error
                 task.completed_at = datetime.now(timezone.utc)
                 await complete_task_in_server(
                     task, None, child_process_id, unique_child_arn

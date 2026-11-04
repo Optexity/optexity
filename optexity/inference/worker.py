@@ -1,11 +1,27 @@
 import asyncio
 import os
 import sys
+import traceback
 
 from optexity.inference.core.run_automation import run_automation
 from optexity.private_nodes import load_plugins
 from optexity.schema.enums import ExitCodes
 from optexity.schema.task import Task
+
+# The parent reads this file to report a crash; stderr only reaches the container log.
+WORKER_ERROR_FILE_ENV = "WORKER_ERROR_FILE"
+WORKER_ERROR_MAX_CHARS = 1000
+
+
+def _write_crash_error(exc: BaseException) -> None:
+    path = os.environ.get(WORKER_ERROR_FILE_ENV)
+    if not path:
+        return
+    try:
+        with open(path, "w") as f:
+            f.write(f"{type(exc).__name__}: {exc}"[:WORKER_ERROR_MAX_CHARS])
+    except OSError:
+        pass
 
 
 def _force_exit(code: int) -> None:
@@ -22,17 +38,17 @@ def _force_exit(code: int) -> None:
 
 
 async def main():
-    # Nodes execute in this process, so private_node handlers must be registered
-    # here — registering them in the parent service would not reach the executor.
-    load_plugins()
-
-    task = Task.model_validate_json(sys.argv[1])
-    unique_child_arn = sys.argv[2]
-    child_process_id = int(sys.argv[3])
-    cdp_url = sys.argv[4]
-    max_tries = int(sys.argv[5]) if len(sys.argv) > 5 else 1
-
     try:
+        # Nodes execute in this process, so private_node handlers must be registered
+        # here — registering them in the parent service would not reach the executor.
+        load_plugins()
+
+        task = Task.model_validate_json(sys.argv[1])
+        unique_child_arn = sys.argv[2]
+        child_process_id = int(sys.argv[3])
+        cdp_url = sys.argv[4]
+        max_tries = int(sys.argv[5]) if len(sys.argv) > 5 else 1
+
         outcome = await run_automation(
             task,
             unique_child_arn,
@@ -40,7 +56,9 @@ async def main():
             cdp_url=cdp_url,
             max_tries=max_tries,
         )
-    except Exception:
+    except Exception as e:
+        traceback.print_exc()
+        _write_crash_error(e)
         _force_exit(ExitCodes.WORKER_CRASHED.value)
 
     if outcome == ExitCodes.BROWSER_UNRESPONSIVE:
