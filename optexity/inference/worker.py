@@ -20,8 +20,9 @@ def _write_crash_error(exc: BaseException) -> None:
     try:
         with open(path, "w") as f:
             f.write(f"{type(exc).__name__}: {exc}"[:WORKER_ERROR_MAX_CHARS])
-    except OSError:
-        pass
+    except OSError as e:
+        # The parent falls back to the exit code, so only note it.
+        print(f"Could not write worker error file {path}: {e}", file=sys.stderr)
 
 
 def _force_exit(code: int) -> None:
