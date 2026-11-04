@@ -220,12 +220,28 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
             raise
 
 
+def _is_worker_crash(returncode: int | None) -> bool:
+    """The worker died without reporting: an uncaught error (1), a caught crash
+    (12), or a signal such as the OOM killer. -1 is the parent's timeout marker."""
+    return returncode is not None and (
+        returncode in (1, ExitCodes.WORKER_CRASHED.value) or returncode < -1
+    )
+
+
 def _read_crash_error(path: pathlib.Path, returncode: int) -> str:
     try:
         text = path.read_text().strip()
     except OSError:
         text = ""
-    return text or f"Worker crashed with exit code {returncode}"
+    if text:
+        return text
+    if returncode < 0:
+        try:
+            name = signal.Signals(-returncode).name
+        except ValueError:
+            name = f"signal {-returncode}"
+        return f"Worker killed by {name}"
+    return f"Worker crashed with exit code {returncode}"
 
 
 async def run_automation_in_process(
@@ -365,11 +381,7 @@ async def run_automation_in_process(
             crash_error = None
             if returncode == ExitCodes.BROWSER_UNRESPONSIVE.value:
                 crash_error = "Browser page did not respond before the workflow started"
-            elif returncode in (1, ExitCodes.WORKER_CRASHED.value) or (
-                returncode is not None and returncode < -1
-            ):
-                # The worker died without reporting (crash, or killed by a signal
-                # such as the OOM killer); -1 is the timeout, reported above.
+            elif _is_worker_crash(returncode):
                 crash_error = _read_crash_error(crash_error_file, returncode)
             if crash_error is not None:
                 task.status = "failed"
@@ -409,7 +421,7 @@ async def run_automation_in_process(
 
         if (
             task.is_dedicated
-            and returncode in (ExitCodes.WORKER_CRASHED.value, -1)
+            and (returncode == -1 or _is_worker_crash(returncode))
             and _global_actual_browser is not None
         ):
             reason = "timeout" if returncode == -1 else "worker crash"
