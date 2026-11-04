@@ -5,11 +5,9 @@ import traceback
 
 from optexity.inference.core.run_automation import run_automation
 from optexity.private_nodes import load_plugins
-from optexity.schema.enums import ExitCodes
+from optexity.schema.enums import WORKER_ERROR_FILE_ENV, ExitCodes
 from optexity.schema.task import Task
 
-# The parent reads this file to report a crash; stderr only reaches the container log.
-WORKER_ERROR_FILE_ENV = "WORKER_ERROR_FILE"
 WORKER_ERROR_MAX_CHARS = 1000
 
 

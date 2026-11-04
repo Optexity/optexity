@@ -1,5 +1,9 @@
 from enum import Enum
 
+# The worker writes its crash error to the file this env var names; stderr only
+# reaches the container log.
+WORKER_ERROR_FILE_ENV = "WORKER_ERROR_FILE"
+
 
 class ExitCodes(Enum):
     SUCCESS = 0

@@ -36,8 +36,7 @@ from optexity.inference.core.logging import (
 )
 from optexity.inference.infra.actual_browser import ActualBrowser
 from optexity.inference.infra.browser_health import consume_browser_restart_request
-from optexity.inference.worker import WORKER_ERROR_FILE_ENV
-from optexity.schema.enums import ExitCodes
+from optexity.schema.enums import WORKER_ERROR_FILE_ENV, ExitCodes
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import Memory, SystemInfo
 from optexity.schema.task import Task
@@ -366,8 +365,11 @@ async def run_automation_in_process(
             crash_error = None
             if returncode == ExitCodes.BROWSER_UNRESPONSIVE.value:
                 crash_error = "Browser page did not respond before the workflow started"
-            elif returncode in (1, ExitCodes.WORKER_CRASHED.value):
-                # The worker died without reporting, so nothing else will.
+            elif returncode in (1, ExitCodes.WORKER_CRASHED.value) or (
+                returncode is not None and returncode < -1
+            ):
+                # The worker died without reporting (crash, or killed by a signal
+                # such as the OOM killer); -1 is the timeout, reported above.
                 crash_error = _read_crash_error(crash_error_file, returncode)
             if crash_error is not None:
                 task.status = "failed"

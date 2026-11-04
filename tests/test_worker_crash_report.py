@@ -5,14 +5,14 @@ from pathlib import Path
 
 from optexity.inference import worker
 from optexity.inference.child_process import _read_crash_error
-from optexity.schema.enums import ExitCodes
+from optexity.schema.enums import WORKER_ERROR_FILE_ENV, ExitCodes
 
 
 def test_worker_writes_startup_crash_for_parent(tmp_path: Path):
     error_file = tmp_path / "worker_error.txt"
     proc = subprocess.run(
         [sys.executable, worker.__file__, '{"task_id": "t1"}', "arn", "0", "cdp"],
-        env={**os.environ, worker.WORKER_ERROR_FILE_ENV: str(error_file)},
+        env={**os.environ, WORKER_ERROR_FILE_ENV: str(error_file)},
         capture_output=True,
         text=True,
         timeout=120,
