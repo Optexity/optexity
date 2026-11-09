@@ -1,0 +1,206 @@
+---
+title: Self-host the open-source worker
+description: Install Optexity with pip or from a clone or fork, then run the first inference with a dashboard API key
+---
+
+Run browser automations on a machine you control. The open-source package is the inference worker: it opens the browser, follows the automation, and writes results back. Recordings, API keys, and run history stay on the [Optexity dashboard](https://dashboard.optexity.com). The worker signs those requests with the API key you create there.
+
+This guide is also published at [docs.optexity.com/docs/getting_started/self-hosting](https://docs.optexity.com/docs/getting_started/self-hosting). Recording a workflow is covered there and in [Recording first automation](https://docs.optexity.com/docs/getting_started/recording-first-inference).
+
+| Piece | Where it runs |
+| ----- | ------------- |
+| Browser automation | Your machine, via this package |
+| Recordings, API keys, task history | Optexity dashboard (`api.optexity.com`) |
+| LLM calls (element finding, extraction) | Your Google Cloud project, on Vertex AI |
+
+## Prerequisites
+
+| Requirement | Used for |
+| ----------- | -------- |
+| Python 3.11+ | The `optexity` package |
+| A dashboard account | The API key and the automation to run |
+| A Google Cloud project with the Vertex AI API enabled | Every LLM call |
+| Git | Clone and fork installs only |
+
+## Create an API key
+
+<Steps>
+    <Step title="Sign in">
+        Open [dashboard.optexity.com](https://dashboard.optexity.com) and create an account, or sign in.
+    </Step>
+    <Step title="Create a key">
+        Go to **API Keys** and create a key. Copy it once; you will set it as `OPTEXITY_API_KEY` on the machine that runs the worker.
+    </Step>
+</Steps>
+
+The worker reads that value from its environment and sends it as the `x-api-key` header when it asks the control plane for a task. Keep the key on the worker. The request you send to `localhost` carries the automation name and inputs.
+
+## Choose an install path
+
+| Path | Use it when | Result |
+| ---- | ----------- | ------ |
+| `pip install optexity` | You want the published package and will not edit the worker | The `optexity` command from PyPI |
+| Clone the repo | You want the current source tree | An editable install of [github.com/Optexity/optexity](https://github.com/Optexity/optexity) |
+| Fork, then clone | You want your own copy and will change the worker | An editable install of your fork |
+
+Both paths end with the same command: `optexity install-browsers`, which installs the Chromium and Chrome builds Playwright and Patchright need.
+
+### Install from PyPI
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+pip install optexity
+optexity install-browsers
+```
+
+### Install from a clone or a fork
+
+Clone the upstream repo when you only need the current source:
+
+```bash
+git clone https://github.com/Optexity/optexity.git
+cd optexity
+```
+
+To keep your own changes, fork [Optexity/optexity](https://github.com/Optexity/optexity) on GitHub, then clone the fork and point `upstream` at the original repo:
+
+```bash
+git clone https://github.com/<your-user>/optexity.git
+cd optexity
+git remote add upstream https://github.com/Optexity/optexity.git
+```
+
+Install that checkout in editable mode so the `optexity` command tracks your working tree:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+pip install -e .
+optexity install-browsers
+```
+
+Add the dev tools (`pip install -e ".[dev]"`) when you will edit the package and run the formatters. Pull later updates from upstream with `git fetch upstream` and merge `upstream/main`.
+
+## Configure the worker
+
+`DEPLOYMENT` and `OPTEXITY_API_KEY` are required. The process exits on startup if either is missing. `GOOGLE_CLOUD_PROJECT` is required for any step that calls a model.
+
+| Variable | Required | Description |
+| -------- | -------- | ----------- |
+| `OPTEXITY_API_KEY` | Yes | API key from **API Keys** in the dashboard. Also accepted as `API_KEY`. |
+| `DEPLOYMENT` | Yes | `dev` on a machine you run yourself. `prod` is for a production deployment of the worker. |
+| `GOOGLE_CLOUD_PROJECT` | Yes, for LLM steps | Google Cloud project billed for Vertex AI |
+| `GOOGLE_CLOUD_LOCATION` | No | Vertex location. Default `us`. |
+| `ENV_PATH` | Only if you use a file | Absolute path to a dotenv file. A `.env` in the working directory is loaded only when this is set. |
+
+Export the variables in the shell you use to start the worker:
+
+```bash
+export OPTEXITY_API_KEY="YOUR_OPTEXITY_API_KEY"
+export DEPLOYMENT="dev"
+export GOOGLE_CLOUD_PROJECT="YOUR_GCP_PROJECT_ID"
+```
+
+Or put the same keys in a file and point `ENV_PATH` at it:
+
+```bash
+export ENV_PATH="$PWD/.env"
+```
+
+In that Google Cloud project, enable the Vertex AI API and enable the Claude models in Model Garden (they are the fallbacks). Then sign in:
+
+```bash
+gcloud auth application-default login
+```
+
+On a server, set `GOOGLE_APPLICATION_CREDENTIALS` to a service-account key file instead. Model choice, tiers, and fallbacks are in [Model Configuration](/docs/advanced/model-configuration). The default tier is `lite` (`gemini-3.5-flash-lite`, then `claude-haiku-5-5`).
+
+## Record a workflow
+
+You can record the workflow yourself. The [Optexity Recorder](https://chromewebstore.google.com/detail/optexity-recorder/pbaganbicadeoacahamnbgohafchgakp) Chrome extension captures clicks, typing, and form selections, then saves the workflow to the same dashboard workspace as your API key. The same steps are on [docs.optexity.com](https://docs.optexity.com/docs/getting_started/recording-first-inference).
+
+To run something that already exists, add a public workflow from the [Marketplace](https://dashboard.optexity.com/marketplace) instead. Either way, the `endpoint_name` you send later must match the workflow name in the dashboard.
+
+<Steps>
+    <Step title="Install the recorder">
+        Add [Optexity Recorder](https://chromewebstore.google.com/detail/optexity-recorder/pbaganbicadeoacahamnbgohafchgakp) from the Chrome Web Store, then pin it from the puzzle icon so it stays on the toolbar.
+    </Step>
+    <Step title="Add your API key">
+        Click the extension icon and paste the key from **API Keys** in the dashboard.
+    </Step>
+    <Step title="Open the site">
+        In Chrome, go to the page you want to automate, for example `https://stockanalysis.com/`.
+    </Step>
+    <Step title="Start capture">
+        Click the extension icon and choose **Start Capture**.
+    </Step>
+    <Step title="Do the workflow">
+        Perform the actions you want the worker to repeat. Move slowly, and skip extra scrolling and hovering. On stockanalysis.com that is: click **Search**, type a symbol, and open the first result.
+    </Step>
+    <Step title="Save it">
+        Click **Complete Capture**. The workflow is saved to your dashboard. Use that name as `endpoint_name` when you run inference.
+    </Step>
+</Steps>
+
+## Run the first inference
+
+The worker runs a workflow that already belongs to the workspace for that API key: one you recorded above, or one you added from the Marketplace.
+
+Start the local server in the same environment that has the variables above:
+
+```bash
+optexity inference --port 9000 --child_process_id 0
+```
+
+| Flag | Default | Meaning |
+| ---- | ------- | ------- |
+| `--port` | `9000` | Port for this worker |
+| `--host` | `0.0.0.0` | Bind address |
+| `--child_process_id` | `0` | Id for this worker. Use a different id for each extra worker on the same machine. |
+
+Check that it is up:
+
+```bash
+curl http://localhost:9000/health
+```
+
+Allocate a task. Replace `endpoint_name` and `input_parameters` with the workflow in your workspace. Values are lists, even when there is a single value.
+
+```bash
+curl -X POST http://localhost:9000/inference \
+  -H "Content-Type: application/json" \
+  -d '{
+    "endpoint_name": "extract_price_stockanalysis",
+    "input_parameters": {
+      "search_term": ["NVDA"]
+    },
+    "unique_parameter_names": []
+  }'
+```
+
+The worker posts that body to `https://api.optexity.com/api/v1/inference` with your API key, receives the task for that recording, and runs it locally. A successful call returns `202`:
+
+```json
+{
+  "success": true,
+  "message": "Task has been allocated. Check its status and output at https://dashboard.optexity.com/tasks",
+  "task_id": "..."
+}
+```
+
+A browser window opens on the machine running the worker. Status, errors, outputs, and downloads show up on [dashboard.optexity.com/tasks](https://dashboard.optexity.com/tasks). Leave the `optexity inference` process running until the task finishes.
+
+`unique_parameter_names` lists input keys that identify this run. Leave it empty to allocate immediately. See [Running first inference](/docs/getting_started/running-first-inference) for the local endpoints, and the [inference API reference](/docs/inference/inference-api) for the task lifecycle.
+
+## If the first run fails
+
+| What you see | What to check |
+| ------------ | ------------- |
+| Process exits before it listens | `OPTEXITY_API_KEY` and `DEPLOYMENT` are exported in this shell, or `ENV_PATH` points at the file that contains them |
+| `/inference` returns an auth or permission error | The key is the one from **API Keys**, and the workflow belongs to that same workspace |
+| Unknown endpoint | `endpoint_name` matches the workflow name in the dashboard exactly |
+| Browser install errors | Re-run `optexity install-browsers`. On Linux, `--with-deps` may need permission to install system libraries |
+| Model or credential errors after the browser opens | Vertex AI is enabled, Claude is enabled in Model Garden, and `gcloud auth application-default login` was run for `GOOGLE_CLOUD_PROJECT` |
