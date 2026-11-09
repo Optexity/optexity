@@ -1159,6 +1159,10 @@
                 ],
                 "referenced_by": [
                     {
+                        "doc_id": "docs-getting-started-self-hosting",
+                        "context": "Self-hosting links here for Vertex model choice, tiers, and fallbacks."
+                    },
+                    {
                         "doc_id": "docs-action-types-llm-query-action",
                         "context": "llm_query defers model selection to this page."
                     },
@@ -1650,6 +1654,10 @@
                 ],
                 "referenced_by": [
                     {
+                        "doc_id": "docs-getting-started-self-hosting",
+                        "context": "Self-hosting is the install-and-first-run guide; local setup remains the shorter environment checklist."
+                    },
+                    {
                         "doc_id": "docs-building-automations-quickstart",
                         "context": "Quickstart lists local setup as a prerequisite."
                     },
@@ -1929,7 +1937,12 @@
                         "context": "Next step after recording is running the inference."
                     }
                 ],
-                "referenced_by": []
+                "referenced_by": [
+                    {
+                        "doc_id": "docs-getting-started-self-hosting",
+                        "context": "Self-hosting links here for creating the automation the worker will run."
+                    }
+                ]
             },
             "entities": {
                 "systems": ["Optexity Recorder", "Chrome"],
@@ -1939,6 +1952,66 @@
             "reading_priority": 1,
             "when_to_use": "Select when the query is about how to record a first automation, using the recorder extension, or getting started with Optexity from zero.",
             "embedding_hint": "record first automation Chrome extension beginner stockanalysis.com video tutorial"
+        },
+        {
+            "id": "docs-getting-started-self-hosting",
+            "path": "docs/getting_started/self-hosting.mdx",
+            "title": "Self-host the open-source worker",
+            "summary": "Guide for running the open-source Optexity inference worker on your own machine. Covers two install paths (pip install optexity, and cloning or forking github.com/Optexity/optexity with an editable install), installing browsers, creating an API key in the dashboard, required environment variables (OPTEXITY_API_KEY, DEPLOYMENT, GOOGLE_CLOUD_PROJECT, ENV_PATH), Vertex AI application-default credentials, recording a workflow with the Optexity Recorder Chrome extension, starting optexity inference, and the first POST to localhost:9000/inference. Notes that the same guide is published on docs.optexity.com. Explains that the worker sends the dashboard API key as x-api-key to api.optexity.com, executes the browser locally, and reports status on the dashboard.",
+            "gist": "Self-host the worker via pip or a clone/fork, record a workflow, then run the first local inference with a dashboard API key.",
+            "keywords": [
+                "self-hosting",
+                "self host",
+                "record a workflow",
+                "Optexity Recorder",
+                "docs.optexity.com",
+                "pip install optexity",
+                "clone",
+                "fork",
+                "OPTEXITY_API_KEY",
+                "API key",
+                "dashboard",
+                "optexity inference",
+                "ENV_PATH",
+                "first inference",
+                "Vertex AI"
+            ],
+            "document_type": "guide",
+            "tags": ["getting-started", "self-hosting", "installation", "inference"],
+            "relationships": {
+                "depends_on": [],
+                "references": [
+                    {
+                        "doc_id": "docs-advanced-model-configuration",
+                        "context": "Vertex AI setup, model tiers, and fallbacks."
+                    },
+                    {
+                        "doc_id": "docs-getting-started-recording-first-inference",
+                        "context": "Record the automation the worker runs."
+                    },
+                    {
+                        "doc_id": "docs-getting-started-running-first-inference",
+                        "context": "Local inference server endpoints beyond the first call."
+                    },
+                    {
+                        "doc_id": "docs-inference-inference-api",
+                        "context": "Task lifecycle after the worker allocates a task."
+                    },
+                    {
+                        "doc_id": "docs-building-automations-local-setup",
+                        "context": "Shorter environment checklist that overlaps the install steps."
+                    }
+                ],
+                "referenced_by": []
+            },
+            "entities": {
+                "systems": ["Optexity dashboard", "Vertex AI", "PyPI"],
+                "apis": ["/inference", "/health", "api/v1/inference"],
+                "data_models": ["InferenceRequest"]
+            },
+            "reading_priority": 1,
+            "when_to_use": "Select when the query is about self-hosting Optexity, installing via pip or from a clone or fork, using a dashboard API key with the open-source worker, or running the first local inference.",
+            "embedding_hint": "self-host open source pip install clone fork dashboard API key OPTEXITY_API_KEY first inference localhost worker Vertex"
         },
         {
             "id": "docs-getting-started-running-first-inference",
@@ -1969,6 +2042,10 @@
                     }
                 ],
                 "referenced_by": [
+                    {
+                        "doc_id": "docs-getting-started-self-hosting",
+                        "context": "Self-hosting links here for the local inference endpoints after the first call."
+                    },
                     {
                         "doc_id": "docs-getting-started-recording-first-inference",
                         "context": "Recording guide links to this as the next step."
@@ -2011,6 +2088,10 @@
                 "depends_on": [],
                 "references": [],
                 "referenced_by": [
+                    {
+                        "doc_id": "docs-getting-started-self-hosting",
+                        "context": "Self-hosting links here for the task lifecycle after the worker allocates a task."
+                    },
                     {
                         "doc_id": "docs-getting-started-running-first-inference",
                         "context": "Running first inference uses the local-mode inference server."
