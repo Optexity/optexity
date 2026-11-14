@@ -41,6 +41,10 @@ class InferenceRequest(BaseModel):
     # same key returns the task the first POST created instead of a new one, so
     # a caller that times out or retries cannot run the same automation twice.
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
+    # Optional browser start-URL override for automation.url (applied on the
+    # worker before reuse / go_to_url). Not a substitute for
+    # input_parameters["url"], which graphs and credential_index still use.
+    url: str | None = None
 
     @model_validator(mode="after")
     def validate_use_proxy(self):

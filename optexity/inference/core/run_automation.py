@@ -163,6 +163,29 @@ async def _can_reuse_page(browser: Browser, target_url: str) -> bool:
         return False
 
 
+def _first_str(value: Any) -> str | None:
+    if isinstance(value, list):
+        value = value[0] if value else None
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s or None
+
+
+def _resolve_automation_start_url(task: Task) -> str | None:
+    """Start URL for automation.url: Task.url, else input url/base_url."""
+    if task.url is not None:
+        override = task.url.strip()
+        if override:
+            return override
+    params = task.input_parameters or {}
+    for key in ("url", "base_url"):
+        candidate = _first_str(params.get(key))
+        if candidate:
+            return candidate
+    return None
+
+
 async def run_automation(
     task: Task,
     unique_child_arn: str,
@@ -197,6 +220,15 @@ async def run_automation(
         memory.update_system_info()
 
         automation = task.automation
+        start_url = _resolve_automation_start_url(task)
+        if start_url is not None:
+            automation.url = start_url
+            task.automation.url = start_url
+            logger.info(
+                "Task %s automation start URL set to %s",
+                task.task_id,
+                start_url,
+            )
 
         def _get_browser():
             return Browser(
