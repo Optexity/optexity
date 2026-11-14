@@ -153,6 +153,10 @@ class Task(BaseModel):
     # last (see priority_order_key). Only orders tasks within the same login /
     # unique_parameters group; never across users.
     priority: int | None = None
+    # Marketplace lite only: stamped by opcloud from portal_config.
+    # None = not applicable / unset → no sticky httpx proxy fallback.
+    # False = direct-only. True = allow sticky promote after 503/timeout/connect.
+    lite_worker_use_proxy_on_retry: bool | None = None
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}
