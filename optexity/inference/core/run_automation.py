@@ -163,6 +163,30 @@ async def _can_reuse_page(browser: Browser, target_url: str) -> bool:
         return False
 
 
+def _resolve_automation_start_url(task: Task) -> str | None:
+    """Start URL for automation.url.
+
+    Always honor an explicit Task.url. Fall back to input url/base_url only for
+    marketplace endpoints so recording-backed graphs keep their own start URL.
+    """
+    if task.url is not None:
+        override = task.url.strip()
+        if override:
+            return override
+
+    if not (task.endpoint_name or "").startswith("marketplace/"):
+        return None
+
+    params = task.input_parameters or {}
+    if params.get("url"):
+        value = params["url"]
+        return str(value[0] if isinstance(value, list) else value).strip() or None
+    elif params.get("base_url"):
+        value = params["base_url"]
+        return str(value[0] if isinstance(value, list) else value).strip() or None
+    return None
+
+
 async def run_automation(
     task: Task,
     unique_child_arn: str,
@@ -196,6 +220,16 @@ async def run_automation(
         memory = Memory(unique_child_arn=unique_child_arn)
         memory.update_system_info()
 
+        # Marketplace targets return a module-level Automation singleton; copy
+        # before overriding url so one tenant cannot poison the next task.
+        start_url = _resolve_automation_start_url(task)
+        if start_url is not None:
+            task.automation = task.automation.model_copy(update={"url": start_url})
+            logger.info(
+                "Task %s automation start URL set to %s",
+                task.task_id,
+                start_url,
+            )
         automation = task.automation
 
         def _get_browser():

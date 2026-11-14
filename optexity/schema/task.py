@@ -153,6 +153,9 @@ class Task(BaseModel):
     # last (see priority_order_key). Only orders tasks within the same login /
     # unique_parameters group; never across users.
     priority: int | None = None
+    # Optional browser start-URL override for automation.url (from
+    # InferenceRequest.url). Not a substitute for input_parameters["url"].
+    url: str | None = None
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}
