@@ -156,6 +156,10 @@ class Task(BaseModel):
     # Optional browser start-URL override for automation.url (from
     # InferenceRequest.url). Not a substitute for input_parameters["url"].
     url: str | None = None
+    # Marketplace lite only: stamped by opcloud from portal_config.
+    # None = not applicable (browser/recording) → client keeps sticky fallback.
+    # False = disable sticky httpx proxy fallback. True = allow it.
+    lite_worker_use_proxy_on_retry: bool | None = None
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() if v is not None else None}
