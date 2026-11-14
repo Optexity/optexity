@@ -154,8 +154,8 @@ class Task(BaseModel):
     # unique_parameters group; never across users.
     priority: int | None = None
     # Marketplace lite only: stamped by opcloud from portal_config.
-    # None = not applicable (browser/recording) → client keeps sticky fallback.
-    # False = disable sticky httpx proxy fallback. True = allow it.
+    # None = not applicable / unset → no sticky httpx proxy fallback.
+    # False = direct-only. True = allow sticky promote after 503/timeout/connect.
     lite_worker_use_proxy_on_retry: bool | None = None
 
     class Config:
