@@ -22,7 +22,7 @@ class Tier(str, Enum):
 # Order inside a tier: Gemini, then Claude.
 TIERS: dict[Tier, list[str]] = {
     Tier.LITE: ["gemini-3.5-flash-lite", "claude-haiku-5-5"],
-    Tier.STANDARD: ["gemini-3.6-flash", "claude-sonnet-5-5"],
+    Tier.STANDARD: ["gemini-3.8-flash", "claude-sonnet-5-5"],
     Tier.PRO: ["gemini-3.1-pro-preview", "claude-opus-5-5"],
 }
 # Where a location lacks a tier model: gemini-3.1-pro-preview is served on global only.
@@ -52,6 +52,7 @@ RETIRED: dict[str, str | Tier] = {
     "gemini-2.5-pro": Tier.PRO,
     "gemini-3.1-pro": Tier.PRO,
     "gemini-2.5-flash": Tier.STANDARD,
+    "gemini-3.6-flash": Tier.STANDARD,
     "gemini-2.5-flash-lite": Tier.LITE,
     "claude-sonnet-4": "claude-sonnet-5-5",
     "claude-sonnet-4-5": "claude-sonnet-5-5",

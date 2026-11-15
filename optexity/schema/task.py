@@ -143,7 +143,7 @@ class Task(BaseModel):
     max_parallelism: int = 1
     per_login_parallelism: int = 1
     company_id: CompanyID
-    # A Vertex model ID, e.g. "gemini-3.6-flash" or "claude-sonnet-5-5" (older
+    # A Vertex model ID, e.g. "gemini-3.8-flash" or "claude-sonnet-5-5" (older
     # "gemini/..." strings still work). Unset falls through to settings.LLM_MODEL.
     # llm_provider is deprecated but still honored so existing workflow JSON
     # keeps working.
