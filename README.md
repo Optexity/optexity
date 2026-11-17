@@ -98,7 +98,7 @@ Every call uses a model tier (`lite`, `standard`, `pro`) with automatic fallback
 to Claude. To pick models yourself:
 
 ```bash
-LLM_MODEL=gemini-3.6-flash              # model for calls that don't choose one
+LLM_MODEL=gemini-3.8-flash              # model for calls that don't choose one
 LLM_MODEL_FALLBACK=claude-sonnet-5-5    # optional backup model
 ```
 

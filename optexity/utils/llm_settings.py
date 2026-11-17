@@ -25,7 +25,7 @@ class LLMSettings(BaseSettings):
     # a model ID); the tiers' default models live in inference/models/llm/config.py.
     # These settings are optional overrides, e.g.:
     #
-    #   LLM_MODEL=gemini-3.6-flash                    model for calls that don't pick one
+    #   LLM_MODEL=gemini-3.8-flash                    model for calls that don't pick one
     #   LLM_MODEL_FALLBACK=claude-sonnet-5-5          backup for LLM_MODEL / llm_model_name
     #   LLM_TIER_PRO=claude-opus-5-5,gemini-4-argon   replaces the pro tier's models
     #

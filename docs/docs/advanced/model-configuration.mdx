@@ -30,12 +30,12 @@ Every LLM call in Optexity runs on [Google Vertex AI](https://cloud.google.com/v
 | Tier | Models, in fallback order | Used by |
 | ---- | ------------------------- | ------- |
 | `lite` | `gemini-3.5-flash-lite`, `claude-haiku-5-5` | Default for every call that doesn't choose a model |
-| `standard` | `gemini-3.6-flash`, `claude-sonnet-5-5` | — |
+| `standard` | `gemini-3.8-flash`, `claude-sonnet-5-5` | — |
 | `pro` | `gemini-3.1-pro-preview`, `claude-opus-5-5` (`us`: `gemini-4-argon`, `claude-opus-5-5`) | Captcha solving |
 
 ## Model IDs
 
-Use Vertex model IDs, such as `gemini-3.6-flash`, `gemini-4-argon` or `claude-sonnet-5-5`.
+Use Vertex model IDs, such as `gemini-3.8-flash`, `gemini-4-argon` or `claude-sonnet-5-5`.
 
 Model strings saved in older automations keep working: `gemini/gemini-2.5-flash` and `anthropic/claude-sonnet-4-6` are converted, and models Vertex no longer serves run on a current model of the same strength (for example `gemini-2.5-pro` runs on the `pro` tier). Models Vertex doesn't offer, such as OpenAI models, run on the default models. Optexity logs a warning in both cases; update the saved value when you next edit the automation.
 
@@ -45,7 +45,7 @@ Model strings saved in older automations keep working: `gemini/gemini-2.5-flash`
 | -------- | ------ | ------- |
 | 1 | Action-level `llm_model_name` | `extraction_action.llm.llm_model_name` |
 | 2 | Task-level `llm_model_name` | Top-level field on the automation |
-| 3 | `LLM_MODEL` environment variable | `gemini-3.6-flash` |
+| 3 | `LLM_MODEL` environment variable | `gemini-3.8-flash` |
 | 4 | The `lite` tier | `gemini-3.5-flash-lite` |
 
 ### Action-Level Override
@@ -89,6 +89,6 @@ Token usage is reported per task from Vertex AI's token counts. Cost is estimate
 | ------ | ----- |
 | `GOOGLE_API_KEY`, `LLM_MODEL_API_KEY`, `LLM_MODEL_FALLBACK_API_KEY`, provider keys | Removed — set `GOOGLE_CLOUD_PROJECT` and sign in with Application Default Credentials |
 | `LLM_MODEL=gemini/gemini-3.5-flash-lite` | `LLM_MODEL=gemini-3.5-flash-lite`, or leave it unset |
-| `"llm_provider": "gemini", "llm_model_name": "gemini-2.5-flash"` | `"llm_model_name": "gemini-3.6-flash"` |
+| `"llm_provider": "gemini", "llm_model_name": "gemini-2.5-flash"` | `"llm_model_name": "gemini-3.8-flash"` |
 
 `llm_provider` is deprecated. Automations that still set it keep working.

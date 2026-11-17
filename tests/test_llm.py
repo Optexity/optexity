@@ -52,30 +52,31 @@ def test_tier_call_ignores_env_fallback(monkeypatch):
 
 
 def test_pinned_model_falls_back_to_rest_of_its_tier():
-    assert models(config.resolve_chain("gemini/gemini-3.6-flash")) == [
-        "gemini-3.6-flash",
+    assert models(config.resolve_chain("gemini/gemini-3.8-flash")) == [
+        "gemini-3.8-flash",
         "claude-sonnet-5-5",
     ]
 
 
 def test_pinned_model_uses_env_fallback_when_set(monkeypatch):
     monkeypatch.setattr(llm_settings, "LLM_MODEL_FALLBACK", "anthropic/claude-opus-5-5")
-    assert models(config.resolve_chain("gemini-3.6-flash")) == [
-        "gemini-3.6-flash",
+    assert models(config.resolve_chain("gemini-3.8-flash")) == [
+        "gemini-3.8-flash",
         "claude-opus-5-5",
     ]
 
 
 def test_llm_model_env_replaces_default_primary(monkeypatch):
-    monkeypatch.setattr(llm_settings, "LLM_MODEL", "gemini-3.6-flash")
+    monkeypatch.setattr(llm_settings, "LLM_MODEL", "gemini-3.8-flash")
     assert models(config.resolve_chain(None)) == [
-        "gemini-3.6-flash",
+        "gemini-3.8-flash",
         "claude-sonnet-5-5",
     ]
 
 
 def test_retired_and_unavailable_models():
     assert config.normalize("gemini/gemini-2.5-pro") is Tier.PRO
+    assert config.normalize("gemini-3.6-flash") is Tier.STANDARD
     assert (
         config.normalize("bedrock/anthropic.claude-sonnet-4-20250514-v1:0")
         == "claude-sonnet-5-5"
