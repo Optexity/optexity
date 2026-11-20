@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from optexity.schema.automation import RDPParameter, SecureParameter
 
@@ -45,6 +46,11 @@ class InferenceRequest(BaseModel):
     # worker before reuse / go_to_url). Not a substitute for
     # input_parameters["url"], which graphs and credential_index still use.
     url: str | None = None
+    # Optional caller labels (e.g. environment, run id) stored on the task and
+    # shown in the server's failure alerts. Never sent to the worker; no PHI.
+    metadata: dict[str, Annotated[str, StringConstraints(max_length=256)]] | None = (
+        Field(default=None, max_length=20)
+    )
 
     @model_validator(mode="after")
     def validate_use_proxy(self):
