@@ -68,6 +68,7 @@ from optexity.schema.automation import (
 from optexity.schema.enums import ExitCodes
 from optexity.schema.memory import BrowserState, ForLoopStatus, Memory, OutputData
 from optexity.schema.task import Task
+from optexity.utils.proxy_config import PROXY_ASSIGNMENT, ProxyAssignment
 from optexity.utils.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -196,6 +197,7 @@ async def run_automation(
 ) -> ExitCodes | None:
     assert task.automation is not None, f"Task {task.task_id} has no automation"
     TASK_ID.set(task.task_id)
+    PROXY_ASSIGNMENT.set(ProxyAssignment(task.proxy_url))
     file_handler = logging.FileHandler(str(task.log_file_path))
     file_handler.setLevel(logging.DEBUG)
 

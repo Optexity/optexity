@@ -119,6 +119,8 @@ class Task(BaseModel):
     is_cloud: bool = False
     save_directory: Path = Field(default=Path("/tmp/optexity"))
     use_proxy: bool = False
+    # The PROXY_URL entry opcloud assigned at dispatch; None = pick at random.
+    proxy_url: str | None = None
 
     dedup_key: DedupKey = Field(default_factory=lambda: DedupKey(str(uuid.uuid4())))
     retry_count: int = 0
@@ -300,6 +302,8 @@ class TaskCompleteRequest(BaseModel):
     completed_at: datetime
     token_usage: TokenUsage | None = None
     retry_count: int
+    # True when the task's clients went through its assigned proxy entry.
+    proxy_used: bool = False
 
     @model_validator(mode="after")
     def must_have_timezone(self):

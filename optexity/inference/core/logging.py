@@ -17,6 +17,7 @@ from optexity.schema.automation import ActionNode, PrivateNode
 from optexity.schema.memory import Memory
 from optexity.schema.task import Task
 from optexity.schema.token_usage import TokenUsage
+from optexity.utils.proxy_config import PROXY_ASSIGNMENT
 from optexity.utils.settings import settings
 from optexity.utils.utils import save_screenshot
 
@@ -148,6 +149,9 @@ async def complete_task_in_server(
         "error": task.error,
         "retry_count": task.retry_count + 1,
     }
+    assignment = PROXY_ASSIGNMENT.get()
+    if assignment is not None and assignment.used:
+        body["proxy_used"] = True
     if token_usage:
         body["token_usage"] = token_usage.model_dump()
 
