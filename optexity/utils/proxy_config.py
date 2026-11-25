@@ -9,6 +9,7 @@ other fields broadcast a single value across all URLs, or align by index.
 from __future__ import annotations
 
 import random
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -80,3 +81,34 @@ def pick_random_proxy(settings: Any) -> ProxyChoice | None:
     if not configs:
         return None
     return random.choice(configs)
+
+
+@dataclass
+class ProxyAssignment:
+    """The ``PROXY_URL`` entry opcloud assigned to the running task, and whether
+    any of its clients actually went through the proxy."""
+
+    url: str | None
+    used: bool = False
+
+
+# Set per task so portal code that builds its own clients needs no task plumbing.
+PROXY_ASSIGNMENT: ContextVar[ProxyAssignment | None] = ContextVar(
+    "proxy_assignment", default=None
+)
+
+
+def pick_proxy(settings: Any, url: str | None = None) -> ProxyChoice | None:
+    """The assigned entry (``url``, else the running task's), else a random one.
+
+    Call it only when a client is about to use the proxy: it marks the task's
+    assignment as used.
+    """
+    configs = proxy_configs_from_settings(settings)
+    if not configs:
+        return None
+    assignment = PROXY_ASSIGNMENT.get()
+    if assignment is not None:
+        assignment.used = True
+    wanted = url or (assignment.url if assignment is not None else None)
+    return next((c for c in configs if c.url == wanted), None) or random.choice(configs)

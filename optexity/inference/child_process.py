@@ -40,6 +40,7 @@ from optexity.schema.enums import WORKER_ERROR_FILE_ENV, ExitCodes
 from optexity.schema.inference import InferenceRequest
 from optexity.schema.memory import Memory, SystemInfo
 from optexity.schema.task import Task
+from optexity.utils.proxy_config import PROXY_ASSIGNMENT, ProxyAssignment
 from optexity.utils.settings import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -191,9 +192,9 @@ async def setup_browser(task: Task, unique_child_arn: str, child_process_id: int
 
     if _global_actual_browser is None:
         logger.info("Starting new actual browser")
-        from optexity.utils.proxy_config import pick_random_proxy
+        from optexity.utils.proxy_config import pick_proxy
 
-        proxy_choice = pick_random_proxy(settings) if task.use_proxy else None
+        proxy_choice = pick_proxy(settings, task.proxy_url) if task.use_proxy else None
         _global_actual_browser = ActualBrowser(
             channel=task.automation.browser_channel,
             unique_child_arn=unique_child_arn,
@@ -488,6 +489,8 @@ async def run_marketplace_function(
     """
     memory: Memory | None = None
     file_handler = attach_task_log_file(task)
+    # Lite tasks run one after another in this coroutine: reset after completion.
+    proxy_token = PROXY_ASSIGNMENT.set(ProxyAssignment(task.proxy_url))
     started = time.monotonic()
     try:
         try:
@@ -589,6 +592,8 @@ async def run_marketplace_function(
             await initiate_callback(task)
     except Exception as fail_err:
         logger.error(f"Failed to report task {task.task_id} completion: {fail_err}")
+    finally:
+        PROXY_ASSIGNMENT.reset(proxy_token)
 
 
 async def task_processor():
