@@ -302,7 +302,8 @@ class TaskCompleteRequest(BaseModel):
     completed_at: datetime
     token_usage: TokenUsage | None = None
     retry_count: int
-    # True when the task's clients went through its assigned proxy entry.
+    # True when a client went through the assigned entry. Matters for lite tasks,
+    # which may stay direct; use_proxy (browser) tasks always use the proxy.
     proxy_used: bool = False
 
     @model_validator(mode="after")
