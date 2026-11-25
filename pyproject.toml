@@ -32,6 +32,8 @@ dependencies = [
     # misc runtime deps
     "onepassword-sdk",
     "boto3",
+    # Pin below 2.12: 2.12+ rejects common 16-char (80-bit) TOTP secrets.
+    "pyotp==2.9.0",
 
     # llm clients (Vertex AI)
     "google-genai>=1.73",
