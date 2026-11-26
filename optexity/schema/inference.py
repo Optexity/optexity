@@ -77,6 +77,9 @@ class FetchEmailMessagesRequest(BaseModel):
     integration_email_address: str | None = (
         None  # integration's email address which might be different from receiver's email address
     )
+    subject: str | None = (
+        None  # also require this text in the subject; None = no filter
+    )
     start_2fa_time: datetime
     end_2fa_time: datetime
     endpoint_name: str

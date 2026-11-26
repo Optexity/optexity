@@ -8,6 +8,8 @@ class EmailTwoFAAction(BaseModel):
     receiver_email_address: str
     sender_email_address: str
     integration_email_address: str | None = None
+    # Extra Gmail subject filter; blank = none (e.g. forwarded mail is tagged in its subject).
+    subject: str | None = None
 
     def replace(self, pattern: str, replacement: str):
         if self.integration_email_address:
@@ -22,6 +24,8 @@ class EmailTwoFAAction(BaseModel):
             self.sender_email_address = self.sender_email_address.replace(
                 pattern, replacement
             )
+        if self.subject:
+            self.subject = self.subject.replace(pattern, replacement)
 
 
 class SlackTwoFAAction(BaseModel):
