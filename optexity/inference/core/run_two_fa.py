@@ -123,6 +123,7 @@ async def fetch_messages(
             receiver_email_address=action.receiver_email_address,
             sender_email_address=action.sender_email_address,
             integration_email_address=action.integration_email_address,
+            subject=(action.subject or "").strip() or None,
             start_2fa_time=start_2fa_time,
             end_2fa_time=end_2fa_time,
             endpoint_name=task.endpoint_name,

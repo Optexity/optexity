@@ -2661,6 +2661,11 @@
                     "integration_email_address": {
                         "anyOf": [{ "type": "string" }, { "type": "null" }],
                         "title": "Integration Email Address"
+                    },
+                    "subject": {
+                        "anyOf": [{ "type": "string" }, { "type": "null" }],
+                        "title": "Subject",
+                        "description": "Also require this text in the email subject. Empty or omitted means no subject filter."
                     }
                 },
                 "type": "object",
@@ -2765,6 +2770,11 @@
                     "integration_email_address": {
                         "anyOf": [{ "type": "string" }, { "type": "null" }],
                         "title": "Integration Email Address"
+                    },
+                    "subject": {
+                        "anyOf": [{ "type": "string" }, { "type": "null" }],
+                        "title": "Subject",
+                        "description": "Also require this text in the email subject. Empty or omitted means no subject filter."
                     },
                     "start_2fa_time": {
                         "type": "string",

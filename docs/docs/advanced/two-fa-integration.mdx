@@ -69,9 +69,14 @@ Fetch verification codes from email messages:
 | `receiver_email_address`    | `str`          | Yes      | Recipient mailbox to search for 2FA emails                                  |
 | `sender_email_address`      | `str`          | Yes      | Sender to filter (e.g., `noreply@site.com`)                                 |
 | `integration_email_address` | `str \| null`  | No       | Connected integration mailbox. Defaults to `receiver_email_address` if omitted |
+| `subject`                   | `str \| null`  | No       | Also require this text in the subject (Gmail `subject:` search). Empty or omitted means no subject filter |
 
 <Tip>
 Use `integration_email_address` when the connected mailbox is different from the mailbox receiving the 2FA email (for example, alias/forwarding setups).
+</Tip>
+
+<Tip>
+Use `subject` when one sender mails codes for several sites, for example forwarded copies tagged in the subject. It narrows the search to mails whose subject contains the text. Gmail inboxes only for now; Outlook ignores it.
 </Tip>
 
 ---
